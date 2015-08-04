@@ -1,0 +1,43 @@
+A. A new Client into service
+1.	install MAP and discover SQL server instances
+2.	install dbaTDPMon - all modules, on a "central-hub"/monitoring machine
+3.	configure server as a new SQL Server into service
+4.	configure central-hub/monitoring machine                
+5.	configure Central Management Server (add all supported servers)
+6.	configure dbaTDPMon to perform Health Checks on all suported servers
+
+B. A new SQL Server into service
+1.	configure database mail (can be scripted)
+2.	install dbaTDPMon - maintenance-plan module only (scripted)
+3.	create an SQL Agent operator: SQL DBA Team (can be scripted)
+4.	configure maintenance plan
+5.	default backup location
+6.	backup retention period
+7.	consistency checks and index/statistics maintenance
+8.	cleanup "garbage"
+9.	delete old/unused SQL Server operators 
+10.	delete old database maintenance plan SQL Server Agent jobs (drop also maintenance plan?!)
+11.	disable/drop old sysadmin accounts 
+	-	old support companies, disabled AD accounts , DBA who have left the company
+12.	change old sysadmin accounts ownership for databases/jobs/schedules
+
+C. Server configuration settings: 
+1.	Enable Instant File Initialization
+2.	Enable DAC
+3.	Check memory settings (limit max server memory if needed)
+	-	OS limit - 4/6
+4.	set min server memory 
+-	1/2 of max server memory, not less than 4GB
+5.	Split tempdb to the number of logical processors
+	-	2 files on 4 CPUs 
+	-	4 files on 8 CPUs 
+	-	8 files on more than 8 CPUs
+6.	Configure autogrowth on model database (at least to eliminate the percentage growth)
+	-	check existing VLFs count / change log file grow to 1024M
+7.	Restart service to confirm credentials
+8.	For SSRS backup encryption keys
+9.	enable page checksum vs. torn page or none (+2005) for all databases
+10.	enable default trace
+11.	Change agent job owners for owners that are no longer active (account disabled, old sysadmin)
+	-	sa (open for discussion)
+	-	set to SQL Server service account

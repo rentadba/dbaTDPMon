@@ -1,0 +1,337 @@
+RAISERROR('Create procedure: [dbo].[usp_mpDatabaseBackupCleanup]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sysobjects 
+	     WHERE [id] = OBJECT_ID(N'[dbo].[usp_mpDatabaseBackupCleanup]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_mpDatabaseBackupCleanup]
+GO
+
+-----------------------------------------------------------------------------------------
+CREATE PROCEDURE [dbo].[usp_mpDatabaseBackupCleanup]
+		@sqlServerName			[sysname],
+		@dbName					[sysname],
+		@backupLocation			[nvarchar](1024)=NULL,	/*  disk only: local or UNC */
+		@backupFileExtension	[nvarchar](8),			/*  BAK - cleanup full/incremental database backup
+															TRN - cleanup transaction log backup
+														*/
+		@flgOptions				[int]	= 128,			/* 32 - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
+														  128 - when performing cleanup, delete also orphans diff and log backups, when cleanup full database backups(default)
+														  256 - for +2k5 versions, use xp_delete_file option
+														 2048 - change retention policy from RetentionDays to RetentionBackupsCount (number of full database backups to be kept)
+															  - this may be forced by setting to true property 'Change retention policy from RetentionDays to RetentionFullBackupsCount'
+														*/
+		@retentionDays			[smallint]	= 14,
+		@executionLevel			[tinyint]	=  0,
+		@debugMode				[bit]		=  0
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 2004-2006 / review on 2015.03.10
+-- Module			 : Database Maintenance Plan 
+-- Description		 : Optimization and Maintenance Checks
+--					   - if @retentionDays is set to Days, this number represent the number of days on which database can be restored
+--						 depending on the backup strategy, a full backup will always be included
+--					   - if @retentionDays is set to BackupCount, this number represent the number of full and differential backups to be kept
+--						 an older full backup may exists to ensure that a newer differential backuup can be restored
+-- ============================================================================
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--returns: 0 = success, >0 = failure
+
+DECLARE		@queryToRun  					[nvarchar](2048),
+			@nestedExecutionLevel			[tinyint]
+
+DECLARE		@backupFileName					[nvarchar](1024),
+			@serverEdition					[sysname],
+			@serverVersionStr				[sysname],
+			@serverVersionNum				[numeric](9,6),
+			@errorCode						[int],
+			@maxAllowedDate					[datetime]
+
+DECLARE		@lastFullBackupSetIDRemaining	[int],
+			@lastDiffBackupSetIDRemaining	[int],
+			@lastBackupType					[char](1)
+
+DECLARE @optionXPIsAvailable		[bit],
+		@optionXPValue				[int],
+		@optionXPHasChanged			[bit],
+		@optionAdvancedIsAvailable	[bit],
+		@optionAdvancedValue		[int],
+		@optionAdvancedHasChanged	[bit]
+
+DECLARE @backupSET TABLE 
+		(
+			  [backup_set_id]		[int]
+			, [backup_start_date]	[datetime]
+			, [type]				[char](1)	NULL
+		)
+
+-----------------------------------------------------------------------------------------
+SET NOCOUNT ON
+
+-----------------------------------------------------------------------------------------
+IF @executionLevel=0
+	EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+SET @queryToRun= 'Cleanup backup files for database: ' + ' [' + @dbName + ']'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+-----------------------------------------------------------------------------------------
+--get destination server running version/edition
+SET @nestedExecutionLevel = @executionLevel + 1
+EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName		= @sqlServerName,
+										@serverEdition		= @serverEdition OUT,
+										@serverVersionStr	= @serverVersionStr OUT,
+										@serverVersionNum	= @serverVersionNum OUT,
+										@executionLevel		= @nestedExecutionLevel,
+										@debugMode			= @debugMode
+
+-----------------------------------------------------------------------------------------
+--get configuration values: force retention policy
+---------------------------------------------------------------------------------------------
+DECLARE @forceChangeRetentionPolicy [nvarchar](128)
+SELECT @forceChangeRetentionPolicy=[value] 
+FROM [dbo].[appConfigurations] 
+WHERE [name]='Change retention policy from RetentionDays to RetentionBackupsCount'
+
+SET @forceChangeRetentionPolicy = LOWER(ISNULL(@forceChangeRetentionPolicy, 'false'))
+
+-----------------------------------------------------------------------------------------
+--changing backup expiration date from RetentionDays to full/diff database backup count
+IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'
+	begin
+		SET ROWCOUNT @retentionDays
+		INSERT	INTO @backupSET([backup_set_id], [backup_start_date], [type])
+				SELECT [backup_set_id], [backup_start_date], [type]
+				FROM msdb.dbo.backupset
+				WHERE	[type] IN ('D', 'I')
+						AND [database_name] = @dbName
+						AND [server_name] = @sqlServerName
+				ORDER BY [backup_start_date] DESC
+		SET ROWCOUNT 0
+
+		SELECT TOP 1  @maxAllowedDate = DATEADD(ss, -1, [backup_start_date])
+					, @lastFullBackupSetIDRemaining = [backup_set_id]
+					, @lastBackupType = [type]
+		FROM @backupSET
+		ORDER BY [backup_start_date]
+
+		--if oldest backup is a differential one, go deep and find the full database backup that it will need/use
+		IF @lastBackupType='I'
+			SELECT TOP 1  @maxAllowedDate = DATEADD(ss, -1, [backup_start_date])
+						, @lastFullBackupSetIDRemaining = [backup_set_id]
+						, @lastBackupType = [type]
+			FROM msdb.dbo.backupset
+			WHERE	[type] IN ('D')
+					AND [database_name] = @dbName
+					AND [server_name] = @sqlServerName
+					AND [backup_set_id] < @lastFullBackupSetIDRemaining
+			ORDER BY [backup_start_date] DESC
+
+		SELECT TOP 1 @lastDiffBackupSetIDRemaining = [backup_set_id]
+		FROM msdb.dbo.backupset
+		WHERE	[type]='I'
+				AND [database_name] = @dbName
+				AND [server_name] = @sqlServerName
+				AND [backup_start_date] <= DATEADD(dd, -@retentionDays, GETDATE())
+				AND [backup_set_id] > @lastFullBackupSetIDRemaining
+		ORDER BY [backup_set_id] DESC 
+	end
+ELSE
+	begin
+		/* SET @maxAllowedDate = DATEADD(dd, -@retentionDays, GETDATE()) */
+		--find first full database backup to allow @retentionDays database restore
+		SET ROWCOUNT 1
+		INSERT	INTO @backupSET([backup_set_id], [backup_start_date])
+				SELECT [backup_set_id], [backup_start_date]
+				FROM msdb.dbo.backupset
+				WHERE	[type]='D'
+						AND [database_name] = @dbName
+						AND [server_name] = @sqlServerName
+						AND [backup_start_date] <= DATEADD(dd, -@retentionDays, GETDATE())
+				ORDER BY [backup_start_date] DESC
+		SET ROWCOUNT 0
+
+		SELECT TOP 1  @maxAllowedDate = DATEADD(ss, -1, [backup_start_date])
+					, @lastFullBackupSetIDRemaining = [backup_set_id]
+		FROM @backupSET
+		ORDER BY [backup_start_date]
+
+		SELECT TOP 1 @lastDiffBackupSetIDRemaining = [backup_set_id]
+		FROM msdb.dbo.backupset
+		WHERE	[type]='I'
+				AND [database_name] = @dbName
+				AND [server_name] = @sqlServerName
+				AND [backup_start_date] <= DATEADD(dd, -@retentionDays, GETDATE())
+				AND [backup_set_id] > @lastFullBackupSetIDRemaining
+		ORDER BY [backup_set_id] DESC 
+	end
+
+-----------------------------------------------------------------------------------------
+--for +2k5 versions, will use xp_delete_file
+SET @errorCode=0
+IF @serverVersionNum>=9 AND @flgOptions & 256 = 256
+	begin
+		SET @queryToRun = N'EXEC master.dbo.xp_delete_file 0, N''' + @backupLocation + ''', N''' + @backupFileExtension + ''', N''' + CONVERT([varchar](20), @maxAllowedDate, 120) + ''', 0'
+		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+														@dbName			= @dbName,
+														@module			= 'dbo.usp_mpDatabaseBackupCleanup',
+														@eventName		= 'database backup cleanup',
+														@queryToRun  	= @queryToRun,
+														@flgOptions		= @flgOptions,
+														@executionLevel	= @nestedExecutionLevel,
+														@debugMode		= @debugMode
+	end
+
+IF @debugMode=1
+	SELECT	@maxAllowedDate AS maxAllowedDate, 
+			@lastFullBackupSetIDRemaining AS lastFullBackupSetIDRemaining, 
+			@lastDiffBackupSetIDRemaining AS lastDiffBackupSetIDRemaining, 
+			@forceChangeRetentionPolicy AS forceChangeRetentionPolicy
+
+-----------------------------------------------------------------------------------------
+--in case of previous errors or 2k version, will use "standard" delete file
+IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@serverVersionNum < 9) OR (@flgOptions & 128 = 128 AND @lastFullBackupSetIDRemaining IS NOT NULL)
+	begin
+		SELECT  @optionXPIsAvailable		= 0,
+				@optionXPValue				= 0,
+				@optionXPHasChanged			= 0,
+				@optionAdvancedIsAvailable	= 0,
+				@optionAdvancedValue		= 0,
+				@optionAdvancedHasChanged	= 0
+
+		IF @serverVersionNum>=9
+			begin
+				/* enable xp_cmdshell configuration option */
+				EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+																	@configOptionName	= 'xp_cmdshell',
+																	@configOptionValue	= 1,
+																	@optionIsAvailable	= @optionXPIsAvailable OUT,
+																	@optionCurrentValue	= @optionXPValue OUT,
+																	@optionHasChanged	= @optionXPHasChanged OUT,
+																	@executionLevel		= 0,
+																	@debugMode			= @debugMode
+
+				IF @optionXPIsAvailable = 0
+					begin
+						/* enable show advanced options configuration option */
+						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+																			@configOptionName	= 'show advanced options',
+																			@configOptionValue	= 1,
+																			@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
+																			@optionCurrentValue	= @optionAdvancedValue OUT,
+																			@optionHasChanged	= @optionAdvancedHasChanged OUT,
+																			@executionLevel		= 0,
+																			@debugMode			= @debugMode
+
+						IF @optionAdvancedIsAvailable = 1 AND (@optionAdvancedValue=1 OR @optionAdvancedHasChanged=1)
+							EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+																				@configOptionName	= 'xp_cmdshell',
+																				@configOptionValue	= 1,
+																				@optionIsAvailable	= @optionXPIsAvailable OUT,
+																				@optionCurrentValue	= @optionXPValue OUT,
+																				@optionHasChanged	= @optionXPHasChanged OUT,
+																				@executionLevel		= 0,
+																				@debugMode			= @debugMode
+					end
+
+				IF @optionXPIsAvailable=0 OR @optionXPValue=0
+					begin
+						set @queryToRun='xp_cmdshell component is turned off. Cannot continue'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+						RETURN 1
+					end		
+			end											
+
+		DECLARE crsCleanupBackupFiles CURSOR FOR	SELECT bmf.[physical_device_name]
+													FROM [msdb].[dbo].[backupset] bs
+													INNER JOIN [msdb].[dbo].[backupmediafamily] bmf ON bmf.[media_set_id]=bs.[media_set_id]
+													WHERE	(   (    bs.[backup_start_date] <= @maxAllowedDate 
+																 AND bmf.[physical_device_name] LIKE (@backupLocation + '%.' + @backupFileExtension)
+																 AND (	 (@flgOptions & 256 = 0) 
+																      OR (@errorCode<>0 AND @flgOptions & 256 = 256) 
+																	  OR (@serverVersionNum < 9)
+																	 )
+																)
+															 OR (
+																	 -- when performing cleanup, delete also orphans diff and log backups, when cleanup full database backups(default)
+																	 bs.[backup_set_id] < @lastFullBackupSetIDRemaining
+																 AND bs.[database_name] = @dbName
+																 AND @flgOptions & 128 = 128
+																)
+															 OR (
+																	 -- delete incremental and transaction log backups to keep the retention/restore period fixed
+																	 @lastDiffBackupSetIDRemaining IS NOT NULL
+																 AND bs.[backup_set_id] < @lastDiffBackupSetIDRemaining
+																 AND bs.[database_name] = @dbName
+																 AND bs.[type] IN ('I', 'L')
+																 AND @flgOptions & 128 = 128
+																)
+															)														
+															AND bmf.[device_type] = 2														
+													ORDER BY bs.[backup_set_id] ASC
+		OPEN crsCleanupBackupFiles
+		FETCH NEXT FROM crsCleanupBackupFiles INTO @backupFileName
+		WHILE @@FETCH_STATUS=0
+			begin
+				/*
+				EXEC [dbo].[usp_mpDeleteFileOnDisk]	@sqlServerName	= @sqlServerName,
+													@fileName		= @backupFileName,
+													@executionLevel	= @nestedExecutionLevel,
+													@debugMode		= @debugMode
+				*/
+				SET @queryToRun = N'EXEC [' + DB_NAME() + '].[dbo].[usp_mpDeleteFileOnDisk]	@sqlServerName	= ''' + @sqlServerName + N''',
+																							@fileName		= ''' + @backupFileName + N''',
+																							@executionLevel	= ' + CAST(@nestedExecutionLevel AS [nvarchar]) + N',
+																							@debugMode		= ' + CAST(@debugMode AS [nvarchar]) 
+
+				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @@SERVERNAME,
+																@dbName			= NULL,
+																@module			= 'dbo.usp_mpDatabaseBackupCleanup',
+																@eventName		= 'database backup cleanup',
+																@queryToRun  	= @queryToRun,
+																@flgOptions		= @flgOptions,
+																@executionLevel	= @nestedExecutionLevel,
+																@debugMode		= @debugMode
+
+				FETCH NEXT FROM crsCleanupBackupFiles INTO @backupFileName
+			end
+		CLOSE crsCleanupBackupFiles
+		DEALLOCATE crsCleanupBackupFiles
+
+		IF @serverVersionNum>=9 AND (@optionXPHasChanged=1 OR @optionAdvancedHasChanged=1)
+			begin
+				/* disable xp_cmdshell configuration option */
+				IF @optionXPHasChanged = 1
+					EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+																		@configOptionName	= 'xp_cmdshell',
+																		@configOptionValue	= 0,
+																		@optionIsAvailable	= @optionXPIsAvailable OUT,
+																		@optionCurrentValue	= @optionXPValue OUT,
+																		@optionHasChanged	= @optionXPHasChanged OUT,
+																		@executionLevel		= 0,
+																		@debugMode			= @debugMode
+
+				/* disable show advanced options configuration option */
+				IF @optionAdvancedHasChanged = 1
+						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+																			@configOptionName	= 'show advanced options',
+																			@configOptionValue	= 0,
+																			@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
+																			@optionCurrentValue	= @optionAdvancedValue OUT,
+																			@optionHasChanged	= @optionAdvancedHasChanged OUT,
+																			@executionLevel		= 0,
+																			@debugMode			= @debugMode
+			end
+	end
+
+RETURN @errorCode
+GO
