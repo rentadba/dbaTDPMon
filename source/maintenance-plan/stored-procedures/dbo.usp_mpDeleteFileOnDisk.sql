@@ -96,7 +96,7 @@ IF (SELECT [file_exists] FROM #fileExists)=1
 		IF @serverVersionNum>=9
 			begin
 				/* enable xp_cmdshell configuration option */
-				EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+				EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
 																	@configOptionName	= 'xp_cmdshell',
 																	@configOptionValue	= 1,
 																	@optionIsAvailable	= @optionXPIsAvailable OUT,
@@ -108,7 +108,7 @@ IF (SELECT [file_exists] FROM #fileExists)=1
 				IF @optionXPIsAvailable = 0
 					begin
 						/* enable show advanced options configuration option */
-						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
 																			@configOptionName	= 'show advanced options',
 																			@configOptionValue	= 1,
 																			@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
@@ -118,7 +118,7 @@ IF (SELECT [file_exists] FROM #fileExists)=1
 																			@debugMode			= @debugMode
 
 						IF @optionAdvancedIsAvailable = 1 AND (@optionAdvancedValue=1 OR @optionAdvancedHasChanged=1)
-							EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+							EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
 																				@configOptionName	= 'xp_cmdshell',
 																				@configOptionValue	= 1,
 																				@optionIsAvailable	= @optionXPIsAvailable OUT,
@@ -149,7 +149,7 @@ IF (SELECT [file_exists] FROM #fileExists)=1
 			begin
 				/* disable xp_cmdshell configuration option */
 				IF @optionXPHasChanged = 1
-					EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+					EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
 																		@configOptionName	= 'xp_cmdshell',
 																		@configOptionValue	= 0,
 																		@optionIsAvailable	= @optionXPIsAvailable OUT,
@@ -160,7 +160,7 @@ IF (SELECT [file_exists] FROM #fileExists)=1
 
 				/* disable show advanced options configuration option */
 				IF @optionAdvancedHasChanged = 1
-						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
 																			@configOptionName	= 'show advanced options',
 																			@configOptionValue	= 0,
 																			@optionIsAvailable	= @optionAdvancedIsAvailable OUT,

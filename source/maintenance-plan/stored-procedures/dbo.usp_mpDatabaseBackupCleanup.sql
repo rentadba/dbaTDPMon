@@ -68,9 +68,16 @@ DECLARE @optionXPIsAvailable		[bit],
 DECLARE @backupSET TABLE 
 		(
 			  [backup_set_id]		[int]
-			, [backup_start_date]	[datetime]
+			, [backup_start_date]	[datetime]	NULL
 			, [type]				[char](1)	NULL
 		)
+
+DECLARE @backupDevice TABLE
+	(
+		  [backup_set_id]			[int]
+		, [physical_device_name]	[nvarchar](260)
+	)
+
 
 -----------------------------------------------------------------------------------------
 SET NOCOUNT ON
@@ -80,7 +87,7 @@ IF @executionLevel=0
 	EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 SET @queryToRun= 'Cleanup backup files for database: ' + ' [' + @dbName + ']'
-EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 -----------------------------------------------------------------------------------------
 --get destination server running version/edition
@@ -106,15 +113,31 @@ SET @forceChangeRetentionPolicy = LOWER(ISNULL(@forceChangeRetentionPolicy, 'fal
 --changing backup expiration date from RetentionDays to full/diff database backup count
 IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'
 	begin
-		SET ROWCOUNT @retentionDays
+		SET @queryToRun=N''
+		SET @queryToRun = @queryToRun + N'SET ROWCOUNT ' + CAST(@retentionDays AS [nvarchar]) + N'		
+										SELECT bs.[backup_set_id], bs.[backup_start_date], bs.[type]
+										FROM msdb.dbo.backupset bs
+										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
+										WHERE	bs.[type] IN (''D'', ''I'')
+												AND bs.[database_name] = ''' + @dbName + N'''
+												AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
+										ORDER BY bs.[backup_start_date] DESC
+										SET ROWCOUNT 0'
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
 		INSERT	INTO @backupSET([backup_set_id], [backup_start_date], [type])
-				SELECT [backup_set_id], [backup_start_date], [type]
-				FROM msdb.dbo.backupset
-				WHERE	[type] IN ('D', 'I')
-						AND [database_name] = @dbName
-						AND [server_name] = @sqlServerName
-				ORDER BY [backup_start_date] DESC
-		SET ROWCOUNT 0
+				EXEC (@queryToRun)
+
+		--check for remote server msdb information
+		IF @sqlServerName<>@@SERVERNAME
+			begin
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				INSERT	INTO @backupSET([backup_set_id], [backup_start_date], [type])
+						EXEC (@queryToRun)
+			end
+		
 
 		SELECT TOP 1  @maxAllowedDate = DATEADD(ss, -1, [backup_start_date])
 					, @lastFullBackupSetIDRemaining = [backup_set_id]
@@ -124,53 +147,130 @@ IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'
 
 		--if oldest backup is a differential one, go deep and find the full database backup that it will need/use
 		IF @lastBackupType='I'
-			SELECT TOP 1  @maxAllowedDate = DATEADD(ss, -1, [backup_start_date])
-						, @lastFullBackupSetIDRemaining = [backup_set_id]
-						, @lastBackupType = [type]
-			FROM msdb.dbo.backupset
-			WHERE	[type] IN ('D')
-					AND [database_name] = @dbName
-					AND [server_name] = @sqlServerName
-					AND [backup_set_id] < @lastFullBackupSetIDRemaining
-			ORDER BY [backup_start_date] DESC
+			begin
+				SET @queryToRun=N''
+				SET @queryToRun = @queryToRun + N'SELECT TOP 1  bs.[backup_set_id]
+															, bs.[backup_start_date]
+															, bs.[type]
+												FROM msdb.dbo.backupset bs
+												INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
+												WHERE	bs.[type] IN (''D'')
+														AND bs.[database_name] = ''' + @dbName + N'''
+														AND bs.[backup_set_id] < ' + CAST(@lastFullBackupSetIDRemaining AS [nvarchar]) + N'
+														AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
+												ORDER BY bs.[backup_start_date] DESC'
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
-		SELECT TOP 1 @lastDiffBackupSetIDRemaining = [backup_set_id]
-		FROM msdb.dbo.backupset
-		WHERE	[type]='I'
-				AND [database_name] = @dbName
-				AND [server_name] = @sqlServerName
-				AND [backup_start_date] <= DATEADD(dd, -@retentionDays, GETDATE())
-				AND [backup_set_id] > @lastFullBackupSetIDRemaining
-		ORDER BY [backup_set_id] DESC 
+				DELETE FROM @backupSET
+				INSERT	INTO @backupSET([backup_set_id], [backup_start_date], [type])
+						EXEC (@queryToRun)
+
+				IF @sqlServerName<>@@SERVERNAME
+					begin
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+						INSERT	INTO @backupSET([backup_set_id], [backup_start_date], [type])
+								EXEC (@queryToRun)
+					end
+
+				SELECT TOP 1  @maxAllowedDate  = DATEADD(ss, -1, [backup_start_date])
+							, @lastFullBackupSetIDRemaining = [backup_set_id]
+							, @lastBackupType = [type]
+				FROM @backupSET
+				ORDER BY [backup_start_date] DESC
+			end
+
+		SET @queryToRun=N''
+		SET @queryToRun = @queryToRun + N'SELECT TOP 1 bs.[backup_set_id]
+										FROM msdb.dbo.backupset bs
+										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
+										WHERE	bs.[type]=''I''
+												AND bs.[database_name] = ''' + @dbName + N'''
+												AND bs.[backup_start_date] <= DATEADD(dd, -' + CAST(@retentionDays AS [nvarchar]) + N', GETDATE())
+												AND bs.[backup_set_id] > ' + CAST(@lastFullBackupSetIDRemaining AS [nvarchar]) + N'
+												AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
+										ORDER BY bs.[backup_set_id] DESC'
+
+		DELETE FROM @backupSET
+		INSERT	INTO @backupSET([backup_set_id])
+				EXEC (@queryToRun)
+
+		IF @sqlServerName<>@@SERVERNAME
+			begin
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				INSERT	INTO @backupSET([backup_set_id])
+						EXEC (@queryToRun)
+			end
+
+		SELECT TOP 1  @lastDiffBackupSetIDRemaining  = [backup_set_id]
+		FROM @backupSET
+		ORDER BY [backup_start_date] DESC
 	end
 ELSE
 	begin
 		/* SET @maxAllowedDate = DATEADD(dd, -@retentionDays, GETDATE()) */
 		--find first full database backup to allow @retentionDays database restore
-		SET ROWCOUNT 1
+		SET @queryToRun=N''
+		SET @queryToRun = @queryToRun + N'SET ROWCOUNT 1		
+										SELECT bs.[backup_set_id], bs.[backup_start_date]
+										FROM msdb.dbo.backupset bs
+										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
+										WHERE	bs.[type]=''D''
+												AND bs.[database_name] = ''' + @dbName + N'''
+												AND bs.[backup_start_date] <= DATEADD(dd, -' + CAST(@retentionDays AS [nvarchar]) + N', GETDATE())
+												AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
+										ORDER BY bs.[backup_start_date] DESC
+										SET ROWCOUNT 0'
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
 		INSERT	INTO @backupSET([backup_set_id], [backup_start_date])
-				SELECT [backup_set_id], [backup_start_date]
-				FROM msdb.dbo.backupset
-				WHERE	[type]='D'
-						AND [database_name] = @dbName
-						AND [server_name] = @sqlServerName
-						AND [backup_start_date] <= DATEADD(dd, -@retentionDays, GETDATE())
-				ORDER BY [backup_start_date] DESC
-		SET ROWCOUNT 0
+				EXEC (@queryToRun)
+
+		IF @sqlServerName<>@@SERVERNAME
+			begin
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				INSERT	INTO @backupSET([backup_set_id])
+						EXEC (@queryToRun)
+			end
 
 		SELECT TOP 1  @maxAllowedDate = DATEADD(ss, -1, [backup_start_date])
 					, @lastFullBackupSetIDRemaining = [backup_set_id]
 		FROM @backupSET
-		ORDER BY [backup_start_date]
+		ORDER BY [backup_start_date] DESC
 
-		SELECT TOP 1 @lastDiffBackupSetIDRemaining = [backup_set_id]
-		FROM msdb.dbo.backupset
-		WHERE	[type]='I'
-				AND [database_name] = @dbName
-				AND [server_name] = @sqlServerName
-				AND [backup_start_date] <= DATEADD(dd, -@retentionDays, GETDATE())
-				AND [backup_set_id] > @lastFullBackupSetIDRemaining
-		ORDER BY [backup_set_id] DESC 
+		SET @queryToRun=N''
+		SET @queryToRun = @queryToRun + N'SELECT TOP 1 bs.[backup_set_id]
+										FROM msdb.dbo.backupset bs
+										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
+										WHERE	bs.[type]=''I''
+												AND bs.[database_name] = ''' + @dbName + N'''
+												AND bs.[backup_start_date] <= DATEADD(dd, -' + CAST(@retentionDays AS [nvarchar]) + N', GETDATE())
+												AND bs.[backup_set_id] > ' + CAST(@lastFullBackupSetIDRemaining AS [nvarchar]) + N'
+												AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
+										ORDER BY bs.[backup_set_id] DESC'
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+		DELETE FROM @backupSET
+		INSERT	INTO @backupSET([backup_set_id])
+				EXEC (@queryToRun)
+
+		IF @sqlServerName<>@@SERVERNAME
+			begin
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				INSERT	INTO @backupSET([backup_set_id])
+						EXEC (@queryToRun)
+			end
+
+		SELECT TOP 1  @lastDiffBackupSetIDRemaining = [backup_set_id]
+		FROM @backupSET
+		ORDER BY [backup_start_date] DESC
 	end
 
 -----------------------------------------------------------------------------------------
@@ -195,7 +295,11 @@ IF @debugMode=1
 	SELECT	@maxAllowedDate AS maxAllowedDate, 
 			@lastFullBackupSetIDRemaining AS lastFullBackupSetIDRemaining, 
 			@lastDiffBackupSetIDRemaining AS lastDiffBackupSetIDRemaining, 
-			@forceChangeRetentionPolicy AS forceChangeRetentionPolicy
+			@forceChangeRetentionPolicy AS forceChangeRetentionPolicy,
+			@flgOptions & 256,
+			@errorCode,
+			@serverVersionNum,
+			@flgOptions & 128
 
 -----------------------------------------------------------------------------------------
 --in case of previous errors or 2k version, will use "standard" delete file
@@ -211,7 +315,7 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 		IF @serverVersionNum>=9
 			begin
 				/* enable xp_cmdshell configuration option */
-				EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+				EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
 																	@configOptionName	= 'xp_cmdshell',
 																	@configOptionValue	= 1,
 																	@optionIsAvailable	= @optionXPIsAvailable OUT,
@@ -223,7 +327,7 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 				IF @optionXPIsAvailable = 0
 					begin
 						/* enable show advanced options configuration option */
-						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
 																			@configOptionName	= 'show advanced options',
 																			@configOptionValue	= 1,
 																			@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
@@ -233,7 +337,7 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 																			@debugMode			= @debugMode
 
 						IF @optionAdvancedIsAvailable = 1 AND (@optionAdvancedValue=1 OR @optionAdvancedHasChanged=1)
-							EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+							EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
 																				@configOptionName	= 'xp_cmdshell',
 																				@configOptionValue	= 1,
 																				@optionIsAvailable	= @optionXPIsAvailable OUT,
@@ -250,44 +354,58 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 						RETURN 1
 					end		
 			end											
+		
+		SET @queryToRun=N''
+		SET @queryToRun = @queryToRun + N'SELECT bs.[backup_set_id], bmf.[physical_device_name]
+										FROM [msdb].[dbo].[backupset] bs
+										INNER JOIN [msdb].[dbo].[backupmediafamily] bmf ON bmf.[media_set_id]=bs.[media_set_id]
+										WHERE	(   (    bs.[backup_start_date] <= ''' + CONVERT([nvarchar](20), @maxAllowedDate, 120) + N'''
+														AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.' + @backupFileExtension + N''')
+														AND (	 (' + CAST(@flgOptions AS [nvarchar]) + N' & 256 = 0) 
+															OR (' + CAST(@errorCode AS [nvarchar]) + N'<>0 AND ' + CAST(@flgOptions AS [nvarchar]) + N' & 256 = 256) 
+															OR (' + CAST(@serverVersionNum AS [nvarchar]) + N'< 9)
+															)
+													)
+													OR (
+															-- when performing cleanup, delete also orphans diff and log backups, when cleanup full database backups(default)
+															bs.[backup_set_id] < ' + CAST(@lastFullBackupSetIDRemaining AS [nvarchar]) + N'
+														AND bs.[database_name] = ''' + @dbName + N'''
+														AND bs.[type] IN (''I'', ''L'')
+														AND bmf.[physical_device_name] LIKE (''' + @backupLocation + N'%'')
+														AND ' + CAST(@flgOptions AS [nvarchar]) + N' & 128 = 128
+													)
+													OR (
+															-- delete incremental and transaction log backups to keep the retention/restore period fixed
+															' + CAST(ISNULL(@lastDiffBackupSetIDRemaining, 0)  AS [nvarchar]) + N' <> 0
+														AND bs.[backup_set_id] < ' + CAST(ISNULL(@lastDiffBackupSetIDRemaining, 0) AS [nvarchar]) + N'
+														AND bs.[database_name] = ''' + @dbName + N'''
+														AND bs.[type] IN (''I'', ''L'')
+														AND bmf.[physical_device_name] LIKE (''' + @backupLocation + N'%'')
+														AND ' + CAST(@flgOptions AS [nvarchar]) + N' & 128 = 128
+													)
+												)														
+												AND bmf.[device_type] = 2'
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
-		DECLARE crsCleanupBackupFiles CURSOR FOR	SELECT bmf.[physical_device_name]
-													FROM [msdb].[dbo].[backupset] bs
-													INNER JOIN [msdb].[dbo].[backupmediafamily] bmf ON bmf.[media_set_id]=bs.[media_set_id]
-													WHERE	(   (    bs.[backup_start_date] <= @maxAllowedDate 
-																 AND bmf.[physical_device_name] LIKE (@backupLocation + '%.' + @backupFileExtension)
-																 AND (	 (@flgOptions & 256 = 0) 
-																      OR (@errorCode<>0 AND @flgOptions & 256 = 256) 
-																	  OR (@serverVersionNum < 9)
-																	 )
-																)
-															 OR (
-																	 -- when performing cleanup, delete also orphans diff and log backups, when cleanup full database backups(default)
-																	 bs.[backup_set_id] < @lastFullBackupSetIDRemaining
-																 AND bs.[database_name] = @dbName
-																 AND @flgOptions & 128 = 128
-																)
-															 OR (
-																	 -- delete incremental and transaction log backups to keep the retention/restore period fixed
-																	 @lastDiffBackupSetIDRemaining IS NOT NULL
-																 AND bs.[backup_set_id] < @lastDiffBackupSetIDRemaining
-																 AND bs.[database_name] = @dbName
-																 AND bs.[type] IN ('I', 'L')
-																 AND @flgOptions & 128 = 128
-																)
-															)														
-															AND bmf.[device_type] = 2														
-													ORDER BY bs.[backup_set_id] ASC
+		INSERT	INTO @backupDevice([backup_set_id], [physical_device_name])
+				EXEC (@queryToRun)
+
+		IF @sqlServerName<>@@SERVERNAME
+			begin
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				INSERT	INTO @backupDevice([backup_set_id], [physical_device_name])
+						EXEC (@queryToRun)
+			end
+
+		DECLARE crsCleanupBackupFiles CURSOR FOR	SELECT [physical_device_name]
+													FROM @backupDevice														
+													ORDER BY [backup_set_id] ASC
 		OPEN crsCleanupBackupFiles
 		FETCH NEXT FROM crsCleanupBackupFiles INTO @backupFileName
 		WHILE @@FETCH_STATUS=0
 			begin
-				/*
-				EXEC [dbo].[usp_mpDeleteFileOnDisk]	@sqlServerName	= @sqlServerName,
-													@fileName		= @backupFileName,
-													@executionLevel	= @nestedExecutionLevel,
-													@debugMode		= @debugMode
-				*/
 				SET @queryToRun = N'EXEC [' + DB_NAME() + '].[dbo].[usp_mpDeleteFileOnDisk]	@sqlServerName	= ''' + @sqlServerName + N''',
 																							@fileName		= ''' + @backupFileName + N''',
 																							@executionLevel	= ' + CAST(@nestedExecutionLevel AS [nvarchar]) + N',
@@ -311,7 +429,7 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 			begin
 				/* disable xp_cmdshell configuration option */
 				IF @optionXPHasChanged = 1
-					EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+					EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
 																		@configOptionName	= 'xp_cmdshell',
 																		@configOptionValue	= 0,
 																		@optionIsAvailable	= @optionXPIsAvailable OUT,
@@ -322,7 +440,7 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 
 				/* disable show advanced options configuration option */
 				IF @optionAdvancedHasChanged = 1
-						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
 																			@configOptionName	= 'show advanced options',
 																			@configOptionValue	= 0,
 																			@optionIsAvailable	= @optionAdvancedIsAvailable OUT,

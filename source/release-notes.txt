@@ -222,3 +222,6 @@
 	- check forwarded records percentage and page density in order to decide whenever to rebuild a heap (http://sqlblog.com/blogs/tibor_karaszi/archive/2014/03/06/how-often-do-you-rebuild-your-heaps.aspx)
 	- check page density in order to decide whenever to reorganize/rebuild an index
 	- add time limit option for the optimization task in maintenance plan
+
+/* 05.08.2015 */
+	- fix a bug on backup files cleanup algorithm when running for a remote server
