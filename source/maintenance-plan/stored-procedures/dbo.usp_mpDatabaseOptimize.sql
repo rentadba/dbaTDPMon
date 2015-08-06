@@ -19,6 +19,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseOptimize]
 		@DefragIndexThreshold		[smallint]	=     5,
 		@RebuildIndexThreshold		[smallint]	=    30,
 		@PageThreshold				[int]		=  1000,
+		@RebuildIndexPageCountLimit	[int]		= 2147483647,	--16TB/no limit
 		@StatsSamplePercent			[smallint]	=   100,
 		@StatsAgeDays				[smallint]	=     7,
 		@StatsChangePercent			[smallint]	=     1,
@@ -73,6 +74,7 @@ AS
 --		@DefragIndexThreshold		- min value for fragmentation level when to start reorganize it
 --		@@RebuildIndexThreshold		- min value for fragmentation level when to start rebuild it
 --		@PageThreshold				- the minimum number of pages for an index to be reorganized/rebuild
+--		@RebuildIndexPageCountLimit	- the maximum number of page for an index to be rebuild. if index has more pages than @RebuildIndexPageCountLimit, it will be reorganized
 --		@StatsSamplePercent			- value for sample percent when update statistics. if 100 is present, then fullscan will be used
 --		@StatsAgeDays				- when statistics were last updated (stats ages); don't update statistics more recent then @StatsAgeDays days
 --		@StatsChangePercent			- for more recent statistics, if percent of changes is greater of equal, perform update
@@ -521,7 +523,9 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 									FROM [' + @DBName + ']..sysindexes si
 									INNER JOIN [' + @DBName + ']..sysobjects ob	ON ob.[id] = si.[id]
 									INNER JOIN [' + @DBName + ']..sysusers sc	ON sc.[uid] = ob.[uid]
-									WHERE	si.[indid] > 0 
+									WHERE	ob.[name] LIKE ''' + @TableName + '''
+											AND sc.[name] LIKE ''' + @TableSchema + '''
+											AND si.[indid] > 0 
 											AND si.[indid] < 255
 											AND ob.[xtype] <> ''S''
 											AND si.[rowcnt] > 0
@@ -656,6 +660,19 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 														 AND doil.[page_density_deviation] >= @DefragIndexThreshold 
 														 AND doil.[page_density_deviation] < @RebuildIndexThreshold
 														)
+													OR
+														(	/* for very large tables, will performed reorganize instead of rebuild */
+															doil.[page_count] >= @RebuildIndexPageCountLimit
+															AND	( 
+																	(
+																		doil.[avg_fragmentation_in_percent] >= @RebuildIndexThreshold
+																	)
+																OR  /* when DETAILED analysis is selected, page density information will be used to reorganize / rebuild an index */
+																	(	  @flgOptions & 1024 = 1024 
+																		AND doil.[page_density_deviation] >= @RebuildIndexThreshold
+																	)
+																)
+														)
 													)
 										ORDER BY doil.[table_schema], doil.[table_name]
 		OPEN crsTableList
@@ -681,7 +698,20 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 																			 AND doil.[page_density_deviation] >= @DefragIndexThreshold 
 																			 AND doil.[page_density_deviation] < @RebuildIndexThreshold
 																			)
-																		)
+																		OR
+																			(	/* for very large tables, will performed reorganize instead of rebuild */
+																				doil.[page_count] >= @RebuildIndexPageCountLimit
+																				AND	( 
+																						(
+																							doil.[avg_fragmentation_in_percent] >= @RebuildIndexThreshold
+																						)
+																					OR  /* when DETAILED analysis is selected, page density information will be used to reorganize / rebuild an index */
+																						(	  @flgOptions & 1024 = 1024 
+																							AND doil.[page_density_deviation] >= @RebuildIndexThreshold
+																						)
+																					)
+																			)
+																		)																		
 															ORDER BY doil.[index_id]
 				OPEN crsIndexesToDegfragment
 				FETCH NEXT FROM crsIndexesToDegfragment INTO @IndexName, @CurrentFragmentation, @CurrentPageCount, @ObjectID, @IndexID, @CurentPageDensityDeviation
@@ -785,6 +815,7 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 		   									FROM	#databaseObjectsWithIndexList doil
 											WHERE	    doil.[index_type] <> 0 /* heap tables will be excluded */
 													AND doil.[page_count] >= @PageThreshold
+													AND doil.[page_count] < @RebuildIndexPageCountLimit
 													AND	( 
 															(
 																doil.[avg_fragmentation_in_percent] >= @RebuildIndexThreshold
@@ -809,6 +840,7 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 		   																	WHERE	doil.[table_name] = @CurrentTableName
 		   																			AND doil.[table_schema] = @CurrentTableSchema
 																					AND doil.[page_count] >= @PageThreshold
+																					AND doil.[page_count] < @RebuildIndexPageCountLimit
 																					AND doil.[index_type] <> 0 /* heap tables will be excluded */
 																					AND doil.[is_rebuilt] = 0
 																					AND	( 

@@ -225,3 +225,6 @@
 
 /* 05.08.2015 */
 	- fix a bug on backup files cleanup algorithm when running for a remote server
+
+/* 06.08.2015 */
+	- add upper limit for page count for rebuilding indexes (@RebuildIndexPageCountLimit) - very large tables will only be REORGANIZED
