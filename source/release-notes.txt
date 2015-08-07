@@ -228,3 +228,7 @@
 
 /* 06.08.2015 */
 	- add upper limit for page count for rebuilding indexes (@RebuildIndexPageCountLimit) - very large tables will only be REORGANIZED
+	- may use to implement staggered index maintenance (http://sqlmag.com/blog/efficient-index-maintenance-using-database-mirroring)
+	
+/* 07.08.2015 */
+	- auto-complete value for option "Default backup location" at install time with current instance default backup directory

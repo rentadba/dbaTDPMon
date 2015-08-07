@@ -70,3 +70,18 @@ IF @SQLMajorVersion>8
 		EXEC (@queryToRun)
 	end
 GO
+
+
+---------------------------------------------------------------------------------------------
+--get SQL Server instance default backup location
+---------------------------------------------------------------------------------------------
+DECLARE @defaultBackupDirectory [nvarchar](260)
+
+EXEC master.dbo.xp_instance_regread N'HKEY_LOCAL_MACHINE',N'Software\Microsoft\MSSQLServer\MSSQLServer',
+									N'BackupDirectory',
+									@defaultBackupDirectory OUTPUT, 
+									'no_output'
+
+IF @defaultBackupDirectory IS NOT NULL
+	UPDATE [dbo].[appConfigurations] SET [value] = @defaultBackupDirectory WHERE [name] = 'Default backup location'
+GO
