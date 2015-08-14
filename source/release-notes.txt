@@ -232,3 +232,8 @@
 	
 /* 07.08.2015 */
 	- auto-complete value for option "Default backup location" at install time with current instance default backup directory
+
+/* 14.08.2015 */
+	- add fill_factor to the index details xml schema information
+	- fix small bug when running backup cleanup on SQL Server 2000 instances
+	

@@ -682,7 +682,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 				SET @queryToRun=N'[' + @CurrentTableSchema+ '].[' + @CurrentTableName + ']'
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
-				DECLARE crsIndexesToDegfragment CURSOR FOR 	SELECT	DISTINCT doil.[index_name], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[object_id], doil.[index_id], doil.[page_density_deviation]
+				DECLARE crsIndexesToDegfragment CURSOR FOR 	SELECT	DISTINCT doil.[index_name], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[object_id], doil.[index_id], doil.[page_density_deviation], doil.[fill_factor] 
 							   								FROM	#databaseObjectsWithIndexList doil
    															WHERE	doil.[table_name] = @CurrentTableName
 																	AND doil.[table_schema] = @CurrentTableSchema
@@ -714,7 +714,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 																		)																		
 															ORDER BY doil.[index_id]
 				OPEN crsIndexesToDegfragment
-				FETCH NEXT FROM crsIndexesToDegfragment INTO @IndexName, @CurrentFragmentation, @CurrentPageCount, @ObjectID, @IndexID, @CurentPageDensityDeviation
+				FETCH NEXT FROM crsIndexesToDegfragment INTO @IndexName, @CurrentFragmentation, @CurrentPageCount, @ObjectID, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor
 				WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 					begin
 						SET @IndexTypeDesc=CASE @IndexType	WHEN 0 THEN 'Heap' 
@@ -738,6 +738,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 											'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
 											'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
 											'<page_count>' + CAST(@CurrentPageCount AS [varchar](32)) + '</page_count>' + 
+											'<fill_factor>' + CAST(@IndexFillFactor AS [varchar](32)) + '</fill_factor>' + 
 											'<page_density_deviation>' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + '</page_density_deviation>' + 
 										'</detail></index-fragmentation>'
 
@@ -788,7 +789,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 																				@debugMode		= @DebugMode
 
 							end
-	   					FETCH NEXT FROM crsIndexesToDegfragment INTO @IndexName, @CurrentFragmentation, @CurrentPageCount, @ObjectID, @IndexID, @CurentPageDensityDeviation
+	   					FETCH NEXT FROM crsIndexesToDegfragment INTO @IndexName, @CurrentFragmentation, @CurrentPageCount, @ObjectID, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor
 					end		
 				CLOSE crsIndexesToDegfragment
 				DEALLOCATE crsIndexesToDegfragment
@@ -835,7 +836,7 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 
 				SET @ClusteredRebuildNonClustered = 0
 
-				DECLARE crsIndexesToRebuild CURSOR LOCAL FAST_FORWARD FOR 	SELECT	DISTINCT doil.[index_name], doil.[index_type], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[index_id], doil.[page_density_deviation]
+				DECLARE crsIndexesToRebuild CURSOR LOCAL FAST_FORWARD FOR 	SELECT	DISTINCT doil.[index_name], doil.[index_type], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[index_id], doil.[page_density_deviation], doil.[fill_factor] 
 				   							   								FROM	#databaseObjectsWithIndexList doil
 		   																	WHERE	doil.[table_name] = @CurrentTableName
 		   																			AND doil.[table_schema] = @CurrentTableSchema
@@ -855,7 +856,7 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 																			ORDER BY doil.[index_id]
 
 				OPEN crsIndexesToRebuild
-				FETCH NEXT FROM crsIndexesToRebuild INTO @IndexName, @IndexType, @CurrentFragmentation, @CurrentPageCount, @IndexID, @CurentPageDensityDeviation
+				FETCH NEXT FROM crsIndexesToRebuild INTO @IndexName, @IndexType, @CurrentFragmentation, @CurrentPageCount, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor
 				WHILE @@FETCH_STATUS = 0 AND @ClusteredRebuildNonClustered = 0 AND (GETDATE() <= @stopTimeLimit)
 					begin
 						SELECT	@indexIsRebuilt = doil.[is_rebuilt]
@@ -887,6 +888,7 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 													'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
 													'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
 													'<page_count>' + CAST(@CurrentPageCount AS [varchar](32)) + '</page_count>' + 
+													'<fill_factor>' + CAST(@IndexFillFactor AS [varchar](32)) + '</fill_factor>' + 
 													'<page_density_deviation>' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + '</page_density_deviation>' + 
 												'</detail></index-fragmentation>'
 
@@ -977,7 +979,7 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 	   								AND doil.[table_schema] = @CurrentTableSchema
 									AND doil.[index_id] = @IndexID
 
-	   					FETCH NEXT FROM crsIndexesToRebuild INTO @IndexName, @IndexType, @CurrentFragmentation, @CurrentPageCount, @IndexID, @CurentPageDensityDeviation
+	   					FETCH NEXT FROM crsIndexesToRebuild INTO @IndexName, @IndexType, @CurrentFragmentation, @CurrentPageCount, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor
 					end		
 				CLOSE crsIndexesToRebuild
 				DEALLOCATE crsIndexesToRebuild
@@ -1043,7 +1045,7 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 
 
 		--rebuilding indexes
-		DECLARE crsObjectsWithIndexes CURSOR LOCAL FAST_FORWARD FOR SELECT	DISTINCT doil.[table_schema], doil.[table_name], doil.[index_name], doil.[index_type], doil.[index_id], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[page_density_deviation]
+		DECLARE crsObjectsWithIndexes CURSOR LOCAL FAST_FORWARD FOR SELECT	DISTINCT doil.[table_schema], doil.[table_name], doil.[index_name], doil.[index_type], doil.[index_id], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[page_density_deviation], doil.[fill_factor] 
 							   										FROM	#databaseObjectsWithIndexList doil
    																	WHERE	doil.[index_type] <> 0 /* heap tables will be excluded */
 																			AND doil.[is_rebuilt]=0
@@ -1060,7 +1062,7 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 																	ORDER BY doil.[table_schema], doil.[table_name], doil.[index_id]
 
 		OPEN crsObjectsWithIndexes
-		FETCH NEXT FROM crsObjectsWithIndexes INTO @CurrentTableSchema, @CurrentTableName, @IndexName, @IndexType, @IndexID, @CurrentFragmentation, @CurrentPageCount, @CurentPageDensityDeviation
+		FETCH NEXT FROM crsObjectsWithIndexes INTO @CurrentTableSchema, @CurrentTableName, @IndexName, @IndexType, @IndexID, @CurrentFragmentation, @CurrentPageCount, @CurentPageDensityDeviation, @IndexFillFactor
 		WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 			begin
 				SET @indexIsRebuilt = 0
@@ -1100,6 +1102,7 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 											'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
 											'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
 											'<page_count>' + CAST(@CurrentPageCount AS [varchar](32)) + '</page_count>' + 
+											'<fill_factor>' + CAST(@IndexFillFactor AS [varchar](32)) + '</fill_factor>' + 
 											'<page_density_deviation>' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + '</page_density_deviation>' + 
 										'</detail></index-fragmentation>'
 
@@ -1187,7 +1190,7 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 									AND doil.[index_id] = @IndexID
 					end
 
-				FETCH NEXT FROM crsObjectsWithIndexes INTO @CurrentTableSchema, @CurrentTableName, @IndexName, @IndexType, @IndexID, @CurrentFragmentation, @CurrentPageCount, @CurentPageDensityDeviation
+				FETCH NEXT FROM crsObjectsWithIndexes INTO @CurrentTableSchema, @CurrentTableName, @IndexName, @IndexType, @IndexID, @CurrentFragmentation, @CurrentPageCount, @CurentPageDensityDeviation, @IndexFillFactor
 			end
 		CLOSE crsObjectsWithIndexes
 		DEALLOCATE crsObjectsWithIndexes
