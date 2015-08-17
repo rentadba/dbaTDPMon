@@ -17,7 +17,7 @@ CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 																8 - Disk Space information
 															   16 - Errorlog messages
 															*/
-		@flgOptions				[int]			= 14680063,	/*	 1 - Instances - Offline
+		@flgOptions				[int]			= 31457279,	/*	 1 - Instances - Offline
 																 2 - Instances - Online
 																 4 - Databases Status - Issues Detected
 																 8 - Databases Status - Complete Details
@@ -41,6 +41,7 @@ CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 														   2097152 - Errorlog messages - Complete Details
 														   4194304 - Databases with Fixed File(s) Size - Issues Detected													
 														   8388608 - Databases with (Page Verify not CHECKSUM) or (Page Verify is NONE)
+														  16777216 - Indexes Frequently Fragmented (consider lowering the fill-factor)
 															*/
 		@reportDescription		[nvarchar](256) = NULL,
 		@reportFileName			[nvarchar](max) = NULL,	/* if file name is null, than the name will be generated */
@@ -998,6 +999,16 @@ BEGIN TRY
 					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 8388608 = 8388608)
 						  THEN N'<A HREF="#DatabasePageVerifyIssuesDetected" class="summary-style color-2">Databases with Improper Page Verify Option {DatabasePageVerifyIssuesDetectedCount}</A>'
 						  ELSE N'>Databases with Improper Page Verify Option (N/A)'
+					END + N'
+				</TR>
+				<TR VALIGN="TOP" class="color-2">
+					<TD ALIGN=LEFT class="summary-style add-border color-2">
+						&nbsp;
+					</TD>
+					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
+					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 16777216 = 16777216)
+						  THEN N'<A HREF="#IndexesFrequentlyFragmentedIssuesDetected" class="summary-style color-2">Indexes Frequently Fragmented {IndexesFrequentlyFragmentedIssuesDetectedCount}</A>'
+						  ELSE N'>Indexes Frequently Fragmented (N/A)'
 					END + N'
 				</TR>
 			</table>
@@ -2386,6 +2397,154 @@ BEGIN TRY
 		end
 
 
+	-----------------------------------------------------------------------------------------------------
+	--Indexes Frequently Fragmented
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 2 = 2) AND (@flgOptions & 16777216 = 16777216)
+		begin
+			RAISERROR('	...Indexes Frequently Fragmented - Issues Detected', 10, 1) WITH NOWAIT
+
+			DECLARE @indexAnalyzedCount						[int],
+					@indexesPerInstance						[int],
+					@minimumIndexMaintenanceFrequencyDays	[tinyint] = 2,
+					@analyzeOnlyMessagesFromTheLastHours	[tinyint] = 24 ,
+					@analyzeIndexMaintenanceOperation		[nvarchar](128) = 'REBUILD',
+					@objectName								[nvarchar](256), 
+					@indexName								[sysname], 
+					@intervalDays							[tinyint], 
+					@indexType								[sysname], 
+					@indexFragmentation						[numeric](38,2), 
+					@indexPageCount							[int], 
+					@indexFillFactor						[int], 
+					@indexPageDensityDeviation				[numeric](38,2),	
+					@lastActionName							[nvarchar](128)
+
+		
+			-----------------------------------------------------------------------------------------------------
+			--reading report options
+			SELECT	@minimumIndexMaintenanceFrequencyDays = [value]
+			FROM	[dbo].[reportHTMLOptions]
+			WHERE	[name] = N'Minimum Index Maintenance Frequency (days)'
+					AND [report_type_id]=0
+
+			SET @minimumIndexMaintenanceFrequencyDays = ISNULL(@minimumIndexMaintenanceFrequencyDays, 2)
+
+			-----------------------------------------------------------------------------------------------------
+			SELECT	@analyzeOnlyMessagesFromTheLastHours = [value]
+			FROM	[dbo].[reportHTMLOptions]
+			WHERE	[name] = N'Analyze Only Messages from the last hours'
+					AND [report_type_id]=0
+
+			SET @analyzeOnlyMessagesFromTheLastHours = ISNULL(@analyzeOnlyMessagesFromTheLastHours, 24)
+	
+			-----------------------------------------------------------------------------------------------------
+			SELECT	@analyzeIndexMaintenanceOperation = [value]
+			FROM	[dbo].[reportHTMLOptions]
+			WHERE	[name] = N'Analyze Index Maintenance Operation'
+					AND [report_type_id]=0
+
+			
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea =@HTMLReportArea + 
+							N'<A NAME="IndexesFrequentlyFragmentedIssuesDetected" class="category-style">Indexes Frequently Fragmented</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="11">indexes which got fragmented in the last ' + CAST(@minimumIndexMaintenanceFrequencyDays AS [nvarchar](32)) + N' day(s), were analyzed in the last ' + CAST(@analyzeOnlyMessagesFromTheLastHours AS [nvarchar](32)) + N' hours and last action was in (' + @analyzeIndexMaintenanceOperation + N')</TD>
+							</TR>
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="11">consider lowering the fill-factor with at least 5 percent</TD>
+							</TR>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="120px" class="details-bold">Instance Name</TH>
+											<TH WIDTH="120px" class="details-bold">Database Name</TH>
+											<TH WIDTH="120px" class="details-bold">Table Name</TH>
+											<TH WIDTH="120px" class="details-bold">Index Name</TH>
+											<TH WIDTH="100px" class="details-bold">Type</TH>
+											<TH WIDTH=" 80px" class="details-bold">Frequency (days)</TH>
+											<TH WIDTH=" 80px" class="details-bold">Page Count</TH>
+											<TH WIDTH=" 90px" class="details-bold">Fragmentation</TH>
+											<TH WIDTH="100px" class="details-bold">Page Density Deviation</TH>
+											<TH WIDTH=" 80px" class="details-bold">Fill-Factor</TH>
+											<TH WIDTH="120px" class="details-bold">Last Action</TH>
+											'
+			SET @idx=1		
+			SET @tmpHTMLReport=N''
+			SET @indexAnalyzedCount=0
+
+			DECLARE crsIndexesFrequentlyFragmentedMachineNames CURSOR READ_ONLY LOCAL FOR		SELECT    [instance_name]
+																										, COUNT(*) AS [index_count]
+																								FROM [dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectCode, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, @analyzeIndexMaintenanceOperation)
+																								GROUP BY [instance_name]
+																								ORDER BY [instance_name]
+			OPEN crsIndexesFrequentlyFragmentedMachineNames
+			FETCH NEXT FROM crsIndexesFrequentlyFragmentedMachineNames INTO  @instanceName, @indexesPerInstance
+			WHILE @@FETCH_STATUS=0
+				begin
+					SET @indexAnalyzedCount = @indexAnalyzedCount + @indexesPerInstance
+					SET @tmpHTMLReport=@tmpHTMLReport + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" ROWSPAN="' + CAST(@indexesPerInstance AS [nvarchar](64)) + N'"><A NAME="IndexesFrequentlyFragmentedCompleteDetails' + @instanceName + N'">' + @instanceName + N'</A></TD>' 
+
+					DECLARE crsIndexesFrequentlyFragmentedIssuesDetected CURSOR READ_ONLY LOCAL FOR		SELECT    [event_date_utc], [database_name], [object_name], [index_name]
+																												, [interval_days], [index_type], [fragmentation], [page_count], [fill_factor], [page_density_deviation], [last_action_made]
+																										FROM	[dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectCode, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, @analyzeIndexMaintenanceOperation)
+																										WHERE	[instance_name] =  @instanceName
+																										ORDER BY [database_name], [object_name], [index_name]
+					OPEN crsIndexesFrequentlyFragmentedIssuesDetected
+					FETCH NEXT FROM crsIndexesFrequentlyFragmentedIssuesDetected INTO @eventDate, @databaseName, @objectName, @indexName, @intervalDays, @indexType, @indexFragmentation, @indexPageCount, @indexFillFactor, @indexPageDensityDeviation, @lastActionName
+					WHILE @@FETCH_STATUS=0
+						begin
+							SET @tmpHTMLReport=@tmpHTMLReport + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL(@objectName, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" >' + ISNULL(@indexName, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="100px" class="details" ALIGN="LEFT" >' + ISNULL(@indexType, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH= "80px" class="details" ALIGN="CENTER" >' + ISNULL(CAST(@intervalDays AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST(@indexPageCount AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH= "90px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST(@indexFragmentation AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="100px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST(@indexPageDensityDeviation AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST(@indexFillFactor AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL(@lastActionName, N'&nbsp;') + N'</TD>' + 
+								N'</TR>'
+							
+							SET @indexesPerInstance = @indexesPerInstance-1
+							IF @indexesPerInstance>0
+								SET @tmpHTMLReport=@tmpHTMLReport + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+
+							FETCH NEXT FROM crsIndexesFrequentlyFragmentedIssuesDetected INTO @eventDate, @databaseName, @objectName, @indexName, @intervalDays, @indexType, @indexFragmentation, @indexPageCount, @indexFillFactor, @indexPageDensityDeviation, @lastActionName
+						end
+					CLOSE crsIndexesFrequentlyFragmentedIssuesDetected
+					DEALLOCATE crsIndexesFrequentlyFragmentedIssuesDetected
+					
+					SET @idx=@idx+1
+					FETCH NEXT FROM crsIndexesFrequentlyFragmentedMachineNames INTO @instanceName, @indexesPerInstance
+
+					IF @@FETCH_STATUS=0
+						SET @tmpHTMLReport=@tmpHTMLReport + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
+												<TD class="details" COLSPAN=11>&nbsp;</TD>
+										</TR>'
+				end
+			CLOSE crsIndexesFrequentlyFragmentedMachineNames
+			DEALLOCATE crsIndexesFrequentlyFragmentedMachineNames
+
+			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
+			SET @HTMLReportArea =@HTMLReportArea + N'
+								</TD>
+							</TR>
+						</TABLE>'
+
+			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea						
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{IndexesFrequentlyFragmentedIssuesDetectedCount}', '(' + CAST((@indexAnalyzedCount) AS [nvarchar]) + ')')			
+		end
+		
+	
 	-----------------------------------------------------------------------------------------------------
 	--Outdated Backup for Databases - Issues Detected
 	-----------------------------------------------------------------------------------------------------

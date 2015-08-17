@@ -237,3 +237,6 @@
 	- add fill_factor to the index details xml schema information
 	- fix small bug when running backup cleanup on SQL Server 2000 instances
 	
+/* 17.08.2015 */
+	- documentation reviewed / corrections made (thank you Dragos Esanu)
+	- add health-check rule for detecting frequently fragmented indexes / for which lowering the fill-factor may prevent fragmentation
