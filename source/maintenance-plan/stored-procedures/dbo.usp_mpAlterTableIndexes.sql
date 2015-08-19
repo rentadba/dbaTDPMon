@@ -20,6 +20,7 @@ CREATE PROCEDURE [dbo].[usp_mpAlterTableIndexes]
 		@flgAction					[tinyint] = 1,
 		@flgOptions					[int] = 6145, --4096 + 2048 + 1	/* 6177 for space optimized index rebuild */
 		@MaxDOP						[smallint] = 1,
+		@FillFactor					[tinyint] = 0,
 		@executionLevel				[tinyint] = 0,
 		@affectedDependentObjects	[nvarchar](max) OUTPUT,
 		@DebugMode					[bit] = 0
@@ -393,6 +394,32 @@ BEGIN TRY
 																						, @DebugMode		= @DebugMode										
 										end
 
+								---------------------------------------------------------------------------------------------
+								/* FIX: Data corruption occurs in clustered index when you run online index rebuild in SQL Server 2012 or SQL Server 2014 https://support.microsoft.com/en-us/kb/2969896 */
+								IF (@sqlScriptOnline = N'ONLINE = ON')
+									begin
+										--get destination server running version/edition
+										DECLARE		@serverEdition					[sysname],
+													@serverVersionStr				[sysname],
+													@serverVersionNum				[numeric](9,6)
+
+										SET @nestedExecutionLevel = @executionLevel + 1
+										EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @SQLServerName,
+																				@serverEdition			= @serverEdition OUT,
+																				@serverVersionStr		= @serverVersionStr OUT,
+																				@serverVersionNum		= @serverVersionNum OUT,
+																				@executionLevel			= @nestedExecutionLevel,
+																				@debugMode				= @DebugMode
+										
+										IF     (@serverVersionNum >= 11.02100 AND @serverVersionNum < 11.03449) /* SQL Server 2012 RTM till SQL Server 2012 SP1 CU 11*/
+											OR (@serverVersionNum >= 11.05058 AND @serverVersionNum < 11.05532) /* SQL Server 2012 SP2 till SQL Server 2012 SP2 CU 1*/
+											OR (@serverVersionNum >= 12.02000 AND @serverVersionNum < 12.02370) /* SQL Server 2014 RTM CU 2*/
+											begin
+												SET @MaxDOP=1
+											end
+									end
+
+								---------------------------------------------------------------------------------------------
 								--generate rebuild index script
 								SET @tmpSQL = N''
 
@@ -401,7 +428,9 @@ BEGIN TRY
 					
 								--rebuild options
 								SET @tmpSQL = @tmpSQL + N' WITH (SORT_IN_TEMPDB = ON' + CASE WHEN ISNULL(@MaxDOP, 0) <> 0 THEN N', MAXDOP = ' + CAST(@MaxDOP AS [nvarchar]) ELSE N'' END + 
-																						CASE WHEN ISNULL(@sqlScriptOnline, N'')<>N'' THEN N', ' + @sqlScriptOnline ELSE N'' END + N')'
+																						CASE WHEN ISNULL(@sqlScriptOnline, N'')<>N'' THEN N', ' + @sqlScriptOnline ELSE N'' END + 
+																						CASE WHEN ISNULL(@FillFactor, 0) <> 0 THEN N', FILLFACTOR = ' + CAST(@FillFactor AS [nvarchar]) ELSE N'' END +
+																N')'
 
 								IF @PartitionNumber>1
 									SET @tmpSQL = @tmpSQL + N' PARTITION ' + CAST(@PartitionNumber AS [nvarchar])

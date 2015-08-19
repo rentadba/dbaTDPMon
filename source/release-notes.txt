@@ -240,3 +240,13 @@
 /* 17.08.2015 */
 	- documentation reviewed / corrections made (thank you Dragos Esanu)
 	- add health-check rule for detecting frequently fragmented indexes / for which lowering the fill-factor may prevent fragmentation
+
+/* 18.08.2015 */
+	- when rebuild an index online, check the SQL Server version and reset MAXDOP to 1 (automatic check and fix for KB2969896)
+
+/* 19.08.2015 */
+	- create simple batches in order to automate maintenance plan when running as agent on SQL Express edition
+	- when running DBCC CHECKDB, DATA_PURITY option will be used only when dbi_dbccFlags <> 2 (SQL Server 2005 onwards)
+	- fix small bug on database backup, getting state while database was restoring
+	- add stored procedure to automatically lower the fill-factor / rebuild all detected frequently fragmented indexes (customizable) dbo.usp_hcChangeFillFactorForIndexesFrequentlyFragmented
+	

@@ -246,6 +246,9 @@ if errorlevel 1 goto install_err
 
 echo Health Check: Creating Functions / Stored Procedures
 
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\functions\dbo.ufn_hcGetIndexesFrequentlyFragmented.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectDatabaseDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -262,6 +265,9 @@ sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_h
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_reportHTMLBuildHealthCheck.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcChangeFillFactorForIndexesFrequentlyFragmented.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 

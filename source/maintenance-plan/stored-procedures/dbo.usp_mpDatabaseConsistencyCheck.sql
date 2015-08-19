@@ -15,7 +15,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseConsistencyCheck]
 		@tableSchema			[sysname]	=  '%',
 		@tableName				[sysname]   =  '%',
 		@flgActions				[smallint]	=   12,
-		@flgOptions				[int]	=    3,
+		@flgOptions				[int]		=    3,
 		@executionLevel			[tinyint]	=    0,
 		@debugMode				[bit]		=    0
 /* WITH ENCRYPTION */
@@ -76,7 +76,8 @@ DECLARE		@queryToRun  					[nvarchar](2048),
 			@objectName						[nvarchar](512),
 			@DBCCCheckTableBatchSize 		[int],
 			@errorCode						[int],
-			@databaseStatus					[int]
+			@databaseStatus					[int],
+			@dbi_dbccFlags					[int]
 
 SET NOCOUNT ON
 
@@ -94,8 +95,34 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@serverVersionNum		= @serverVersionNum OUT,
 										@executionLevel			= @nestedExecutionLevel,
 										@debugMode				= @debugMode
----------------------------------------------------------------------------------------------
 
+---------------------------------------------------------------------------------------------
+DECLARE @compatibilityLevel [tinyint]
+IF object_id('tempdb..#databaseCompatibility') IS NOT NULL 
+	DROP TABLE #databaseCompatibility
+
+CREATE TABLE #databaseCompatibility
+	(
+		[compatibility_level]		[tinyint]
+	)
+
+
+SET @queryToRun = N''
+IF @serverVersionNum >= 9
+	SET @queryToRun = @queryToRun + N'SELECT [compatibility_level] FROM sys.databases WHERE [name] = ''' + @dbName + N''''
+ELSE
+	SET @queryToRun = @queryToRun + N'SELECT [cmptlevel] FROM master.dbo.sysdatabases WHERE [name] = ''' + @dbName + N''''
+
+SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@compatibilityLevel, @queryToRun)
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+INSERT	INTO #databaseCompatibility([compatibility_level])
+		EXEC (@queryToRun)
+
+SELECT TOP 1 @compatibilityLevel = [compatibility_level] FROM #databaseCompatibility
+
+
+---------------------------------------------------------------------------------------------
 SET @DBCCCheckTableBatchSize = 65536
 SET @CurrentTableSchema		 = @tableSchema
 SET @tableName				 = REPLACE(@tableName, '''', '''''')
@@ -225,6 +252,72 @@ INNER JOIN
 	end
 
 --------------------------------------------------------------------------------------------------
+--when running DBCC CHECKDB, check if DATA_PURITY option should be used or not (run only when dbi_dbccFlags=0)
+--------------------------------------------------------------------------------------------------
+IF @flgActions & 1 = 1 AND @serverVersionNum >= 9 AND @flgOptions & 1 = 0
+	begin
+		IF object_id('tempdb..#dbi_dbccFlags') IS NOT NULL DROP TABLE #dbccLastKnownGood
+		CREATE TABLE #dbi_dbccFlags
+		(
+			[Value]					[sysname]			NULL
+		)
+
+		IF object_id('tempdb..#dbccDBINFO') IS NOT NULL DROP TABLE #dbccDBINFO
+		CREATE TABLE #dbccDBINFO
+			(
+				[id]				[int] IDENTITY(1,1),
+				[ParentObject]		[varchar](255),
+				[Object]			[varchar](255),
+				[Field]				[varchar](255),
+				[Value]				[varchar](255)
+			)
+	
+		IF @sqlServerName <> @@SERVERNAME
+			begin
+				IF @serverVersionNum < 11
+					SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
+										FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @dbName + N']) WITH TABLERESULTS'''')'')x
+										WHERE [Field]=''dbi_dbccFlags'''
+				ELSE
+					SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
+										FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @dbName + N']) WITH TABLERESULTS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
+										WHERE [Field]=''dbi_dbccFlags'''
+			end
+		ELSE
+			begin							
+				BEGIN TRY
+					INSERT INTO #dbccDBINFO
+							EXEC ('DBCC DBINFO (''' + @dbName + N''') WITH TABLERESULTS')
+				END TRY
+				BEGIN CATCH
+					PRINT ERROR_MESSAGE()
+				END CATCH
+
+				SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_dbccFlags'''											
+			end
+
+		IF @debugMode = 1 PRINT @queryToRun
+				
+		TRUNCATE TABLE #dbi_dbccFlags
+		BEGIN TRY
+			INSERT	INTO #dbi_dbccFlags([Value])
+					EXEC (@queryToRun)
+		END TRY
+		BEGIN CATCH
+			PRINT ERROR_MESSAGE()
+		END CATCH
+
+		BEGIN TRY
+			SELECT @dbi_dbccFlags = ISNULL([Value], 0)
+			FROM #dbi_dbccFlags
+		END TRY
+		BEGIN CATCH
+			SET @dbi_dbccFlags=0
+		END CATCH
+	end
+
+
+--------------------------------------------------------------------------------------------------
 --database consistency check
 --------------------------------------------------------------------------------------------------
 IF @flgActions & 1 = 1
@@ -236,10 +329,13 @@ IF @flgActions & 1 = 1
 
 		SET @queryToRun = N''
 		SET @queryToRun = @queryToRun + N'DBCC CHECKDB(''' + @dbName + ''') WITH ALL_ERRORMSGS, NO_INFOMSGS' + CASE WHEN @flgOptions & 1 = 1 THEN ', PHYSICAL_ONLY' ELSE '' END
-		IF @serverVersionNum >= 9 AND @flgOptions & 1 = 0
+
+		IF @serverVersionNum >= 9 AND @flgOptions & 1 = 0 AND @dbi_dbccFlags <> 2
 			SET @queryToRun = @queryToRun + ', DATA_PURITY'
-		IF @serverVersionNum >= 10 AND @flgOptions & 1 = 0
+
+		IF @compatibilityLevel >= 100 AND @flgOptions & 1 = 0
 			SET @queryToRun = @queryToRun + ', EXTENDED_LOGICAL_CHECKS'
+
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 		
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
@@ -276,10 +372,13 @@ IF @flgActions & 2 = 2
 
 				SET @queryToRun = N''
 				SET @queryToRun = @queryToRun + N'DBCC CHECKTABLE(''[' + @CurrentTableSchema + '].[' + RTRIM(@CurrentTableName) + ']''' + CASE WHEN @flgOptions & 2 = 2 THEN ', NOINDEX' ELSE '' END + ') WITH ALL_ERRORMSGS, NO_INFOMSGS'
-				IF @serverVersionNum >= 9
+				
+				IF @serverVersionNum >= 9 AND @dbi_dbccFlags <> 2
 					SET @queryToRun = @queryToRun + ', DATA_PURITY'
-				IF @serverVersionNum >= 10 AND @flgOptions & 2 = 0
+				
+				IF @compatibilityLevel >= 10 AND @flgOptions & 2 = 0
 					SET @queryToRun = @queryToRun + ', EXTENDED_LOGICAL_CHECKS'
+
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 				
 				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
