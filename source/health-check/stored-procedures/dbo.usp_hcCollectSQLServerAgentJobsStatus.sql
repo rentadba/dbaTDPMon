@@ -128,6 +128,12 @@ WHILE @@FETCH_STATUS=0
 		FETCH NEXT FROM crsJobs INTO @jobName
 		WHILE @@FETCH_STATUS=0
 			begin
+				SET @strMessage				= NULL
+				SET @currentRunning			= NULL
+				SET @lastExecutionStatus	= NULL
+				SET @lastExecutionDate		= NULL
+				SET @lastExecutionTime 		= NULL
+
 				BEGIN TRY
 					EXEC dbo.usp_sqlAgentJobCheckStatus		@sqlServerName			= @sqlServerName,
 															@jobName				= @jobName,
