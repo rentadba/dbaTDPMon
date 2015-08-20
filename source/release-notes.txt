@@ -249,4 +249,7 @@
 	- when running DBCC CHECKDB, DATA_PURITY option will be used only when dbi_dbccFlags <> 2 (SQL Server 2005 onwards)
 	- fix small bug on database backup, getting state while database was restoring
 	- add stored procedure to automatically lower the fill-factor / rebuild all detected frequently fragmented indexes (customizable) dbo.usp_hcChangeFillFactorForIndexesFrequentlyFragmented
-	
+
+/* 20.08.2015 */
+	- fix small bugs on checking database state before performing maintenance plan
+	- get start date and time information for jobs currently running, in health-check module

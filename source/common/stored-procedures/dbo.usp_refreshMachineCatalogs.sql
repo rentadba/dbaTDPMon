@@ -259,6 +259,7 @@ BEGIN TRY
 													WHEN sdb.[status] & 128 = 128 THEN ''RECOVERING''
 													WHEN sdb.[status] & 64 = 64 THEN ''PRE RECOVERY''
 													WHEN sdb.[status] & 32 = 32 THEN ''LOADING''
+													WHEN sdb.[status] = 0 THEN ''UNKNOWN''
 													ELSE ''ONLINE''
 												END AS [state_desc]
 									FROM master.dbo.sysdatabases sdb'

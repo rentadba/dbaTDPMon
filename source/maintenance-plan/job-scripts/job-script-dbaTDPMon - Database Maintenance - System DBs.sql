@@ -593,6 +593,7 @@ IF DATEPART(dw, GETUTCDATE())= 2
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases
 									WHERE [name] IN (''master'', ''model'', ''msdb'')
+											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
 													 WHEN [status] & 64 = 64 THEN ''PRE RECOVERY''
 													 WHEN [status] & 128 = 128 THEN ''RECOVERING''
@@ -655,6 +656,7 @@ IF DATEPART(dw, GETUTCDATE())=7 AND DATEPART(dd, GETUTCDATE())<=7
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases
 									WHERE [name] IN (''master'', ''model'', ''msdb'', ''tempdb'')
+											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
 													 WHEN [status] & 64 = 64 THEN ''PRE RECOVERY''
 													 WHEN [status] & 128 = 128 THEN ''RECOVERING''

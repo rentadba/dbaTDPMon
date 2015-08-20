@@ -506,6 +506,7 @@ IF @flgActions & 32 = 32
 			OR @databaseStatus & 32768 = 32768		/* EMERGENCY MODE */
 			OR @databaseStatus & 2097152 = 2097152	/* STANDBY */
 			OR @databaseStatus & 4194584 = 4194584	/* SUSPECT */
+			OR @databaseStatus = 0
 			begin
 				SET @queryToRun='Current database state does not allow running DBCC CHECKIDENT. It will be skipped.'
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
