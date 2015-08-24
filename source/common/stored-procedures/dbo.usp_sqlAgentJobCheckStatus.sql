@@ -211,7 +211,7 @@ ELSE
 				
 				SET @strMessage='--Job currently running step    : [' + CAST(@StepID AS varchar) + '] - [' + @StepName + ']'
 				SET @strMessage=@strMessage + CHAR(13) + '--Job started at         	    : [' + ISNULL(@RunDate, '') + ' ' + ISNULL(@RunTime, '') + ']'
-				SET @strMessage=@strMessage + CHAR(13) + '--Job execution status  	    : [' + ISNULL(@RunStatus, '') + ']'	
+				SET @strMessage=@strMessage + CHAR(13) + '--Execution status  	        : [' + ISNULL(@RunStatus, '') + ']'	
 			end
 		ELSE
 			begin

@@ -17,11 +17,11 @@ CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 																8 - Disk Space information
 															   16 - Errorlog messages
 															*/
-		@flgOptions				[int]			= 31457279,	/*	 1 - Instances - Offline
+		@flgOptions				[int]			= 65011711,	/*	 1 - Instances - Offline
 																 2 - Instances - Online
 																 4 - Databases Status - Issues Detected
 																 8 - Databases Status - Complete Details
-																16 - SQL Server Agent Jobs - Issues Detected
+																16 - SQL Server Agent Jobs - Job Failures
 																32 - SQL Server Agent Jobs - Permissions errors
 																64 - SQL Server Agent Jobs - Complete Details
 															   128 - Big Size for System Databases - Issues Detected
@@ -42,6 +42,7 @@ CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 														   4194304 - Databases with Fixed File(s) Size - Issues Detected													
 														   8388608 - Databases with (Page Verify not CHECKSUM) or (Page Verify is NONE)
 														  16777216 - Frequently Fragmented Indexes (consider lowering the fill-factor)
+														  33554432 - SQL Server Agent Jobs - Long Running SQL Agent Jobs
 															*/
 		@reportDescription		[nvarchar](256) = NULL,
 		@reportFileName			[nvarchar](max) = NULL,	/* if file name is null, than the name will be generated */
@@ -101,6 +102,7 @@ DECLARE   @databaseName							[sysname]
 		, @configFreeDiskMinSpace				[int]
 		, @configErrorlogMessageLastHours		[int]
 		, @configErrorlogMessageLimit			[int]
+		, @configMaxJobRunningTimeInHours		[int]
 
 
 		, @logSizeMB							[numeric](20,3)
@@ -384,6 +386,19 @@ BEGIN TRY
 	SET @configErrorlogMessageLimit = ISNULL(@configErrorlogMessageLimit, 1000)
 
 	IF @configErrorlogMessageLimit= 0 SET @configErrorlogMessageLimit=2147483647
+
+	-----------------------------------------------------------------------------------------------------
+	BEGIN TRY
+		SELECT	@configMaxJobRunningTimeInHours = [value]
+		FROM	[dbo].[reportHTMLOptions]
+		WHERE	[name] = N'SQL Agent Job - Maximum Running Time (hours)'
+				AND [report_type_id]=0
+	END TRY
+	BEGIN CATCH
+		SET @configMaxJobRunningTimeInHours = 3
+	END CATCH
+	SET @configMaxJobRunningTimeInHours = ISNULL(@configMaxJobRunningTimeInHours, 3)
+
 	
 	-----------------------------------------------------------------------------------------------------
 	--setting styles used in html report
@@ -741,6 +756,9 @@ BEGIN TRY
 						<TR VALIGN="TOP" class="color-2">
 							<TD WIDTH="180px" class="details-very-small" ALIGN="LEFT">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + CASE WHEN @flgActions &   8 =   8 THEN [dbo].[ufn_reportHTMLGetImage]('check-checked') ELSE [dbo].[ufn_reportHTMLGetImage]('check-unchecked') END + N'&nbsp;&nbsp;Disk Space information</TD>
 						</TR>
+						<TR VALIGN="TOP" class="color-1">
+							<TD WIDTH="180px" class="details-very-small" ALIGN="LEFT">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + CASE WHEN @flgActions &  16 =  16  THEN [dbo].[ufn_reportHTMLGetImage]('check-checked') ELSE [dbo].[ufn_reportHTMLGetImage]('check-unchecked') END  + N'&nbsp;&nbsp;Errorlog messages</TD>
+						</TR>
 					</TABLE>
 				</TD>
 			</TR>
@@ -926,9 +944,9 @@ BEGIN TRY
 				</TR>
 				<TR VALIGN="TOP" class="color-1">
 					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
-					CASE WHEN (@flgActions & 8 = 8) AND (@flgOptions & 262144 = 262144)
-						  THEN N'<A HREF="#DiskSpaceInformationIssuesDetected" class="summary-style color-1">Low Free Disk Space {DiskSpaceInformationIssuesDetectedCount}</A>'
-						  ELSE N'Low Free Disk Space (N/A)'
+					CASE WHEN (@flgActions & 4 = 4) AND (@flgOptions & 33554432 = 33554432)
+						  THEN N'<A HREF="#LongRunningSQLAgentJobsIssuesDetected" class="summary-style color-1">Long Running SQL Agent Jobs {LongRunningSQLAgentJobsIssuesDetectedCount}</A>'
+						  ELSE N'Long Running SQL Agent Jobs'
 					END + N'
 					</TD>
 					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
@@ -940,9 +958,9 @@ BEGIN TRY
 				</TR>
 				<TR VALIGN="TOP" class="color-2">
 					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
-					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 8192 = 8192)
-						  THEN N'<A HREF="#DatabaseBACKUPAgeIssuesDetected" class="summary-style color-2">Outdated Backup for Databases {DatabaseBACKUPAgeIssuesDetectedCount}</A>'
-						  ELSE N'Outdated Backup for Databases (N/A)'
+					CASE WHEN (@flgActions & 8 = 8) AND (@flgOptions & 262144 = 262144)
+						  THEN N'<A HREF="#DiskSpaceInformationIssuesDetected" class="summary-style color-2">Low Free Disk Space {DiskSpaceInformationIssuesDetectedCount}</A>'
+						  ELSE N'Low Free Disk Space (N/A)'
 					END + N'
 					</TD>
 					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
@@ -954,9 +972,9 @@ BEGIN TRY
 				</TR>
 				<TR VALIGN="TOP" class="color-1">
 					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
-					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 16384 = 16384)
-						  THEN N'<A HREF="#DatabaseDBCCCHECKDBAgeIssuesDetected" class="summary-style color-1">Outdated DBCC CHECKDB Databases {DatabaseDBCCCHECKDBAgeIssuesDetectedCount}</A>'
-						  ELSE N'Outdated DBCC CHECKDB Databases (N/A)'
+					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 8192 = 8192)
+						  THEN N'<A HREF="#DatabaseBACKUPAgeIssuesDetected" class="summary-style color-1">Outdated Backup for Databases {DatabaseBACKUPAgeIssuesDetectedCount}</A>'
+						  ELSE N'Outdated Backup for Databases (N/A)'
 					END + N'
 					</TD>
 					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
@@ -968,9 +986,9 @@ BEGIN TRY
 				</TR> 
 				<TR VALIGN="TOP" class="color-2">
 					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
-					CASE WHEN (@flgActions & 16 = 16) AND (@flgOptions & 1048576 = 1048576)
-						  THEN N'<A HREF="#ErrorlogMessagesIssuesDetected" class="summary-style color-2">Errorlog Messages {ErrorlogMessagesIssuesDetectedCount}</A>'
-						  ELSE N'ErrorlogMessagesIssuesDetected (N/A)'
+					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 16384 = 16384)
+						  THEN N'<A HREF="#DatabaseDBCCCHECKDBAgeIssuesDetected" class="summary-style color-2">Outdated DBCC CHECKDB Databases {DatabaseDBCCCHECKDBAgeIssuesDetectedCount}</A>'
+						  ELSE N'Outdated DBCC CHECKDB Databases (N/A)'
 					END + N'
 					</TD>
 					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
@@ -982,9 +1000,9 @@ BEGIN TRY
 				</TR> 
 				<TR VALIGN="TOP" class="color-1">
 					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
-					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 16777216 = 16777216)
-						  THEN N'<A HREF="#FrequentlyFragmentedIndexesIssuesDetected" class="summary-style color-1">Frequently Fragmented Indexes {FrequentlyFragmentedIndexesIssuesDetectedCount}</A>'
-						  ELSE N'>Frequently Fragmented Indexes (N/A)'
+					CASE WHEN (@flgActions & 16 = 16) AND (@flgOptions & 1048576 = 1048576)
+						  THEN N'<A HREF="#ErrorlogMessagesIssuesDetected" class="summary-style color-1">Errorlog Messages {ErrorlogMessagesIssuesDetectedCount}</A>'
+						  ELSE N'ErrorlogMessagesIssuesDetected (N/A)'
 					END + N'
 					</TD>
 					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
@@ -995,8 +1013,11 @@ BEGIN TRY
 					</TD>
 				</TR> 
 				<TR VALIGN="TOP" class="color-2">
-					<TD ALIGN=LEFT class="summary-style add-border color-2">
-						&nbsp;
+					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
+					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 16777216 = 16777216)
+						  THEN N'<A HREF="#FrequentlyFragmentedIndexesIssuesDetected" class="summary-style color-2">Frequently Fragmented Indexes {FrequentlyFragmentedIndexesIssuesDetectedCount}</A>'
+						  ELSE N'>Frequently Fragmented Indexes (N/A)'
+					END + N'
 					</TD>
 					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
 					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 8388608 = 8388608)
@@ -1479,10 +1500,10 @@ BEGIN TRY
 										N'<TR class="color-3">
 											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
 											<TH WIDTH="200px" class="details-bold" nowrap>Job Name</TH>
-											<TH WIDTH="80px" class="details-bold" nowrap>Execution Status</TH>
+											<TH WIDTH="110px" class="details-bold" nowrap>Execution Status</TH>
 											<TH WIDTH="80px" class="details-bold" nowrap>Execution Date</TH>
 											<TH WIDTH="80px" class="details-bold" nowrap>Execution Time</TH>
-											<TH WIDTH="490px" class="details-bold">Message</TH>'
+											<TH WIDTH="460px" class="details-bold">Message</TH>'
 
 
 			SET @idx=1		
@@ -1511,7 +1532,7 @@ BEGIN TRY
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @jobName + N'</TD>' + 
-										N'<TD WIDTH="80px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @lastExecStatus = 0 THEN N'Failed'
+										N'<TD WIDTH="110px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @lastExecStatus = 0 THEN N'Failed'
 																									WHEN @lastExecStatus = 1 THEN N'Succeded'
 																									WHEN @lastExecStatus = 2 THEN N'Retry'
 																									WHEN @lastExecStatus = 3 THEN N'Canceled'
@@ -1520,7 +1541,7 @@ BEGIN TRY
 										 + N'</TD>' + 
 										N'<TD WIDTH="80px" class="details" ALIGN="CENTER" nowrap>' + @lastExecDate + N'</TD>' + 
 										N'<TD WIDTH="80px" class="details" ALIGN="CENTER" nowrap>' + @lastExecTime + N'</TD>' + 
-										N'<TD WIDTH="490px" class="details" ALIGN="LEFT">' + @message + N'</TD>' + 
+										N'<TD WIDTH="460px" class="details" ALIGN="LEFT">' + @message + N'</TD>' + 
 									N'</TR>'
 					SET @idx=@idx+1
 
@@ -1543,6 +1564,87 @@ BEGIN TRY
 		end
 
 
+	-----------------------------------------------------------------------------------------------------
+	-- Long Running SQL Agent Jobs
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 4 = 4) AND (@flgOptions & 33554432 = 33554432)
+		begin
+			RAISERROR('	...Build Report: Long Running SQL Agent Jobs - Issues Detected', 10, 1) WITH NOWAIT
+			
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea =@HTMLReportArea + 
+							N'<A NAME="LongRunningSQLAgentJobsIssuesDetected" class="category-style">Long Running SQL Agent Jobs - Issues Detected</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="6">jobs currently running for more than ' + CAST(@configMaxJobRunningTimeInHours AS [nvarchar]) + N'hours</TD>
+							</TR>
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
+											<TH WIDTH="200px" class="details-bold" nowrap>Job Name</TH>
+											<TH WIDTH="110px" class="details-bold" nowrap>Running Time</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Start Date</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Start Time</TH>
+											<TH WIDTH="460px" class="details-bold">Message</TH>'
+
+
+			SET @idx=1		
+			SET @tmpHTMLReport=N''
+
+			DECLARE   @runningTime		[varchar](32)
+			
+			SET @dateTimeLowerLimit = DATEADD(hh, -@configFailuresInLastHours, GETUTCDATE())
+			DECLARE crsLongRunningSQLAgentJobsIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT	  [instance_name], [job_name]
+																								, [last_execution_date] AS [start_date], [last_execution_time] AS [start_time]
+																								, [dbo].[ufn_reportHTMLFormatTimeValue]([dbo].[ufn_getMilisecondsBetweenDates](CONVERT([datetime], [last_execution_date] + ' ' + [last_execution_time], 120), GETDATE())) AS [running_time]
+																								, [message]
+																						FROM [dbo].[vw_statsSQLServerAgentJobsHistory]
+																						WHERE [last_execution_status] = 4
+																								AND [last_execution_date] IS NOT NULL
+																								AND [last_execution_time] IS NOT NULL
+																								AND DATEDIFF(hh, CONVERT([datetime], [last_execution_date] + ' ' + [last_execution_time], 120), GETDATE())>=@configMaxJobRunningTimeInHours
+																						ORDER BY [start_date], [start_time]
+
+			OPEN crsLongRunningSQLAgentJobsIssuesDetected
+			FETCH NEXT FROM crsLongRunningSQLAgentJobsIssuesDetected INTO @instanceName, @jobName, @lastExecDate, @lastExecTime, @runningTime, @message
+			WHILE @@FETCH_STATUS=0
+				begin
+					SET @message = CASE WHEN LEFT(@message, 2) = '--' THEN SUBSTRING(@message, 3, LEN(@message)) ELSE @message END
+					SET @message = ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') 
+					SET @message = REPLACE(@message, '--', N'<BR>')
+
+					SET @tmpHTMLReport=@tmpHTMLReport + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
+										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @jobName + N'</TD>' + 
+										N'<TD WIDTH="110px" class="details" ALIGN="CENTER" nowrap>' + @runningTime + N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="CENTER" nowrap>' + @lastExecDate + N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="CENTER" nowrap>' + @lastExecTime + N'</TD>' + 
+										N'<TD WIDTH="460px" class="details" ALIGN="LEFT">' + @message + N'</TD>' + 
+									N'</TR>'
+					SET @idx=@idx+1
+
+					FETCH NEXT FROM crsLongRunningSQLAgentJobsIssuesDetected INTO @instanceName, @jobName, @lastExecDate, @lastExecTime, @runningTime, @message
+				end
+			CLOSE crsLongRunningSQLAgentJobsIssuesDetected
+			DEALLOCATE crsLongRunningSQLAgentJobsIssuesDetected
+
+
+			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
+			SET @HTMLReportArea =@HTMLReportArea + N'
+								</TD>
+							</TR>
+						</TABLE>'
+
+			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{LongRunningSQLAgentJobsIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
+		end
+		
+		
 	-----------------------------------------------------------------------------------------------------
 	--Low Free Disk Space - Permission Errors
 	-----------------------------------------------------------------------------------------------------

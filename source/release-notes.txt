@@ -253,3 +253,6 @@
 /* 20.08.2015 */
 	- fix small bugs on checking database state before performing maintenance plan
 	- get start date and time information for jobs currently running, in health-check module
+
+/* 24.08.2015 */
+	- add health-check rule for detecting long running SQL Agent jobs (default more than 3 hours)
