@@ -285,13 +285,8 @@ IF @flgActions & 1 = 1 AND @serverVersionNum >= 9 AND @flgOptions & 1 = 0
 			end
 		ELSE
 			begin							
-				BEGIN TRY
-					INSERT INTO #dbccDBINFO
-							EXEC ('DBCC DBINFO (''' + @dbName + N''') WITH TABLERESULTS')
-				END TRY
-				BEGIN CATCH
-					PRINT ERROR_MESSAGE()
-				END CATCH
+				INSERT	INTO #dbccDBINFO
+						EXEC ('DBCC DBINFO (''' + @dbName + N''') WITH TABLERESULTS')
 
 				SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_dbccFlags'''											
 			end
@@ -299,21 +294,13 @@ IF @flgActions & 1 = 1 AND @serverVersionNum >= 9 AND @flgOptions & 1 = 0
 		IF @debugMode = 1 PRINT @queryToRun
 				
 		TRUNCATE TABLE #dbi_dbccFlags
-		BEGIN TRY
-			INSERT	INTO #dbi_dbccFlags([Value])
-					EXEC (@queryToRun)
-		END TRY
-		BEGIN CATCH
-			PRINT ERROR_MESSAGE()
-		END CATCH
+		INSERT	INTO #dbi_dbccFlags([Value])
+				EXEC (@queryToRun)
 
-		BEGIN TRY
-			SELECT @dbi_dbccFlags = ISNULL([Value], 0)
-			FROM #dbi_dbccFlags
-		END TRY
-		BEGIN CATCH
-			SET @dbi_dbccFlags=0
-		END CATCH
+		SELECT @dbi_dbccFlags = ISNULL([Value], 0)
+		FROM #dbi_dbccFlags
+		
+		SET @dbi_dbccFlags = ISNULL(@dbi_dbccFlags, 0)
 	end
 
 
