@@ -24,6 +24,7 @@ SELECT 	  cin.[project_id]		AS [project_id]
 		, ssajh.[last_execution_status]
 		, ssajh.[last_execution_date]
 		, ssajh.[last_execution_time]
+		, ssajh.[running_time_sec]
 		, ssajh.[message]
 FROM [dbo].[statsSQLServerAgentJobsHistory]	ssajh
 INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = ssajh.[instance_id] AND cin.[project_id] = ssajh.[project_id]

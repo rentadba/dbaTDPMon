@@ -257,3 +257,6 @@
 /* 24.08.2015 */
 	- add health-check rule for detecting long running SQL Agent jobs (default more than 3 hours)
 	- fix small bugs when running setup on SQL Server 2000
+
+/* 25.08.2015 */
+	- gather running time when collecting SQL Agent job information

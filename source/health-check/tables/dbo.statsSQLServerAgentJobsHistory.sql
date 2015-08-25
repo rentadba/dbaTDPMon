@@ -24,6 +24,7 @@ CREATE TABLE [dbo].[statsSQLServerAgentJobsHistory]
 	[last_execution_status] [int]			NOT NULL,
 	[last_execution_date]	[varchar](10)	NULL, 
 	[last_execution_time]	[varchar](8)	NULL,
+	[running_time_sec]		[bigint]		NULL,
 	[message]				[varchar](max)	NULL, 
 	CONSTRAINT [PK_statsSQLServerAgentJobsHistory] PRIMARY KEY  CLUSTERED 
 	(

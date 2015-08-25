@@ -35,6 +35,7 @@ DECLARE @currentRunning 		[int],
 		@lastExecutionDate		[varchar](10),
 		@lastExecutionTime		[varchar](8),
 		@lastExecutionStep		[int],
+		@runningTimeSec			[bigint],
 		@strMessage				[varchar](4096),
 		@lastMessage			[varchar](4096),
 		@jobWasRunning			[bit],
@@ -107,7 +108,7 @@ WHILE @currentRunning<>0
 	begin
 		SET @currentRunning=1
 		--verific daca job-ul este in curs de executie. daca da, afisez momentele de executie ale job-ului
-		EXEC [dbo].[usp_sqlAgentJobCheckStatus] @sqlServerName, @jobName, @strMessage OUT, @currentRunning OUT, @lastExecutionStatus OUT, @lastExecutionDate OUT, @lastExecutionTime OUT, 0, 0, 0
+		EXEC [dbo].[usp_sqlAgentJobCheckStatus] @sqlServerName, @jobName, @strMessage OUT, @currentRunning OUT, @lastExecutionStatus OUT, @lastExecutionDate OUT, @lastExecutionTime OUT, @runningTimeSec OUT, 0, 0, 0
 		IF @currentRunning<>0
 			begin
 				IF ISNULL(@strMessage,'')<>ISNULL(@lastMessage, '')
@@ -307,7 +308,7 @@ IF @startJob=1
 													begin
 														SET @currentRunning=1
 														--verific daca job-ul este in curs de executie. daca da, afisez momentele de executie ale job-ului
-														EXEC [dbo].[usp_sqlAgentJobCheckStatus] @sqlServerName, @jobName, @strMessage OUT, @currentRunning OUT, @lastExecutionStatus OUT, @lastExecutionDate OUT, @lastExecutionTime OUT, 0, 0, 0
+														EXEC [dbo].[usp_sqlAgentJobCheckStatus] @sqlServerName, @jobName, @strMessage OUT, @currentRunning OUT, @lastExecutionStatus OUT, @lastExecutionDate OUT, @lastExecutionTime OUT, @runningTimeSec OUT, 0, 0, 0
 														IF @currentRunning<>0
 															begin
 																IF ISNULL(@strMessage,'')<>ISNULL(@lastMessage, '')
@@ -359,7 +360,7 @@ IF @startJob=1
 			end
 	end	
 --afisez mesaje despre starea de executie a job-ului 
-EXEC [dbo].[usp_sqlAgentJobCheckStatus] @sqlServerName, @jobName, @strMessage OUT, @currentRunning OUT, @lastExecutionStatus OUT, @lastExecutionDate OUT, @lastExecutionTime OUT, 0, 0, 0
+EXEC [dbo].[usp_sqlAgentJobCheckStatus] @sqlServerName, @jobName, @strMessage OUT, @currentRunning OUT, @lastExecutionStatus OUT, @lastExecutionDate OUT, @lastExecutionTime OUT, @runningTimeSec OUT, 0, 0, 0
 print @strMessage
 IF @lastExecutionStatus=0
 	begin

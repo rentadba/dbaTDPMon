@@ -16,7 +16,8 @@ CREATE PROCEDURE dbo.usp_sqlAgentJobCheckStatus
 		@currentRunning			[int]=0 			OUTPUT,			
 		@lastExecutionStatus	[int]=0 			OUTPUT,			
 		@lastExecutionDate		[varchar](10)=''	OUTPUT,		
-		@lastExecutionTime 		[varchar](8)=''		OUTPUT,		
+		@lastExecutionTime 		[varchar](8)=''		OUTPUT,	
+		@runningTimeSec			[bigint]=0			OUTPUT,
 		@selectResult			[bit]=0,
 		@extentedStepDetails	[bit]=0,		
 		@debugMode				[bit]=0
@@ -45,6 +46,7 @@ DECLARE 	@Message 			[varchar](8000),
 			@RunStatus			[varchar](32),
 			@RunStatusDetail	[varchar](32),
 			@RunDurationLast	[varchar](8),
+			@EventTime			[datetime],
 			@ReturnValue		[int],
 			@queryToRun			[nvarchar](4000)
 
@@ -142,11 +144,12 @@ ELSE
 
 				--get job start date/time
 				IF OBJECT_ID('tempdb..#JobRunDetail3') IS NOT NULL DROP TABLE #JobRunDetail3
-				CREATE TABLE #JobRunDetail3(run_date varchar(16), run_time varchar(16), run_status int)
+				CREATE TABLE #JobRunDetail3(run_date varchar(16), run_time varchar(16), run_status int, event_time [datetime])
 
 				SET @queryToRun='SELECT TOP 1 CAST(h.[run_date] AS varchar) AS [run_date]
 											, CAST(h.[run_time] AS varchar) AS [run_time]
 											, h.[run_status]
+											, GETDATE() AS [event_time]
 						FROM [msdb].[dbo].[sysjobs] j 
 						RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
 						WHERE j.[name]=''' + @jobName + ''' 
@@ -172,6 +175,7 @@ ELSE
 						SET @queryToRun='SELECT TOP 1 CAST(h.[run_date] AS varchar) AS [run_date]
 													, CAST(h.[run_time] AS varchar) AS [run_time]
 													, h.[run_status]
+													, GETDATE() AS [event_time]
 								FROM [msdb].[dbo].[sysjobs] j 
 								RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
 								WHERE j.[name]=''' + @jobName + ''' 
@@ -193,7 +197,12 @@ ELSE
 									
 				SET @RunDate	=null
 				SET @RunTime	=null
-				SELECT TOP 1 @RunDate=[run_date], @RunTime=[run_time], @RunStatus=CAST([run_status] AS varchar) FROM #JobRunDetail3
+				SET @EventTime	=null
+				SELECT TOP 1  @RunDate	 = [run_date]
+							, @RunTime	 = [run_time]
+							, @RunStatus = CAST([run_status] AS varchar) 
+							, @EventTime = [event_time]
+				FROM #JobRunDetail3
 	
 
 				SET @RunTime=REPLICATE('0', 6-LEN(@RunTime)) + @RunTime
@@ -202,6 +211,7 @@ ELSE
 
 				SET @lastExecutionDate=@RunDate
 				SET @lastExecutionTime=@RunTime
+				SET @runningTimeSec = [dbo].[ufn_getMilisecondsBetweenDates](CONVERT([datetime], @lastExecutionDate + ' ' + @lastExecutionTime, 120), @EventTime) / 1000
 
 				IF @RunStatus='0' SET @RunStatus='Failed'
 				IF @RunStatus='1' SET @RunStatus='Succeded'				
@@ -216,9 +226,11 @@ ELSE
 		ELSE
 			begin
 				IF OBJECT_ID('tempdb..#JobRunDetail2') IS NOT NULL DROP TABLE #JobRunDetail2
-				CREATE TABLE #JobRunDetail2(message varchar(4000), step_id int, step_name varchar(255), run_status int, run_date varchar(16), run_time varchar(16), run_duration varchar(16))
+				CREATE TABLE #JobRunDetail2(message varchar(4000), step_id int, step_name varchar(255), run_status int, run_date varchar(16), run_time varchar(16), run_duration varchar(16), event_time [datetime])
 
-				SET @queryToRun='SELECT TOP 1 h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+				SET @queryToRun='SELECT TOP 1 h.[message], h.[step_id], h.[step_name], h.[run_status]
+											, CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+											, GETDATE() AS [event_time]
 								FROM [msdb].[dbo].[sysjobs] j 
 								RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
 								WHERE	j.[name]=''' + @jobName + ''' 
@@ -238,9 +250,17 @@ ELSE
 				SET @RunDate	=null
 				SET @RunTime	=null
 				SET @RunDuration=null
-				SELECT TOP 1 @Message=[message], @StepID=[step_id], @StepName=[step_name], @RunDate=[run_date], @RunTime=[run_time], @RunDuration=[run_duration] FROM #JobRunDetail2
+				SET @EventTime	=null
+				SELECT TOP 1  @Message		= [message]
+							, @StepID		= [step_id]
+							, @StepName		= [step_name]
+							, @RunDate		= [run_date]
+							, @RunTime		= [run_time]
+							, @RunDuration	= [run_duration] 
+							, @EventTime	= [event_time]
+				FROM #JobRunDetail2
 				
-				SET @queryToRun='SELECT TOP 1 null, null, null, [run_status], null, null, CAST([run_duration] AS varchar) AS [RunDuration]
+				SET @queryToRun='SELECT TOP 1 null, null, null, [run_status], null, null, CAST([run_duration] AS varchar) AS [RunDuration], null
 								FROM [msdb].[dbo].[sysjobhistory]
 								WHERE	[job_id] IN (
 													 SELECT [job_id] FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + @jobName + '''
@@ -391,6 +411,7 @@ ELSE
 
 				SET @lastExecutionDate=@RunDate
 				SET @lastExecutionTime=@RunTime
+				SET @runningTimeSec = CAST(SUBSTRING(@RunDurationLast, 1, 2) AS [bigint])*3600 + CAST(SUBSTRING(@RunDurationLast, 4, 2) AS [bigint])*60 + CAST(SUBSTRING(@RunDurationLast, 7, 2) AS [bigint])
 
 				SET @ReturnValue=@lastExecutionStatus
 				IF OBJECT_ID('tempdb..#JobRunDetail2') IS NOT NULL DROP TABLE #JobRunDetail2

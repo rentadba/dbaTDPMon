@@ -39,6 +39,7 @@ DECLARE @sqlServerName			[sysname],
 		@lastExecutionStatus	[int],
 		@lastExecutionDate		[varchar](10),
 		@lastExecutionTime		[varchar](10),
+		@runningTimeSec			[bigint],
 		@projectID				[smallint],
 		@instanceID				[smallint],
 		@strMessage				[nvarchar](max)
@@ -142,12 +143,15 @@ WHILE @@FETCH_STATUS=0
 															@lastExecutionStatus	= @lastExecutionStatus OUT,
 															@lastExecutionDate		= @lastExecutionDate OUT,
 															@lastExecutionTime 		= @lastExecutionTime OUT,
+															@runningTimeSec			= @runningTimeSec OUT,
 															@selectResult			= 0,
 															@extentedStepDetails	= 0,		
 															@debugMode				= @debugMode
 
-					INSERT	INTO [dbo].[statsSQLServerAgentJobsHistory]([instance_id], [project_id], [event_date_utc], [job_name], [message], [last_execution_status], [last_execution_date], [last_execution_time])
-							SELECT @instanceID, @projectID, GETUTCDATE(), @jobName, @strMessage, @lastExecutionStatus, @lastExecutionDate, @lastExecutionTime
+					INSERT	INTO [dbo].[statsSQLServerAgentJobsHistory]([instance_id], [project_id], [event_date_utc], [job_name], [message], [last_execution_status], [last_execution_date], [last_execution_time], [running_time_sec])
+							SELECT	  @instanceID, @projectID, GETUTCDATE(), @jobName, @strMessage
+									, @lastExecutionStatus, @lastExecutionDate, @lastExecutionTime
+									, @runningTimeSec
 				END TRY
 				BEGIN CATCH
 					INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])

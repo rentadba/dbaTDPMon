@@ -671,7 +671,8 @@ BEGIN TRY
 			@currentRunning			[int],	
 			@lastExecutionStatus	[int],
 			@lastExecutionDate		[varchar](10),
-			@lastExecutionTime 		[varchar](8)
+			@lastExecutionTime 		[varchar](8),
+			@runningTimeSec			[bigint]
 
 	EXEC [dbo].[usp_sqlAgentJobCheckStatus]	@sqlServerName			= @@SERVERNAME,
 											@jobName				= @analysisJobName,
@@ -680,6 +681,7 @@ BEGIN TRY
 											@lastExecutionStatus	= @lastExecutionStatus OUT,
 											@lastExecutionDate		= @lastExecutionDate OUT,
 											@lastExecutionTime 		= @lastExecutionTime OUT,
+											@runningTimeSec			= @runningTimeSec OUT,
 											@selectResult			= 0,
 											@extentedStepDetails	= 0,		
 											@debugMode				= 0
@@ -1598,13 +1600,13 @@ BEGIN TRY
 			SET @dateTimeLowerLimit = DATEADD(hh, -@configFailuresInLastHours, GETUTCDATE())
 			DECLARE crsLongRunningSQLAgentJobsIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT	  [instance_name], [job_name]
 																								, [last_execution_date] AS [start_date], [last_execution_time] AS [start_time]
-																								, [dbo].[ufn_reportHTMLFormatTimeValue]([dbo].[ufn_getMilisecondsBetweenDates](CONVERT([datetime], [last_execution_date] + ' ' + [last_execution_time], 120), GETDATE())) AS [running_time]
+																								, [dbo].[ufn_reportHTMLFormatTimeValue](CAST([running_time_sec]*1000 AS [bigint])) AS [running_time]
 																								, [message]
 																						FROM [dbo].[vw_statsSQLServerAgentJobsHistory]
 																						WHERE [last_execution_status] = 4
 																								AND [last_execution_date] IS NOT NULL
 																								AND [last_execution_time] IS NOT NULL
-																								AND DATEDIFF(hh, CONVERT([datetime], [last_execution_date] + ' ' + [last_execution_time], 120), GETDATE())>=@configMaxJobRunningTimeInHours
+																								AND ([running_time_sec]/3600) >= @configMaxJobRunningTimeInHours
 																						ORDER BY [start_date], [start_time]
 
 			OPEN crsLongRunningSQLAgentJobsIssuesDetected
