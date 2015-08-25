@@ -42,7 +42,19 @@ DECLARE @sqlServerName			[sysname],
 		@runningTimeSec			[bigint],
 		@projectID				[smallint],
 		@instanceID				[smallint],
+		@collectStepDetails		[bit],
 		@strMessage				[nvarchar](max)
+
+
+-----------------------------------------------------------------------------------------------------
+--appConfigurations - check if step details should be collected
+-----------------------------------------------------------------------------------------------------
+SELECT	@collectStepDetails = CASE WHEN LOWER([value])='true' THEN 1 ELSE 0 END
+FROM	[dbo].[appConfigurations]
+WHERE	[name]='Collect SQL Agent jobs step details (health-check)'
+
+SET @collectStepDetails = ISNULL(@collectStepDetails, 0)
+
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
 IF object_id('#msdbSysJobs') IS NOT NULL DROP TABLE #msdbSysJobs
@@ -145,7 +157,7 @@ WHILE @@FETCH_STATUS=0
 															@lastExecutionTime 		= @lastExecutionTime OUT,
 															@runningTimeSec			= @runningTimeSec OUT,
 															@selectResult			= 0,
-															@extentedStepDetails	= 0,		
+															@extentedStepDetails	= @collectStepDetails,		
 															@debugMode				= @debugMode
 
 					INSERT	INTO [dbo].[statsSQLServerAgentJobsHistory]([instance_id], [project_id], [event_date_utc], [job_name], [message], [last_execution_status], [last_execution_date], [last_execution_time], [running_time_sec])

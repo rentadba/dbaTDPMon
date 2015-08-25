@@ -53,7 +53,8 @@ INSERT	INTO [dbo].[appConfigurations] ([name], [value])
 		  SELECT 'Ignore alerts for: Error 1222 - Lock request time out period exceeded'		AS [name], 'true'		AS [value]		UNION ALL
 		  SELECT 'Change retention policy from RetentionDays to RetentionBackupsCount'			AS [name], 'true'		AS [value]		UNION ALL
 		  SELECT 'Force cleanup of ghost records'												AS [name], 'false'		AS [value]		UNION ALL
-		  SELECT 'Ghost records cleanup threshold'												AS [name], '131072'		AS [value]
+		  SELECT 'Ghost records cleanup threshold'												AS [name], '131072'		AS [value]		UNION ALL
+		  SELECT 'Collect SQL Agent jobs step details (health-check)'							AS [name], 'false'		AS [value]
 GO
 
 ---------------------------------------------------------------------------------------------

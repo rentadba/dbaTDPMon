@@ -1528,7 +1528,9 @@ BEGIN TRY
 				begin
 					SET @message = CASE WHEN LEFT(@message, 2) = '--' THEN SUBSTRING(@message, 3, LEN(@message)) ELSE @message END
 					SET @message = ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') 
+					SET @message = REPLACE(@message, CHAR(13), N'<BR>')
 					SET @message = REPLACE(@message, '--', N'<BR>')
+					SET @message = REPLACE(@message, N'<BR><BR>', N'<BR>')
 
 					SET @tmpHTMLReport=@tmpHTMLReport + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
@@ -1615,7 +1617,9 @@ BEGIN TRY
 				begin
 					SET @message = CASE WHEN LEFT(@message, 2) = '--' THEN SUBSTRING(@message, 3, LEN(@message)) ELSE @message END
 					SET @message = ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') 
+					SET @message = REPLACE(@message, CHAR(13), N'<BR>')
 					SET @message = REPLACE(@message, '--', N'<BR>')
+					SET @message = REPLACE(@message, N'<BR><BR>', N'<BR>')
 
 					SET @tmpHTMLReport=@tmpHTMLReport + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
@@ -3172,7 +3176,9 @@ BEGIN TRY
 						begin
 							SET @message = CASE WHEN LEFT(@message, 2) = '--' THEN SUBSTRING(@message, 3, LEN(@message)) ELSE @message END
 							SET @message = ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') 
+							SET @message = REPLACE(@message, CHAR(13), N'<BR>')
 							SET @message = REPLACE(@message, '--', N'<BR>')
+							SET @message = REPLACE(@message, N'<BR><BR>', N'<BR>')
 
 							SET @tmpHTMLReport=@tmpHTMLReport + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT">' + @jobName + N'</TD>' + 
