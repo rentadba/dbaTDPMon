@@ -37,6 +37,7 @@ DECLARE 	@Message 			[varchar](8000),
 			@StepName			[varchar](255),
 			@JobID				[varchar](255),
 			@StepID				[int],
+			@JobSessionID		[int],
 			@RunDate			[varchar](10),
 			@RunDateDetail		[varchar](10),
 			@RunTime			[varchar](8),
@@ -110,19 +111,22 @@ ELSE
 		IF OBJECT_ID('tempdb..#runningSQLAgentJobsProcess') IS NOT NULL DROP TABLE #runningSQLAgentJobsProcess
 		CREATE TABLE #runningSQLAgentJobsProcess
 			(
-				  [step_id] [int], 
-				  [job_id]	[uniqueidentifier]
+				  [step_id]		[int], 
+				  [job_id]		[uniqueidentifier],
+				  [session_id]	[int]
 			)
 		
 		--check for active processes started by SQL Agent job
 		SET @currentRunning=0
-		SET @queryToRun=N'SELECT DISTINCT sp.[step_id], sp.[job_id]
+		SET @queryToRun=N'SELECT DISTINCT sp.[step_id], sp.[job_id], sp.[spid]
 						FROM (
 							  SELECT  [step_id]
 									, SUBSTRING([job_id], 7, 2) + SUBSTRING([job_id], 5, 2) + SUBSTRING([job_id], 3, 2) + LEFT([job_id], 2) + ''-'' + SUBSTRING([job_id], 11, 2) + SUBSTRING([job_id], 9, 2) + ''-'' + SUBSTRING([job_id], 15, 2) + SUBSTRING([job_id], 13, 2) + ''-'' + SUBSTRING([job_id], 17, 4) + ''-'' + RIGHT([job_id], 12) AS [job_id] 
+									, [spid]
  							  FROM (
 									SELECT SUBSTRING([program_name], CHARINDEX('': Step'', [program_name]) + 7, LEN([program_name]) - CHARINDEX('': Step'', [program_name]) - 7) [step_id]
 										 , SUBSTRING([program_name], CHARINDEX(''(Job 0x'', [program_name]) + 7, CHARINDEX('' : Step '', [program_name]) - CHARINDEX(''(Job 0x'', [program_name]) - 7) [job_id]
+										 , [spid]
 			 						FROM [master].[dbo].[sysprocesses] 
 									WHERE [program_name] LIKE ''SQLAgent - %JobStep%''
 								   ) sp
@@ -130,7 +134,7 @@ ELSE
 						INNER JOIN [msdb].[dbo].[sysjobs] sj ON sj.[job_id] = sp.[job_id]
 						WHERE sj.[name]= ''' + @jobName + N'''
 						UNION
-						SELECT DISTINCT sjs.[step_id], sj.[job_id]
+						SELECT DISTINCT sjs.[step_id], sj.[job_id], sp.[spid]
 						FROM [master].[dbo].[sysprocesses] sp
 						INNER JOIN [msdb].[dbo].[sysjobs]		sj  ON sj.[name] = sp.[program_name]
 						INNER JOIN [msdb].[dbo].[sysjobsteps]	sjs ON sjs.[job_id] = sj.[job_id]
@@ -138,15 +142,17 @@ ELSE
 						WHERE sj.[name]= ''' + @jobName + N''''
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode = 1 PRINT @queryToRun
-		INSERT	INTO #runningSQLAgentJobsProcess([step_id], [job_id])
+		INSERT	INTO #runningSQLAgentJobsProcess([step_id], [job_id], [session_id])
 				EXEC (@queryToRun)
 
 		SET @StepID = NULL
 		SET @JobID  = NULL
+		SET @JobSessionID = NULL
 
 		SELECT @currentRunning = COUNT(*) FROM #runningSQLAgentJobsProcess
 		SELECT TOP 1  @StepID = [step_id]
 					, @JobID  = CAST([job_id] AS [varchar](255))
+					, @JobSessionID = [session_id]
 		FROM #runningSQLAgentJobsProcess	
 
 		IF OBJECT_ID('tempdb..#runningSQLAgentJobsProcess') IS NOT NULL DROP TABLE #runningSQLAgentJobsProcess
@@ -199,28 +205,41 @@ ELSE
 				INSERT	INTO #jobStartInfo([start_date], [start_time], [run_status], [event_time])
 						EXEC (@queryToRun)
 
-				/* job was cancelled, but process is still running, probably performing a rollback */
+				
 				IF (SELECT COUNT(*) FROM #jobStartInfo)=0
 					begin
-						SET @queryToRun=N'SELECT TOP 1 CAST(h.[run_date] AS varchar) AS [start_date]
-													, CAST(h.[run_time] AS varchar) AS [start_time]
-													, h.[run_status]
-													, GETDATE() AS [event_time]
-										FROM [msdb].[dbo].[sysjobs] j 
-										RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-										WHERE j.[name]=''' + @jobName + N''' 
-												AND h.[instance_id] = (
-																		/* last job completion id */
-																		SELECT TOP 1 h1.[instance_id]
-																		FROM [msdb].[dbo].[sysjobs] j1 
-																		RIGHT JOIN [msdb].[dbo].[sysjobhistory] h1 ON j1.[job_id] = h1.[job_id] 
-																		WHERE j1.[name]=''' + @jobName + N''' 
-																				AND [step_name] =''(Job outcome)''
-																		ORDER BY h1.[instance_id] DESC
-																		)
-										ORDER BY h.[instance_id] ASC'
-								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-								IF @debugMode = 1 PRINT @queryToRun
+						IF @StepID <> 1
+							begin
+								/* job was cancelled, but process is still running, probably performing a rollback */
+								SET @queryToRun=N'SELECT TOP 1 CAST(h.[run_date] AS varchar) AS [start_date]
+															, CAST(h.[run_time] AS varchar) AS [start_time]
+															, h.[run_status]
+															, GETDATE() AS [event_time]
+												FROM [msdb].[dbo].[sysjobs] j 
+												RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
+												WHERE j.[name]=''' + @jobName + N''' 
+														AND h.[instance_id] = (
+																				/* last job completion id */
+																				SELECT TOP 1 h1.[instance_id]
+																				FROM [msdb].[dbo].[sysjobs] j1 
+																				RIGHT JOIN [msdb].[dbo].[sysjobhistory] h1 ON j1.[job_id] = h1.[job_id] 
+																				WHERE j1.[name]=''' + @jobName + N''' 
+																						AND [step_name] =''(Job outcome)''
+																				ORDER BY h1.[instance_id] DESC
+																				)
+												ORDER BY h.[instance_id] ASC'
+							end
+						ELSE
+							begin
+								SET @queryToRun=N'SELECT  REPLACE(SUBSTRING(CONVERT([varchar](19), [login_time], 120), 1, 10), ''-'', '''')  AS [start_date]
+														, REPLACE(SUBSTRING(CONVERT([varchar](19), [login_time], 120), 12, 19), '':'', '''') AS [start_time]
+														, 4 AS [run_status]
+														, GETDATE() AS [event_time]
+												FROM [master].[dbo].[sysprocesses]
+												WHERE [spid] = ' + CAST(@JobSessionID AS [nvarchar])
+							end
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+						IF @debugMode = 1 PRINT @queryToRun
 
 						INSERT	INTO #jobStartInfo([start_date], [start_time], [run_status], [event_time])
 								EXEC (@queryToRun)
