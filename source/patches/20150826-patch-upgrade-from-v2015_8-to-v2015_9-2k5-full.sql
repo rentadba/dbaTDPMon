@@ -5838,6 +5838,7 @@ BEGIN TRY
 																								OR eld.[text] LIKE '%Database differential changes backed up%'
 																								OR eld.[text] LIKE '%Database differential changes were backed up.%'
 																								OR eld.[text] LIKE '%BACKUP DATABASE WITH DIFFERENTIAL successfully%'
+																								OR eld.[text] LIKE '%BACKUP % successfully processed % pages%'
 																								OR eld.[text] LIKE '%This is an informational message%user action is required%'
 																								OR eld.[text] LIKE '%Analysis of database%complete (approximately%more seconds)%'
 
@@ -5915,6 +5916,7 @@ BEGIN TRY
 																											OR eld.[text] LIKE '%Database differential changes backed up%'
 																											OR eld.[text] LIKE '%Database differential changes were backed up.%'
 																											OR eld.[text] LIKE '%BACKUP DATABASE WITH DIFFERENTIAL successfully%'
+																											OR eld.[text] LIKE '%BACKUP % successfully processed % pages%'
 																											OR eld.[text] LIKE '%This is an informational message%user action is required%'
 																											OR eld.[text] LIKE '%Analysis of database%complete (approximately%more seconds)%'
 
