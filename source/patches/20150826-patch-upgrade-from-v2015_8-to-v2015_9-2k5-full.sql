@@ -4412,7 +4412,7 @@ BEGIN TRY
 																							FROM	[dbo].[vw_statsSQLServerAgentJobsHistory]
 																							WHERE	[project_id]=@projectID
 																									AND [last_execution_status] NOT IN (1, 4) /* 1 = Succeded; 4 = In progress */
-																									AND CONVERT([datetime], [last_execution_date], 120) >= @dateTimeLowerLimit
+																									AND CONVERT([datetime], [last_execution_date] + ' ' + [last_execution_time], 120) >= @dateTimeLowerLimit
 			OPEN crsSQLServerAgentJobsStatusIssuesDetected
 			FETCH NEXT FROM crsSQLServerAgentJobsStatusIssuesDetected INTO @instanceName, @jobName, @lastExecStatus, @lastExecDate, @lastExecTime, @message
 			WHILE @@FETCH_STATUS=0
@@ -5837,6 +5837,7 @@ BEGIN TRY
 																								OR eld.[text] LIKE '%Database backed up%'
 																								OR eld.[text] LIKE '%Database differential changes backed up%'
 																								OR eld.[text] LIKE '%Database differential changes were backed up.%'
+																								OR eld.[text] LIKE '%BACKUP DATABASE WITH DIFFERENTIAL successfully%'
 																								OR eld.[text] LIKE '%This is an informational message%user action is required%'
 																								OR eld.[text] LIKE '%Analysis of database%complete (approximately%more seconds)%'
 
@@ -5913,6 +5914,7 @@ BEGIN TRY
 																											OR eld.[text] LIKE '%Database backed up%'
 																											OR eld.[text] LIKE '%Database differential changes backed up%'
 																											OR eld.[text] LIKE '%Database differential changes were backed up.%'
+																											OR eld.[text] LIKE '%BACKUP DATABASE WITH DIFFERENTIAL successfully%'
 																											OR eld.[text] LIKE '%This is an informational message%user action is required%'
 																											OR eld.[text] LIKE '%Analysis of database%complete (approximately%more seconds)%'
 

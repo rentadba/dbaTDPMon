@@ -1521,7 +1521,7 @@ BEGIN TRY
 																							FROM	[dbo].[vw_statsSQLServerAgentJobsHistory]
 																							WHERE	[project_id]=@projectID
 																									AND [last_execution_status] NOT IN (1, 4) /* 1 = Succeded; 4 = In progress */
-																									AND CONVERT([datetime], [last_execution_date], 120) >= @dateTimeLowerLimit
+																									AND CONVERT([datetime], [last_execution_date] + ' ' + [last_execution_time], 120) >= @dateTimeLowerLimit
 			OPEN crsSQLServerAgentJobsStatusIssuesDetected
 			FETCH NEXT FROM crsSQLServerAgentJobsStatusIssuesDetected INTO @instanceName, @jobName, @lastExecStatus, @lastExecDate, @lastExecTime, @message
 			WHILE @@FETCH_STATUS=0
