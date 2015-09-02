@@ -3,7 +3,8 @@ GO
 IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[ufn_hcGetIndexesFrequentlyFragmented]') AND type in (N'FN', N'IF', N'TF', N'FS', N'FT'))
 DROP FUNCTION [dbo].[ufn_hcGetIndexesFrequentlyFragmented]
 GO
-
+SET QUOTED_IDENTIFIER ON
+GO
 CREATE FUNCTION [dbo].[ufn_hcGetIndexesFrequentlyFragmented]
 (		
 	@projectCode							[varchar](32)=NULL,

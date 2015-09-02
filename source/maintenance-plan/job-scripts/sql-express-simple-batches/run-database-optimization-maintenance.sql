@@ -12,7 +12,8 @@ DECLARE @databaseName [sysname]
 
 DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 							FROM master.dbo.sysdatabases
-							WHERE [status] <> 0
+							WHERE [name] NOT IN ('tempdb')
+								  AND [status] <> 0
 								  AND CASE WHEN [status] & 32 = 32 THEN 'LOADING'
 											WHEN [status] & 64 = 64 THEN 'PRE RECOVERY'
 											WHEN [status] & 128 = 128 THEN 'RECOVERING'

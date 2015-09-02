@@ -266,3 +266,10 @@
 	- fixed small bugs on health-check HTML report
 	- version 2015.9 released
 
+	
+/*----------------------------------------------------------------------*/
+/* September 2015 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 02.09.2015 */
+	- add support for SQL Server 2000 when automatically lower the fill-factor (dbo.usp_hcChangeFillFactorForIndexesFrequentlyFragmented)
+	

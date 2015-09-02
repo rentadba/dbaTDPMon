@@ -12,6 +12,7 @@ DECLARE @databaseName [sysname]
 
 DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 							FROM master.dbo.sysdatabases
+							WHERE [name] NOT IN ('tempdb')
 OPEN crsDatabases
 FETCH NEXT FROM crsDatabases INTO @databaseName
 WHILE @@FETCH_STATUS=0
