@@ -103,6 +103,10 @@ if errorlevel 1 goto install_err
 if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.reportHTMLOptions.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.catalogHardcodedFilters.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+
 sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_catalogInstanceNames.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -231,6 +235,9 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsSQLServerErrorlogDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsOSEventLogs.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsHealthCheckDatabaseDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -241,6 +248,9 @@ sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsHealthChe
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsSQLServerErrorlogDetails.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsOSEventLogs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 
@@ -262,6 +272,9 @@ sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_h
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectErrorlogMessages.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectOSEventLogs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_reportHTMLBuildHealthCheck.sql" -d %dbname%  -b -r 1
