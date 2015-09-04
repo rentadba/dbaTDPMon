@@ -1522,6 +1522,7 @@ BEGIN TRY
 																							WHERE	[project_id]=@projectID
 																									AND [last_execution_status] NOT IN (1, 4) /* 1 = Succeded; 4 = In progress */
 																									AND CONVERT([datetime], [last_execution_date] + ' ' + [last_execution_time], 120) >= @dateTimeLowerLimit
+																							ORDER BY [instance_name], [job_name], [last_execution_date], [last_execution_time]
 			OPEN crsSQLServerAgentJobsStatusIssuesDetected
 			FETCH NEXT FROM crsSQLServerAgentJobsStatusIssuesDetected INTO @instanceName, @jobName, @lastExecStatus, @lastExecDate, @lastExecTime, @message
 			WHILE @@FETCH_STATUS=0
@@ -1537,11 +1538,12 @@ BEGIN TRY
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @jobName + N'</TD>' + 
 										N'<TD WIDTH="110px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @lastExecStatus = 0 THEN N'Failed'
-																									WHEN @lastExecStatus = 1 THEN N'Succeded'
-																									WHEN @lastExecStatus = 2 THEN N'Retry'
-																									WHEN @lastExecStatus = 3 THEN N'Canceled'
-																									WHEN @lastExecStatus = 4 THEN N'In progress'
-																								END
+																											WHEN @lastExecStatus = 1 THEN N'Succeded'
+																											WHEN @lastExecStatus = 2 THEN N'Retry'
+																											WHEN @lastExecStatus = 3 THEN N'Canceled'
+																											WHEN @lastExecStatus = 4 THEN N'In progress'
+																											ELSE N'Unknown'
+																										END
 										 + N'</TD>' + 
 										N'<TD WIDTH="80px" class="details" ALIGN="CENTER" nowrap>' + @lastExecDate + N'</TD>' + 
 										N'<TD WIDTH="80px" class="details" ALIGN="CENTER" nowrap>' + @lastExecTime + N'</TD>' + 

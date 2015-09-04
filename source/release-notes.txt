@@ -272,4 +272,6 @@
 /*----------------------------------------------------------------------*/
 /* 02.09.2015 */
 	- add support for SQL Server 2000 when automatically lower the fill-factor (dbo.usp_hcChangeFillFactorForIndexesFrequentlyFragmented)
-	
+
+/* 04.09.2015 */
+	- fixed small bugs on health-check HTML report
