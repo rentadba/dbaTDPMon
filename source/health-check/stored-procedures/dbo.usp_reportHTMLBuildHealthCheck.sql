@@ -141,9 +141,10 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	--get default project code
 	IF @projectCode IS NULL
-		SELECT @projectCode = [value]
-		FROM [dbo].[appConfigurations]
-		WHERE [name] = 'Default project code'
+		SELECT	@projectCode = [value]
+		FROM	[dbo].[appConfigurations]
+		WHERE	[name] = 'Default project code'
+				AND [module] = 'common'
 
 	SELECT    @projectID = [id]
 			, @projectName = [name]
@@ -189,7 +190,7 @@ BEGIN TRY
 	SELECT	@configAdmittedState = [value]
 	FROM	[dbo].[reportHTMLOptions]
 	WHERE	[name] = N'Database online admitted state'
-			AND [report_type_id]=0
+			AND [module] = 'health-check'
 
 	SET @configAdmittedState = ISNULL(@configAdmittedState, 'ONLINE, READ ONLY')
 			
@@ -198,7 +199,7 @@ BEGIN TRY
 		SELECT	@configDBMaxSizeMaster = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'Database max size (mb) - master'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configDBMaxSizeMaster = 0
@@ -210,7 +211,7 @@ BEGIN TRY
 		SELECT	@configDBMaxSizeMSDB = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'Database max size (mb) - msdb'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configDBMaxSizeMSDB = 0
@@ -222,7 +223,7 @@ BEGIN TRY
 		SELECT	@configLogMaxSize = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'Database Max Log Size (mb)'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configLogMaxSize = 32768
@@ -234,7 +235,7 @@ BEGIN TRY
 		SELECT	@configDataSpaceMinPercent = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'Database Min Data Usage (percent)'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configDataSpaceMinPercent = 50
@@ -246,7 +247,7 @@ BEGIN TRY
 		SELECT	@configLogSpaceMaxPercent = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'Database Max Log Usage (percent)'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configLogSpaceMaxPercent = 90
@@ -258,7 +259,7 @@ BEGIN TRY
 		SELECT	@configDBMinSizeForAnalysis = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'Database Min Size for Analysis (mb)'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configDBMinSizeForAnalysis = 512
@@ -270,7 +271,7 @@ BEGIN TRY
 		SELECT	@configLogVsDataPercent = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'Database Log vs. Data Size (percent)'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configLogVsDataPercent = 50
@@ -282,7 +283,7 @@ BEGIN TRY
 		SELECT	@configFailuresInLastHours = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'SQL Agent Job - Failures in last hours'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configFailuresInLastHours = 24
@@ -294,7 +295,7 @@ BEGIN TRY
 		SELECT	@configUserDatabaseBACKUPAgeDays = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'User Database BACKUP Age (days)'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configUserDatabaseBACKUPAgeDays = 2
@@ -306,7 +307,7 @@ BEGIN TRY
 		SELECT	@configSystemDatabaseBACKUPAgeDays = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'System Database BACKUP Age (days)'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configSystemDatabaseBACKUPAgeDays = 14
@@ -318,7 +319,7 @@ BEGIN TRY
 		SELECT	@configUserDBCCCHECKDBAgeDays = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'User Database DBCC CHECKDB Age (days)'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configUserDBCCCHECKDBAgeDays = 30
@@ -330,7 +331,7 @@ BEGIN TRY
 		SELECT	@configSystemDBCCCHECKDBAgeDays = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'System Database DBCC CHECKDB Age (days)'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configSystemDBCCCHECKDBAgeDays = 90
@@ -342,7 +343,7 @@ BEGIN TRY
 		SELECT	@configFreeDiskMinPercent = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'Free Disk Space Min Percent (percent)'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configFreeDiskMinPercent = 10
@@ -354,7 +355,7 @@ BEGIN TRY
 		SELECT	@configFreeDiskMinSpace = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'Free Disk Space Min Space (mb)'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configFreeDiskMinSpace = 3000
@@ -366,7 +367,7 @@ BEGIN TRY
 		SELECT	@configErrorlogMessageLastHours = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'Errorlog Messages in last hours'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configErrorlogMessageLastHours = 24
@@ -378,7 +379,7 @@ BEGIN TRY
 		SELECT	@configErrorlogMessageLimit = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'Errorlog Messages Limit to Max'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configErrorlogMessageLimit = 1000
@@ -392,7 +393,7 @@ BEGIN TRY
 		SELECT	@configMaxJobRunningTimeInHours = [value]
 		FROM	[dbo].[reportHTMLOptions]
 		WHERE	[name] = N'SQL Agent Job - Maximum Running Time (hours)'
-				AND [report_type_id]=0
+				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
 		SET @configMaxJobRunningTimeInHours = 3
@@ -2529,7 +2530,7 @@ BEGIN TRY
 			SELECT	@minimumIndexMaintenanceFrequencyDays = [value]
 			FROM	[dbo].[reportHTMLOptions]
 			WHERE	[name] = N'Minimum Index Maintenance Frequency (days)'
-					AND [report_type_id]=0
+					AND [module] = 'health-check'
 
 			SET @minimumIndexMaintenanceFrequencyDays = ISNULL(@minimumIndexMaintenanceFrequencyDays, 2)
 
@@ -2537,7 +2538,7 @@ BEGIN TRY
 			SELECT	@analyzeOnlyMessagesFromTheLastHours = [value]
 			FROM	[dbo].[reportHTMLOptions]
 			WHERE	[name] = N'Analyze Only Messages from the last hours'
-					AND [report_type_id]=0
+					AND [module] = 'health-check'
 
 			SET @analyzeOnlyMessagesFromTheLastHours = ISNULL(@analyzeOnlyMessagesFromTheLastHours, 24)
 	
@@ -2545,7 +2546,7 @@ BEGIN TRY
 			SELECT	@analyzeIndexMaintenanceOperation = [value]
 			FROM	[dbo].[reportHTMLOptions]
 			WHERE	[name] = N'Analyze Index Maintenance Operation'
-					AND [report_type_id]=0
+					AND [module] = 'health-check'
 
 			
 			SET @HTMLReportArea=N''
@@ -2937,65 +2938,14 @@ BEGIN TRY
 																				WHERE cin.[instance_active]=1
 																						AND cin.[project_id] = @projectID																							
 																						AND eld.[log_date] >= @dateTimeLowerLimit
-																						AND NOT (  eld.[text] LIKE '%Attempting to cycle errorlog%'
-																								OR eld.[text] LIKE '%error%log has been reinitialized%'
-																								OR eld.[text] LIKE '%without errors%'
-																								OR eld.[text] LIKE '%found 0 errors and repaired 0 errors%'
-																								OR eld.[text] LIKE '%Log was backed up%'
-																								OR eld.[text] LIKE '%Log backed up%'
-																								OR eld.[text] LIKE '%Log was restored%'
-																								OR eld.[text] LIKE '%Database was backed up%'
-																								OR eld.[text] LIKE '%Database backed up%'
-																								OR eld.[text] LIKE '%Database differential changes backed up%'
-																								OR eld.[text] LIKE '%Database differential changes were backed up.%'
-																								OR eld.[text] LIKE '%BACKUP DATABASE WITH DIFFERENTIAL successfully%'
-																								OR eld.[text] LIKE '%BACKUP % successfully processed % pages%'
-																								OR eld.[text] LIKE '%This is an informational message%user action is required%'
-																								OR eld.[text] LIKE '%Analysis of database%complete (approximately%more seconds)%'
-
-																								OR eld.[text] LIKE '%Microsoft Corporation%'
-																								OR eld.[text] LIKE '%Microsoft SQL Server%'
-																								OR eld.[text] LIKE '%All rights reserved.%'
-																								OR eld.[text] LIKE '%Server process ID is%'
-																								OR eld.[text] LIKE '%System Manufacturer:%'
-																								OR eld.[text] LIKE '%Authentication mode is%'
-																								OR eld.[text] LIKE '%Logging SQL Server messages in file%'
-																								OR eld.[text] LIKE '%Registry startup parameters:%'
-																								OR eld.[text] LIKE '%Command Line Startup Parameters:%'
-																								OR eld.[text] LIKE '%SQL Server is%'
-																								OR eld.[text] LIKE '%FILESTREAM: effective level = %, configured level = %, file system access share name = %'
-																								OR eld.[text] LIKE '%Server name is %'
-																								OR eld.[text] LIKE '%Clearing tempdb database.%'
-																								OR eld.[text] LIKE '%A self-generated certificate was successfully loaded for encryption.%'
-																								OR eld.[text] LIKE '%SQL server listening %'
-																								OR eld.[text] LIKE '%Server is listening %'
-																								OR eld.[text] LIKE '%Server % provider is ready to accept connection%'
-																								OR eld.[text] LIKE '%Dedicated admin connection support was established for listening%'
-																								OR eld.[text] LIKE '%The SQL Server Network Interface library successfully registered%'
-																								OR eld.[text] LIKE '%Resource governor reconfiguration succeeded.%'
-																								OR eld.[text] LIKE '%The % protocol transport is disabled or not configured%'
-																								OR eld.[text] LIKE '%The % endpoint is in disabled or stopped state.%'
-																								OR eld.[text] LIKE '%Service Broker manager has started.%'
-																								OR eld.[text] LIKE '%Using conventional memory in the memory manager.%'
-																								OR eld.[text] LIKE '%Software Usage Metrics is disabled.%'
-																								OR eld.[text] LIKE '%Using % version %'
-																								OR eld.[text] LIKE '%CLR version % loaded%'
-																								OR eld.[text] LIKE '%Address Windowing Extensions enabled.%'
-																								OR eld.[text] LIKE '%SQL Trace ID 1 was started by login "sa".%'
-																								OR eld.[text] LIKE '%A new instance of the full-text filter daemon host process has been successfully started.%'
-																								OR eld.[text] LIKE '%Attempting to initialize Distributed Transaction Coordinator.%'
-																								OR eld.[text] LIKE '%Informational: No full-text supported languages found.%'
-
-																								OR eld.[text] LIKE '%Starting up database%'
-																								OR eld.[text] LIKE '%The database % is marked RESTORING and is in a state that does not allow recovery to be run.%'
-																								OR eld.[text] LIKE '%Setting database option % to % for database %'
-																								OR eld.[text] LIKE '%Configuration option % changed from % to %. Run the RECONFIGURE statement to install.%'
-																								OR eld.[text] LIKE '%SQL Server blocked access to procedure ''sys.xp_cmdshell'' of component ''xp_cmdshell''%'
-
-																								OR eld.[text] LIKE '%Error: 18456, Severity: 14, State: %'
-																								OR eld.[text] LIKE '%Login failed for user %'
-																								OR eld.[text] LIKE '%SQL Trace%'
-																								)
+																						AND NOT EXISTS	( 
+																											SELECT 1
+																											FROM	[dbo].[catalogHardcodedFilters] chf 
+																											WHERE	chf.[module] = 'health-check'
+																													AND chf.[object_name] = 'dbo.statsSQLServerErrorlogDetails'
+																													AND chf.[active] = 1
+																													AND PATINDEX(chf.[filter_pattern], eld.[text]) > 0
+																										)
 																				GROUP BY cin.[instance_name]
 																				ORDER BY cin.[instance_name]
 			OPEN crsErrorlogMessagesInstanceName
@@ -3015,65 +2965,14 @@ BEGIN TRY
 																							WHERE	eld.[project_id]=@projectID
 																									AND eld.[instance_name] = @instanceName
 																									AND eld.[log_date] >= @dateTimeLowerLimit
-																									AND NOT (  eld.[text] LIKE '%Attempting to cycle errorlog%'
-																											OR eld.[text] LIKE '%error%log has been reinitialized%'
-																											OR eld.[text] LIKE '%without errors%'
-																											OR eld.[text] LIKE '%found 0 errors and repaired 0 errors%'
-																											OR eld.[text] LIKE '%Log was backed up%'
-																											OR eld.[text] LIKE '%Log backed up%'
-																											OR eld.[text] LIKE '%Log was restored%'
-																											OR eld.[text] LIKE '%Database was backed up%'
-																											OR eld.[text] LIKE '%Database backed up%'
-																											OR eld.[text] LIKE '%Database differential changes backed up%'
-																											OR eld.[text] LIKE '%Database differential changes were backed up.%'
-																											OR eld.[text] LIKE '%BACKUP DATABASE WITH DIFFERENTIAL successfully%'
-																											OR eld.[text] LIKE '%BACKUP % successfully processed % pages%'
-																											OR eld.[text] LIKE '%This is an informational message%user action is required%'
-																											OR eld.[text] LIKE '%Analysis of database%complete (approximately%more seconds)%'
-
-																											OR eld.[text] LIKE '%Microsoft Corporation%'
-																											OR eld.[text] LIKE '%Microsoft SQL Server%'
-																											OR eld.[text] LIKE '%All rights reserved.%'
-																											OR eld.[text] LIKE '%Server process ID is%'
-																											OR eld.[text] LIKE '%System Manufacturer:%'
-																											OR eld.[text] LIKE '%Authentication mode is%'
-																											OR eld.[text] LIKE '%Logging SQL Server messages in file%'
-																											OR eld.[text] LIKE '%Registry startup parameters:%'
-																											OR eld.[text] LIKE '%Command Line Startup Parameters:%'
-																											OR eld.[text] LIKE '%SQL Server is%'
-																											OR eld.[text] LIKE '%FILESTREAM: effective level = %, configured level = %, file system access share name = %'
-																											OR eld.[text] LIKE '%Server name is %'
-																											OR eld.[text] LIKE '%Clearing tempdb database.%'
-																											OR eld.[text] LIKE '%A self-generated certificate was successfully loaded for encryption.%'
-																											OR eld.[text] LIKE '%SQL server listening %'
-																											OR eld.[text] LIKE '%Server is listening %'
-																											OR eld.[text] LIKE '%Server % provider is ready to accept connection%'
-																											OR eld.[text] LIKE '%Dedicated admin connection support was established for listening%'
-																											OR eld.[text] LIKE '%The SQL Server Network Interface library successfully registered%'
-																											OR eld.[text] LIKE '%Resource governor reconfiguration succeeded.%'
-																											OR eld.[text] LIKE '%The % protocol transport is disabled or not configured%'
-																											OR eld.[text] LIKE '%The % endpoint is in disabled or stopped state.%'
-																											OR eld.[text] LIKE '%Service Broker manager has started.%'
-																											OR eld.[text] LIKE '%Using conventional memory in the memory manager.%'
-																											OR eld.[text] LIKE '%Software Usage Metrics is disabled.%'
-																											OR eld.[text] LIKE '%Using % version %'
-																											OR eld.[text] LIKE '%CLR version % loaded%'
-																											OR eld.[text] LIKE '%Address Windowing Extensions enabled.%'
-																											OR eld.[text] LIKE '%SQL Trace ID 1 was started by login "sa".%'
-																											OR eld.[text] LIKE '%A new instance of the full-text filter daemon host process has been successfully started.%'
-																											OR eld.[text] LIKE '%Attempting to initialize Distributed Transaction Coordinator.%'
-																											OR eld.[text] LIKE '%Informational: No full-text supported languages found.%'
-
-																											OR eld.[text] LIKE '%Starting up database%'
-																											OR eld.[text] LIKE '%The database % is marked RESTORING and is in a state that does not allow recovery to be run.%'
-																											OR eld.[text] LIKE '%Setting database option % to % for database %'
-																											OR eld.[text] LIKE '%Configuration option % changed from % to %. Run the RECONFIGURE statement to install.%'
-																											OR eld.[text] LIKE '%SQL Server blocked access to procedure ''sys.xp_cmdshell'' of component ''xp_cmdshell''%'
-
-																											OR eld.[text] LIKE '%Error: 18456, Severity: 14, State: %'
-																											OR eld.[text] LIKE '%Login failed for user %'
-																											OR eld.[text] LIKE '%SQL Trace%'
-																											)
+																									AND NOT EXISTS	( 
+																														SELECT 1
+																														FROM	[dbo].[catalogHardcodedFilters] chf 
+																														WHERE	chf.[module] = 'health-check'
+																																AND chf.[object_name] = 'dbo.statsSQLServerErrorlogDetails'
+																																AND chf.[active] = 1
+																																AND PATINDEX(chf.[filter_pattern], eld.[text]) > 0
+																													)
 																							ORDER BY eld.[log_date], eld.[id]
 					OPEN crsErrorlogMessagesCompleteDetails
 					FETCH NEXT FROM crsErrorlogMessagesCompleteDetails INTO @logDate, @processInfo, @message
@@ -3651,9 +3550,10 @@ BEGIN TRY
 	DECLARE	@HTTPAddress [nvarchar](128)
 	
 	--get configuration values
-	SELECT @HTTPAddress=[value] 
-	FROM [dbo].[appConfigurations] 
-	WHERE [name]='HTTP address for report files'
+	SELECT	@HTTPAddress=[value] 
+	FROM	[dbo].[appConfigurations] 
+	WHERE	[name]='HTTP address for report files'
+			AND [module] = 'common'
 
 	
 	-----------------------------------------------------------------------------------------------------
