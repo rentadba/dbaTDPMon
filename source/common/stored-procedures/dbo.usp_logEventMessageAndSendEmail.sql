@@ -70,9 +70,10 @@ SET @ReturnValue=1
 -----------------------------------------------------------------------------------------------------
 --get default project code
 IF @projectCode IS NULL
-	SELECT @projectCode = [value]
-	FROM [dbo].[appConfigurations]
-	WHERE [name] = 'Default project code'
+	SELECT	@projectCode = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Default project code'
+			AND [module] = 'common'
 
 SELECT @projectID = [id]
 FROM [dbo].[catalogProjects]
@@ -93,20 +94,21 @@ IF UPPER(@dbMailProfileName)='NULL'
 	SET @dbMailProfileName = NULL
 		
 IF @dbMailProfileName IS NULL
-	SELECT @dbMailProfileName=[value] 
-	FROM [dbo].[appConfigurations] 
-	WHERE [name]='Database Mail profile name to use for sending emails'
+	SELECT	@dbMailProfileName=[value] 
+	FROM	[dbo].[appConfigurations] 
+	WHERE	[name]='Database Mail profile name to use for sending emails'
+			AND [module] = 'common'
 
 IF @recipientsList = ''		SET @recipientsList = NULL
 IF @dbMailProfileName = ''	SET @dbMailProfileName = NULL
 
 
 IF @recipientsList IS NULL
-	SELECT @recipientsList=[value] 
-	FROM [dbo].[appConfigurations] 
-	WHERE  (@eventType=1 AND [name]='Default recipients list - Alerts (semicolon separated)')
-		OR (@eventType IN (2, 5) AND [name]='Default recipients list - Job Status (semicolon separated)')
-		OR (@eventType=3 AND [name]='Default recipients list - Reports (semicolon separated)')
+	SELECT	@recipientsList=[value] 
+	FROM	[dbo].[appConfigurations] 
+	WHERE  (@eventType=1 AND [name]='Default recipients list - Alerts (semicolon separated)' AND [module] = 'common')
+		OR (@eventType IN (2, 5) AND [name]='Default recipients list - Job Status (semicolon separated)' AND [module] = 'common')
+		OR (@eventType=3 AND [name]='Default recipients list - Reports (semicolon separated)' AND [module] = 'common')
 
 -----------------------------------------------------------------------------------------------------
 --get alert repeat frequency, default every 60 minutes
@@ -114,6 +116,7 @@ IF @recipientsList IS NULL
 SELECT	@alertFrequency = [value]
 FROM	[dbo].[appConfigurations]
 WHERE	[name]='Alert repeat interval (minutes)'
+		AND [module] = 'common'
 
 SELECT @alertFrequency = ISNULL(@alertFrequency, 60)
 
@@ -124,6 +127,7 @@ SELECT @alertFrequency = ISNULL(@alertFrequency, 60)
 SELECT	@ignoreAlertsForError1222 = CASE WHEN LOWER([value])='true' THEN 1 ELSE 0 END
 FROM	[dbo].[appConfigurations]
 WHERE	[name]='Ignore alerts for: Error 1222 - Lock request time out period exceeded'
+		AND [module] = 'common'
 
 SET @ignoreAlertsForError1222 = ISNULL(@ignoreAlertsForError1222, 0)
 
@@ -419,6 +423,7 @@ IF @eventType IN (2, 5)
 		SELECT	@notifyOnlyFailedJobs = LOWER([value])
 		FROM	[dbo].[appConfigurations]
 		WHERE	[name]='Notify job status only for Failed jobs'
+				AND [module] = 'common'
 
 
 		IF @notifyOnlyFailedJobs = 'true' AND @additionalOption=0

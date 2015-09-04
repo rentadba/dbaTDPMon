@@ -38,7 +38,7 @@ CREATE TABLE [dbo].[statsHealthCheckDatabaseDetails]
 		[id],
 		[catalog_database_id]
 	) ON [FG_Statistics_Data],
-	CONSTRAINT [FK_statsHealthCheckDatabaseDetailsy_catalogDatabaseNames] FOREIGN KEY 
+	CONSTRAINT [FK_statsHealthCheckDatabaseDetails_catalogDatabaseNames] FOREIGN KEY 
 	(
 		  [catalog_database_id]
 		, [instance_id]

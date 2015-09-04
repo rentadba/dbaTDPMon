@@ -69,9 +69,10 @@ BEGIN TRY
 	RAISERROR(@errMessage, 10, 1) WITH NOWAIT
 
 	-----------------------------------------------------------------------------------------------------
-	SELECT @localStoragePath=[value] 
-	FROM [dbo].[appConfigurations] 
-	WHERE [name]='Local storage path for HTML reports'
+	SELECT	@localStoragePath=[value] 
+	FROM	[dbo].[appConfigurations] 
+	WHERE	[name] = 'Local storage path for HTML reports'
+			AND [module] = 'common'
 	
 	SET @relativeStoragePath = N''
 	

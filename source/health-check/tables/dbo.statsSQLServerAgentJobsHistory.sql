@@ -31,7 +31,7 @@ CREATE TABLE [dbo].[statsSQLServerAgentJobsHistory]
 		[id],
 		[instance_id]
 	) ON [FG_Statistics_Data],
-	CONSTRAINT [FK_statsSQLServerAgentJobsHistoryy_catalogProjects] FOREIGN KEY 
+	CONSTRAINT [FK_statsSQLServerAgentJobsHistory_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
 	) 

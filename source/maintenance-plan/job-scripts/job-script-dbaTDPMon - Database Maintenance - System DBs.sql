@@ -731,6 +731,7 @@ IF DATEPART(dw, GETUTCDATE())=7 AND DATEPART(dd, GETUTCDATE())<=7
 SELECT @retentionDays = [value]
 FROM [dbo].[appConfigurations]
 WHERE [name] = ''Log events retention (days)''
+	AND [module] = ''common''
 
 SET @retentionDays = ISNULL(@retentionDays, 0)
 IF @retentionDays<>0

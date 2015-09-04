@@ -43,8 +43,7 @@ DECLARE @projectID				[smallint],
 
 DECLARE @SQLMajorVersion		[int],
 		@sqlServerVersion		[sysname],
-		@dbccLastKnownGood		[datetime],
-		@optionAdmittedState	[sysname]
+		@dbccLastKnownGood		[datetime]
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
 IF object_id('#databaseSpaceInfo') IS NOT NULL DROP TABLE #databaseSpaceInfo
@@ -99,9 +98,10 @@ CREATE TABLE #statsHealthCheckDatabaseDetails
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default project code
 IF @projectCode IS NULL
-	SELECT @projectCode = [value]
-	FROM [dbo].[appConfigurations]
-	WHERE [name] = 'Default project code'
+	SELECT	@projectCode = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Default project code'
+			AND [module] = 'common'
 
 SELECT @projectID = [id]
 FROM [dbo].[catalogProjects]
@@ -135,14 +135,6 @@ WHERE cin.[project_id] = @projectID
 		AND lsam.[descriptor]='dbo.usp_hcCollectDatabaseDetails'
 
 
-/*-------------------------------------------------------------------------------------------------------------------------------*/
-SELECT	@optionAdmittedState = [value]
-FROM	[dbo].[reportHTMLOptions]
-WHERE	[name] = N'Database online admitted state'
-		AND [report_type_id]=0
-
-SET @optionAdmittedState = ISNULL(@optionAdmittedState, 'ONLINE, READ ONLY')
-
 -------------------------------------------------------------------------------------------------------------------------
 RAISERROR('--Step 2: Get Database Details Information....', 10, 1) WITH NOWAIT
 		
@@ -174,7 +166,7 @@ WHILE @@FETCH_STATUS=0
 																AND cdn.[instance_id] = @instanceID
 																AND cdn.[active]=1
 																AND cdn.[database_name] LIKE @databaseNameFilter
-																AND CHARINDEX(cdn.[state_desc], @optionAdmittedState)<>0
+																AND CHARINDEX(cdn.[state_desc], 'ONLINE, READ ONLY')<>0
 														ORDER BY cdn.[database_name]
 		OPEN crsActiveDatabases	
 		FETCH NEXT FROM crsActiveDatabases INTO @catalogDatabaseID, @databaseID, @databaseName

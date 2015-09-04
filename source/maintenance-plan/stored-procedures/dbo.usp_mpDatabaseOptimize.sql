@@ -125,9 +125,10 @@ ELSE
 --get configuration values
 ---------------------------------------------------------------------------------------------
 DECLARE @queryLockTimeOut [int]
-SELECT @queryLockTimeOut=[value] 
-FROM [dbo].[appConfigurations] 
-WHERE [name]='Default lock timeout (ms)'
+SELECT	@queryLockTimeOut=[value] 
+FROM	[dbo].[appConfigurations] 
+WHERE	[name]='Default lock timeout (ms)'
+		AND [module] = 'common'
 
 -----------------------------------------------------------------------------------------
 --get configuration values: Force cleanup of ghost records
@@ -135,9 +136,10 @@ WHERE [name]='Default lock timeout (ms)'
 DECLARE   @forceCleanupGhostRecords [nvarchar](128)
 		, @thresholdGhostRecords	[bigint]
 
-SELECT @forceCleanupGhostRecords=[value] 
-FROM [dbo].[appConfigurations] 
-WHERE [name]='Force cleanup of ghost records'
+SELECT	@forceCleanupGhostRecords=[value] 
+FROM	[dbo].[appConfigurations] 
+WHERE	[name]='Force cleanup of ghost records'
+		AND [module] = 'maintenance-plan'
 
 SET @forceCleanupGhostRecords = LOWER(ISNULL(@forceCleanupGhostRecords, 'false'))
 
@@ -151,9 +153,10 @@ IF LOWER(@forceCleanupGhostRecords)='true' AND @flgOptions & 65536 = 0
 
 IF LOWER(@forceCleanupGhostRecords)='true' OR @flgOptions & 65536 = 65536
 	begin
-		SELECT @thresholdGhostRecords=[value] 
-		FROM [dbo].[appConfigurations] 
-		WHERE [name]='Ghost records cleanup threshold'
+		SELECT	@thresholdGhostRecords=[value] 
+		FROM	[dbo].[appConfigurations] 
+		WHERE	[name]='Ghost records cleanup threshold'
+				AND [module] = 'maintenance-plan'
 	end
 
 SET @thresholdGhostRecords = ISNULL(@thresholdGhostRecords, 0)

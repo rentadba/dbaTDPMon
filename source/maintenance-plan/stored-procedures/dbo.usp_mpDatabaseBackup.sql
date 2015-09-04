@@ -93,9 +93,10 @@ EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrin
 --get default backup location
 IF @backupLocation IS NULL
 	begin
-		SELECT @backupLocation = [value]
-		FROM [dbo].[appConfigurations]
-		WHERE [name] = N'Default backup location'
+		SELECT	@backupLocation = [value]
+		FROM	[dbo].[appConfigurations]
+		WHERE	[name] = N'Default backup location'
+				AND [module] = 'maintenance-plan'
 
 		IF @backupLocation IS NULL
 			begin
@@ -108,9 +109,10 @@ IF @backupLocation IS NULL
 --get default backup retention
 IF @retentionDays IS NULL
 	begin
-		SELECT @retentionDays = [value]
-		FROM [dbo].[appConfigurations]
-		WHERE [name] = N'Default backup retention (days)'
+		SELECT	@retentionDays = [value]
+		FROM	[dbo].[appConfigurations]
+		WHERE	[name] = N'Default backup retention (days)'
+				AND [module] = 'maintenance-plan'
 
 		IF @retentionDays IS NULL
 			begin

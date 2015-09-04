@@ -51,7 +51,8 @@ DECLARE @sqlServerName			[sysname],
 -----------------------------------------------------------------------------------------------------
 SELECT	@collectStepDetails = CASE WHEN LOWER([value])='true' THEN 1 ELSE 0 END
 FROM	[dbo].[appConfigurations]
-WHERE	[name]='Collect SQL Agent jobs step details (health-check)'
+WHERE	[name]='Collect SQL Agent jobs step details'
+		AND [module] = 'health-check'
 
 SET @collectStepDetails = ISNULL(@collectStepDetails, 0)
 
@@ -67,9 +68,10 @@ CREATE TABLE #msdbSysJobs
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default project code
 IF @projectCode IS NULL
-	SELECT @projectCode = [value]
-	FROM [dbo].[appConfigurations]
-	WHERE [name] = 'Default project code'
+	SELECT	@projectCode = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Default project code'
+			AND [module] = 'common'
 
 SELECT @projectID = [id]
 FROM [dbo].[catalogProjects]

@@ -108,9 +108,10 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName		= @sqlServerName,
 --get configuration values: force retention policy
 ---------------------------------------------------------------------------------------------
 DECLARE @forceChangeRetentionPolicy [nvarchar](128)
-SELECT @forceChangeRetentionPolicy=[value] 
-FROM [dbo].[appConfigurations] 
-WHERE [name]='Change retention policy from RetentionDays to RetentionBackupsCount'
+SELECT	@forceChangeRetentionPolicy=[value] 
+FROM	[dbo].[appConfigurations] 
+WHERE	[name]='Change retention policy from RetentionDays to RetentionBackupsCount'
+		AND [module] = 'maintenance-plan'
 
 SET @forceChangeRetentionPolicy = LOWER(ISNULL(@forceChangeRetentionPolicy, 'false'))
 

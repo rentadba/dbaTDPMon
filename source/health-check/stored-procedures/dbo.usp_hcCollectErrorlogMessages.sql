@@ -59,9 +59,10 @@ CREATE TABLE #xpReadErrorLog
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default project code
 IF @projectCode IS NULL
-	SELECT @projectCode = [value]
-	FROM [dbo].[appConfigurations]
-	WHERE [name] = 'Default project code'
+	SELECT	@projectCode = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Default project code'
+			AND [module] = 'common'
 
 SELECT @projectID = [id]
 FROM [dbo].[catalogProjects]

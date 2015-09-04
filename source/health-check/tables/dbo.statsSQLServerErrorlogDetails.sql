@@ -28,7 +28,7 @@ CREATE TABLE [dbo].[statsSQLServerErrorlogDetails]
 		[id],
 		[instance_id]
 	) ON [FG_Statistics_Data],
-	CONSTRAINT [FK_statsSQLServerErrorlogDetailsy_catalogProjects] FOREIGN KEY 
+	CONSTRAINT [FK_statsSQLServerErrorlogDetails_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
 	) 

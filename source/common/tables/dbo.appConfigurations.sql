@@ -17,14 +17,16 @@ GO
 CREATE TABLE [dbo].[appConfigurations]
 (
 	[id]			[smallint] IDENTITY (1, 1)NOT NULL,
+	[module]		[varchar](32)			NOT NULL,
 	[name] 			[nvarchar](128)			NOT NULL,
 	[value]			[nvarchar](128)			NULL,
 	CONSTRAINT [PK_appConfigurations] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
 	) ON [PRIMARY],
-	CONSTRAINT [IX_appConfigurations_Name] UNIQUE  NONCLUSTERED 
+	CONSTRAINT [UK_appConfigurations_Name] UNIQUE  NONCLUSTERED 
 	(
+		[module], 
 		[name]
 	) ON [PRIMARY]
 ) ON [PRIMARY]
@@ -35,26 +37,31 @@ RAISERROR('		...insert default data', 10, 1) WITH NOWAIT
 GO
 SET NOCOUNT ON
 GO
-INSERT	INTO [dbo].[appConfigurations] ([name], [value])
-		  SELECT 'Default project code'															AS [name], NULL			AS [value]		UNION ALL
-		  SELECT 'Alert repeat interval (minutes)'												AS [name], '60'			AS [value]		UNION ALL
-		  SELECT 'Default lock timeout (ms)'													AS [name], '5000'		AS [value]		UNION ALL
-		  SELECT 'Default backup location'														AS [name], NULL			AS [value]		UNION ALL
-		  SELECT 'Default backup retention (days)'												AS [name], '7'			AS [value]		UNION ALL
-		  SELECT 'Database Mail profile name to use for sending emails'							AS [name], NULL			AS [value]		UNION ALL
-		  SELECT 'Default recipients list - Reports (semicolon separated)'						AS [name], NULL			AS [value]		UNION ALL
-		  SELECT 'Default recipients list - Job Status (semicolon separated)'					AS [name], NULL			AS [value]		UNION ALL
-		  SELECT 'Default recipients list - Alerts (semicolon separated)'						AS [name], NULL			AS [value]		UNION ALL
-		  SELECT 'Local storage path for HTML reports'											AS [name], NULL			AS [value]		UNION ALL
-		  SELECT 'HTTP address for report files'												AS [name], NULL			AS [value]		UNION ALL
-		  SELECT 'Notify job status only for Failed jobs'										AS [name], 'true'		AS [value]		UNION ALL
-		  SELECT 'Log action events'															AS [name], 'true'		AS [value]		UNION ALL
-		  SELECT 'Log events retention (days)'													AS [name], '15'			AS [value]		UNION ALL
-		  SELECT 'Ignore alerts for: Error 1222 - Lock request time out period exceeded'		AS [name], 'true'		AS [value]		UNION ALL
-		  SELECT 'Change retention policy from RetentionDays to RetentionBackupsCount'			AS [name], 'true'		AS [value]		UNION ALL
-		  SELECT 'Force cleanup of ghost records'												AS [name], 'false'		AS [value]		UNION ALL
-		  SELECT 'Ghost records cleanup threshold'												AS [name], '131072'		AS [value]		UNION ALL
-		  SELECT 'Collect SQL Agent jobs step details (health-check)'							AS [name], 'false'		AS [value]
+INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
+		  SELECT 'common'			AS [module], 'Default project code'															AS [name], NULL			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Database Mail profile name to use for sending emails'							AS [name], NULL			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Default recipients list - Reports (semicolon separated)'						AS [name], NULL			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Default recipients list - Job Status (semicolon separated)'					AS [name], NULL			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Default recipients list - Alerts (semicolon separated)'						AS [name], NULL			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Local storage path for HTML reports'											AS [name], NULL			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'HTTP address for report files'												AS [name], NULL			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Alert repeat interval (minutes)'												AS [name], '60'			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Notify job status only for Failed jobs'										AS [name], 'true'		AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Ignore alerts for: Error 1222 - Lock request time out period exceeded'		AS [name], 'true'		AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Log action events'															AS [name], 'true'		AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Log events retention (days)'													AS [name], '15'			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Default lock timeout (ms)'													AS [name], '5000'		AS [value]		UNION ALL
+
+		  SELECT 'maintenance-plan' AS [module], 'Default backup location'														AS [name], NULL			AS [value]		UNION ALL
+		  SELECT 'maintenance-plan' AS [module], 'Default backup retention (days)'												AS [name], '7'			AS [value]		UNION ALL
+		  SELECT 'maintenance-plan' AS [module], 'Change retention policy from RetentionDays to RetentionBackupsCount'			AS [name], 'true'		AS [value]		UNION ALL
+		  SELECT 'maintenance-plan' AS [module], 'Force cleanup of ghost records'												AS [name], 'false'		AS [value]		UNION ALL
+		  SELECT 'maintenance-plan' AS [module], 'Ghost records cleanup threshold'												AS [name], '131072'		AS [value]		UNION ALL
+
+		  SELECT 'health-check'		AS [module], 'Collect SQL Agent jobs step details'											AS [name], 'false'		AS [value]		UNION ALL
+		  SELECT 'health-check'		AS [module], 'Collect Information OS Events'												AS [name], 'false'		AS [value]		UNION ALL
+		  SELECT 'health-check'		AS [module], 'Collect OS Events timeout (seconds)'											AS [name], '600'		AS [value]		UNION ALL
+		  SELECT 'health-check'		AS [module], 'Collect OS Events from last hours'											AS [name], '24'			AS [value]
 GO
 
 ---------------------------------------------------------------------------------------------
@@ -84,5 +91,5 @@ EXEC master.dbo.xp_instance_regread N'HKEY_LOCAL_MACHINE',N'Software\Microsoft\M
 									'no_output'
 
 IF @defaultBackupDirectory IS NOT NULL
-	UPDATE [dbo].[appConfigurations] SET [value] = @defaultBackupDirectory WHERE [name] = 'Default backup location'
+	UPDATE [dbo].[appConfigurations] SET [value] = @defaultBackupDirectory WHERE [module] = 'maintenance-plan' AND [name] = 'Default backup location'
 GO

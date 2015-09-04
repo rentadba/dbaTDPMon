@@ -60,14 +60,16 @@ SET NOCOUNT ON
 --get configuration values
 ---------------------------------------------------------------------------------------------
 DECLARE @queryLockTimeOut [int]
-SELECT @queryLockTimeOut=[value] 
-FROM [dbo].[appConfigurations] 
-WHERE [name]='Default lock timeout (ms)'
+SELECT	@queryLockTimeOut=[value] 
+FROM	[dbo].[appConfigurations] 
+WHERE	[name]='Default lock timeout (ms)'
+		AND [module] = 'common'
 
 --reset configuration value
 UPDATE [dbo].[appConfigurations]
 	SET [value]='-1'
-WHERE [name]='Default lock timeout (ms)'
+WHERE	[name]='Default lock timeout (ms)'
+		AND [module] = 'common'
 
 -----------------------------------------------------------------------------------------
 SET @queryToRun=N'Rebuilding previously disabled indexes...'
@@ -134,6 +136,7 @@ DEALLOCATE crsStatsMaintenancePlanInternals
 -----------------------------------------------------------------------------------------
 UPDATE [dbo].[appConfigurations]
 	SET [value]=@queryLockTimeOut
-WHERE [name]='Default lock timeout (ms)'
+WHERE	[name]='Default lock timeout (ms)'
+		AND [module] = 'common'
 
 GO

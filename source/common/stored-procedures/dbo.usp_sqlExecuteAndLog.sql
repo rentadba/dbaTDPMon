@@ -55,6 +55,7 @@ WHERE	[code] IN (
 					SELECT	[value]
 					FROM	[dbo].[appConfigurations]
 					WHERE	[name] = 'Default project code'
+							AND [module] = 'common'
 				  )
 
 SELECT  @instanceID = [id] 
@@ -68,6 +69,7 @@ DECLARE @logEventActions	[nvarchar](32)
 SELECT	@logEventActions = LOWER([value])
 FROM	[dbo].[appConfigurations]
 WHERE	[name]='Log action events'
+		AND [module] = 'common'
 
 
 ---------------------------------------------------------------------------------------------

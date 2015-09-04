@@ -114,9 +114,10 @@ BEGIN TRY
 		--get configuration values
 		---------------------------------------------------------------------------------------------
 		DECLARE @queryLockTimeOut [int]
-		SELECT @queryLockTimeOut=[value] 
-		FROM [dbo].[appConfigurations] 
-		WHERE [name]='Default lock timeout (ms)'
+		SELECT	@queryLockTimeOut=[value] 
+		FROM	[dbo].[appConfigurations] 
+		WHERE	[name] = 'Default lock timeout (ms)'
+				AND [module] = 'common'
 
 		---------------------------------------------------------------------------------------------		
 		--get tables list	

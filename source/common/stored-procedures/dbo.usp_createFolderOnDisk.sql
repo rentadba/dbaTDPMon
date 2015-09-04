@@ -206,9 +206,11 @@ ELSE
 			---------------------------------------------------------------------------------------------
 			/* get configuration values - wait/lock timeout */
 			DECLARE @queryLockTimeOut [int]
-			SELECT @queryLockTimeOut=[value] 
-			FROM [dbo].[appConfigurations] 
-			WHERE [name]='Default lock timeout (ms)'
+			SELECT	@queryLockTimeOut=[value] 
+			FROM	[dbo].[appConfigurations] 
+			WHERE	[name] = 'Default lock timeout (ms)'
+					AND [module] = 'maintenance-plan'
+
 
 			SET @queryLockTimeOut = @queryLockTimeOut / 1000
 			DECLARE @waitDelay [varchar](16)
