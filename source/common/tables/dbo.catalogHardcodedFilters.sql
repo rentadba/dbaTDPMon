@@ -96,4 +96,4 @@ INSERT	INTO [dbo].[catalogHardcodedFilters] ([module], [object_name], [filter_pa
 		SELECT 'health-check', 'dbo.statsSQLServerErrorlogDetails', '%Error: 18456, Severity: 14, State: %', 1 UNION ALL
 		SELECT 'health-check', 'dbo.statsSQLServerErrorlogDetails', '%Login failed for user %', 1 UNION ALL
 		SELECT 'health-check', 'dbo.statsSQLServerErrorlogDetails', '%SQL Trace%', 1 
-		
+GO

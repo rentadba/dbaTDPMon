@@ -3436,11 +3436,11 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	--save report entry
 	-----------------------------------------------------------------------------------------------------
-	INSERT INTO [dbo].[reportHTMLDailyHealthCheck](   [project_id], [start_date], [flg_actions], [flg_options]
-													, [file_name], [file_path]
-													, [build_at], [build_duration], [html_content], [build_in_progress], [report_uid])												
+	INSERT INTO [dbo].[reportHTML](   [project_id], [module], [start_date], [flg_actions], [flg_options]
+									, [file_name], [file_path]
+									, [build_at], [build_duration], [html_content], [build_in_progress], [report_uid])												
 
-			SELECT    @projectID, @reportBuildStartTime, @flgActions, @flgOptions
+			SELECT    @projectID, 'health-check', @reportBuildStartTime, @flgActions, @flgOptions
 					, @HTMLReportFileName, @localStoragePath
 					, @reportBuildStartTime, DATEDIFF(ms, @reportBuildStartTime, GETUTCDATE()), @HTMLReport
 					, 0, NEWID()
@@ -3509,7 +3509,7 @@ BEGIN TRY
 		end
 
 	/* save report using bcp */	
-	SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [html_content] FROM [' + DB_NAME() + '].[dbo].[reportHTMLDailyHealthCheck] WHERE [id]=' + CAST(@reportID AS [varchar]) + '" queryout ' + @reportFilePath + ' -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'''
+	SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [html_content] FROM [' + DB_NAME() + '].[dbo].[reportHTML] WHERE [id]=' + CAST(@reportID AS [varchar]) + '" queryout ' + @reportFilePath + ' -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'''
 	EXEC (@queryToRun)
 	
 	/* disable xp_cmdshell configuration option */
@@ -3536,7 +3536,7 @@ BEGIN TRY
 
 
 	IF @@ERROR=0
-		UPDATE [dbo].[reportHTMLDailyHealthCheck]
+		UPDATE [dbo].[reportHTML]
 			SET   [html_content] = NULL
 				, [file_name]	 = @HTMLReportFileName
 		WHERE [id] = @reportID
@@ -3561,7 +3561,7 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF @HTTPAddress IS NOT NULL				
 		begin		
-			UPDATE [dbo].[reportHTMLDailyHealthCheck]
+			UPDATE [dbo].[reportHTML]
 				SET   [http_address] = @HTTPAddress + @relativeStoragePath + @HTMLReportFileName
 			WHERE [id] = @reportID
 		end

@@ -168,7 +168,7 @@ IF @flgActions & 2 = 2 OR @flgActions & 16 = 16 OR @flgActions & 64 = 64 OR @flg
 		--get table list that will be analyzed including materialized views; will pick only tables with reserved pages
 		SET @queryToRun = N''
 		IF @serverVersionNum >= 9
-			SET @queryToRun = @queryToRun + N'SELECT ob.[table_schema], ob.[table_name]
+			SET @queryToRun = @queryToRun + N'SELECT DISTINCT ob.[table_schema], ob.[table_name]
 FROM (
 		SELECT obj.[object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name]
 		FROM [' + @dbName + N'].sys.objects obj WITH (READPAST)
@@ -346,7 +346,7 @@ IF @flgActions & 2 = 2
 		SET @queryToRun=N'Tables/views consistency check ' + CASE WHEN @flgOptions & 1 = 1 THEN '(PHYSICAL_ONLY)' ELSE '' END + CASE WHEN @flgOptions & 2 = 2 THEN '(NOINDEX)' ELSE '' END + '...' + ' [' + @dbName + ']'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		DECLARE crsTableList CURSOR FOR	SELECT [table_schema], [table_name] 
+		DECLARE crsTableList CURSOR FOR	SELECT DISTINCT [table_schema], [table_name] 
 										FROM #databaseTableList	
 										ORDER BY [table_name]
 		OPEN crsTableList
@@ -445,7 +445,7 @@ IF @flgActions & 16 = 16
 		SET @queryToRun=N'Table constraints consistency check ...' + ' [' + @dbName + ']'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 		
-		DECLARE crsTableList CURSOR FOR	SELECT [table_schema], [table_name] 
+		DECLARE crsTableList CURSOR FOR	SELECT DISTINCT [table_schema], [table_name] 
 										FROM #databaseTableList	
 										ORDER BY [table_name]
 		OPEN crsTableList
@@ -552,7 +552,7 @@ IF @flgActions & 32 = 32
 				INSERT	INTO #databaseTableListIdent([table_schema], [table_name])
 						EXEC (@queryToRun)
 
-				DECLARE crsTableList CURSOR FOR	SELECT [table_schema], [table_name] 
+				DECLARE crsTableList CURSOR FOR	SELECT DISTINCT [table_schema], [table_name] 
 												FROM #databaseTableListIdent	
 												ORDER BY [table_name]
 				OPEN crsTableList
@@ -615,7 +615,7 @@ IF @flgActions & 64 = 64
 			end
 		ELSE
 			begin
-				DECLARE crsTableList CURSOR FOR	SELECT [table_schema], [table_name] 
+				DECLARE crsTableList CURSOR FOR	SELECT DISTINCT [table_schema], [table_name] 
 												FROM #databaseTableList	
 												ORDER BY [table_name]
 				OPEN crsTableList
@@ -669,7 +669,7 @@ IF @flgActions & 128 = 128
 		SET @queryToRun=N'Cleaning wasted space in variable length columns...' + ' [' + @dbName + ']'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		DECLARE crsTableList CURSOR FOR	SELECT [table_schema], [table_name] 
+		DECLARE crsTableList CURSOR FOR	SELECT DISTINCT [table_schema], [table_name] 
 										FROM #databaseTableList	
 										ORDER BY [table_name]
 		OPEN crsTableList

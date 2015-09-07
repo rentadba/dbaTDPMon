@@ -9,15 +9,17 @@
 -----------------------------------------------------------------------------------------------------
 --
 -----------------------------------------------------------------------------------------------------
-RAISERROR('Create table: [dbo].[reportHTMLDailyHealthCheck]', 10, 1) WITH NOWAIT
+RAISERROR('Create table: [dbo].[reportHTML]', 10, 1) WITH NOWAIT
 GO
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[reportHTMLDailyHealthCheck]') AND type in (N'U'))
-DROP TABLE [dbo].[reportHTMLDailyHealthCheck]
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[reportHTML]') AND type in (N'U'))
+DROP TABLE [dbo].[reportHTML]
 GO
-CREATE TABLE [dbo].[reportHTMLDailyHealthCheck]
+CREATE TABLE [dbo].[reportHTML]
 (
 	[id]										[int] IDENTITY (1, 1)NOT NULL,
 	[project_id]								[smallint]			NOT NULL,
+	[module]									[varchar](32)		NOT NULL,
+	[instance_id]								[smallint]			NULL,
 	[start_date]								[datetime]			NOT NULL,
 	[flg_actions]								[int]				NOT NULL,
 	[flg_options]								[int]				NOT NULL,
@@ -27,23 +29,36 @@ CREATE TABLE [dbo].[reportHTMLDailyHealthCheck]
 	[build_at]									[datetime]			NOT NULL,
 	[build_duration]							[int]				NOT NULL,
 	[html_content] 								[nvarchar](max)		NULL,
-	[build_in_progress]							[bit]				NOT NULL CONSTRAINT [DF_reportHTMLDailyHealthCheck_BuildInProgress]  DEFAULT ((0)),
-	[report_uid]								[uniqueidentifier]	NOT NULL CONSTRAINT [DF_reportHTMLDailyHealthCheck_ReportUID]  DEFAULT ((NEWID())),
-	CONSTRAINT [PK_reportHTMLDailyHealthCheck] PRIMARY KEY  CLUSTERED 
+	[build_in_progress]							[bit]				NOT NULL CONSTRAINT [DF_reportHTML_BuildInProgress]  DEFAULT ((0)),
+	[report_uid]								[uniqueidentifier]	NOT NULL CONSTRAINT [DF_reportHTML_ReportUID]  DEFAULT ((NEWID())),
+	CONSTRAINT [PK_reportHTML] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
 	) ON [FG_Statistics_Data],
-	CONSTRAINT [FK_reportHTMLDailyHealthCheck_CatalogProjects] FOREIGN KEY 
+	CONSTRAINT [FK_reportHTML_CatalogProjects] FOREIGN KEY 
 	(
 		[project_id]
 	) 
 	REFERENCES [dbo].[catalogProjects] 
 	(
 		[id]
+	),
+	CONSTRAINT [FK_reportHTML_catalogInstanceNames] FOREIGN KEY 
+	(
+		[instance_id],
+		[project_id]
+	) 
+	REFERENCES [dbo].[catalogInstanceNames] 
+	(
+		[id],
+		[project_id]
 	)
+
 ) ON [FG_Statistics_Data]
 GO
 
 
-CREATE INDEX [IX_reportHTMLDailyHealthCheck_ProjecteID] ON [dbo].[reportHTMLDailyHealthCheck]([project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_reportHTML_ProjecteID] ON [dbo].[reportHTML]([project_id]) ON [FG_Statistics_Index]
+GO
+CREATE INDEX [IX_reportHTML_InstanceID] ON [dbo].[reportHTML]([instance_id], [project_id]) ON [FG_Statistics_Index]
 GO

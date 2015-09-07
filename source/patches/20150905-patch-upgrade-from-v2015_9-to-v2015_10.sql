@@ -7,6 +7,9 @@ GO
 RAISERROR('Alter table: [dbo].[appConfigurations]', 10, 1) WITH NOWAIT
 GO
 
+SELECT * INTO  [dbo].[appConfigurations_Backup] FROM [dbo].[appConfigurations]
+GO
+
 IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='appConfigurations' AND COLUMN_NAME='module')
 	ALTER TABLE [dbo].[appConfigurations] ADD [module] [varchar](32) NULL
 GO

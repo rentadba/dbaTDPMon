@@ -100,6 +100,9 @@ if errorlevel 1 goto install_err
 if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.catalogReportHTMLGraphics.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.reportHTML.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.reportHTMLOptions.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -219,9 +222,6 @@ goto help
 echo *-----------------------------------------------------------------------------*
 echo Health Check: Creating Table / Views and Indexes...
 echo *-----------------------------------------------------------------------------*
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.reportHTMLDailyHealthCheck.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsHealthCheckDatabaseDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err

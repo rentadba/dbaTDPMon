@@ -1,44 +1,28 @@
-USE dbaTDPMon
+USE [dbaTDPMon]
 GO
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-IF NOT EXISTS(SELECT * FROM [dbo].[appConfigurations] WHERE [name]='Collect SQL Agent jobs step details (health-check)')
-	INSERT	INTO [dbo].[appConfigurations] ([name], [value])
-			SELECT 'Collect SQL Agent jobs step details (health-check)'							AS [name], 'false'		AS [value]
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 29.12.2014
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+	
+RAISERROR('Create procedure: [dbo].[usp_createFolderOnDisk]', 10, 1) WITH NOWAIT
 GO
-
-
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-/*
-ALTER TABLE [dbo].[logEventMessages] ALTER COLUMN [message] [varchar](max) --4000
-GO
-ALTER TABLE [dbo].[logEventMessages] ALTER COLUMN [send_email_to] [varchar](1024) --4000
-GO
-*/
-
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-RAISERROR('Create procedure: [dbo].[usp_sqlAgentJobCheckStatus]', 10, 1) WITH NOWAIT
-GO
-SET QUOTED_IDENTIFIER ON 
-GO
-SET ANSI_NULLS ON 
+IF  EXISTS (
+	    SELECT * 
+	      FROM sysobjects 
+	     WHERE id = OBJECT_ID(N'[dbo].[usp_createFolderOnDisk]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_createFolderOnDisk]
 GO
 
-if exists (select * from dbo.sysobjects where id = object_id(N'[dbo].[usp_sqlAgentJobCheckStatus]') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-drop procedure [dbo].[usp_sqlAgentJobCheckStatus]
-GO
-
-CREATE PROCEDURE dbo.usp_sqlAgentJobCheckStatus
+CREATE PROCEDURE [dbo].[usp_createFolderOnDisk]
 		@sqlServerName			[sysname],
-		@jobName				[varchar](255),
-		@strMessage				[varchar](8000)=''	OUTPUT,	
-		@currentRunning			[int]=0 			OUTPUT,			
-		@lastExecutionStatus	[int]=0 			OUTPUT,			
-		@lastExecutionDate		[varchar](10)=''	OUTPUT,		
-		@lastExecutionTime 		[varchar](8)=''		OUTPUT,	
-		@runningTimeSec			[bigint]=0			OUTPUT,
-		@selectResult			[bit]=0,
-		@extentedStepDetails	[bit]=0,		
-		@debugMode				[bit]=0
+		@folderName				[nvarchar](1024),
+		@executionLevel			[tinyint] = 0,
+		@debugMode				[bit] = 0
 /* WITH ENCRYPTION */
 AS
 
@@ -46,1266 +30,315 @@ AS
 -- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
 -- ============================================================================
 -- Author			 : Dan Andrei STEFAN
--- Create date		 : 2004-2014
+-- Create date		 : 04.03.2015
 -- Module			 : Database Analysis & Performance Monitoring
 -- ============================================================================
 
-------------------------------------------------------------------------------------------------------------------------------------------
-DECLARE 	@Message 			[varchar](8000), 
-			@StepName			[varchar](255),
-			@JobID				[varchar](255),
-			@StepID				[int],
-			@JobSessionID		[int],
-			@RunDate			[varchar](10),
-			@RunDateDetail		[varchar](10),
-			@RunTime			[varchar](8),
-			@RunTimeDetail		[varchar](8),
-			@RunDuration		[varchar](8),
-			@RunDurationDetail	[varchar](8),
-			@RunStatus			[varchar](32),
-			@RunStatusDetail	[varchar](32),
-			@RunDurationLast	[varchar](8),
-			@EventTime			[datetime],		
-			@ReturnValue		[int],
-			@queryToRun			[nvarchar](4000)
+DECLARE   @queryToRun				[nvarchar](1024)
+		, @serverToRun				[nvarchar](512)
+		, @errorCode				[int]
+
+DECLARE	  @serverEdition			[sysname]
+		, @serverVersionStr			[sysname]
+		, @serverVersionNum			[numeric](9,6)
+		, @nestedExecutionLevel		[tinyint]
+		, @warningMessage			[nvarchar](1024)
+		, @runWithxpCreateSubdir	[bit]
+		, @retryAttempts			[tinyint]
+
+DECLARE @optionXPIsAvailable		[bit],
+		@optionXPValue				[int],
+		@optionXPHasChanged			[bit],
+		@optionAdvancedIsAvailable	[bit],
+		@optionAdvancedValue		[int],
+		@optionAdvancedHasChanged	[bit]
 
 SET NOCOUNT ON
 
-IF OBJECT_ID('tempdb..#tmpCheck') IS NOT NULL DROP TABLE #tmpCheck
-CREATE TABLE #tmpCheck (Result varchar(1024))
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF object_id('#serverPropertyConfig') IS NOT NULL DROP TABLE #serverPropertyConfig
+CREATE TABLE #serverPropertyConfig
+			(
+				[value]			[sysname]	NULL
+			)
 
-IF ISNULL(@sqlServerName, '')=''
+IF object_id('#fileExists') IS NOT NULL DROP TABLE #fileExists
+CREATE TABLE #fileExists
+			(
+				[file_exists]				[bit]	NULL,
+				[file_is_directory]			[bit]	NULL,
+				[parent_directory_exists]	[bit]	NULL
+			)
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF RIGHT(@folderName, 1)<>'\' SET @folderName = @folderName + N'\'
+
+SET @queryToRun= 'Creating destination folder: "' + @folderName + '"'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+-----------------------------------------------------------------------------------------
+--get destination server running version/edition
+SET @nestedExecutionLevel = @executionLevel + 1
+EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
+										@serverEdition			= @serverEdition OUT,
+										@serverVersionStr		= @serverVersionStr OUT,
+										@serverVersionNum		= @serverVersionNum OUT,
+										@executionLevel			= @nestedExecutionLevel,
+										@debugMode				= @debugMode
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+/* check if folderName exists																									 */
+IF @sqlServerName=@@SERVERNAME
+		SET @queryToRun = N'master.dbo.xp_fileexist ''' + @folderName + ''''
+else
+		SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC master.dbo.xp_fileexist ''''' + @folderName + ''''';'')x'
+
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+INSERT	INTO #fileExists([file_exists], [file_is_directory], [parent_directory_exists])
+		EXEC (@queryToRun)
+
+SET @warningMessage = N''
+IF (SELECT [parent_directory_exists] FROM #fileExists)=0
 	begin
-		SET @queryToRun=N'--	ERROR: The specified value for SOURCE server is not valid.'
-		RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
-		RETURN 1
+		SET @warningMessage = N'WARNING: Root folder does not exists or it is not available.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @warningMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 	end
 
-IF LEN(@jobName)=0 OR ISNULL(@jobName, '')=''
+SET @retryAttempts=3
+
+IF (SELECT [file_is_directory] FROM #fileExists)=1
 	begin
-		RAISERROR('--ERROR: Must specify a job name.', 10, 1) WITH NOWAIT
-		RETURN 1
+		SET @queryToRun = N'Folder already exists.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 	end
+ELSE
+	WHILE (SELECT [file_is_directory] FROM #fileExists)=0 AND @retryAttempts > 0
+		begin
+			SET @runWithxpCreateSubdir=0
 
-SET @queryToRun=N'SELECT [srvid] FROM master.dbo.sysservers WHERE [srvname]=''' + @sqlServerName + ''''
-TRUNCATE TABLE #tmpCheck
-INSERT INTO #tmpCheck EXEC (@queryToRun)
-IF (SELECT count(*) FROM #tmpCheck)=0
+			SELECT  @optionXPIsAvailable		= 0,
+					@optionXPValue				= 0,
+					@optionXPHasChanged			= 0,
+					@optionAdvancedIsAvailable	= 0,
+					@optionAdvancedValue		= 0,
+					@optionAdvancedHasChanged	= 0
+
+			IF @serverVersionNum>=9
+				begin
+					/*-------------------------------------------------------------------------------------------------------------------------------*/
+					SET @queryToRun = N'[' + @sqlServerName + '].master.sys.xp_create_subdir N''' + @folderName + ''''
+					IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+					EXEC (@queryToRun)
+				
+					IF @@ERROR=0
+						SET @runWithxpCreateSubdir=1
+					ELSE
+						begin
+							/* enable xp_cmdshell configuration option */
+							EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+																				@configOptionName	= 'xp_cmdshell',
+																				@configOptionValue	= 1,
+																				@optionIsAvailable	= @optionXPIsAvailable OUT,
+																				@optionCurrentValue	= @optionXPValue OUT,
+																				@optionHasChanged	= @optionXPHasChanged OUT,
+																				@executionLevel		= 0,
+																				@debugMode			= @debugMode
+
+							IF @optionXPIsAvailable = 0
+								begin
+									/* enable show advanced options configuration option */
+									EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+																						@configOptionName	= 'show advanced options',
+																						@configOptionValue	= 1,
+																						@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
+																						@optionCurrentValue	= @optionAdvancedValue OUT,
+																						@optionHasChanged	= @optionAdvancedHasChanged OUT,
+																						@executionLevel		= 0,
+																						@debugMode			= @debugMode
+
+									IF @optionAdvancedIsAvailable = 1 AND (@optionAdvancedValue=1 OR @optionAdvancedHasChanged=1)
+										EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+																							@configOptionName	= 'xp_cmdshell',
+																							@configOptionValue	= 1,
+																							@optionIsAvailable	= @optionXPIsAvailable OUT,
+																							@optionCurrentValue	= @optionXPValue OUT,
+																							@optionHasChanged	= @optionXPHasChanged OUT,
+																							@executionLevel		= 0,
+																							@debugMode			= @debugMode
+								end
+
+							IF @optionXPIsAvailable=0 OR @optionXPValue=0
+								begin
+									set @queryToRun='xp_cmdshell component is turned off. Cannot continue'
+									EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+									RETURN 1
+								end		
+						end
+				end
+
+			/*-------------------------------------------------------------------------------------------------------------------------------*/
+			/* creating folder   																											 */
+			IF @runWithxpCreateSubdir=0
+				begin
+					SET @queryToRun = N'MKDIR -P "' + @folderName + '"'
+					SET @serverToRun = N'[' + @sqlServerName + '].master.dbo.xp_cmdshell'
+					IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+					EXEC @serverToRun @queryToRun , NO_OUTPUT
+				end
+
+			/*-------------------------------------------------------------------------------------------------------------------------------*/
+			IF @serverVersionNum>=9 AND @runWithxpCreateSubdir=0 AND (@optionXPHasChanged=1 OR @optionAdvancedHasChanged=1)
+				begin
+					/* disable xp_cmdshell configuration option */
+					IF @optionXPHasChanged = 1
+						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+																			@configOptionName	= 'xp_cmdshell',
+																			@configOptionValue	= 0,
+																			@optionIsAvailable	= @optionXPIsAvailable OUT,
+																			@optionCurrentValue	= @optionXPValue OUT,
+																			@optionHasChanged	= @optionXPHasChanged OUT,
+																			@executionLevel		= 0,
+																			@debugMode			= @debugMode
+
+					/* disable show advanced options configuration option */
+					IF @optionAdvancedHasChanged = 1
+							EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+																				@configOptionName	= 'show advanced options',
+																				@configOptionValue	= 0,
+																				@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
+																				@optionCurrentValue	= @optionAdvancedValue OUT,
+																				@optionHasChanged	= @optionAdvancedHasChanged OUT,
+																				@executionLevel		= 0,
+																				@debugMode			= @debugMode
+				end
+
+
+			---------------------------------------------------------------------------------------------
+			/* get configuration values - wait/lock timeout */
+			DECLARE @queryLockTimeOut [int]
+			SELECT	@queryLockTimeOut=[value] 
+			FROM	[dbo].[appConfigurations] 
+			WHERE	[name] = 'Default lock timeout (ms)'
+					AND [module] = 'maintenance-plan'
+
+
+			SET @queryLockTimeOut = @queryLockTimeOut / 1000
+			DECLARE @waitDelay [varchar](16)
+
+			SET @waitDelay = REPLICATE('0', 2-LEN(CAST(@queryLockTimeOut/3600 AS [varchar]))) + CAST(@queryLockTimeOut/3600 AS [varchar]) + ':' + 
+							 REPLICATE('0', 2-LEN(CAST((@queryLockTimeOut%3600)/60 AS [varchar]))) + CAST((@queryLockTimeOut%3600)/60 AS [varchar]) + ':' +
+							 REPLICATE('0', 2-LEN(CAST(@queryLockTimeOut%60 AS [varchar]))) + CAST(@queryLockTimeOut%60 AS [varchar])
+
+			--wait 5 seconds before
+			WAITFOR DELAY @waitDelay
+
+			/*-------------------------------------------------------------------------------------------------------------------------------*/
+			/* check if folderName exists																									 */
+			IF @sqlServerName=@@SERVERNAME
+					SET @queryToRun = N'master.dbo.xp_fileexist ''' + @folderName + ''''
+			else
+					SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC master.dbo.xp_fileexist ''''' + @folderName + ''''';'')x'
+
+			IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+			DELETE FROM #fileExists
+			INSERT	INTO #fileExists([file_exists], [file_is_directory], [parent_directory_exists])
+					EXEC (@queryToRun)
+
+			IF (SELECT [file_is_directory] FROM #fileExists)=0
+				SET @retryAttempts=@retryAttempts - 1
+			ELSE
+				SET @retryAttempts=0
+		end
+
+IF (SELECT [file_is_directory] FROM #fileExists)=0
 	begin
-		SET @queryToRun=N'--	ERROR: SOURCE server [' + @sqlServerName + '] is not defined as linked server on THIS server [' + @sqlServerName + '].'
-		RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
+		SET @queryToRun = CASE WHEN @warningMessage <> N'' THEN @warningMessage + N' ' ELSE N'' END + N'ERROR: Destination folder cannot be created.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=1
 		RETURN 1
-	end
-
----------------------------------------------------------------------------------------------
-SET	@strMessage			= NULL
-SET	@currentRunning		= NULL
-SET	@lastExecutionStatus= NULL
-SET	@lastExecutionDate	= NULL
-SET	@lastExecutionTime 	= NULL
-SET	@runningTimeSec		= NULL
-
-
----------------------------------------------------------------------------------------------
-SET @ReturnValue	= 5 --Unknown
-
-SET @queryToRun=N'SELECT Count(*) FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + @jobName + ''''
-SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-IF @debugMode = 1 PRINT @queryToRun
-
-TRUNCATE TABLE #tmpCheck
-INSERT INTO #tmpCheck EXEC (@queryToRun)
-------------------------------------------------------------------------------------------------------------------------------------------
-IF (SELECT TOP 1 Result FROM #tmpCheck)=0
-	begin
-		SET @strMessage='--SQL Server Agent: The specified job name [' + @jobName + '] does not exists on this server [' + @sqlServerName + ']'
-		IF @debugMode=1
-			RAISERROR(@strMessage, 10, 1) WITH NOWAIT
-		SET @currentRunning = 0
-		SET @ReturnValue = -5 --Unknown
 	end
 ELSE
 	begin
-		IF OBJECT_ID('tempdb..#runningSQLAgentJobsProcess') IS NOT NULL DROP TABLE #runningSQLAgentJobsProcess
-		CREATE TABLE #runningSQLAgentJobsProcess
-			(
-				  [step_id]		[int], 
-				  [job_id]		[uniqueidentifier],
-				  [session_id]	[int]
-			)
-		
-		--check for active processes started by SQL Agent job
-		SET @currentRunning=0
-		SET @queryToRun=N'SELECT DISTINCT sp.[step_id], sp.[job_id], sp.[spid]
-						FROM (
-							  SELECT  [step_id]
-									, SUBSTRING([job_id], 7, 2) + SUBSTRING([job_id], 5, 2) + SUBSTRING([job_id], 3, 2) + LEFT([job_id], 2) + ''-'' + SUBSTRING([job_id], 11, 2) + SUBSTRING([job_id], 9, 2) + ''-'' + SUBSTRING([job_id], 15, 2) + SUBSTRING([job_id], 13, 2) + ''-'' + SUBSTRING([job_id], 17, 4) + ''-'' + RIGHT([job_id], 12) AS [job_id] 
-									, [spid]
- 							  FROM (
-									SELECT SUBSTRING([program_name], CHARINDEX('': Step'', [program_name]) + 7, LEN([program_name]) - CHARINDEX('': Step'', [program_name]) - 7) [step_id]
-										 , SUBSTRING([program_name], CHARINDEX(''(Job 0x'', [program_name]) + 7, CHARINDEX('' : Step '', [program_name]) - CHARINDEX(''(Job 0x'', [program_name]) - 7) [job_id]
-										 , [spid]
-			 						FROM [master].[dbo].[sysprocesses] 
-									WHERE [program_name] LIKE ''SQLAgent - %JobStep%''
-								   ) sp
-							) sp
-						INNER JOIN [msdb].[dbo].[sysjobs] sj ON sj.[job_id] = sp.[job_id]
-						WHERE sj.[name]= ''' + @jobName + N'''
-						UNION
-						SELECT DISTINCT sjs.[step_id], sj.[job_id], sp.[spid]
-						FROM [master].[dbo].[sysprocesses] sp
-						INNER JOIN [msdb].[dbo].[sysjobs]		sj  ON sj.[name] = sp.[program_name]
-						INNER JOIN [msdb].[dbo].[sysjobsteps]	sjs ON sjs.[job_id] = sj.[job_id]
-						INNER JOIN [msdb].[dbo].[sysjobhistory] sjh ON sjh.[job_id] = sj.[job_id] AND sjh.[step_id] = sjs.[step_id] AND sjh.[run_status] = 4
-						WHERE sj.[name]= ''' + @jobName + N''''
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode = 1 PRINT @queryToRun
-		INSERT	INTO #runningSQLAgentJobsProcess([step_id], [job_id], [session_id])
-				EXEC (@queryToRun)
-
-		SET @StepID = NULL
-		SET @JobID  = NULL
-		SET @JobSessionID = NULL
-
-		SELECT @currentRunning = COUNT(*) FROM #runningSQLAgentJobsProcess
-		SELECT TOP 1  @StepID = [step_id]
-					, @JobID  = CAST([job_id] AS [varchar](255))
-					, @JobSessionID = [session_id]
-		FROM #runningSQLAgentJobsProcess	
-
-		IF OBJECT_ID('tempdb..#runningSQLAgentJobsProcess') IS NOT NULL DROP TABLE #runningSQLAgentJobsProcess
-	
-		IF @currentRunning > 0 
-			begin
-				SET @queryToRun=N'SELECT [step_name] FROM [msdb].[dbo].[sysjobsteps] WHERE [step_id]=' + CAST(@StepID AS [nvarchar]) + ' AND [job_id]=''' + @JobID + ''''
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
-
-				TRUNCATE TABLE #tmpCheck
-				INSERT INTO #tmpCheck EXEC (@queryToRun)
-				SELECT TOP 1 @StepName=Result FROM #tmpCheck
-
-				SET @lastExecutionStatus=4 -- in progress
-				IF @debugMode=1
-					RAISERROR(@strMessage, 10, 1) WITH NOWAIT
-				SET @ReturnValue=4
-
-				--get job start date/time
-				IF OBJECT_ID('tempdb..#jobStartInfo') IS NOT NULL DROP TABLE #jobStartInfo
-				CREATE TABLE #jobStartInfo
-					(
-						[start_date]	[varchar](16), 
-						[start_time]	[varchar](16), 
-						[run_status]	[int], 
-						[event_time]	[datetime]
-					)
-
-				SET @queryToRun=N'SELECT TOP 1 CAST(h.[run_date] AS varchar) AS [start_date]
-											, CAST(h.[run_time] AS varchar) AS [start_time]
-											, NULL AS [run_status]
-											, GETDATE() AS [event_time]
-								FROM [msdb].[dbo].[sysjobs] j 
-								INNER JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-								WHERE j.[name]=''' + @jobName + N''' 
-										AND h.[instance_id] > (
-																/* last job completion id */
-																SELECT TOP 1 h1.[instance_id]
-																FROM [msdb].[dbo].[sysjobs] j1 
-																RIGHT JOIN [msdb].[dbo].[sysjobhistory] h1 ON j1.[job_id] = h1.[job_id] 
-																WHERE j1.[name]=''' + @jobName + N''' 
-																		AND [step_name] =''(Job outcome)''
-																ORDER BY h1.[instance_id] DESC
-																)
-								ORDER BY h.[instance_id] ASC'
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
-
-				INSERT	INTO #jobStartInfo([start_date], [start_time], [run_status], [event_time])
-						EXEC (@queryToRun)
-
-				
-				IF (SELECT COUNT(*) FROM #jobStartInfo)=0
-					begin
-						IF @StepID <> 1
-							begin
-								/* job was cancelled, but process is still running, probably performing a rollback */
-								SET @queryToRun=N'SELECT TOP 1 CAST(h.[run_date] AS varchar) AS [start_date]
-															, CAST(h.[run_time] AS varchar) AS [start_time]
-															, h.[run_status]
-															, GETDATE() AS [event_time]
-												FROM [msdb].[dbo].[sysjobs] j 
-												RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-												WHERE j.[name]=''' + @jobName + N''' 
-														AND h.[instance_id] = (
-																				/* last job completion id */
-																				SELECT TOP 1 h1.[instance_id]
-																				FROM [msdb].[dbo].[sysjobs] j1 
-																				RIGHT JOIN [msdb].[dbo].[sysjobhistory] h1 ON j1.[job_id] = h1.[job_id] 
-																				WHERE j1.[name]=''' + @jobName + N''' 
-																						AND [step_name] =''(Job outcome)''
-																				ORDER BY h1.[instance_id] DESC
-																				)
-												ORDER BY h.[instance_id] ASC'
-							end
-						ELSE
-							begin
-								SET @queryToRun=N'SELECT  REPLACE(SUBSTRING(CONVERT([varchar](19), [login_time], 120), 1, 10), ''-'', '''')  AS [start_date]
-														, REPLACE(SUBSTRING(CONVERT([varchar](19), [login_time], 120), 12, 19), '':'', '''') AS [start_time]
-														, 4 AS [run_status]
-														, GETDATE() AS [event_time]
-												FROM [master].[dbo].[sysprocesses]
-												WHERE [spid] = ' + CAST(@JobSessionID AS [nvarchar])
-							end
-						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-						IF @debugMode = 1 PRINT @queryToRun
-
-						INSERT	INTO #jobStartInfo([start_date], [start_time], [run_status], [event_time])
-								EXEC (@queryToRun)
-					end
-									
-				SET @RunDate	= NULL
-				SET @RunTime	= NULL
-				SET @EventTime	= NULL
-				SELECT TOP 1  @RunDate	 = [start_date]
-							, @RunTime	 = [start_time]
-							, @RunStatus = CAST(ISNULL([run_status], @lastExecutionStatus) AS [varchar]) 
-							, @EventTime = [event_time]
-				FROM #jobStartInfo
-	
-
-				SET @RunTime = REPLICATE('0', 6 - LEN(@RunTime)) + @RunTime
-				SET @RunTime = SUBSTRING(@RunTime, 1, 2) + ':' + SUBSTRING(@RunTime, 3, 2) + ':' + SUBSTRING(@RunTime, 5, 2)
-				SET @RunDate = SUBSTRING(@RunDate, 1, 4) + '-' + SUBSTRING(@RunDate, 5, 2) + '-' + SUBSTRING(@RunDate, 7, 2)
-
-				SET @lastExecutionDate = @RunDate
-				SET @lastExecutionTime = @RunTime
-				SET @runningTimeSec = [dbo].[ufn_getMilisecondsBetweenDates](CONVERT([datetime], @lastExecutionDate + ' ' + @lastExecutionTime, 120), @EventTime) / 1000
-
-				SET @RunStatus = CASE @RunStatus WHEN '0' THEN 'Failed'
-												 WHEN '1' THEN 'Succeded'				
-												 WHEN '2' THEN 'Retry'
-												 WHEN '3' THEN 'Canceled'
-												 WHEN '4' THEN 'In progress'
-								 END
-				
-				SET @strMessage=                         '--Job currently running step: [' + CAST(@StepID AS varchar) + '] - [' + @StepName + ']'
-				SET @strMessage=@strMessage + CHAR(13) + '--Job started at            : [' + ISNULL(@RunDate, '') + ' ' + ISNULL(@RunTime, '') + ']'
-				SET @strMessage=@strMessage + CHAR(13) + '--Execution status          : [' + ISNULL(@RunStatus, '') + ']'	
-			end
-		ELSE
-			begin
-				IF OBJECT_ID('tempdb..#jobLastRunDetails') IS NOT NULL DROP TABLE #jobLastRunDetails
-				CREATE TABLE #jobLastRunDetails
-					(
-						[message]		[varchar](4000), 
-						[step_id]		[int], 
-						[step_name]		[varchar](255), 
-						[run_status]	[int], 
-						[run_date]		[varchar](16), 
-						[run_time]		[varchar](16), 
-						[run_duration]	[varchar](16), 
-						[event_time]	[datetime])
-
-				SET @queryToRun=N'SELECT TOP 1 h.[message], h.[step_id], h.[step_name], h.[run_status]
-											, CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-											, GETDATE() AS [event_time]
-								FROM [msdb].[dbo].[sysjobs] j 
-								RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-								WHERE	j.[name]=''' + @jobName + N''' 
-										AND h.[step_name] <> ''(Job outcome)''
-								ORDER BY h.[instance_id] DESC'
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
-
-				INSERT	INTO #jobLastRunDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
-						EXEC (@queryToRun)
-				
-				SET @Message	=null
-				SET @StepID		=null
-				SET @StepName	=null
-				SET @lastExecutionStatus=null
-				SET @RunStatus	=null
-				SET @RunDate	=null
-				SET @RunTime	=null
-				SET @RunDuration=null
-				SET @EventTime	=null
-				SELECT TOP 1  @Message		= [message]
-							, @StepID		= [step_id]
-							, @StepName		= [step_name]
-							, @RunDate		= [run_date]
-							, @RunTime		= [run_time]
-							, @RunDuration	= [run_duration] 
-							, @EventTime	= [event_time]
-				FROM #jobLastRunDetails
-				
-				SET @queryToRun=N'SELECT TOP 1 NULL AS [message], NULL AS [step_id], NULL AS [step_name], [run_status], NULL AS [run_date], NULL AS [run_time], CAST([run_duration] AS varchar) AS [RunDuration], NULL AS [event_time]
-								FROM [msdb].[dbo].[sysjobhistory]
-								WHERE	[job_id] IN (
-													 SELECT [job_id] FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + @jobName + N'''
-													)
-										AND [step_name] =''(Job outcome)''
-								ORDER BY [instance_id] DESC'
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
-
-				TRUNCATE TABLE #jobLastRunDetails
-				INSERT	INTO #jobLastRunDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
-						EXEC (@queryToRun)
-				
-				SET @RunDurationLast=null
-				SET @RunStatus=null
-				SELECT TOP 1  @RunDurationLast	   = [run_duration]
-							, @RunStatus		   = CAST([run_status] AS varchar)
-							, @lastExecutionStatus = [run_status] 
-				FROM #jobLastRunDetails
-			
-				--for failed jobs, get last step message
-				IF @RunStatus=0
-					begin
-						SET @queryToRun='SELECT TOP 1 h.[message], NULL AS [step_id], NULL AS [step_name], NULL AS [run_status], NULL AS [run_date], NULL AS [run_time], NULL AS [run_duration], NULL AS [event_time]
-									FROM [msdb].[dbo].[sysjobs] j 
-									RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-									WHERE j.[name]=''' + @jobName + ''' 
-											AND h.[step_name] <> ''(Job outcome)'' 
-											AND h.[run_status]=0
-									ORDER BY h.[instance_id] DESC'
-						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-						IF @debugMode = 1 PRINT @queryToRun
-
-						TRUNCATE TABLE #jobLastRunDetails
-						INSERT	INTO #jobLastRunDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
-								EXEC (@queryToRun)
-
-						SELECT TOP 1 @Message=[message] 
-						FROM #jobLastRunDetails
-						
-						SET @lastExecutionStatus=0
-					end
-
-				SET @RunDurationLast=REPLICATE('0', 6 - LEN(@RunDurationLast)) + @RunDurationLast
-				SET @runningTimeSec = CAST(SUBSTRING(@RunDurationLast, 1, LEN(@RunDurationLast) - 4) AS [bigint])*3600 + CAST(SUBSTRING(RIGHT(@RunDurationLast, 4), 1, 2) AS [bigint])*60 + CAST(SUBSTRING(RIGHT(@RunDurationLast, 4), 3, 2) AS [bigint])
-				SET @RunDurationLast=SUBSTRING(@RunDurationLast, 1, LEN(@RunDurationLast) - 4) + ':' + SUBSTRING(RIGHT(@RunDurationLast, 4), 1, 2) + ':' + SUBSTRING(RIGHT(@RunDurationLast, 4), 3, 2)
-				
-				IF @lastExecutionStatus IS NULL
-					begin
-						SET @RunStatus='Unknown'
-						SET @lastExecutionStatus='5' 
-					end
-
-				SET @RunStatus = CASE @RunStatus WHEN '0' THEN 'Failed'
-												 WHEN '1' THEN 'Succeded'				
-												 WHEN '2' THEN 'Retry'
-												 WHEN '3' THEN 'Canceled'
-												 WHEN '4' THEN 'In progress'
-								 END
-
-				SET @RunTime=REPLICATE('0', 6 - LEN(@RunTime)) + @RunTime
-				SET @RunTime=SUBSTRING(@RunTime, 1, 2) + ':' + SUBSTRING(@RunTime, 3, 2) + ':' + SUBSTRING(@RunTime, 5, 2)
-				SET @RunDate=SUBSTRING(@RunDate, 1, 4) + '-' + SUBSTRING(@RunDate, 5, 2) + '-' + SUBSTRING(@RunDate, 7, 2)
-				SET @RunDuration=REPLICATE('0', 6 - LEN(@RunDuration)) + @RunDuration
-				--SET @RunDuration=SUBSTRING(@RunDuration, 1,2) + ':' + SUBSTRING(@RunDuration, 3,2) + ':' + SUBSTRING(@RunDuration, 5,2)
-				SET @RunDuration=SUBSTRING(@RunDuration, 1, LEN(@RunDuration) - 4) + ':' + SUBSTRING(RIGHT(@RunDuration, 4), 1, 2) + ':' + SUBSTRING(RIGHT(@RunDuration, 4), 3, 2)
-				
-				SET @strMessage='--The specified job [' + @sqlServerName + '].[' + @jobName + '] is not currently running.'
-				IF @RunStatus<>'Unknown'
-					begin
-						SET @strMessage=@strMessage + CHAR(13) + '--Last execution step			: [' + ISNULL(CAST(@StepID AS varchar), '') + '] - [' + ISNULL(@StepName, '') + ']'
-						SET @strMessage=@strMessage + CHAR(13) + '--Last step finished at      	: [' + ISNULL(@RunDate, '') + ' ' + ISNULL(@RunTime, '') + ']'
-						SET @strMessage=@strMessage + CHAR(13) + '--Last step running time		: [' + ISNULL(@RunDuration, '') + ']'
-						SET @strMessage=@strMessage + CHAR(13) + '--Job execution time (total)	: [' + ISNULL(@RunDurationLast, '') + ']'	
-					end
-				SET @strMessage=@strMessage + CHAR(13) + '--Last job execution status  	: [' + ISNULL(@RunStatus, 'Unknown') + ']'	
-
-				SET @lastExecutionDate=@RunDate
-				SET @lastExecutionTime=@RunTime
-
-				SET @ReturnValue=@lastExecutionStatus
-			end
-
-			IF @extentedStepDetails=1
-				begin
-					IF OBJECT_ID('tempdb..#jobRunStepDetails') IS NOT NULL DROP TABLE #jobRunStepDetails
-					CREATE TABLE #jobRunStepDetails
-						(
-							[message]		[varchar](4000), 
-							[step_id]		[int], 
-							[step_name]		[varchar](255), 
-							[run_status]	[int], 
-							[run_date]		[varchar](16), 
-							[run_time]		[varchar](16), 
-							[run_duration]	[varchar](16), 
-							[event_time]	[datetime])
-
-					--get job execution details: steps execution status
-					IF @currentRunning = 0 
-						SET @queryToRun=N'SELECT   h.[message], h.[step_id], h.[step_name], h.[run_status]
-												, CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-												, GETDATE() AS [event_time]
-										FROM [msdb].[dbo].[sysjobs] j 
-										RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-										WHERE	 h.[instance_id] < (
-																	SELECT TOP 1 [instance_id] 
-																	FROM (	
-																			SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-																			FROM [msdb].[dbo].[sysjobs] j 
-																			RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-																			WHERE	j.[name]=''' + @jobName + N''' 
-																					AND h.[step_name] =''(Job outcome)''
-																			ORDER BY h.[instance_id] DESC
-																		)A
-																	) 
-												AND	h.[instance_id] > ISNULL(
-																	( SELECT [instance_id] 
-																	FROM (	
-																			SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-																			FROM [msdb].[dbo].[sysjobs] j 
-																			RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-																			WHERE	j.[name]=''' + @jobName + N''' 
-																					AND h.[step_name] =''(Job outcome)''
-																			ORDER BY h.[instance_id] DESC
-																		)A
-																	WHERE [instance_id] NOT IN 
-																		(
-																		SELECT TOP 1 [instance_id] 
-																		FROM (	SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-																				FROM [msdb].[dbo].[sysjobs] j 
-																				RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-																				WHERE	j.[name]=''' + @jobName + N''' 
-																						AND h.[step_name] =''(Job outcome)''
-																				ORDER BY h.[instance_id] DESC
-																			)A
-																		)),0)
-												AND j.[job_id] IN (
-																	SELECT [job_id] FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + @jobName + N''' 
-																)
-											ORDER BY h.[instance_id]'
-					ELSE
-						SET @queryToRun=N'SELECT   h.[message], h.[step_id], h.[step_name], h.[run_status]
-												, CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-												, GETDATE() AS [event_time]
-										FROM [msdb].[dbo].[sysjobs] j 
-										RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-										WHERE	 h.[instance_id] > (
-																	SELECT TOP 1 [instance_id] 
-																	FROM (	
-																			SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-																			FROM [msdb].[dbo].[sysjobs] j 
-																			RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-																			WHERE	j.[name]=''' + @jobName + N''' 
-																					AND h.[step_name] =''(Job outcome)''
-																			ORDER BY h.[instance_id] DESC
-																		)A
-																	) 
-												AND j.[job_id] IN (
-																	SELECT [job_id] FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + @jobName + N''' 
-																)
-											ORDER BY h.[instance_id]'
-
-					SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-					IF @debugMode = 1 PRINT @queryToRun
-
-					TRUNCATE TABLE #jobRunStepDetails
-					INSERT	INTO #jobRunStepDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
-							EXEC (@queryToRun)
-						
-					DECLARE @maxLengthStepName [int]
-					SELECT @maxLengthStepName = MAX(LEN([step_name]))
-					FROM #jobRunStepDetails
-					
-					SET @maxLengthStepName = ISNULL(@maxLengthStepName, 16)
-
-					DECLARE crsJobDetails CURSOR FOR	SELECT DISTINCT   [step_id]
-																		, [step_name]
-																		, [run_status]
-																		, [run_date]
-																		, [run_time]
-																		, [run_duration]
-																		, [message]
-														FROM #jobRunStepDetails
-														ORDER BY [run_date], [run_time]
-					OPEN crsJobDetails
-					FETCH NEXT FROM crsJobDetails INTO @StepID, @StepName, @RunStatusDetail, @RunDateDetail, @RunTimeDetail, @RunDurationDetail, @queryToRun
-
-					IF @@FETCH_STATUS=0
-						begin
-							SET @queryToRun='[' + LEFT('Run Date' + SPACE(10), 10) + '] [' + LEFT('RunTime' + SPACE(8), 8) +'] [' + LEFT('Status' + SPACE(12), 12) + '] [' + LEFT('Duration' + SPACE(20), 20) + '] [' + LEFT('ID' + SPACE(3), 3) + '] [' + LEFT('Step Name' + SPACE(@maxLengthStepName), @maxLengthStepName) + ']'
-							SET @strMessage=@strMessage + CHAR(13) + @queryToRun
-						end
-						
-					WHILE @@FETCH_STATUS=0
-						begin								
-							SET @RunStatusDetail = CASE @RunStatusDetail WHEN '0' THEN 'Failed'
-																			WHEN '1' THEN 'Succeded'				
-																			WHEN '2' THEN 'Retry'
-																			WHEN '3' THEN 'Canceled'
-																			WHEN '4' THEN 'In progress'
-														END
-	
-							SET @RunTimeDetail=REPLICATE('0', 6 - LEN(@RunTimeDetail)) + @RunTimeDetail
-							SET @RunTimeDetail=SUBSTRING(@RunTimeDetail, 1, 2) + ':' + SUBSTRING(@RunTimeDetail, 3, 2) + ':' + SUBSTRING(@RunTimeDetail, 5, 2)
-							SET @RunDateDetail=SUBSTRING(@RunDateDetail, 1, 4) + '-' + SUBSTRING(@RunDateDetail, 5, 2) + '-' + SUBSTRING(@RunDateDetail, 7, 2)
-
-							SET @RunDurationDetail=REPLICATE('0', 6 - LEN(@RunDurationDetail)) + @RunDurationDetail
-								
-							SET @strMessage=@strMessage + CHAR(13) + ISNULL(
-									'[' + LEFT(@RunDateDetail + SPACE(10), 10) + '] ' + 
-									'[' + LEFT(@RunTimeDetail + SPACE(8), 8) + '] ' + 
-									'[' + LEFT(@RunStatusDetail + SPACE(12), 12) + '] ' + 
-									'[' + LEFT(dbo.ufn_reportHTMLFormatTimeValue((CAST(SUBSTRING(@RunDurationDetail, 1, LEN(@RunDurationDetail) - 4) AS [bigint])*3600 + CAST(SUBSTRING(RIGHT(@RunDurationDetail, 4), 1, 2) AS [bigint])*60 + CAST(SUBSTRING(RIGHT(@RunDurationDetail, 4), 3, 2) AS [bigint]))*1000) + SPACE(20), 20) + '] ' + 
-									'[' + LEFT(CAST(@StepID AS varchar) + SPACE(3), 3) + '] ' + 
-									'[' + LEFT(@StepName + SPACE(@maxLengthStepName), @maxLengthStepName) + ']', '')
-
-							FETCH NEXT FROM crsJobDetails INTO @StepID, @StepName, @RunStatusDetail, @RunDateDetail, @RunTimeDetail, @RunDurationDetail, @queryToRun
-						end
-					CLOSE crsJobDetails
-					DEALLOCATE crsJobDetails					
-				end
-
-			--final error message
-			IF @currentRunning = 0  AND @RunStatus='Failed'
-				begin
-					SET @strMessage=@strMessage + CHAR(13) + '--Job execution return this message: ' + ISNULL(@Message, '')
-					IF @debugMode=1
-						print '--Job execution return this message: ' + ISNULL(@Message, '')
-				end
-	end
-
-IF @debugMode=1
-	print @strMessage
-SET @ReturnValue=ISNULL(@ReturnValue, 0)
-IF @selectResult=1
-	SELECT @strMessage AS StrMessage, @currentRunning AS CurrentRunning, @lastExecutionStatus AS LastExecutionStatus, @lastExecutionDate AS LastExecutionDate, @lastExecutionTime AS LastExecutionTime, @runningTimeSec AS RunningTimeSec
-RETURN @ReturnValue
-
-
-
-GO
-SET QUOTED_IDENTIFIER OFF 
-GO
-SET ANSI_NULLS ON 
-GO
-
-
-RAISERROR('Create procedure: [dbo].[usp_sqlAgentJobStartAndWatch]', 10, 1) WITH NOWAIT
-GO
-SET QUOTED_IDENTIFIER ON 
-GO
-SET ANSI_NULLS ON 
-GO
-
-if exists (select * from dbo.sysobjects where id = object_id(N'[dbo].[usp_sqlAgentJobStartAndWatch]') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-drop procedure [dbo].[usp_sqlAgentJobStartAndWatch]
-GO
-
-CREATE PROCEDURE dbo.usp_sqlAgentJobStartAndWatch
-		@sqlServerName				[sysname],
-		@jobName					[sysname],
-		@stepToStart				[int],
-		@stepToStop					[int],
-		@waitForDelay				[varchar](8),
-		@dontRunIfLastExecutionSuccededLast	[int]=0,		--numarul de minute 
-		@startJobIfPrevisiousErrorOcured	[bit]=1,
-		@watchJob					[bit]=1,
-		@debugMode					[bit]=0
-/* WITH ENCRYPTION */
-AS
-
--- ============================================================================
--- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
--- ============================================================================
--- Author			 : Dan Andrei STEFAN
--- Create date		 : 2004-2014
--- Module			 : Database Analysis & Performance Monitoring
--- ============================================================================
-
-DECLARE @currentRunning 		[int],
-		@lastExecutionStatus	[int],
-		@lastExecutionDate		[varchar](10),
-		@lastExecutionTime		[varchar](8),
-		@lastExecutionStep		[int],
-		@runningTimeSec			[bigint],
-		@strMessage				[varchar](4096),
-		@lastMessage			[varchar](4096),
-		@jobWasRunning			[bit],
-		@returnValue			[bit],		--1=eroare, 0=succes
-		@startJob				[bit],
-		@jobID					[varchar](255),
-		@stepName				[varchar](255),
-		@lastStepSuccesAction	[int],
-		@lastStepFailureAction	[int],
-		@tmpServer				[varchar](1024),
-		@queryToRun				[nvarchar](4000)
-
-SET NOCOUNT ON
-
----------------------------------------------------------------------------------------------
-IF object_id('#tmpCheckParameters') IS NOT NULL DROP TABLE #tmpCheckParameters
-CREATE TABLE #tmpCheckParameters (Result varchar(1024))
-
-IF ISNULL(@sqlServerName, '')=''
-	begin
-		SET @queryToRun='--	ERROR: The specified value for SOURCE server is not valid.'
-		RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
-		RETURN 1
-	end
-
-IF LEN(@jobName)=0 OR ISNULL(@jobName, '')=''
-	begin
-		RAISERROR('--ERROR: Must specify a job name.', 10, 1) WITH NOWAIT
-		RETURN 1
-	end
-
-SET @queryToRun='SELECT [srvid] FROM master.dbo.sysservers WHERE [srvname]=''' + @sqlServerName + ''''
-IF @debugMode = 1 PRINT @queryToRun
-
-TRUNCATE TABLE #tmpCheckParameters
-INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-IF (SELECT count(*) FROM #tmpCheckParameters)=0
-	begin
-		SET @queryToRun='--	ERROR: SOURCE server [' + @sqlServerName + '] is not defined as linked server on THIS server [' + @sqlServerName + '].'
-		RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
-		RETURN 1
-	end
-
-SET @queryToRun='SELECT [srvid] FROM master.dbo.sysservers WHERE [srvname]=''' + @sqlServerName + ''''
-SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-IF @debugMode = 1 PRINT @queryToRun
-
-SET @tmpServer='[' + @sqlServerName + '].master.dbo.sp_executesql'
-
-TRUNCATE TABLE #tmpCheckParameters
-INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-IF (SELECT count(*) FROM #tmpCheckParameters)=0
-	begin
-		SET @queryToRun='--	ERROR: THIS server [' + @sqlServerName + '] is not defined as linked server on SOURCE server [' + @sqlServerName + '].'
-		RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
-		RETURN 1
-	end
-
-
----------------------------------------------------------------------------------------------
-SET @lastMessage	= ''
-SET @currentRunning	= 1
-SET @jobWasRunning	= 0
-SET @startJob		= 0
-SET @returnValue	= 0
-
-
---daca job-ul e pornit il monitorizez
-WHILE @currentRunning<>0
-	begin
-		SET @currentRunning=1
-		--verific daca job-ul este in curs de executie. daca da, afisez momentele de executie ale job-ului
-		EXEC [dbo].[usp_sqlAgentJobCheckStatus] @sqlServerName, @jobName, @strMessage OUT, @currentRunning OUT, @lastExecutionStatus OUT, @lastExecutionDate OUT, @lastExecutionTime OUT, @runningTimeSec OUT, 0, 0, 0
-		IF @currentRunning<>0
-			begin
-				IF ISNULL(@strMessage,'')<>ISNULL(@lastMessage, '')
-					begin
-						IF @watchJob=1
-							RAISERROR(@strMessage,10,1) WITH NOWAIT
-						SET @lastMessage=@strMessage
-					end
-				IF @jobWasRunning=0
-					SET @jobWasRunning=1
-				IF @watchJob=0
-					SET @currentRunning=0
-				ELSE
-					WAITFOR DELAY @waitForDelay
-			end
-		ELSE
-			begin
-				--RAISERROR(@strMessage,10,1) WITH NOWAIT
-				--job-ul s-a terminat sau nu s-a executat.
-				IF @lastExecutionStatus=0
-					begin
-						--job-ul care a rulat si a  fost urmarit s-a terminat cu eroare
-						IF @jobWasRunning=1
-							begin
-								--ultima executie a job-ului a fost cu eroare
-								print @strMessage
-								RAISERROR('--Execution failed. Please notify your Database Administrator.',16,1) WITH NOWAIT
-								SET @currentRunning=0
-								SET @returnValue=1	--1=eroare, 0=succes
-							end
-						ELSE
-							begin
-								RAISERROR('--Warning: Last job execution failed.',10,1) WITH NOWAIT
-								IF @startJobIfPrevisiousErrorOcured=1
-									SET @startJob=1
-							end
-					end
-				ELSE
-					--verific daca job-ul a fost lansat de aici sau a de catre o alta locatie si s-a asteptat terminarea executiei sale
-					IF @jobWasRunning=0
-						begin
-							SET @currentRunning=1
-							IF @lastExecutionStatus=1
-								IF (@lastExecutionDate<>'') AND (@lastExecutionTime<>'')
-									begin
-										--daca job-ul s-a executat cu succes in ultimele 120 de minute, nu se va mai lansa
-										SET @strMessage=@lastExecutionDate + ' ' + @lastExecutionTime
-										IF ABS(DATEDIFF(minute, GetDate(), CONVERT(datetime, @strMessage, 120)))<@dontRunIfLastExecutionSuccededLast
-											begin
-												SET @currentRunning=0
-												RAISERROR('--Job was previosly executed with a succes closing state.',10,1) WITH NOWAIT
-												SET @returnValue=0
-											end
-										end
-							IF @currentRunning<>0
-								begin
-									SET @startJob=1
-									SET @currentRunning=0
-								end
-						end
-					ELSE
-						SET @currentRunning=0
-			end
-		IF @watchJob=0
-			SET @currentRunning=0
-	end
---job-ul trebuie pornit
-IF @startJob=1
-	begin
-		IF @stepToStart > @stepToStop
-			begin
-				SET @strMessage = '--The Start Step cannot be greater than the Stop Step when watching a job!'
-				RAISERROR(@strMessage,16,1) WITH NOWAIT
-				RETURN 1
-			end
-	
-		SET @queryToRun='SELECT CAST([job_id] AS varchar(255)) FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' +  @jobName + ''''
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode = 1 PRINT @queryToRun
-
-		TRUNCATE TABLE #tmpCheckParameters
-		INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-
-		SET @jobID=NULL
-		SELECT @jobID=Result FROM #tmpCheckParameters
-		IF @jobID IS NOT NULL
-			begin
-				--verific existenta primului pas trimis ca parametru
-				SET @queryToRun='SELECT MIN([step_id]) FROM [msdb].[dbo].[sysjobsteps] WHERE [job_id]=''' + @jobID + ''''
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
-
-				TRUNCATE TABLE #tmpCheckParameters
-				INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-				
-				IF (SELECT CAST(Result AS numeric) FROM #tmpCheckParameters)>@stepToStart
-					begin
-						RAISERROR('--The specified Start Step is not defined for this job.', 10, 1) WITH NOWAIT
-						RAISERROR('--Setting Start Step the job''s first defined step.', 10, 1) WITH NOWAIT
-						SELECT @stepToStart=CAST(Result AS numeric) FROM #tmpCheckParameters
-					end
-				
-				--verific existenta ultimului pas trimis ca parametru
-				SET @queryToRun='SELECT MAX([step_id]) FROM [msdb].[dbo].[sysjobsteps] WHERE [job_id]=''' + @jobID + ''''
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
-
-				TRUNCATE TABLE #tmpCheckParameters
-				INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-				
-				IF (SELECT CAST(Result AS numeric) FROM #tmpCheckParameters)<@stepToStop
-					begin
-						RAISERROR('--The specified Stop Step is not defined for this job.', 10, 1) WITH NOWAIT
-						RAISERROR('--Setting Stop Step the job''s last defined step.', 10, 1) WITH NOWAIT
-						SELECT @stepToStop=CAST(Result AS numeric) FROM #tmpCheckParameters
-					end
-		 		SET @strMessage='--Setting execution Start Step: [' + CAST(@stepToStart AS varchar) + ']'
- 				RAISERROR(@strMessage,10,1) WITH NOWAIT
-				
-				--incerc sa modific starea ultimul pas de executie. determinare stare curenta
-				SET @lastStepSuccesAction=NULL
-				SET @lastStepFailureAction=NULL
-
-				SET @queryToRun='SELECT [on_success_action] FROM [msdb].[dbo].[sysjobsteps] WHERE [job_id]=''' + @jobID + ''' AND [step_id]=' + CAST(@stepToStop AS varchar)
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
-
-				TRUNCATE TABLE #tmpCheckParameters
-				INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-				SELECT @lastStepSuccesAction=CAST(Result AS numeric) FROM #tmpCheckParameters
-
-				SET @queryToRun='SELECT [on_fail_action] FROM [msdb].[dbo].[sysjobsteps] WHERE [job_id]=''' + @jobID + ''' AND [step_id]=' + CAST(@stepToStop AS varchar)
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
-
-				TRUNCATE TABLE #tmpCheckParameters
-				INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-				SELECT @lastStepFailureAction=CAST(Result AS numeric) FROM #tmpCheckParameters
-
-				IF (@lastStepSuccesAction IS NULL) OR (@lastStepFailureAction IS NULL)
-					begin
-						RAISERROR('--Cannot read job''s Start Step informations.', 16, 1) WITH NOWAIT
-						IF OBJECT_ID('#tmpCheckParameters') IS NOT NULL DROP TABLE #tmpCheckParameters
-						RETURN 1
-					end			
-				ELSE
-					begin
-						SET @strMessage='--Setting execution Stop Step : [' + CAST(@stepToStop AS varchar) + ']'
-						RAISERROR(@strMessage,10,1) WITH NOWAIT
-						--modific ultimul pas important
-						--print @stepToStop
-						SET @queryToRun='[' + @sqlServerName + '].[msdb].[dbo].[sp_update_jobstep] @job_id = ''' + @jobID + ''', @step_id = ' + CAST(@stepToStop AS varchar) + ', @on_success_action = 1, @on_fail_action=2'
-						IF @debugMode = 1 PRINT @queryToRun
-						EXEC (@queryToRun)
-
-						SET @queryToRun='[' + @sqlServerName + '].[msdb].[dbo].[sp_update_jobstep] @job_id = ''' + @jobID + ''', @step_id = ' + CAST(@stepToStop AS varchar) + ', @on_success_action = 1, @on_fail_action=2'
-						IF @debugMode = 1 PRINT @queryToRun
-						EXEC (@queryToRun)
-
-						IF @@Error<>0
-							RAISERROR('--Failed in modifying job''s execution Stop Step.', 16, 1) WITH NOWAIT
-						ELSE
-							begin
-								--extrag numele pasului de start
-								SET @stepName=NULL
-								SET @queryToRun='SELECT [step_name] FROM [msdb].[dbo].[sysjobsteps] WHERE [job_id]=''' + @jobID + ''' AND [step_id]=' + CAST(@stepToStart AS varchar)
-								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-								IF @debugMode = 1 PRINT @queryToRun
-
-								TRUNCATE TABLE #tmpCheckParameters
-								INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-								SELECT @stepName=Result FROM #tmpCheckParameters
-
-								IF @stepName IS NOT NULL
-									begin
-										SET @strMessage='--Starting job: ' + @jobName
-										RAISERROR(@strMessage,10,1) WITH NOWAIT
-
-										SET @queryToRun='[' + @sqlServerName + '].[msdb].[dbo].[sp_start_job] @job_id=''' + @jobID + ''', @step_name=''' + @stepName + ''''
-										IF @debugMode = 1 PRINT @queryToRun
-
-										EXEC (@queryToRun)
-										IF @@Error<>0
-											RAISERROR('--Failed in starting job.', 16, 1) WITH NOWAIT
-										ELSE
-											begin
-												--monitorizare job
-												IF @watchJob=1
-													begin
-														WAITFOR DELAY @waitForDelay
-														SET @currentRunning=1	
-													end
-												ELSE
-													SET @currentRunning=0
-												--daca job-ul e pornit il monitorizez
-												WHILE @currentRunning<>0
-													begin
-														SET @currentRunning=1
-														--verific daca job-ul este in curs de executie. daca da, afisez momentele de executie ale job-ului
-														EXEC [dbo].[usp_sqlAgentJobCheckStatus] @sqlServerName, @jobName, @strMessage OUT, @currentRunning OUT, @lastExecutionStatus OUT, @lastExecutionDate OUT, @lastExecutionTime OUT, @runningTimeSec OUT, 0, 0, 0
-														IF @currentRunning<>0
-															begin
-																IF ISNULL(@strMessage,'')<>ISNULL(@lastMessage, '')
-																	begin
-																		IF @watchJob=1
-																			RAISERROR(@strMessage,10,1) WITH NOWAIT
-																		SET @lastMessage=@strMessage
-																	end
-																IF @jobWasRunning=0
-																	SET @jobWasRunning=1
-																IF @watchJob=0
-																	SET @currentRunning=0
-																ELSE
-																	WAITFOR DELAY @waitForDelay
-															end
-													end											end
-									end
-								ELSE
-									begin
-										RAISERROR('--Cannot read the name of the job''s last important step.', 16, 1) WITH NOWAIT
-										IF OBJECT_ID('#tmpCheckParameters') IS NOT NULL DROP TABLE #tmpCheckParameters
-										RETURN 1
-									end
-							end
-
-						--modific ultimul pas important (refacere)
-						SET @queryToRun='[' + @sqlServerName + '].[msdb].[dbo].[sp_update_jobstep] @job_id = ''' + @jobID + ''', @step_id = ' + CAST(@stepToStop AS varchar) + ', @on_success_action = ' + CAST(@lastStepSuccesAction AS varchar) + ', @on_fail_action=' + CAST(@lastStepFailureAction AS varchar)
-						IF @debugMode = 1 PRINT @queryToRun
-
-						EXEC(@queryToRun)
-						IF @@Error<>0
-							begin
-								RAISERROR('--Failed in modifying back job''s execution Stop Step.',16,1) WITH NOWAIT
-								IF OBJECT_ID('#tmpCheckParameters') IS NOT NULL DROP TABLE #tmpCheckParameters
-								RETURN 1
-							end
-					end
-			end
-		ELSE
-			begin
-				RAISERROR('--Cannot find the Job ID for the specified Job Name.',16,1) WITH NOWAIT		
-				IF OBJECT_ID('#tmpCheckParameters') IS NOT NULL DROP TABLE #tmpCheckParameters
-				RETURN 1
-			end
-		IF @@Error <> 0
-			begin
-				RAISERROR('--Execution failed. Please notify your Database Administrator.',10,1) WITH NOWAIT
-				SET @returnValue=1
-			end
-	end	
---afisez mesaje despre starea de executie a job-ului 
-EXEC [dbo].[usp_sqlAgentJobCheckStatus] @sqlServerName, @jobName, @strMessage OUT, @currentRunning OUT, @lastExecutionStatus OUT, @lastExecutionDate OUT, @lastExecutionTime OUT, @runningTimeSec OUT, 0, 0, 0
-print @strMessage
-IF @lastExecutionStatus=0
-	begin
-		RAISERROR('--Execution failed. Please notify your Database Administrator.',10,1) WITH NOWAIT
-		SET @returnValue=1
-	end
-IF @watchJob=1
-	begin
-		SET @queryToRun = SUBSTRING(@strMessage, CHARINDEX(N'--Last execution step', @strMessage)+22, LEN(@strMessage))
-		SET @queryToRun = SUBSTRING(@queryToRun, CHARINDEX('[', @queryToRun) + 1, LEN(@queryToRun))
-		SET @queryToRun = SUBSTRING(@queryToRun, 1, CHARINDEX(']', @queryToRun)-1)
-	
-		SET @lastExecutionStep=CAST(@queryToRun as int)
-		IF @lastExecutionStep<>@stepToStop
-			begin
-				RAISERROR('--The LAST EXECUTED STEP is DIFFERENT from the DEFINED STOP STEP. Please notify your Database Administrator.',10,1) WITH NOWAIT
-				SET @returnValue=1
-			end
-	end
-IF @lastExecutionStatus=1
-	SET @returnValue=0
--------------------------------------------------------------------------------------------------------------------------
-RETURN @returnValue
-GO
-
-
-RAISERROR('Create procedure: [dbo].[usp_sqlAgentJob]', 10, 1) WITH NOWAIT
-GO
-SET QUOTED_IDENTIFIER ON 
-GO
-SET ANSI_NULLS ON 
-GO
-
-if exists (select * from dbo.sysobjects where id = object_id(N'[dbo].[usp_sqlAgentJob]') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-drop procedure [dbo].[usp_sqlAgentJob]
-GO
-
-CREATE PROCEDURE [dbo].[usp_sqlAgentJob]
-		@sqlServerName			[sysname],
-		@jobName				[sysname],
-		@operation				[varchar](10), 
-		@dbName					[sysname], 
-		@jobStepName 			[sysname]='',
-		@jobStepCommand			[varchar](8000)='',
-		@jobLOGContainerPath	[varchar](255)='',
-		@debugMode				[bit]=0
-/* WITH ENCRYPTION */
-AS
-	
--- ============================================================================
--- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
--- ============================================================================
--- Author			 : Dan Andrei STEFAN
--- Create date		 : 2004-2014
--- Module			 : Database Analysis & Performance Monitoring
--- ============================================================================
-
-------------------------------------------------------------------------------------------------------------------------------------------
---		@jobName		- numele job-ului... toate operatiunile se vor face functie de acest nume!
---		@operation		'Add'   - se adauga un nou step definit de @jobStepName si @jobStepCommand
---						'Clean' - curata job-ul de pasi si sterge job-ul
---		@dbName			- baza de date pentru care este asociat job-ul
---		@jobStepName	- numele pasului ce se adauga
---		@jobStepCommand	- script sql ce se va executa pentru pasul definit
-------------------------------------------------------------------------------------------------------------------------------------------
-
-DECLARE @Error				[int],
-		@jobID 				[varchar](200),
-		@jobStepLogFile		[varchar](255),
-		@jobStepID			[int],
-		@jobStepIDNew		[int],
-		@jobCategoryID		[int],
-		@jobStepStatus		[int], 
-		@queryToRun			[nvarchar](4000),
-		@tmpServer			[varchar](8000)
-
----------------------------------------------------------------------------------------------
-SET NOCOUNT ON
----------------------------------------------------------------------------------------------
-
-IF object_id('#tmpCheckParameters') IS NOT NULL DROP TABLE #tmpCheckParameters
-CREATE TABLE #tmpCheckParameters (Result varchar(1024))
-
-IF ISNULL(@sqlServerName, '')=''
-	begin
-		SET @queryToRun='--	ERROR: The specified value for SOURCE server is not valid.'
-		RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
-		RETURN 1
-	end
-
-IF LEN(@jobName)=0 OR ISNULL(@jobName, '')=''
-	begin
-		RAISERROR('--ERROR: Must specify a job name.', 10, 1) WITH NOWAIT
-		RETURN 1
-	end
-
-SET @queryToRun='SELECT [srvid] FROM master.dbo.sysservers WHERE [srvname]=''' + @sqlServerName + ''''
-TRUNCATE TABLE #tmpCheckParameters
-INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-IF (SELECT count(*) FROM #tmpCheckParameters)=0
-	begin
-		SET @queryToRun='--	ERROR: SOURCE server [' + @sqlServerName + '] is not defined as linked server on THIS server [' + @sqlServerName + '].'
-		RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
-		RETURN 1
-	end
-
-------------------------------------------------------------------------------------------------------------------------------------------
---adding a new job or step to the existing job
-IF @operation='Add'
-	begin
-		SET @jobStepLogFile=''
-		IF ISNULL(@jobLOGContainerPath,'')<>''
-			begin
-				--creez directorul in care vor fi stocate log-urile
-				IF RIGHT(@jobLOGContainerPath,1)='\'
-					SET @jobLOGContainerPath=SUBSTRING(@jobLOGContainerPath,1,LEN(@jobLOGContainerPath)-1)
-
-				EXEC [dbo].[usp_createFolderOnDisk]	@sqlServerName	= @sqlServerName,
-													@folderName		= @jobLOGContainerPath,
-													@executionLevel	= 0,
-													@debugMode		= 0
-
-				--setez numele fisierului de log
-				SET @jobStepLogFile=@jobLOGContainerPath + '\LOG_' + REPLACE(REPLACE(@jobName, '\', '_'), ':', '_') + '.txt'
-			end
-
-		SET @queryToRun='SELECT category_id FROM msdb.dbo.syscategories WHERE name LIKE ''%Database Maintenance%'''
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode = 1 PRINT @queryToRun
-
-		TRUNCATE TABLE #tmpCheckParameters
-		INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-		SELECT TOP 1 @jobCategoryID=Result FROM #tmpCheckParameters
-
-		SET @jobStepID=1
-
-		SET @queryToRun='SELECT count(*) FROM msdb.dbo.sysjobs WHERE name = ''' + @jobName + ''''
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode = 1 PRINT @queryToRun
-
-		TRUNCATE TABLE #tmpCheckParameters
-		INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-		
-		--defining job and job properties
-		IF (SELECT ISNULL(Result,0) FROM #tmpCheckParameters) =0
-			begin
-				--adding job
-				set @queryToRun='EXEC msdb.dbo.sp_add_job 	@enabled 	 = 1, 
-															@job_name	 = ''' + @jobName + ''', 
-															@description = ''' + @jobName + ''', 
-															@category_id = ' + CAST(@jobCategoryID as varchar) + ', 
-															@owner_login_name = ''sa'''
-				IF @debugMode=1	PRINT @queryToRun
-				EXEC @Error=@tmpServer @queryToRun
-
-				IF @Error<>0
-					begin
-						SET @queryToRun='--Cannot add job [' + @jobName + '] to SQL Server Agent.'
-						RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
-						RETURN 1
-					end
-
-				--adding job to server
-				SET @queryToRun='EXEC msdb.dbo.sp_add_jobserver @job_name = ''' + @jobName + ''', @server_name = ''(local)'''
-				IF @debugMode=1	PRINT @queryToRun
-				EXEC @Error=@tmpServer @queryToRun
-
-				IF @Error<>0
-					begin
-						SET @queryToRun='--Cannot add job [' + @jobName + '] to SQL Server Agent.'
-						RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
-						RETURN 1
-					end
-				ELSE
-					begin
-						SET @queryToRun='--Successfully add job [' + @jobName + '] to SQL Server Agent.'
-						RAISERROR(@queryToRun, 10, 1) WITH NOWAIT
-					end
-		
-			end
-		SET @queryToRun='SELECT job_id FROM msdb.dbo.sysjobs WHERE name = ''' + @jobName + ''''
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode = 1 PRINT @queryToRun
-
-		TRUNCATE TABLE #tmpCheckParameters
-		INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-		SELECT TOP 1 @jobID = ISNULL(Result,'') FROM #tmpCheckParameters
-
-		SET @queryToRun='SELECT TOP 1 (step_id+1) FROM msdb.dbo.sysjobsteps WHERE job_id=''' + @jobID + ''' ORDER BY step_id DESC'
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode = 1 PRINT @queryToRun
-
-		TRUNCATE TABLE #tmpCheckParameters
-		INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-		SELECT TOP 1 @jobStepID = ISNULL(Result,0) FROM #tmpCheckParameters
-
-		IF @jobStepID-1>0
-			begin
-				SET @queryToRun='UPDATE msdb.dbo.sysjobsteps SET on_success_action=4, on_success_step_id=' + CAST(@jobStepID as varchar) + ', on_fail_action=4, on_fail_step_id=' + CAST(@jobStepID as varchar) + ' WHERE job_id=''' + @jobID + ''' AND step_id=' + CAST((@jobStepID-1) as varchar) 
-				IF @debugMode=1	PRINT @queryToRun
-				EXEC @tmpServer @queryToRun				
-			end
-
-		--defining job step and step properties
-		SET @queryToRun='EXEC msdb.dbo.sp_add_jobstep	@job_id = ''' + @jobID + ''',
-														@step_id = ' + CAST(@jobStepID as varchar) + ',
-														@step_name = ''' + @jobStepName + ''',
-														@on_success_action = 1,
-														@on_fail_action = 2, 
-														@retry_interval = 0,							
-														@command = ''' + @jobStepCommand + ''',
-														@database_name = ''' + @dbName + ''','
-		IF @jobStepLogFile<>'' 
-			SET @queryToRun=@queryToRun + '
-								@output_file_name=''' + @jobStepLogFile + ''','
-		SET @queryToRun=@queryToRun + '				
-								@retry_attempts=999,
-								@flags=6'
-		
-		IF @debugMode=1 PRINT @queryToRun
-		EXEC @tmpServer @queryToRun
-
-		SET @queryToRun='UPDATE msdb.dbo.sysjobsteps SET command = ''' + @jobStepCommand + ''' FROM msdb.dbo.sysjobsteps WHERE job_id = ''' + @jobID + ''' AND step_name = ''' + @jobStepName + ''''
-
-		IF @debugMode = 1 PRINT @queryToRun
-		EXEC @Error=@tmpServer @queryToRun
-		IF @Error<>0
-			begin
-				SET @queryToRun= '--Cannot add job step: [' + @jobStepName + '] to server job [' + @jobName + ']'
-				RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
-				RETURN 1
-			end
-		ELSE
-			begin
-				SET @queryToRun= '--Successfully add job step: [' + @jobStepName + '] to server job [' + @jobName + ']'
-				RAISERROR(@queryToRun, 10, 1) WITH NOWAIT
-			end
-	end
-------------------------------------------------------------------------------------------------------------------------------------------
---erase all job steps
-IF @operation='Clean'
-	begin
-		EXEC [dbo].[usp_sqlAgentJobCheckStatus] @sqlServerName, @jobName, '', @Error OUT, '', '', '', 0, 0, 0, 0
-		IF @Error=1
-			begin
-				RAISERROR('--Cannot delete a job while it is running.', 16, 1) WITH NOWAIT
-				RETURN 1
-			end
-
-		SET @queryToRun='SELECT job_id FROM msdb.dbo.sysjobs WHERE name = ''' + @jobName + ''''
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode = 1 PRINT @queryToRun
-
-		TRUNCATE TABLE #tmpCheckParameters
-		INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-		SELECT TOP 1 @jobID = ISNULL(Result,'') FROM #tmpCheckParameters
-
-		SET @queryToRun='SELECT count(*) FROM msdb.dbo.sysjobsteps WHERE job_id=''' + @jobID + ''''
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode = 1 PRINT @queryToRun
-
-		TRUNCATE TABLE #tmpCheckParameters
-		INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-		
-		WHILE (SELECT Result FROM #tmpCheckParameters)<>0
-			begin
-				SET @queryToRun='SELECT step_id FROM msdb.dbo.sysjobsteps WHERE job_id=''' + @jobID + ''' ORDER BY step_id ASC'
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
-
-				TRUNCATE TABLE #tmpCheckParameters
-				INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-
-				DECLARE JobSteps CURSOR FOR SELECT Result FROM #tmpCheckParameters
-				OPEN JobSteps
-				FETCH NEXT FROM JobSteps INTO @jobStepID
-				WHILE @@FETCH_STATUS=0
-					begin
-						SET @queryToRun='EXEC msdb.dbo.sp_delete_jobstep @job_id=''' + @jobID + ''', @step_id=1'
-						IF @debugMode=1 PRINT @queryToRun
-
-						EXEC @Error=@tmpServer @queryToRun
-						IF @Error<>0
-							begin
-								SET @queryToRun= '--Cannot delete job step [' + @jobName + '], StepID [' + CAST(@jobStepID AS varchar) + ']'
-								RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
-								CLOSE JobSteps
-								DEALLOCATE JobSteps
-								RETURN 1
-							end							
-						FETCH NEXT FROM JobSteps INTO @jobStepID
-					end
-				CLOSE JobSteps
-				DEALLOCATE JobSteps
-				SET @queryToRun='SELECT count(*) FROM msdb.dbo.sysjobsteps WHERE job_id=''' + @jobID + ''''
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
-
-				TRUNCATE TABLE #tmpCheckParameters
-				INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-			end
-
-		SET @queryToRun='SELECT count(*) FROM msdb.dbo.sysjobsteps WHERE job_id=''' + @jobID + ''''
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode = 1 PRINT @queryToRun
-
-		TRUNCATE TABLE #tmpCheckParameters
-		INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-
-		IF (SELECT Result FROM #tmpCheckParameters)=0
-			begin
-				SET @queryToRun='SELECT count(*) FROM msdb.dbo.sysjobs WHERE job_id=''' + @jobID + ''''
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
-
-				TRUNCATE TABLE #tmpCheckParameters
-				INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
-
-				IF (SELECT Result FROM #tmpCheckParameters)<>0
-					begin
-						SET @queryToRun='EXEC msdb.dbo.sp_delete_job @job_id=''' + @jobID + ''''
-						IF @debugMode=1 PRINT @queryToRun
-
-						EXEC @Error=@tmpServer @queryToRun
-						IF @Error<>0
-							begin
-								SET @queryToRun= '--Cannot delete job [' + @jobName + ']'
-								RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
-								RETURN 1
-							end		
-						SET @queryToRun= '--Successfully deleted job : [' + @jobName + ']'
-						RAISERROR(@queryToRun, 10, 1) WITH NOWAIT
-					end
-			end
-		ELSE
-			begin
-				SET @queryToRun= '--The specified job: [' + @jobName + '] does not exist on the server.'
-				RAISERROR(@queryToRun, 10, 1) WITH NOWAIT
-			end
+		SET @queryToRun = N'Folder was successfully created.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 	end
 
 RETURN 0
-
-GO
-SET QUOTED_IDENTIFIER OFF 
-GO
-SET ANSI_NULLS ON 
 GO
 
 
-
+RAISERROR('Create procedure: [dbo].[usp_logEventMessage]', 10, 1) WITH NOWAIT
+GO---
 IF  EXISTS (
 	    SELECT * 
-	      FROM sys.objects 
-	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_refreshMachineCatalogs]') 
+	      FROM sysobjects 
+	     WHERE id = OBJECT_ID(N'[dbo].[usp_logEventMessage]') 
 	       AND type in (N'P', N'PC'))
-DROP PROCEDURE [dbo].[usp_refreshMachineCatalogs]
+DROP PROCEDURE [dbo].[usp_logEventMessage]
+GO
+
+GO
+CREATE PROCEDURE [dbo].[usp_logEventMessage]
+		@projectCode			[sysname]=NULL,
+		@sqlServerName			[sysname]=NULL,
+		@dbName					[sysname] = NULL,
+		@objectName				[nvarchar](512) = NULL,
+		@childObjectName		[sysname] = NULL,
+		@module					[sysname],
+		@eventName				[nvarchar](256) = NULL,
+		@parameters				[nvarchar](512) = NULL,			/* may contain the attach file name */
+		@eventMessage			[varchar](8000) = NULL,
+		@eventType				[smallint]=1,	/*	0 - info
+													1 - alert 
+													2 - job-history
+													3 - report-html
+													4 - action
+												*/
+		@recipientsList			[nvarchar](1024) = NULL,
+		@isEmailSent			[bit]=0,
+		@isFloodControl			[bit]=0
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 05.11.2014
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+SET NOCOUNT ON
+
+DECLARE @projectID					[smallint],
+		@instanceID					[smallint]
+
+-----------------------------------------------------------------------------------------------------
+--get default project code
+IF @projectCode IS NULL
+	SELECT	@projectCode = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Default project code'
+			AND [module] = 'common'
+
+SELECT @projectID = [id]
+FROM [dbo].[catalogProjects]
+WHERE [code] = @projectCode 
+
+-----------------------------------------------------------------------------------------------------
+SELECT  @instanceID = [id] 
+FROM	[dbo].[catalogInstanceNames]  
+WHERE	[name] = @sqlServerName
+		AND [project_id] = @projectID
+
+-----------------------------------------------------------------------------------------------------
+--xml corrections
+SET @eventMessage = REPLACE(@eventMessage, CHAR(38), CHAR(38) + 'amp;')
+
+-----------------------------------------------------------------------------------------------------
+INSERT	INTO [dbo].[logEventMessages]([project_id], [instance_id], [event_date_utc], [module], [parameters], [event_name], [database_name], [object_name], [child_object_name], [message], [send_email_to], [event_type], [is_email_sent], [flood_control])
+		SELECT @projectID, @instanceID, GETUTCDATE(), @module, @parameters, @eventName, @dbName, @objectName, @childObjectName, @eventMessage, @recipientsList, @eventType, @isEmailSent, @isFloodControl
+
+RETURN 0
 GO
 
 
@@ -1381,9 +414,10 @@ SET @ReturnValue=1
 -----------------------------------------------------------------------------------------------------
 --get default project code
 IF @projectCode IS NULL
-	SELECT @projectCode = [value]
-	FROM [dbo].[appConfigurations]
-	WHERE [name] = 'Default project code'
+	SELECT	@projectCode = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Default project code'
+			AND [module] = 'common'
 
 SELECT @projectID = [id]
 FROM [dbo].[catalogProjects]
@@ -1404,20 +438,21 @@ IF UPPER(@dbMailProfileName)='NULL'
 	SET @dbMailProfileName = NULL
 		
 IF @dbMailProfileName IS NULL
-	SELECT @dbMailProfileName=[value] 
-	FROM [dbo].[appConfigurations] 
-	WHERE [name]='Database Mail profile name to use for sending emails'
+	SELECT	@dbMailProfileName=[value] 
+	FROM	[dbo].[appConfigurations] 
+	WHERE	[name]='Database Mail profile name to use for sending emails'
+			AND [module] = 'common'
 
 IF @recipientsList = ''		SET @recipientsList = NULL
 IF @dbMailProfileName = ''	SET @dbMailProfileName = NULL
 
 
 IF @recipientsList IS NULL
-	SELECT @recipientsList=[value] 
-	FROM [dbo].[appConfigurations] 
-	WHERE  (@eventType=1 AND [name]='Default recipients list - Alerts (semicolon separated)')
-		OR (@eventType IN (2, 5) AND [name]='Default recipients list - Job Status (semicolon separated)')
-		OR (@eventType=3 AND [name]='Default recipients list - Reports (semicolon separated)')
+	SELECT	@recipientsList=[value] 
+	FROM	[dbo].[appConfigurations] 
+	WHERE  (@eventType=1 AND [name]='Default recipients list - Alerts (semicolon separated)' AND [module] = 'common')
+		OR (@eventType IN (2, 5) AND [name]='Default recipients list - Job Status (semicolon separated)' AND [module] = 'common')
+		OR (@eventType=3 AND [name]='Default recipients list - Reports (semicolon separated)' AND [module] = 'common')
 
 -----------------------------------------------------------------------------------------------------
 --get alert repeat frequency, default every 60 minutes
@@ -1425,6 +460,7 @@ IF @recipientsList IS NULL
 SELECT	@alertFrequency = [value]
 FROM	[dbo].[appConfigurations]
 WHERE	[name]='Alert repeat interval (minutes)'
+		AND [module] = 'common'
 
 SELECT @alertFrequency = ISNULL(@alertFrequency, 60)
 
@@ -1435,6 +471,7 @@ SELECT @alertFrequency = ISNULL(@alertFrequency, 60)
 SELECT	@ignoreAlertsForError1222 = CASE WHEN LOWER([value])='true' THEN 1 ELSE 0 END
 FROM	[dbo].[appConfigurations]
 WHERE	[name]='Ignore alerts for: Error 1222 - Lock request time out period exceeded'
+		AND [module] = 'common'
 
 SET @ignoreAlertsForError1222 = ISNULL(@ignoreAlertsForError1222, 0)
 
@@ -1730,6 +767,7 @@ IF @eventType IN (2, 5)
 		SELECT	@notifyOnlyFailedJobs = LOWER([value])
 		FROM	[dbo].[appConfigurations]
 		WHERE	[name]='Notify job status only for Failed jobs'
+				AND [module] = 'common'
 
 
 		IF @notifyOnlyFailedJobs = 'true' AND @additionalOption=0
@@ -1827,163 +865,28 @@ RETURN @ReturnValue
 GO
 
 
-
-RAISERROR('Create function: [dbo].[ufn_hcGetIndexesFrequentlyFragmented]', 10, 1) WITH NOWAIT
-GO
-IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[ufn_hcGetIndexesFrequentlyFragmented]') AND type in (N'FN', N'IF', N'TF', N'FS', N'FT'))
-DROP FUNCTION [dbo].[ufn_hcGetIndexesFrequentlyFragmented]
-GO
-
-CREATE FUNCTION [dbo].[ufn_hcGetIndexesFrequentlyFragmented]
-(		
-	@projectCode							[varchar](32)=NULL,
-	@minimumIndexMaintenanceFrequencyDays	[tinyint] = 2,
-	@analyzeOnlyMessagesFromTheLastHours	[tinyint] = 24 ,
-	@analyzeIndexMaintenanceOperation		[nvarchar](128) = 'REBUILD'
-)
-RETURNS @fragmentedIndexes TABLE
-	(
-		[instance_name]				[sysname],
-		[event_date_utc]			[datetime],
-		[database_name]				[sysname],
-		[object_name]				[nvarchar](256),
-		[index_name]				[sysname],
-		[interval_days]				[tinyint],
-		[index_type]				[sysname],
-		[fragmentation]				[numeric](38,2),
-		[page_count]				[int],
-		[fill_factor]				[int],
-		[page_density_deviation]	[numeric](38,2),
-		[last_action_made]			[nvarchar](128)
-	)
-/* WITH ENCRYPTION */
-AS
--- ============================================================================
--- Copyright (c) 2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
--- ============================================================================
--- Author			 : Dan Andrei STEFAN
--- Create date		 : 17.08.2015
--- Module			 : Database Analysis & Performance Monitoring
--- ============================================================================
-begin
-	DECLARE	@projectID	[int]
-
-	-----------------------------------------------------------------------------------------------------
-	--get default project code
-	IF @projectCode IS NULL
-		SELECT @projectCode = [value]
-		FROM [dbo].[appConfigurations]
-		WHERE [name] = 'Default project code'
-
-	SELECT    @projectID = [id]
-	FROM [dbo].[catalogProjects]
-	WHERE [code] = @projectCode 
-
-	-----------------------------------------------------------------------------------------------------
-	;WITH fillfactorCandidateIndexes AS
-	(
-		SELECT	  i.[event_message_id], i.[event_date_utc]
-				, i.[instance_name], i.[database_name], i.[object_name], i.[child_object_name]
-				, i.[message_xml] AS [info_xml], a.[message_xml] AS [action_xml]
-		FROM (
-				SELECT	  [event_message_id], [event_date_utc]
-						, ISNULL([instance_name], @@SERVERNAME) AS [instance_name], [database_name], [object_name], [child_object_name]
-						, [message_xml]
-				FROM	[dbo].[vw_logEventMessages]
-				WHERE	(   
-							(   [event_name] = 'database maintenance - rebuilding index' 
-							 AND CHARINDEX('REBUILD', @analyzeIndexMaintenanceOperation) <> 0
-							)
-						 OR
-							(	[event_name] = 'database maintenance - reorganize index' 
-							 AND CHARINDEX('REORGANIZE', @analyzeIndexMaintenanceOperation) <> 0
-							)
-						)
-						AND [event_type] = 0 --info
-						AND [project_id] = @projectID
-			)i
-		INNER JOIN
-			(
-				SELECT	  [event_message_id], [event_date_utc]
-						, ISNULL([instance_name], @@SERVERNAME) AS [instance_name], [database_name], [object_name], [child_object_name]
-						, [message_xml]
-				FROM	[dbo].[vw_logEventMessages]
-				WHERE	(   
-							(   [event_name] = 'database maintenance - rebuilding index' 
-							 AND CHARINDEX('REBUILD', @analyzeIndexMaintenanceOperation) <> 0
-							)
-						 OR
-							(	[event_name] = 'database maintenance - reorganize index' 
-							 AND CHARINDEX('REORGANIZE', @analyzeIndexMaintenanceOperation) <> 0
-							)
-						)
-						AND [event_type] = 4 --action
-						AND [project_id] = @projectID
-			)a ON	a.[instance_name] = i.[instance_name]
-					AND a.[database_name] = i.[database_name] 
-					AND a.[object_name] = i.[object_name] 
-					AND a.[child_object_name] = i.[child_object_name]
-					AND a.[event_message_id] = i.[event_message_id] + 1
-		),
-	fragmentedIndexesInfo AS
-	(
-		SELECT	  [event_message_id], [event_date_utc], [instance_name], [database_name], [object_name], [child_object_name]
-				, [info_xml], [action_xml]
-				, ROW_NUMBER() OVER (PARTITION BY [instance_name], [database_name], [object_name], [child_object_name] ORDER BY [event_date_utc] DESC) AS [sequence_id]
-		FROM fillfactorCandidateIndexes
-	)
-
-	INSERT	INTO @fragmentedIndexes(  [instance_name], [event_date_utc], [database_name], [object_name], [index_name]
-									, [interval_days], [index_type], [fragmentation], [page_count], [fill_factor], [page_density_deviation], [last_action_made])
-			SELECT    [instance_name], [event_date_utc], [database_name], [object_name], [child_object_name] AS [index_name]
-					, [interval_days]
-					, info.value ('index_type[1]', 'sysname') as [index_type]
-					, info.value ('fragmentation[1]', 'numeric(38,2)') as [fragmentation]
-					, info.value ('page_count[1]', 'int') as [page_count]
-					, info.value ('fill_factor[1]', 'int') as [fill_factor]
-					, info.value ('page_density_deviation[1]', 'numeric(38,2)') as [page_density_deviation]
-					, REPLACE(REPLACE(act.value ('event_name[1]', 'sysname'), 'database maintenance - ', ''), ' index', '') as [action_made]
-			FROM (		
-					SELECT    A.[event_message_id], A.[event_date_utc]
-							, A.[instance_name], A.[database_name], A.[object_name], A.[child_object_name]
-							, A.[info_xml], A.[action_xml]
-							, A.[sequence_id], CEILING(DATEDIFF(hh, B.[event_date_utc], A.[event_date_utc]) / 24.) AS [interval_days]
-					FROM fragmentedIndexesInfo A
-					INNER JOIN fragmentedIndexesInfo B ON	A.[instance_name] = B.[instance_name]
-															AND A.[database_name] = B.[database_name] 
-															AND A.[object_name] = B.[object_name] 
-															AND A.[child_object_name] = B.[child_object_name]
-															AND A.sequence_id = B.sequence_id - 1
-					WHERE CEILING(DATEDIFF(hh, B.[event_date_utc], A.[event_date_utc]) / 24.) <= @minimumIndexMaintenanceFrequencyDays
-						AND A.[sequence_id] = 1
-						AND DATEDIFF(hh, A.[event_date_utc], GETUTCDATE()) <= @analyzeOnlyMessagesFromTheLastHours
-				)X
-			CROSS APPLY [info_xml].nodes ('//index-fragmentation/detail') I(info)
-			CROSS APPLY [action_xml].nodes ('//action/detail') A(act)
-		
-	RETURN
-end
-GO
-
-
-
-
-
-RAISERROR('Create procedure: [dbo].[usp_mpDeleteFileOnDisk]', 10, 1) WITH NOWAIT
+RAISERROR('Create procedure: [dbo].[usp_sqlExecuteAndLog]', 10, 1) WITH NOWAIT
 GO
 IF  EXISTS (
 	    SELECT * 
 	      FROM sysobjects 
-	     WHERE id = OBJECT_ID(N'[dbo].[usp_mpDeleteFileOnDisk]') 
+	     WHERE id = OBJECT_ID(N'[dbo].[usp_sqlExecuteAndLog]') 
 	       AND type in (N'P', N'PC'))
-DROP PROCEDURE [dbo].[usp_mpDeleteFileOnDisk]
+DROP PROCEDURE [dbo].[usp_sqlExecuteAndLog]
 GO
 
-CREATE PROCEDURE [dbo].[usp_mpDeleteFileOnDisk]
+-----------------------------------------------------------------------------------------
+CREATE PROCEDURE [dbo].[usp_sqlExecuteAndLog]
 		@sqlServerName			[sysname],
-		@fileName				[nvarchar](1024),
-		@executionLevel			[tinyint] = 0,
-		@debugMode				[bit] = 0
+		@dbName					[sysname] = NULL,
+		@objectName				[nvarchar](512) = NULL,
+		@childObjectName		[sysname] = NULL,
+		@module					[sysname] = NULL,
+		@eventName				[nvarchar](256) = NULL,
+		@queryToRun  			[nvarchar](4000) = NULL,
+		@flgOptions				[int]=32,
+		@executionLevel			[tinyint]= 0,
+		@debugMode				[bit]=0
 /* WITH ENCRYPTION */
 AS
 
@@ -1991,46 +894,60 @@ AS
 -- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
 -- ============================================================================
 -- Author			 : Dan Andrei STEFAN
--- Create date		 : 10.03.2015
--- Module			 : Database Analysis & Performance Monitoring
+-- Create date		 : 23.03.2015
+-- Module			 : Database Maintenance Plan 
+--					 : SQL Server 2000/2005/2008/2008R2/2012+
+-- Description		 : run SQL command and log action
 -- ============================================================================
 
-DECLARE   @queryToRun				[nvarchar](1024)
-		, @serverToRun				[nvarchar](512)
-		, @errorCode				[int]
+DECLARE		@queryParameters				[nvarchar](512),
+			@tmpSQL		  					[nvarchar](2048),
+			@tmpServer						[varchar](256),
+			@ReturnValue					[int]
 
-DECLARE	  @serverEdition			[sysname]
-		, @serverVersionStr			[sysname]
-		, @serverVersionNum			[numeric](9,6)
-		, @nestedExecutionLevel		[tinyint]
-
-DECLARE @optionXPIsAvailable		[bit],
-		@optionXPValue				[int],
-		@optionXPHasChanged			[bit],
-		@optionAdvancedIsAvailable	[bit],
-		@optionAdvancedValue		[int],
-		@optionAdvancedHasChanged	[bit]
-
+DECLARE		@projectID						[smallint],
+			@instanceID						[smallint],
+			@errorCode						[int],
+			@durationSeconds				[bigint],
+			@eventData						[varchar](8000)
+			
 SET NOCOUNT ON
 
-/*-------------------------------------------------------------------------------------------------------------------------------*/
-IF object_id('#serverPropertyConfig') IS NOT NULL DROP TABLE #serverPropertyConfig
-CREATE TABLE #serverPropertyConfig
-			(
-				[value]			[sysname]	NULL
-			)
 
-IF object_id('#fileExists') IS NOT NULL DROP TABLE #fileExists
-CREATE TABLE #fileExists
-			(
-				[file_exists]				[bit]	NULL,
-				[file_is_directory]			[bit]	NULL,
-				[parent_directory_exists]	[bit]	NULL
-			)
+---------------------------------------------------------------------------------------------
+--get default project id / instance id
+SELECT	@projectID = [id]
+FROM	[dbo].[catalogProjects]
+WHERE	[code] IN ( 
+					SELECT	[value]
+					FROM	[dbo].[appConfigurations]
+					WHERE	[name] = 'Default project code'
+							AND [module] = 'common'
+				  )
 
------------------------------------------------------------------------------------------
+SELECT  @instanceID = [id] 
+FROM	[dbo].[catalogInstanceNames]  
+WHERE	[name] = @sqlServerName
+		AND [project_id] = @projectID
+
+---------------------------------------------------------------------------------------------
+DECLARE @logEventActions	[nvarchar](32)
+
+SELECT	@logEventActions = LOWER([value])
+FROM	[dbo].[appConfigurations]
+WHERE	[name]='Log action events'
+		AND [module] = 'common'
+
+
+---------------------------------------------------------------------------------------------
 --get destination server running version/edition
+DECLARE		@serverEdition					[sysname],
+			@serverVersionStr				[sysname],
+			@serverVersionNum				[numeric](9,6),
+			@nestedExecutionLevel			[tinyint]
+
 SET @nestedExecutionLevel = @executionLevel + 1
+
 EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@serverEdition			= @serverEdition OUT,
 										@serverVersionStr		= @serverVersionStr OUT,
@@ -2038,134 +955,144 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@executionLevel			= @nestedExecutionLevel,
 										@debugMode				= @debugMode
 
-/*-------------------------------------------------------------------------------------------------------------------------------*/
-/* check if folderName exists																									 */
-IF @sqlServerName=@@SERVERNAME
-		SET @queryToRun = N'master.dbo.xp_fileexist ''' + @fileName + ''''
-else
-	IF @serverVersionNum<11
-		SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC master.dbo.xp_fileexist ''''' + @fileName + ''''';'')x'
-	ELSE
-		SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''master.dbo.xp_fileexist ''''''''' + @fileName + ''''''''' '''') WITH RESULT SETS(([File Exists] [int], [File is a Directory] [int], [Parent Directory Exists] [int])) '')x'
+--------------------------------------------------------------------------------------------------
+SET @tmpServer='[' + @sqlServerName + '].[' + ISNULL(@dbName, 'master') + '].[dbo].[sp_executesql]'
 
+IF @serverVersionNum >= 9
+	SET @tmpSQL = N'DECLARE @startTime [datetime]
+
+					BEGIN TRY
+						SET @startTime = GETDATE()
+						
+						EXEC @tmpServer @queryToRun
+
+						SET @errorCode = 0
+						SET @durationSeconds=DATEDIFF(ss, @startTime, GETDATE())
+					END TRY
+
+					BEGIN CATCH
+						DECLARE   @flgRaiseErrorAndStop [bit]
+								, @errorString			[nvarchar](max)
+								, @eventMessageData		[varchar](8000)
+
+						SET @errorString = ERROR_MESSAGE()
+						SET @errorCode = ERROR_NUMBER()
+						SET @durationSeconds=DATEDIFF(ss, @startTime, GETDATE())
+
+						IF LEFT(@errorString, 2)=''--'' 
+							SET @errorString = LTRIM(SUBSTRING(@errorString, 3, LEN(@errorString)))
+
+						SET @flgRaiseErrorAndStop = CASE WHEN @flgOptions & 32 = 32 THEN 1 ELSE 0 END
+						
+						SET @eventMessageData = ''<alert><detail>'' + 
+												''<error_code>'' + CAST(@errorCode AS [varchar](32)) + ''</error_code>'' + 
+												''<error_string>'' + @errorString + ''</error_string>'' + 
+												''<query_executed>'' + @queryToRun + ''</query_executed>'' + 
+												''<duration_seconds>'' + CAST(@durationSeconds AS [varchar](32)) + ''</duration_seconds>'' + 
+												''</detail></alert>''
+
+						EXEC [dbo].[usp_logEventMessageAndSendEmail]	@sqlServerName			= @sqlServerName,
+																		@dbName					= @dbName,
+																		@objectName				= @objectName,
+																		@childObjectName		= @childObjectName,
+																		@module					= @module,
+																		@eventName				= @eventName,
+																		@eventMessage			= @eventMessageData,
+																		@eventType				= 1
+
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @errorString, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=@flgRaiseErrorAndStop
+					END CATCH'
+ELSE
+	SET @tmpSQL = N'DECLARE   @startTime			[datetime]
+					
+					SET @startTime = GETDATE()
+					
+					EXEC @tmpServer @queryToRun
+					
+					SET @errorCode=@@ERROR
+					SET @durationSeconds=DATEDIFF(ss, @startTime, GETDATE())
+
+					IF @errorCode<>0
+						begin
+							DECLARE   @flgRaiseErrorAndStop [bit]
+									, @errorString			[nvarchar](255)
+									, @eventData			[varchar](8000)
+
+							SELECT @errorString = [description]
+							FROM master.dbo.sysmessages 
+							WHERE [error] = @errorCode
+
+							SET @flgRaiseErrorAndStop = CASE WHEN @flgOptions & 32 = 32 THEN 1 ELSE 0 END
+							
+							SET @eventData = ''<alert><detail>'' + 
+												''<error_code>'' + CAST(@errorCode AS [varchar](32)) + ''</error_code>'' + 
+												''<error_string>'' + ISNULL(@errorString, '''') + ''</error_string>'' + 
+												''<query_executed>'' + @queryToRun + ''</query_executed>'' + 
+												''<duration_seconds>'' + CAST(@durationSeconds AS [varchar](32)) + ''</duration_seconds>'' + 
+											''</detail></alert>''
+
+							EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+																@dbName			= @dbName,
+																@objectName		= @objectName,
+																@childObjectName= @childObjectName,
+																@module			= @module,
+																@eventName		= @eventName,
+																@eventMessage	= @eventData,
+																@eventType		= 1
+
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @errorString, @stopExecution=0
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @stopExecution=@flgRaiseErrorAndStop
+						end'
+
+SET @queryParameters=N'@tmpServer [nvarchar](512), @queryToRun [nvarchar](2048), @flgOptions [int], @module [sysname], @eventName [nvarchar](512), @sqlServerName [sysname], @dbName [sysname], @objectName [nvarchar](512), @childObjectName [sysname], @errorCode [int] OUTPUT, @durationSeconds [bigint] OUTPUT'
+
+
+--------------------------------------------------------------------------------------------------
+--running action
+SET @errorCode=0
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpServer, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-INSERT	INTO #fileExists([file_exists], [file_is_directory], [parent_directory_exists])
-		EXEC (@queryToRun)
 
-IF (SELECT [file_exists] FROM #fileExists)=1
+EXEC sp_executesql @tmpSQL, @queryParameters, @tmpServer		= @tmpServer
+											, @queryToRun		= @queryToRun
+											, @flgOptions		= @flgOptions
+											, @eventName		= @eventName
+											, @module			= @module
+											, @sqlServerName	= @sqlServerName
+											, @dbName			= @dbName
+											, @objectName		= @objectName
+											, @childObjectName	= @childObjectName
+											, @errorCode		= @errorCode OUT
+											, @durationSeconds	= @durationSeconds OUT
+
+--------------------------------------------------------------------------------------------------
+--logging action
+IF @logEventActions = 'true'
 	begin
-		SET @queryToRun= 'Deleting file: "' + @fileName + '"'
-		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+		SET @eventData = '<action><detail>' + 
+							CASE WHEN @dbName IS NOT NULL THEN '<database_name>' + @dbName + '</database_name>' ELSE N'' END + 
+							CASE WHEN @eventName IS NOT NULL THEN '<event_name>' + @eventName + '</event_name>' ELSE N'' END + 
+							CASE WHEN @objectName IS NOT NULL THEN '<object_name>' + @objectName + '</object_name>' ELSE N'' END + 
+							CASE WHEN @childObjectName IS NOT NULL THEN '<child_object_name>' + @childObjectName + '</child_object_name>' ELSE N'' END + 
+							'<query_executed>' + @queryToRun + '</query_executed>' + 
+							'<duration>' + REPLICATE('0', 2-LEN(CAST(@durationSeconds / 3600 AS [varchar]))) + CAST(@durationSeconds / 3600 AS [varchar]) + 'h'
+												+ ' ' + REPLICATE('0', 2-LEN(CAST((@durationSeconds / 60) % 60 AS [varchar]))) + CAST((@durationSeconds / 60) % 60 AS [varchar]) + 'm'
+												+ ' ' + REPLICATE('0', 2-LEN(CAST(@durationSeconds % 60 AS [varchar]))) + CAST(@durationSeconds % 60 AS [varchar]) + 's' + '</duration>' + 
+							'<error_code>' + CAST(@errorCode AS [varchar](32) )+ '</error_code>' + 
+							'</detail></action>'
 
-		SELECT  @optionXPIsAvailable		= 0,
-				@optionXPValue				= 0,
-				@optionXPHasChanged			= 0,
-				@optionAdvancedIsAvailable	= 0,
-				@optionAdvancedValue		= 0,
-				@optionAdvancedHasChanged	= 0
-
-		IF @serverVersionNum>=9
-			begin
-				/* enable xp_cmdshell configuration option */
-				EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
-																	@configOptionName	= 'xp_cmdshell',
-																	@configOptionValue	= 1,
-																	@optionIsAvailable	= @optionXPIsAvailable OUT,
-																	@optionCurrentValue	= @optionXPValue OUT,
-																	@optionHasChanged	= @optionXPHasChanged OUT,
-																	@executionLevel		= 0,
-																	@debugMode			= @debugMode
-
-				IF @optionXPIsAvailable = 0
-					begin
-						/* enable show advanced options configuration option */
-						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
-																			@configOptionName	= 'show advanced options',
-																			@configOptionValue	= 1,
-																			@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
-																			@optionCurrentValue	= @optionAdvancedValue OUT,
-																			@optionHasChanged	= @optionAdvancedHasChanged OUT,
-																			@executionLevel		= 0,
-																			@debugMode			= @debugMode
-
-						IF @optionAdvancedIsAvailable = 1 AND (@optionAdvancedValue=1 OR @optionAdvancedHasChanged=1)
-							EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
-																				@configOptionName	= 'xp_cmdshell',
-																				@configOptionValue	= 1,
-																				@optionIsAvailable	= @optionXPIsAvailable OUT,
-																				@optionCurrentValue	= @optionXPValue OUT,
-																				@optionHasChanged	= @optionXPHasChanged OUT,
-																				@executionLevel		= 0,
-																				@debugMode			= @debugMode
-					end
-
-				IF @optionXPIsAvailable=0 OR @optionXPValue=0
-					begin
-						set @queryToRun='xp_cmdshell component is turned off. Cannot continue'
-						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-						RETURN 1
-					end		
-			end
-
-		/*-------------------------------------------------------------------------------------------------------------------------------*/
-		/* deleting file     																											 */
-		SET @queryToRun = N'DEL "' + @fileName + '"'
-		SET @serverToRun = N'[' + @sqlServerName + '].master.dbo.xp_cmdshell'
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-		EXEC @serverToRun @queryToRun , NO_OUTPUT
-
-
-		/*-------------------------------------------------------------------------------------------------------------------------------*/
-		IF @serverVersionNum>=9 AND (@optionXPHasChanged=1 OR @optionAdvancedHasChanged=1)
-			begin
-				/* disable xp_cmdshell configuration option */
-				IF @optionXPHasChanged = 1
-					EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
-																		@configOptionName	= 'xp_cmdshell',
-																		@configOptionValue	= 0,
-																		@optionIsAvailable	= @optionXPIsAvailable OUT,
-																		@optionCurrentValue	= @optionXPValue OUT,
-																		@optionHasChanged	= @optionXPHasChanged OUT,
-																		@executionLevel		= 0,
-																		@debugMode			= @debugMode
-
-				/* disable show advanced options configuration option */
-				IF @optionAdvancedHasChanged = 1
-						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
-																			@configOptionName	= 'show advanced options',
-																			@configOptionValue	= 0,
-																			@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
-																			@optionCurrentValue	= @optionAdvancedValue OUT,
-																			@optionHasChanged	= @optionAdvancedHasChanged OUT,
-																			@executionLevel		= 0,
-																			@debugMode			= @debugMode
-			end
-
-		/*-------------------------------------------------------------------------------------------------------------------------------*/
-		/* check if file still exists																									 */
-		IF @sqlServerName=@@SERVERNAME
-				SET @queryToRun = N'master.dbo.xp_fileexist ''' + @fileName + ''''
-		else
-				SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC master.dbo.xp_fileexist ''''' + @fileName + ''''';'')x'
-
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-		DELETE FROM #fileExists
-		INSERT	INTO #fileExists([file_exists], [file_is_directory], [parent_directory_exists])
-				EXEC (@queryToRun)
-
-		IF (SELECT [file_exists] FROM #fileExists)=1
-			begin
-				SET @queryToRun = N'ERROR: File could not be deleted.'
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-				RETURN 1
-			end
-		ELSE
-			begin
-				SET @queryToRun = N'File successfully deleted.'
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-			end
+		EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+											@dbName			= @dbName,
+											@objectName		= @objectName,
+											@childObjectName= @childObjectName,
+											@module			= @module,
+											@eventName		= @eventName,
+											@eventMessage	= @eventData,
+											@eventType		= 4 /* action */
 	end
-RETURN 0
+
+RETURN @errorCode
 GO
 
 
@@ -2285,9 +1212,10 @@ BEGIN TRY
 		--get configuration values
 		---------------------------------------------------------------------------------------------
 		DECLARE @queryLockTimeOut [int]
-		SELECT @queryLockTimeOut=[value] 
-		FROM [dbo].[appConfigurations] 
-		WHERE [name]='Default lock timeout (ms)'
+		SELECT	@queryLockTimeOut=[value] 
+		FROM	[dbo].[appConfigurations] 
+		WHERE	[name] = 'Default lock timeout (ms)'
+				AND [module] = 'common'
 
 		---------------------------------------------------------------------------------------------		
 		--get tables list	
@@ -2869,35 +1797,168 @@ END CATCH
 RETURN @errorCode
 GO
 
-
-
-RAISERROR('Create procedure: [dbo].[usp_mpDatabaseBackupCleanup]', 10, 1) WITH NOWAIT
+RAISERROR('Create procedure: [dbo].[usp_mpCheckAndRevertInternalActions]', 10, 1) WITH NOWAIT
 GO
 IF  EXISTS (
 	    SELECT * 
 	      FROM sysobjects 
-	     WHERE [id] = OBJECT_ID(N'[dbo].[usp_mpDatabaseBackupCleanup]') 
+	     WHERE [id] = OBJECT_ID(N'[dbo].[usp_mpCheckAndRevertInternalActions]') 
 	       AND type in (N'P', N'PC'))
-DROP PROCEDURE [dbo].[usp_mpDatabaseBackupCleanup]
+DROP PROCEDURE [dbo].[usp_mpCheckAndRevertInternalActions]
 GO
 
 -----------------------------------------------------------------------------------------
-CREATE PROCEDURE [dbo].[usp_mpDatabaseBackupCleanup]
+CREATE PROCEDURE [dbo].[usp_mpCheckAndRevertInternalActions]
 		@sqlServerName			[sysname],
-		@dbName					[sysname],
-		@backupLocation			[nvarchar](1024)=NULL,	/*  disk only: local or UNC */
-		@backupFileExtension	[nvarchar](8),			/*  BAK - cleanup full/incremental database backup
-															TRN - cleanup transaction log backup
-														*/
-		@flgOptions				[int]	= 128,			/* 32 - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
-														  128 - when performing cleanup, delete also orphans diff and log backups, when cleanup full database backups(default)
-														  256 - for +2k5 versions, use xp_delete_file option
-														 2048 - change retention policy from RetentionDays to RetentionBackupsCount (number of full database backups to be kept)
-															  - this may be forced by setting to true property 'Change retention policy from RetentionDays to RetentionFullBackupsCount'
-														*/
-		@retentionDays			[smallint]	= 14,
-		@executionLevel			[tinyint]	=  0,
-		@debugMode				[bit]		=  0
+		@flgOptions				[int]	= 12941,
+		@executionLevel			[tinyint]	=     0,
+		@debugMode				[bit]		=     0
+/* WITH ENCRYPTION */
+AS
+
+DECLARE   @crtDatabaseName			[sysname]
+		, @crtSchemaName			[sysname]
+		, @crtObjectName			[sysname]
+		, @crtChildObjectName		[sysname]
+		, @queryToRun				[nvarchar](1024)
+		, @nestExecutionLevel		[tinyint]
+		, @affectedDependentObjects	[nvarchar](max)
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 19.02.2015
+-- Module			 : Database Maintenance Plan 
+-- Description		 : Optimization and Maintenance Checks
+-- ============================================================================
+-----------------------------------------------------------------------------------------
+-- Input Parameters:
+--		@flgOptions		 1  - Compact large objects (LOB) (default)
+--						 2  - Rebuild index by create with drop existing on (default)
+--						 4  - Rebuild all non-clustered indexes when rebuild clustered indexes (default)
+--						 8  - Disable non-clustered index before rebuild (save space) (default)
+--						16  - Disable all foreign key constraints that reffered current table before rebuilding clustered indexes
+--						32  - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
+--					    64  - When enabling foreign key constraints, do no check values. Default behaviour is to enabled foreign key constraint with check option
+--					  4096  - rebuild/reorganize indexes using ONLINE=ON, if applicable (default)
+--		@debugMode		 1 - print dynamic SQL statements / 0 - no statements will be displayed
+-----------------------------------------------------------------------------------------
+-- Return : 
+-- 1 : Succes  -1 : Fail 
+-----------------------------------------------------------------------------------------
+/*
+	--usage sample
+	EXEC [dbo].[usp_mpCheckAndRevertInternalActions]	@flgOptions				= DEFAULT,
+														@debugMode				= DEFAULT
+*/
+
+SET NOCOUNT ON
+
+---------------------------------------------------------------------------------------------
+--get configuration values
+---------------------------------------------------------------------------------------------
+DECLARE @queryLockTimeOut [int]
+SELECT	@queryLockTimeOut=[value] 
+FROM	[dbo].[appConfigurations] 
+WHERE	[name]='Default lock timeout (ms)'
+		AND [module] = 'common'
+
+--reset configuration value
+UPDATE [dbo].[appConfigurations]
+	SET [value]='-1'
+WHERE	[name]='Default lock timeout (ms)'
+		AND [module] = 'common'
+
+-----------------------------------------------------------------------------------------
+SET @queryToRun=N'Rebuilding previously disabled indexes...'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+SET @nestExecutionLevel = @executionLevel + 1
+DECLARE crsStatsMaintenancePlanInternals CURSOR FOR SELECT	[database_name], [schema_name], [object_name], [child_object_name]
+													FROM	[dbo].[statsMaintenancePlanInternals]
+													WHERE	[name] = 'index-made-disable'
+															AND [server_name] = @sqlServerName
+OPEN crsStatsMaintenancePlanInternals
+FETCH NEXT FROM crsStatsMaintenancePlanInternals INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+WHILE @@FETCH_STATUS=0
+	begin
+		EXEC [dbo].[usp_mpAlterTableIndexes]		@SQLServerName				= @sqlServerName,
+													@DBName						= @crtDatabaseName,
+													@TableSchema				= @crtSchemaName,
+													@TableName					= @crtObjectName,
+													@IndexName					= @crtChildObjectName,
+													@IndexID					= NULL,
+													@PartitionNumber			= DEFAULT,
+													@flgAction					= 1,
+													@flgOptions					= @flgOptions,
+													@MaxDOP						= 1,
+													@executionLevel				= @nestExecutionLevel,
+													@affectedDependentObjects	= @affectedDependentObjects OUT,
+													@debugMode					= @debugMode
+
+		FETCH NEXT FROM crsStatsMaintenancePlanInternals INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+	end
+CLOSE crsStatsMaintenancePlanInternals
+DEALLOCATE crsStatsMaintenancePlanInternals
+
+
+-----------------------------------------------------------------------------------------
+SET @queryToRun=N'Rebuilding previously disabled foreign key constraints...'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+DECLARE crsStatsMaintenancePlanInternals CURSOR FOR SELECT	[database_name], [schema_name], [object_name], [child_object_name]
+													FROM	[dbo].[statsMaintenancePlanInternals]
+													WHERE	[name] = 'foreign-key-made-disable'
+															AND [server_name] = @sqlServerName
+OPEN crsStatsMaintenancePlanInternals
+FETCH NEXT FROM crsStatsMaintenancePlanInternals INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+WHILE @@FETCH_STATUS=0
+	begin
+		EXEC [dbo].[usp_mpAlterTableForeignKeys]	@SQLServerName		= @sqlServerName,
+													@DBName				= @crtDatabaseName,
+													@TableSchema		= @crtSchemaName,
+													@TableName			= @crtObjectName,
+													@ConstraintName		= @crtChildObjectName,
+													@flgAction			= 1,
+													@flgOptions			= @flgOptions,
+													@executionLevel		= @nestExecutionLevel,
+													@debugMode			= @debugMode
+		FETCH NEXT FROM crsStatsMaintenancePlanInternals INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+	end
+CLOSE crsStatsMaintenancePlanInternals
+DEALLOCATE crsStatsMaintenancePlanInternals
+
+
+-----------------------------------------------------------------------------------------
+--restore original configuration value
+-----------------------------------------------------------------------------------------
+UPDATE [dbo].[appConfigurations]
+	SET [value]=@queryLockTimeOut
+WHERE	[name]='Default lock timeout (ms)'
+		AND [module] = 'common'
+
+GO
+RAISERROR('Create procedure: [dbo].[usp_mpAlterTableRebuildHeap]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sys.objects 
+	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_mpAlterTableRebuildHeap]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_mpAlterTableRebuildHeap]
+GO
+
+-----------------------------------------------------------------------------------------
+CREATE PROCEDURE [dbo].[usp_mpAlterTableRebuildHeap]
+		@SQLServerName		[sysname],
+		@DBName				[sysname],
+		@TableSchema		[sysname],
+		@TableName			[sysname],
+		@flgActions			[smallint] = 1,
+		@flgOptions			[int] = 10264, --8192 + 2048 + 16 + 8
+		@executionLevel		[tinyint] = 0,
+		@DebugMode			[bit] = 0
 /* WITH ENCRYPTION */
 AS
 
@@ -2905,434 +1966,533 @@ AS
 -- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
 -- ============================================================================
 -- Author			 : Dan Andrei STEFAN
--- Create date		 : 2004-2006 / review on 2015.03.10
--- Module			 : Database Maintenance Plan 
--- Description		 : Optimization and Maintenance Checks
---					   - if @retentionDays is set to Days, this number represent the number of days on which database can be restored
---						 depending on the backup strategy, a full backup will always be included
---					   - if @retentionDays is set to BackupCount, this number represent the number of full and differential backups to be kept
---						 an older full backup may exists to ensure that a newer differential backuup can be restored
+-- Create date		 : 2004-2015
+-- Module			 : Database Maintenance Scripts
 -- ============================================================================
-
-------------------------------------------------------------------------------------------------------------------------------------------
---returns: 0 = success, >0 = failure
-
-DECLARE		@queryToRun  					[nvarchar](2048),
-			@nestedExecutionLevel			[tinyint]
-
-DECLARE		@backupFileName					[nvarchar](1024),
-			@serverEdition					[sysname],
-			@serverVersionStr				[sysname],
-			@serverVersionNum				[numeric](9,6),
-			@errorCode						[int],
-			@maxAllowedDate					[datetime]
-
-DECLARE		@lastFullBackupSetIDRemaining	[int],
-			@lastDiffBackupSetIDRemaining	[int],
-			@lastBackupType					[char](1)
-
-DECLARE @optionXPIsAvailable		[bit],
-		@optionXPValue				[int],
-		@optionXPHasChanged			[bit],
-		@optionAdvancedIsAvailable	[bit],
-		@optionAdvancedValue		[int],
-		@optionAdvancedHasChanged	[bit]
-
-IF OBJECT_ID('tempdb..#backupSET') IS NOT NULL
-	DROP TABLE #backupSET
-
-CREATE TABLE #backupSET 
-		(
-			  [backup_set_id]		[int]
-			, [backup_start_date]	[datetime]	NULL
-			, [type]				[char](1)	NULL
-		)
-
-IF OBJECT_ID('tempdb..#backupDevice') IS NOT NULL
-	DROP TABLE #backupDevice
-CREATE TABLE #backupDevice 
-	(
-		  [backup_set_id]			[int]
-		, [physical_device_name]	[nvarchar](260)
-	)
-
+-- Change Date: 2015.03.04 / Andrei STEFAN
+-- Description: heap tables with disabled unique indexes won't be rebuild
+-----------------------------------------------------------------------------------------
 
 -----------------------------------------------------------------------------------------
+-- Input Parameters:
+--		@SQLServerName	- name of SQL Server instance to analyze
+--		@DBName			- database to be analyzed
+--		@TableSchema	- schema that current table belongs to
+--		@TableName		- specify table name to be analyzed.
+--		@flgActions		- 1 - ALTER TABLE REBUILD (2k8+). If lower version is detected or error catched, will run CREATE CLUSTERED INDEX / DROP INDEX
+--						- 2 - Rebuild table: copy records to a temp table, delete records from source, insert back records from source, rebuild non-clustered indexes
+--		@flgOptions		 8  - Disable non-clustered index before rebuild (save space) (default)
+--						16  - Disable all foreign key constraints that reffered current table before rebuilding indexes (default)
+--						64  - When enabling foreign key constraints, do no check values. Default behaviour is to enabled foreign key constraint with check option
+--					  2048  - send email when a error occurs (default)
+--					  8192  - when rebuilding heaps, disable/enable table triggers (default)
+--					 16384  - for versions below 2008, do heap rebuild using temporary clustered index
+--		@DebugMode:		 1 - print dynamic SQL statements 
+--						 0 - no statements will be displayed (default)
+-----------------------------------------------------------------------------------------
+-- Return : 
+-- 1 : Succes  -1 : Fail 
+-----------------------------------------------------------------------------------------
+
 SET NOCOUNT ON
 
------------------------------------------------------------------------------------------
-IF @executionLevel=0
-	EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+DECLARE		@queryToRun					[nvarchar](max),
+			@objectName					[nvarchar](512),
+			@CopyTableName				[sysname],
+			@crtSchemaName				[sysname], 
+			@crtTableName				[sysname], 
+			@crtRecordCount				[int],
+			@flgCopyMade				[bit],
+			@flgErrorsOccured			[bit], 
+			@nestExecutionLevel			[tinyint],
+			@guid						[nvarchar](40),
+			@affectedDependentObjects	[nvarchar](max),
+			@flgOptionsNested			[int]
 
-SET @queryToRun= 'Cleanup backup files for database: ' + ' [' + @dbName + ']'
-EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
------------------------------------------------------------------------------------------
---get destination server running version/edition
-SET @nestedExecutionLevel = @executionLevel + 1
-EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName		= @sqlServerName,
-										@serverEdition		= @serverEdition OUT,
-										@serverVersionStr	= @serverVersionStr OUT,
-										@serverVersionNum	= @serverVersionNum OUT,
-										@executionLevel		= @nestedExecutionLevel,
-										@debugMode			= @debugMode
+DECLARE		@flgRaiseErrorAndStop		[bit]
+		  , @errorCode					[int]
+		  , @errorString				[nvarchar](max)
 
------------------------------------------------------------------------------------------
---get configuration values: force retention policy
----------------------------------------------------------------------------------------------
-DECLARE @forceChangeRetentionPolicy [nvarchar](128)
-SELECT @forceChangeRetentionPolicy=[value] 
-FROM [dbo].[appConfigurations] 
-WHERE [name]='Change retention policy from RetentionDays to RetentionBackupsCount'
-
-SET @forceChangeRetentionPolicy = LOWER(ISNULL(@forceChangeRetentionPolicy, 'false'))
 
 -----------------------------------------------------------------------------------------
---changing backup expiration date from RetentionDays to full/diff database backup count
-IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'
-	begin
-		SET @queryToRun=N''
-		SET @queryToRun = @queryToRun + N'SET ROWCOUNT ' + CAST(@retentionDays AS [nvarchar]) + N'		
-										SELECT bs.[backup_set_id], bs.[backup_start_date], bs.[type]
-										FROM msdb.dbo.backupset bs
-										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
-										WHERE	bs.[type] IN (''D'', ''I'')
-												AND bs.[database_name] = ''' + @dbName + N'''
-												AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
-										ORDER BY bs.[backup_start_date] DESC
-										SET ROWCOUNT 0'
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+DECLARE @tableGetRowCount TABLE	
+		(
+			[record_count]			[bigint]	NULL
+		)
 
-		INSERT	INTO #backupSET([backup_set_id], [backup_start_date], [type])
-				EXEC (@queryToRun)
+IF object_id('tempdb..#heapTableList') IS NOT NULL 
+	DROP TABLE #heapTableList
 
-		--check for remote server msdb information
-		IF @sqlServerName<>@@SERVERNAME
-			begin
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+CREATE TABLE #heapTableList		(
+									[schema_name]			[sysname]	NULL,
+									[table_name]			[sysname]	NULL,
+									[record_count]			[bigint]	NULL
+								)
 
-				INSERT	INTO #backupSET([backup_set_id], [backup_start_date], [type])
-						EXEC (@queryToRun)
-			end
+
+SET NOCOUNT ON
+
+-- { sql_statement | statement_block }
+BEGIN TRY
+		SET @errorCode	 = 1
+
+		---------------------------------------------------------------------------------------------
+		--get configuration values
+		---------------------------------------------------------------------------------------------
+		DECLARE @queryLockTimeOut [int]
+		SELECT	@queryLockTimeOut=[value] 
+		FROM	[dbo].[appConfigurations] 
+		WHERE	[name]='Default lock timeout (ms)'
+				AND [module] = 'common'
 		
+		---------------------------------------------------------------------------------------------
+		--get destination server running version/edition
+		DECLARE		@serverEdition					[sysname],
+					@serverVersionStr				[sysname],
+					@serverVersionNum				[numeric](9,6),
+					@nestedExecutionLevel			[tinyint]
 
-		SELECT TOP 1  @maxAllowedDate = DATEADD(ss, -1, [backup_start_date])
-					, @lastFullBackupSetIDRemaining = [backup_set_id]
-					, @lastBackupType = [type]
-		FROM #backupSET
-		ORDER BY [backup_start_date]
+		SET @nestedExecutionLevel = @executionLevel + 1
+		EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @SQLServerName,
+												@serverEdition			= @serverEdition OUT,
+												@serverVersionStr		= @serverVersionStr OUT,
+												@serverVersionNum		= @serverVersionNum OUT,
+												@executionLevel			= @nestedExecutionLevel,
+												@debugMode				= @DebugMode
 
-		--if oldest backup is a differential one, go deep and find the full database backup that it will need/use
-		IF @lastBackupType='I'
-			begin
-				SET @queryToRun=N''
-				SET @queryToRun = @queryToRun + N'SELECT TOP 1  bs.[backup_set_id]
-															, bs.[backup_start_date]
-															, bs.[type]
-												FROM msdb.dbo.backupset bs
-												INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
-												WHERE	bs.[type] IN (''D'')
-														AND bs.[database_name] = ''' + @dbName + N'''
-														AND bs.[backup_set_id] < ' + CAST(@lastFullBackupSetIDRemaining AS [nvarchar]) + N'
-														AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
-												ORDER BY bs.[backup_start_date] DESC'
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+		---------------------------------------------------------------------------------------------
+		--get current index/heap properties, filtering only the ones not empty
+		--heap tables with disabled unique indexes will be excluded: rebuild means also index rebuild, and unique indexes may enable unwanted constraints
+		SET @TableName = REPLACE(@TableName, '''', '''''')
+		SET @queryToRun = N''
+		SET @queryToRun = @queryToRun + N'	SELECT    sch.[name] AS [schema_name]
+													, so.[name]  AS [table_name]
+													, rc.[record_count]
+											FROM [' + @DBName + '].[sys].[objects] so WITH (READPAST)
+											INNER JOIN [' + @DBName + '].[sys].[schemas] sch WITH (READPAST) ON sch.[schema_id] = so.[schema_id] 
+											INNER JOIN [' + @DBName + '].[sys].[indexes] si WITH (READPAST) ON si.[object_id] = so.[object_id] 
+											INNER  JOIN 
+													(
+														SELECT ps.object_id,
+																SUM(CASE WHEN (ps.index_id < 2) THEN row_count ELSE 0 END) AS [record_count]
+														FROM [' + @DBName + '].[sys].[dm_db_partition_stats] ps WITH (READPAST)
+														GROUP BY ps.object_id		
+													)rc ON rc.[object_id] = so.[object_id] 
+											WHERE   so.[name] LIKE ''' + @TableName + '''
+												AND sch.[name] LIKE ''' + @TableSchema + '''
+												AND so.[is_ms_shipped] = 0
+												AND si.[index_id] = 0
+												AND rc.[record_count]<>0
+												AND NOT EXISTS(
+																SELECT *
+																FROM [' + @DBName + '].sys.indexes si_unq
+																WHERE si_unq.[object_id] = so.[object_id] 
+																		AND si_unq.[is_disabled]=1
+																		AND si_unq.[is_unique]=1
+															  )'
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-				DELETE FROM #backupSET
-				INSERT	INTO #backupSET([backup_set_id], [backup_start_date], [type])
-						EXEC (@queryToRun)
+		DELETE FROM #heapTableList
+		INSERT INTO #heapTableList ([schema_name], [table_name], [record_count])
+			EXEC (@queryToRun)
 
-				IF @sqlServerName<>@@SERVERNAME
-					begin
-						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
-						INSERT	INTO #backupSET([backup_set_id], [backup_start_date], [type])
-								EXEC (@queryToRun)
-					end
-
-				SELECT TOP 1  @maxAllowedDate  = DATEADD(ss, -1, [backup_start_date])
-							, @lastFullBackupSetIDRemaining = [backup_set_id]
-							, @lastBackupType = [type]
-				FROM #backupSET
-				ORDER BY [backup_start_date] DESC
-			end
-
-		SET @queryToRun=N''
-		SET @queryToRun = @queryToRun + N'SELECT TOP 1 bs.[backup_set_id]
-										FROM msdb.dbo.backupset bs
-										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
-										WHERE	bs.[type]=''I''
-												AND bs.[database_name] = ''' + @dbName + N'''
-												AND bs.[backup_start_date] <= DATEADD(dd, -' + CAST(@retentionDays AS [nvarchar]) + N', GETDATE())
-												AND bs.[backup_set_id] > ' + CAST(@lastFullBackupSetIDRemaining AS [nvarchar]) + N'
-												AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
-										ORDER BY bs.[backup_set_id] DESC'
-
-		DELETE FROM #backupSET
-		INSERT	INTO #backupSET([backup_set_id])
-				EXEC (@queryToRun)
-
-		IF @sqlServerName<>@@SERVERNAME
-			begin
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-
-				INSERT	INTO #backupSET([backup_set_id])
-						EXEC (@queryToRun)
-			end
-
-		SELECT TOP 1  @lastDiffBackupSetIDRemaining  = [backup_set_id]
-		FROM #backupSET
-		ORDER BY [backup_start_date] DESC
-	end
-ELSE
-	begin
-		/* SET @maxAllowedDate = DATEADD(dd, -@retentionDays, GETDATE()) */
-		--find first full database backup to allow @retentionDays database restore
-		SET @queryToRun=N''
-		SET @queryToRun = @queryToRun + N'SET ROWCOUNT 1		
-										SELECT bs.[backup_set_id], bs.[backup_start_date]
-										FROM msdb.dbo.backupset bs
-										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
-										WHERE	bs.[type]=''D''
-												AND bs.[database_name] = ''' + @dbName + N'''
-												AND bs.[backup_start_date] <= DATEADD(dd, -' + CAST(@retentionDays AS [nvarchar]) + N', GETDATE())
-												AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
-										ORDER BY bs.[backup_start_date] DESC
-										SET ROWCOUNT 0'
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-
-		INSERT	INTO #backupSET([backup_set_id], [backup_start_date])
-				EXEC (@queryToRun)
-
-		IF @sqlServerName<>@@SERVERNAME
-			begin
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-
-				INSERT	INTO #backupSET([backup_set_id])
-						EXEC (@queryToRun)
-			end
-
-		SELECT TOP 1  @maxAllowedDate = DATEADD(ss, -1, [backup_start_date])
-					, @lastFullBackupSetIDRemaining = [backup_set_id]
-		FROM #backupSET
-		ORDER BY [backup_start_date] DESC
-
-		SET @queryToRun=N''
-		SET @queryToRun = @queryToRun + N'SELECT TOP 1 bs.[backup_set_id]
-										FROM msdb.dbo.backupset bs
-										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
-										WHERE	bs.[type]=''I''
-												AND bs.[database_name] = ''' + @dbName + N'''
-												AND bs.[backup_start_date] <= DATEADD(dd, -' + CAST(@retentionDays AS [nvarchar]) + N', GETDATE())
-												AND bs.[backup_set_id] > ' + CAST(@lastFullBackupSetIDRemaining AS [nvarchar]) + N'
-												AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
-										ORDER BY bs.[backup_set_id] DESC'
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-
-		DELETE FROM #backupSET
-		INSERT	INTO #backupSET([backup_set_id])
-				EXEC (@queryToRun)
-
-		IF @sqlServerName<>@@SERVERNAME
-			begin
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-
-				INSERT	INTO #backupSET([backup_set_id])
-						EXEC (@queryToRun)
-			end
-
-		SELECT TOP 1  @lastDiffBackupSetIDRemaining = [backup_set_id]
-		FROM #backupSET
-		ORDER BY [backup_start_date] DESC
-	end
-
------------------------------------------------------------------------------------------
---for +2k5 versions, will use xp_delete_file
-SET @errorCode=0
-IF @serverVersionNum>=9 AND @flgOptions & 256 = 256
-	begin
-		SET @queryToRun = N'EXEC master.dbo.xp_delete_file 0, N''' + @backupLocation + ''', N''' + @backupFileExtension + ''', N''' + CONVERT([varchar](20), @maxAllowedDate, 120) + ''', 0'
-		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
-														@dbName			= @dbName,
-														@module			= 'dbo.usp_mpDatabaseBackupCleanup',
-														@eventName		= 'database backup cleanup',
-														@queryToRun  	= @queryToRun,
-														@flgOptions		= @flgOptions,
-														@executionLevel	= @nestedExecutionLevel,
-														@debugMode		= @debugMode
-	end
-
-IF @debugMode=1
-	SELECT	@maxAllowedDate AS maxAllowedDate, 
-			@lastFullBackupSetIDRemaining AS lastFullBackupSetIDRemaining, 
-			@lastDiffBackupSetIDRemaining AS lastDiffBackupSetIDRemaining, 
-			@forceChangeRetentionPolicy AS forceChangeRetentionPolicy,
-			@flgOptions & 256,
-			@errorCode,
-			@serverVersionNum,
-			@flgOptions & 128
-
------------------------------------------------------------------------------------------
---in case of previous errors or 2k version, will use "standard" delete file
-IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@serverVersionNum < 9) OR (@flgOptions & 128 = 128 AND @lastFullBackupSetIDRemaining IS NOT NULL)
-	begin
-		SELECT  @optionXPIsAvailable		= 0,
-				@optionXPValue				= 0,
-				@optionXPHasChanged			= 0,
-				@optionAdvancedIsAvailable	= 0,
-				@optionAdvancedValue		= 0,
-				@optionAdvancedHasChanged	= 0
-
-		IF @serverVersionNum>=9
-			begin
-				/* enable xp_cmdshell configuration option */
-				EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
-																	@configOptionName	= 'xp_cmdshell',
-																	@configOptionValue	= 1,
-																	@optionIsAvailable	= @optionXPIsAvailable OUT,
-																	@optionCurrentValue	= @optionXPValue OUT,
-																	@optionHasChanged	= @optionXPHasChanged OUT,
-																	@executionLevel		= 0,
-																	@debugMode			= @debugMode
-
-				IF @optionXPIsAvailable = 0
-					begin
-						/* enable show advanced options configuration option */
-						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
-																			@configOptionName	= 'show advanced options',
-																			@configOptionValue	= 1,
-																			@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
-																			@optionCurrentValue	= @optionAdvancedValue OUT,
-																			@optionHasChanged	= @optionAdvancedHasChanged OUT,
-																			@executionLevel		= 0,
-																			@debugMode			= @debugMode
-
-						IF @optionAdvancedIsAvailable = 1 AND (@optionAdvancedValue=1 OR @optionAdvancedHasChanged=1)
-							EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
-																				@configOptionName	= 'xp_cmdshell',
-																				@configOptionValue	= 1,
-																				@optionIsAvailable	= @optionXPIsAvailable OUT,
-																				@optionCurrentValue	= @optionXPValue OUT,
-																				@optionHasChanged	= @optionXPHasChanged OUT,
-																				@executionLevel		= 0,
-																				@debugMode			= @debugMode
-					end
-
-				IF @optionXPIsAvailable=0 OR @optionXPValue=0
-					begin
-						set @queryToRun='xp_cmdshell component is turned off. Cannot continue'
-						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-						RETURN 1
-					end		
-			end											
-		
-		SET @queryToRun=N''
-		SET @queryToRun = @queryToRun + N'SELECT bs.[backup_set_id], bmf.[physical_device_name]
-										FROM [msdb].[dbo].[backupset] bs
-										INNER JOIN [msdb].[dbo].[backupmediafamily] bmf ON bmf.[media_set_id]=bs.[media_set_id]
-										WHERE	(   (    bs.[backup_start_date] <= CONVERT([datetime], ''' + CONVERT([nvarchar](20), @maxAllowedDate, 120) + N''', 120)
-														AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.' + @backupFileExtension + N''')
-														AND (	 (' + CAST(@flgOptions AS [nvarchar]) + N' & 256 = 0) 
-															OR (' + CAST(@errorCode AS [nvarchar]) + N'<>0 AND ' + CAST(@flgOptions AS [nvarchar]) + N' & 256 = 256) 
-															OR (' + CAST(@serverVersionNum AS [nvarchar]) + N'< 9)
-															)
-													)
-													OR (
-															-- when performing cleanup, delete also orphans diff and log backups, when cleanup full database backups(default)
-															bs.[backup_set_id] < ' + CAST(@lastFullBackupSetIDRemaining AS [nvarchar]) + N'
-														AND bs.[database_name] = ''' + @dbName + N'''
-														AND bs.[type] IN (''I'', ''L'')
-														AND bmf.[physical_device_name] LIKE (''' + @backupLocation + N'%'')
-														AND ' + CAST(@flgOptions AS [nvarchar]) + N' & 128 = 128
-													)
-													OR (
-															-- delete incremental and transaction log backups to keep the retention/restore period fixed
-															' + CAST(ISNULL(@lastDiffBackupSetIDRemaining, 0)  AS [nvarchar]) + N' <> 0
-														AND bs.[backup_set_id] < ' + CAST(ISNULL(@lastDiffBackupSetIDRemaining, 0) AS [nvarchar]) + N'
-														AND bs.[database_name] = ''' + @dbName + N'''
-														AND bs.[type] IN (''I'', ''L'')
-														AND bmf.[physical_device_name] LIKE (''' + @backupLocation + N'%'')
-														AND ' + CAST(@flgOptions AS [nvarchar]) + N' & 128 = 128
-													)
-												)														
-												AND bmf.[device_type] = 2'
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-
-		INSERT	INTO #backupDevice([backup_set_id], [physical_device_name])
-				EXEC (@queryToRun)
-
-		IF @sqlServerName<>@@SERVERNAME
-			begin
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-
-				INSERT	INTO #backupDevice([backup_set_id], [physical_device_name])
-						EXEC (@queryToRun)
-			end
-
-		DECLARE crsCleanupBackupFiles CURSOR FOR	SELECT [physical_device_name]
-													FROM #backupDevice														
-													ORDER BY [backup_set_id] ASC
-		OPEN crsCleanupBackupFiles
-		FETCH NEXT FROM crsCleanupBackupFiles INTO @backupFileName
+		---------------------------------------------------------------------------------------------
+		DECLARE crsTableListToRebuild CURSOR LOCAL READ_ONLY FOR	SELECT [schema_name], [table_name], [record_count] 
+																	FROM #heapTableList
+																	ORDER BY [schema_name], [table_name]
+ 		OPEN crsTableListToRebuild
+		FETCH NEXT FROM crsTableListToRebuild INTO @crtSchemaName, @crtTableName, @crtRecordCount
 		WHILE @@FETCH_STATUS=0
 			begin
-				SET @queryToRun = N'EXEC [' + DB_NAME() + '].[dbo].[usp_mpDeleteFileOnDisk]	@sqlServerName	= ''' + @sqlServerName + N''',
-																							@fileName		= ''' + @backupFileName + N''',
-																							@executionLevel	= ' + CAST(@nestedExecutionLevel AS [nvarchar]) + N',
-																							@debugMode		= ' + CAST(@debugMode AS [nvarchar]) 
+				SET @objectName = '[' + @crtSchemaName + '].[' + @crtTableName + ']'
+				SET @queryToRun=N'Rebuilding heap ON ' + @objectName
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+			
+				SET @flgErrorsOccured=0
+				
+				IF @flgActions=1
+					begin
+						IF @serverVersionNum >= 10
+							begin
+								SET @queryToRun= 'Running ALTER TABLE REBUILD...'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
-				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @@SERVERNAME,
-																@dbName			= NULL,
-																@module			= 'dbo.usp_mpDatabaseBackupCleanup',
-																@eventName		= 'database backup cleanup',
-																@queryToRun  	= @queryToRun,
-																@flgOptions		= @flgOptions,
-																@executionLevel	= @nestedExecutionLevel,
-																@debugMode		= @debugMode
+								SET @queryToRun = N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; ';
+								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + @objectName + ''') IS NOT NULL ALTER TABLE ' + @objectName + N' REBUILD'
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 
-				FETCH NEXT FROM crsCleanupBackupFiles INTO @backupFileName
+								SET @nestedExecutionLevel = @executionLevel + 3
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																				@dbName			= @DBName,
+																				@objectName		= @objectName,
+																				@module			= 'dbo.usp_mpAlterTableRebuildHeap',
+																				@eventName		= 'database maintenance - rebuilding heap',
+																				@queryToRun  	= @queryToRun,
+																				@flgOptions		= @flgOptions,
+																				@executionLevel	= @nestedExecutionLevel,
+																				@debugMode		= @DebugMode
+								IF @errorCode<>0 SET @flgErrorsOccured=1								
+							end
+
+						IF (@flgOptions & 16384 = 16384) AND (@serverVersionNum < 10 OR @flgErrorsOccured=1)
+							begin
+								------------------------------------------------------------------------------------------------------------------------
+								--disable table non-clustered indexes
+								IF @flgOptions & 8 = 8
+									begin
+										SET @nestExecutionLevel = @executionLevel + 1
+										EXEC [dbo].[usp_mpAlterTableIndexes]	@SQLServerName				= @SQLServerName,
+																				@DBName						= @DBName,
+																				@TableSchema				= @crtSchemaName,
+																				@TableName					= @crtTableName,
+																				@IndexName					= '%',
+																				@IndexID					= NULL,
+																				@PartitionNumber			= 1,
+																				@flgAction					= 4,
+																				@flgOptions					= DEFAULT,
+																				@MaxDOP						= 1,
+																				@executionLevel				= @nestExecutionLevel,
+																				@affectedDependentObjects	= @affectedDependentObjects OUT,
+																				@debugMode					= @DebugMode
+									end
+
+								------------------------------------------------------------------------------------------------------------------------
+								--disable table constraints
+								IF @flgOptions & 16 = 16
+									begin
+										SET @nestExecutionLevel = @executionLevel + 1
+										SET @flgOptionsNested = 3 + (@flgOptions & 2048)
+										EXEC [dbo].[usp_mpAlterTableForeignKeys]	@SQLServerName		= @SQLServerName ,
+																					@DBName				= @DBName,
+																					@TableSchema		= @crtSchemaName, 
+																					@TableName			= @crtTableName,
+																					@ConstraintName		= '%',
+																					@flgAction			= 0,
+																					@flgOptions			= @flgOptionsNested,
+																					@executionLevel		= @nestExecutionLevel,
+																					@debugMode			= @DebugMode
+									end
+
+								SET @guid = CAST(NEWID() AS [nvarchar](38))
+
+								--------------------------------------------------------------------------------------------------------
+								SET @queryToRun= 'Add a new temporary column [bigint]'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+								SET @queryToRun = N'ALTER TABLE [' + @DBName + N'].' + @objectName + N' ADD [' + @guid + N'] [bigint] IDENTITY'
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
+
+								SET @nestedExecutionLevel = @executionLevel + 3
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																				@dbName			= @DBName,
+																				@objectName		= @objectName,
+																				@module			= 'dbo.usp_mpAlterTableRebuildHeap',
+																				@eventName		= 'database maintenance - rebuilding heap',
+																				@queryToRun  	= @queryToRun,
+																				@flgOptions		= @flgOptions,
+																				@executionLevel	= @nestedExecutionLevel,
+																				@debugMode		= @DebugMode
+								IF @errorCode<>0 SET @flgErrorsOccured=1								
+
+								--------------------------------------------------------------------------------------------------------
+								SET @queryToRun= 'Create a temporary clustered index'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+								SET @queryToRun = N' CREATE CLUSTERED INDEX [PK_' + @guid + N'] ON [' + @DBName + N'].' + @objectName + N' ([' + @guid + N'])'
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
+
+								SET @nestedExecutionLevel = @executionLevel + 3
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																				@dbName			= @DBName,
+																				@objectName		= @objectName,
+																				@module			= 'dbo.usp_mpAlterTableRebuildHeap',
+																				@eventName		= 'database maintenance - rebuilding heap',
+																				@queryToRun  	= @queryToRun,
+																				@flgOptions		= @flgOptions,
+																				@executionLevel	= @nestedExecutionLevel,
+																				@debugMode		= @DebugMode
+								IF @errorCode<>0 SET @flgErrorsOccured=1								
+
+								--------------------------------------------------------------------------------------------------------
+								SET @queryToRun= 'Drop the temporary clustered index'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+								SET @queryToRun = N'DROP INDEX [PK_' + @guid + N'] ON [' + @DBName + N'].' + @objectName 
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
+
+								SET @nestedExecutionLevel = @executionLevel + 3
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																				@dbName			= @DBName,
+																				@objectName		= @objectName,
+																				@module			= 'dbo.usp_mpAlterTableRebuildHeap',
+																				@eventName		= 'database maintenance - rebuilding heap',
+																				@queryToRun  	= @queryToRun,
+																				@flgOptions		= @flgOptions,
+																				@executionLevel	= @nestedExecutionLevel,
+																				@debugMode		= @DebugMode
+								IF @errorCode<>0 SET @flgErrorsOccured=1
+
+								--------------------------------------------------------------------------------------------------------
+								SET @queryToRun= 'Drop the temporary column'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+								SET @queryToRun = N'ALTER TABLE [' + @DBName + N'].' + @objectName + N' DROP COLUMN [' + @guid + N']'
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
+
+								SET @nestedExecutionLevel = @executionLevel + 3
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																				@dbName			= @DBName,
+																				@objectName		= @objectName,
+																				@module			= 'dbo.usp_mpAlterTableRebuildHeap',
+																				@eventName		= 'database maintenance - rebuilding heap',
+																				@queryToRun  	= @queryToRun,
+																				@flgOptions		= @flgOptions,
+																				@executionLevel	= @nestedExecutionLevel,
+																				@debugMode		= @DebugMode
+								IF @errorCode<>0 SET @flgErrorsOccured=1								
+
+								---------------------------------------------------------------------------------------------------------
+								--rebuild table non-clustered indexes
+								IF @flgOptions & 8 = 8
+									begin
+										SET @nestExecutionLevel = @executionLevel + 1
+
+										EXEC [dbo].[usp_mpAlterTableIndexes]	@SQLServerName				= @SQLServerName,
+																				@DBName						= @DBName,
+																				@TableSchema				= @crtSchemaName,
+																				@TableName					= @crtTableName,
+																				@IndexName					= '%',
+																				@IndexID					= NULL,
+																				@PartitionNumber			= 1,
+																				@flgAction					= 1,
+																				@flgOptions					= 6165,
+																				@MaxDOP						= 1,
+																				@executionLevel				= @nestExecutionLevel, 
+																				@affectedDependentObjects	= @affectedDependentObjects OUT,
+																				@debugMode					= @DebugMode
+									end
+
+								---------------------------------------------------------------------------------------------------------
+								--enable table constraints
+								IF @flgOptions & 16 = 16
+									begin
+										SET @nestExecutionLevel = @executionLevel + 1
+										SET @flgOptionsNested = 3 + (@flgOptions & 2048)
+	
+										--64  - When enabling foreign key constraints, do no check values. Default behaviour is to enabled foreign key constraint with check option
+										IF @flgOptions & 64 = 64
+											SET @flgOptionsNested = @flgOptionsNested + 4		-- Enable constraints with NOCHECK. Default is to enable constraints using CHECK option
+
+										EXEC [dbo].[usp_mpAlterTableForeignKeys]	@SQLServerName		= @SQLServerName ,
+																					@DBName				= @DBName,
+																					@TableSchema		= @crtSchemaName, 
+																					@TableName			= @crtTableName,
+																					@ConstraintName		= '%',
+																					@flgAction			= 1,
+																					@flgOptions			= @flgOptionsNested,
+																					@executionLevel		= @nestExecutionLevel, 
+																					@debugMode			= @DebugMode
+									end
+							end
+					end
+
+				-- 2 - Rebuild table: copy records to a temp table, delete records from source, insert back records from source, rebuild non-clustered indexes
+				IF @flgActions=2
+					begin
+						SET @CopyTableName=@crtTableName + 'RebuildCopy'
+
+						SET @queryToRun= 'Total Rows In Table To Be Exported To Temporary Storage: ' + CAST(@crtRecordCount AS [varchar](20))
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+						SET @flgCopyMade=0
+						--------------------------------------------------------------------------------------------------------
+						--dropping copy table, if exists
+						--------------------------------------------------------------------------------------------------------
+						SET @queryToRun = 'IF EXISTS (	SELECT * 
+														FROM [' + @DBName + '].[sys].[objects] so
+														INNER JOIN [' + @DBName + '].[sys].[schemas] sch ON so.[schema_id] = sch.[schema_id]
+														WHERE	sch.[name] = ''' + @crtSchemaName + ''' 
+																AND so.[name] = ''' + @CopyTableName + '''
+													) 
+											DROP TABLE [' + @DBName + '].[' + @crtSchemaName + '].[' + @CopyTableName + ']'
+						IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+						SET @nestedExecutionLevel = @executionLevel + 1
+						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																		@dbName			= @DBName,
+																		@objectName		= @objectName,
+																		@module			= 'dbo.usp_mpAlterTableRebuildHeap',
+																		@eventName		= 'database maintenance - rebuilding heap',
+																		@queryToRun  	= @queryToRun,
+																		@flgOptions		= @flgOptions,
+																		@executionLevel	= @nestedExecutionLevel,
+																		@debugMode		= @DebugMode
+				
+						--------------------------------------------------------------------------------------------------------
+						--create a copy of the source table
+						--------------------------------------------------------------------------------------------------------
+						SET @queryToRun = 'SELECT * INTO [' + @DBName + '].[' + @crtSchemaName + '].[' + @CopyTableName + '] FROM [' + @DBName + '].' + @objectName 
+						IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+						SET @nestedExecutionLevel = @executionLevel + 1
+						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																		@dbName			= @DBName,
+																		@objectName		= @objectName,
+																		@module			= 'dbo.usp_mpAlterTableRebuildHeap',
+																		@eventName		= 'database maintenance - rebuilding heap',
+																		@queryToRun  	= @queryToRun,
+																		@flgOptions		= @flgOptions,
+																		@executionLevel	= @nestedExecutionLevel,
+																		@debugMode		= @DebugMode
+
+						IF @errorCode = 0
+							SET @flgCopyMade=1
+				
+						IF @flgCopyMade=1
+							begin
+								--------------------------------------------------------------------------------------------------------
+								SET @queryToRun = N''
+								SET @queryToRun = @queryToRun + N'	SELECT    rc.[record_count]
+																	FROM [' + @DBName + '].[sys].[objects] so WITH (READPAST)
+																	INNER JOIN [' + @DBName + '].[sys].[schemas] sch WITH (READPAST) ON sch.[schema_id] = so.[schema_id] 
+																	INNER JOIN [' + @DBName + '].[sys].[indexes] si WITH (READPAST) ON si.[object_id] = so.[object_id] 
+																	INNER  JOIN 
+																			(
+																				SELECT ps.object_id,
+																						SUM(CASE WHEN (ps.index_id < 2) THEN row_count ELSE 0 END) AS [record_count]
+																				FROM [' + @DBName + '].[sys].[dm_db_partition_stats] ps WITH (READPAST)
+																				GROUP BY ps.object_id		
+																			)rc ON rc.[object_id] = so.[object_id] 
+																	WHERE   so.[name] LIKE ''' + @CopyTableName + '''
+																		AND sch.[name] LIKE ''' + @crtSchemaName + '''
+																		AND si.[index_id] = 0'
+								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+								DELETE FROM @tableGetRowCount
+								INSERT INTO @tableGetRowCount([record_count])
+									EXEC (@queryToRun)
+							
+								SELECT TOP 1 @crtRecordCount=[record_count] FROM @tableGetRowCount
+								SET @queryToRun= '--	Total Rows In Temporary Storage Table After Export: ' + CAST(@crtRecordCount AS varchar(20))
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+
+								--------------------------------------------------------------------------------------------------------
+								--rebuild source table
+								SET @nestExecutionLevel=@executionLevel + 2
+								EXEC @flgErrorsOccured = [dbo].[usp_mpTableDataSynchronizeInsert]	@sourceServerName		= @SQLServerName,
+																									@sourceDB				= @DBName,			
+																									@sourceTableSchema		= @crtSchemaName,
+																									@sourceTableName		= @CopyTableName,
+																									@destinationServerName	= @SQLServerName,
+																									@destinationDB			= @DBName,			
+																									@destinationTableSchema	= @crtSchemaName,		
+																									@destinationTableName	= @crtTableName,		
+																									@flgActions				= 3,
+																									@flgOptions				= @flgOptions,
+																									@allowDataLoss			= 0,
+																									@executionLevel			= @nestExecutionLevel,
+																									@DebugMode				= @DebugMode
+						
+								--------------------------------------------------------------------------------------------------------
+								--dropping copy table
+								--------------------------------------------------------------------------------------------------------
+								IF @flgErrorsOccured=0
+									begin
+										SET @queryToRun = 'IF EXISTS (	SELECT * 
+																		FROM [' + @DBName + '].[sys].[objects] so
+																		INNER JOIN [' + @DBName + '].[sys].[schemas] sch ON so.[schema_id] = sch.[schema_id]
+																		WHERE	sch.[name] = ''' + @crtSchemaName + ''' 
+																				AND so.[name] = ''' + @CopyTableName + '''
+																	) 
+															DROP TABLE [' + @DBName + '].[' + @crtSchemaName + '].[' + @CopyTableName + ']'
+										IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+										SET @nestedExecutionLevel = @executionLevel + 1
+										EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																						@dbName			= @DBName,
+																						@objectName		= @objectName,
+																						@module			= 'dbo.usp_mpAlterTableRebuildHeap',
+																						@eventName		= 'database maintenance - rebuilding heap',
+																						@queryToRun  	= @queryToRun,
+																						@flgOptions		= @flgOptions,
+																						@executionLevel	= @nestedExecutionLevel,
+																						@debugMode		= @DebugMode
+									end
+							end
+					end
+
+				FETCH NEXT FROM crsTableListToRebuild INTO @crtSchemaName, @crtTableName, @crtRecordCount
 			end
-		CLOSE crsCleanupBackupFiles
-		DEALLOCATE crsCleanupBackupFiles
+		CLOSE crsTableListToRebuild
+		DEALLOCATE crsTableListToRebuild
+	
+		----------------------------------------------------------------------------------
+		IF object_id('#tmpRebuildTableList') IS NOT NULL DROP TABLE #tmpRebuildTableList
+		IF OBJECT_ID('#heapTableIndexList') IS NOT NULL DROP TABLE #heapTableIndexList
+END TRY
 
-		IF @serverVersionNum>=9 AND (@optionXPHasChanged=1 OR @optionAdvancedHasChanged=1)
-			begin
-				/* disable xp_cmdshell configuration option */
-				IF @optionXPHasChanged = 1
-					EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
-																		@configOptionName	= 'xp_cmdshell',
-																		@configOptionValue	= 0,
-																		@optionIsAvailable	= @optionXPIsAvailable OUT,
-																		@optionCurrentValue	= @optionXPValue OUT,
-																		@optionHasChanged	= @optionXPHasChanged OUT,
-																		@executionLevel		= 0,
-																		@debugMode			= @debugMode
+BEGIN CATCH
+DECLARE 
+        @ErrorMessage    NVARCHAR(4000),
+        @ErrorNumber     INT,
+        @ErrorSeverity   INT,
+        @ErrorState      INT,
+        @ErrorLine       INT,
+        @ErrorProcedure  NVARCHAR(200);
+    -- Assign variables to error-handling functions that 
+    -- capture information for RAISERROR.
+	SET @errorCode = -1
 
-				/* disable show advanced options configuration option */
-				IF @optionAdvancedHasChanged = 1
-						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
-																			@configOptionName	= 'show advanced options',
-																			@configOptionValue	= 0,
-																			@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
-																			@optionCurrentValue	= @optionAdvancedValue OUT,
-																			@optionHasChanged	= @optionAdvancedHasChanged OUT,
-																			@executionLevel		= 0,
-																			@debugMode			= @debugMode
-			end
-	end
+    SELECT 
+        @ErrorNumber = ERROR_NUMBER(),
+        @ErrorSeverity = ERROR_SEVERITY(),
+        @ErrorState = CASE WHEN ERROR_STATE() BETWEEN 1 AND 127 THEN ERROR_STATE() ELSE 1 END ,
+        @ErrorLine = ERROR_LINE(),
+        @ErrorProcedure = ISNULL(ERROR_PROCEDURE(), '-');
+	-- Building the message string that will contain original
+    -- error information.
+    SELECT @ErrorMessage = 
+        N'Error %d, Level %d, State %d, Procedure %s, Line %d, ' + 
+            'Message: '+ ERROR_MESSAGE();
+    -- Raise an error: msg_str parameter of RAISERROR will contain
+    -- the original error information.
+    RAISERROR 
+        (
+        @ErrorMessage, 
+        @ErrorSeverity, 
+        @ErrorState,               
+        @ErrorNumber,    -- parameter: original error number.
+        @ErrorSeverity,  -- parameter: original error severity.
+        @ErrorState,     -- parameter: original error state.
+        @ErrorProcedure, -- parameter: original error procedure name.
+        @ErrorLine       -- parameter: original error line number.
+        );
+
+        -- Test XACT_STATE:
+        -- If 1, the transaction is committable.
+        -- If -1, the transaction is uncommittable and should 
+        --     be rolled back.
+        -- XACT_STATE = 0 means that there is no transaction and
+        --     a COMMIT or ROLLBACK would generate an error.
+
+    -- Test if the transaction is uncommittable.
+    IF (XACT_STATE()) = -1
+    BEGIN
+        PRINT
+            N'The transaction is in an uncommittable state.' +
+            'Rolling back transaction.'
+        ROLLBACK TRANSACTION 
+   END;
+
+END CATCH
 
 RETURN @errorCode
 GO
-
-
 
 RAISERROR('Create procedure: [dbo].[usp_mpDatabaseBackup]', 10, 1) WITH NOWAIT
 GO
@@ -3429,9 +2589,10 @@ EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrin
 --get default backup location
 IF @backupLocation IS NULL
 	begin
-		SELECT @backupLocation = [value]
-		FROM [dbo].[appConfigurations]
-		WHERE [name] = N'Default backup location'
+		SELECT	@backupLocation = [value]
+		FROM	[dbo].[appConfigurations]
+		WHERE	[name] = N'Default backup location'
+				AND [module] = 'maintenance-plan'
 
 		IF @backupLocation IS NULL
 			begin
@@ -3444,9 +2605,10 @@ IF @backupLocation IS NULL
 --get default backup retention
 IF @retentionDays IS NULL
 	begin
-		SELECT @retentionDays = [value]
-		FROM [dbo].[appConfigurations]
-		WHERE [name] = N'Default backup retention (days)'
+		SELECT	@retentionDays = [value]
+		FROM	[dbo].[appConfigurations]
+		WHERE	[name] = N'Default backup retention (days)'
+				AND [module] = 'maintenance-plan'
 
 		IF @retentionDays IS NULL
 			begin
@@ -3842,7 +3004,467 @@ IF @errorCode = 0 AND ISNULL(@retentionDays,0) <> 0
 RETURN @errorCode
 GO
 
+RAISERROR('Create procedure: [dbo].[usp_mpDatabaseBackupCleanup]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sysobjects 
+	     WHERE [id] = OBJECT_ID(N'[dbo].[usp_mpDatabaseBackupCleanup]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_mpDatabaseBackupCleanup]
+GO
 
+-----------------------------------------------------------------------------------------
+CREATE PROCEDURE [dbo].[usp_mpDatabaseBackupCleanup]
+		@sqlServerName			[sysname],
+		@dbName					[sysname],
+		@backupLocation			[nvarchar](1024)=NULL,	/*  disk only: local or UNC */
+		@backupFileExtension	[nvarchar](8),			/*  BAK - cleanup full/incremental database backup
+															TRN - cleanup transaction log backup
+														*/
+		@flgOptions				[int]	= 128,			/* 32 - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
+														  128 - when performing cleanup, delete also orphans diff and log backups, when cleanup full database backups(default)
+														  256 - for +2k5 versions, use xp_delete_file option
+														 2048 - change retention policy from RetentionDays to RetentionBackupsCount (number of full database backups to be kept)
+															  - this may be forced by setting to true property 'Change retention policy from RetentionDays to RetentionFullBackupsCount'
+														*/
+		@retentionDays			[smallint]	= 14,
+		@executionLevel			[tinyint]	=  0,
+		@debugMode				[bit]		=  0
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 2004-2006 / review on 2015.03.10
+-- Module			 : Database Maintenance Plan 
+-- Description		 : Optimization and Maintenance Checks
+--					   - if @retentionDays is set to Days, this number represent the number of days on which database can be restored
+--						 depending on the backup strategy, a full backup will always be included
+--					   - if @retentionDays is set to BackupCount, this number represent the number of full and differential backups to be kept
+--						 an older full backup may exists to ensure that a newer differential backuup can be restored
+-- ============================================================================
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--returns: 0 = success, >0 = failure
+
+DECLARE		@queryToRun  					[nvarchar](2048),
+			@nestedExecutionLevel			[tinyint]
+
+DECLARE		@backupFileName					[nvarchar](1024),
+			@serverEdition					[sysname],
+			@serverVersionStr				[sysname],
+			@serverVersionNum				[numeric](9,6),
+			@errorCode						[int],
+			@maxAllowedDate					[datetime]
+
+DECLARE		@lastFullBackupSetIDRemaining	[int],
+			@lastDiffBackupSetIDRemaining	[int],
+			@lastBackupType					[char](1)
+
+DECLARE @optionXPIsAvailable		[bit],
+		@optionXPValue				[int],
+		@optionXPHasChanged			[bit],
+		@optionAdvancedIsAvailable	[bit],
+		@optionAdvancedValue		[int],
+		@optionAdvancedHasChanged	[bit]
+
+IF OBJECT_ID('tempdb..#backupSET') IS NOT NULL
+	DROP TABLE #backupSET
+
+CREATE TABLE #backupSET 
+		(
+			  [backup_set_id]		[int]
+			, [backup_start_date]	[datetime]	NULL
+			, [type]				[char](1)	NULL
+		)
+
+IF OBJECT_ID('tempdb..#backupDevice') IS NOT NULL
+	DROP TABLE #backupDevice
+CREATE TABLE #backupDevice 
+	(
+		  [backup_set_id]			[int]
+		, [physical_device_name]	[nvarchar](260)
+	)
+
+
+-----------------------------------------------------------------------------------------
+SET NOCOUNT ON
+
+-----------------------------------------------------------------------------------------
+IF @executionLevel=0
+	EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+SET @queryToRun= 'Cleanup backup files for database: ' + ' [' + @dbName + ']'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+-----------------------------------------------------------------------------------------
+--get destination server running version/edition
+SET @nestedExecutionLevel = @executionLevel + 1
+EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName		= @sqlServerName,
+										@serverEdition		= @serverEdition OUT,
+										@serverVersionStr	= @serverVersionStr OUT,
+										@serverVersionNum	= @serverVersionNum OUT,
+										@executionLevel		= @nestedExecutionLevel,
+										@debugMode			= @debugMode
+
+-----------------------------------------------------------------------------------------
+--get configuration values: force retention policy
+---------------------------------------------------------------------------------------------
+DECLARE @forceChangeRetentionPolicy [nvarchar](128)
+SELECT	@forceChangeRetentionPolicy=[value] 
+FROM	[dbo].[appConfigurations] 
+WHERE	[name]='Change retention policy from RetentionDays to RetentionBackupsCount'
+		AND [module] = 'maintenance-plan'
+
+SET @forceChangeRetentionPolicy = LOWER(ISNULL(@forceChangeRetentionPolicy, 'false'))
+
+-----------------------------------------------------------------------------------------
+--changing backup expiration date from RetentionDays to full/diff database backup count
+IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'
+	begin
+		SET @queryToRun=N''
+		SET @queryToRun = @queryToRun + N'SET ROWCOUNT ' + CAST(@retentionDays AS [nvarchar]) + N'		
+										SELECT bs.[backup_set_id], bs.[backup_start_date], bs.[type]
+										FROM msdb.dbo.backupset bs
+										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
+										WHERE	bs.[type] IN (''D'', ''I'')
+												AND bs.[database_name] = ''' + @dbName + N'''
+												AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
+										ORDER BY bs.[backup_start_date] DESC
+										SET ROWCOUNT 0'
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+		INSERT	INTO #backupSET([backup_set_id], [backup_start_date], [type])
+				EXEC (@queryToRun)
+
+		--check for remote server msdb information
+		IF @sqlServerName<>@@SERVERNAME
+			begin
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				INSERT	INTO #backupSET([backup_set_id], [backup_start_date], [type])
+						EXEC (@queryToRun)
+			end
+		
+
+		SELECT TOP 1  @maxAllowedDate = DATEADD(ss, -1, [backup_start_date])
+					, @lastFullBackupSetIDRemaining = [backup_set_id]
+					, @lastBackupType = [type]
+		FROM #backupSET
+		ORDER BY [backup_start_date]
+
+		--if oldest backup is a differential one, go deep and find the full database backup that it will need/use
+		IF @lastBackupType='I'
+			begin
+				SET @queryToRun=N''
+				SET @queryToRun = @queryToRun + N'SELECT TOP 1  bs.[backup_set_id]
+															, bs.[backup_start_date]
+															, bs.[type]
+												FROM msdb.dbo.backupset bs
+												INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
+												WHERE	bs.[type] IN (''D'')
+														AND bs.[database_name] = ''' + @dbName + N'''
+														AND bs.[backup_set_id] < ' + CAST(@lastFullBackupSetIDRemaining AS [nvarchar]) + N'
+														AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
+												ORDER BY bs.[backup_start_date] DESC'
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				DELETE FROM #backupSET
+				INSERT	INTO #backupSET([backup_set_id], [backup_start_date], [type])
+						EXEC (@queryToRun)
+
+				IF @sqlServerName<>@@SERVERNAME
+					begin
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+						INSERT	INTO #backupSET([backup_set_id], [backup_start_date], [type])
+								EXEC (@queryToRun)
+					end
+
+				SELECT TOP 1  @maxAllowedDate  = DATEADD(ss, -1, [backup_start_date])
+							, @lastFullBackupSetIDRemaining = [backup_set_id]
+							, @lastBackupType = [type]
+				FROM #backupSET
+				ORDER BY [backup_start_date] DESC
+			end
+
+		SET @queryToRun=N''
+		SET @queryToRun = @queryToRun + N'SELECT TOP 1 bs.[backup_set_id]
+										FROM msdb.dbo.backupset bs
+										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
+										WHERE	bs.[type]=''I''
+												AND bs.[database_name] = ''' + @dbName + N'''
+												AND bs.[backup_start_date] <= DATEADD(dd, -' + CAST(@retentionDays AS [nvarchar]) + N', GETDATE())
+												AND bs.[backup_set_id] > ' + CAST(@lastFullBackupSetIDRemaining AS [nvarchar]) + N'
+												AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
+										ORDER BY bs.[backup_set_id] DESC'
+
+		DELETE FROM #backupSET
+		INSERT	INTO #backupSET([backup_set_id])
+				EXEC (@queryToRun)
+
+		IF @sqlServerName<>@@SERVERNAME
+			begin
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				INSERT	INTO #backupSET([backup_set_id])
+						EXEC (@queryToRun)
+			end
+
+		SELECT TOP 1  @lastDiffBackupSetIDRemaining  = [backup_set_id]
+		FROM #backupSET
+		ORDER BY [backup_start_date] DESC
+	end
+ELSE
+	begin
+		/* SET @maxAllowedDate = DATEADD(dd, -@retentionDays, GETDATE()) */
+		--find first full database backup to allow @retentionDays database restore
+		SET @queryToRun=N''
+		SET @queryToRun = @queryToRun + N'SET ROWCOUNT 1		
+										SELECT bs.[backup_set_id], bs.[backup_start_date]
+										FROM msdb.dbo.backupset bs
+										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
+										WHERE	bs.[type]=''D''
+												AND bs.[database_name] = ''' + @dbName + N'''
+												AND bs.[backup_start_date] <= DATEADD(dd, -' + CAST(@retentionDays AS [nvarchar]) + N', GETDATE())
+												AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
+										ORDER BY bs.[backup_start_date] DESC
+										SET ROWCOUNT 0'
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+		INSERT	INTO #backupSET([backup_set_id], [backup_start_date])
+				EXEC (@queryToRun)
+
+		IF @sqlServerName<>@@SERVERNAME
+			begin
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				INSERT	INTO #backupSET([backup_set_id])
+						EXEC (@queryToRun)
+			end
+
+		SELECT TOP 1  @maxAllowedDate = DATEADD(ss, -1, [backup_start_date])
+					, @lastFullBackupSetIDRemaining = [backup_set_id]
+		FROM #backupSET
+		ORDER BY [backup_start_date] DESC
+
+		SET @queryToRun=N''
+		SET @queryToRun = @queryToRun + N'SELECT TOP 1 bs.[backup_set_id]
+										FROM msdb.dbo.backupset bs
+										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
+										WHERE	bs.[type]=''I''
+												AND bs.[database_name] = ''' + @dbName + N'''
+												AND bs.[backup_start_date] <= DATEADD(dd, -' + CAST(@retentionDays AS [nvarchar]) + N', GETDATE())
+												AND bs.[backup_set_id] > ' + CAST(@lastFullBackupSetIDRemaining AS [nvarchar]) + N'
+												AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
+										ORDER BY bs.[backup_set_id] DESC'
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+		DELETE FROM #backupSET
+		INSERT	INTO #backupSET([backup_set_id])
+				EXEC (@queryToRun)
+
+		IF @sqlServerName<>@@SERVERNAME
+			begin
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				INSERT	INTO #backupSET([backup_set_id])
+						EXEC (@queryToRun)
+			end
+
+		SELECT TOP 1  @lastDiffBackupSetIDRemaining = [backup_set_id]
+		FROM #backupSET
+		ORDER BY [backup_start_date] DESC
+	end
+
+-----------------------------------------------------------------------------------------
+--for +2k5 versions, will use xp_delete_file
+SET @errorCode=0
+IF @serverVersionNum>=9 AND @flgOptions & 256 = 256
+	begin
+		SET @queryToRun = N'EXEC master.dbo.xp_delete_file 0, N''' + @backupLocation + ''', N''' + @backupFileExtension + ''', N''' + CONVERT([varchar](20), @maxAllowedDate, 120) + ''', 0'
+		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+														@dbName			= @dbName,
+														@module			= 'dbo.usp_mpDatabaseBackupCleanup',
+														@eventName		= 'database backup cleanup',
+														@queryToRun  	= @queryToRun,
+														@flgOptions		= @flgOptions,
+														@executionLevel	= @nestedExecutionLevel,
+														@debugMode		= @debugMode
+	end
+
+IF @debugMode=1
+	SELECT	@maxAllowedDate AS maxAllowedDate, 
+			@lastFullBackupSetIDRemaining AS lastFullBackupSetIDRemaining, 
+			@lastDiffBackupSetIDRemaining AS lastDiffBackupSetIDRemaining, 
+			@forceChangeRetentionPolicy AS forceChangeRetentionPolicy,
+			@flgOptions & 256,
+			@errorCode,
+			@serverVersionNum,
+			@flgOptions & 128
+
+-----------------------------------------------------------------------------------------
+--in case of previous errors or 2k version, will use "standard" delete file
+IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@serverVersionNum < 9) OR (@flgOptions & 128 = 128 AND @lastFullBackupSetIDRemaining IS NOT NULL)
+	begin
+		SELECT  @optionXPIsAvailable		= 0,
+				@optionXPValue				= 0,
+				@optionXPHasChanged			= 0,
+				@optionAdvancedIsAvailable	= 0,
+				@optionAdvancedValue		= 0,
+				@optionAdvancedHasChanged	= 0
+
+		IF @serverVersionNum>=9
+			begin
+				/* enable xp_cmdshell configuration option */
+				EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
+																	@configOptionName	= 'xp_cmdshell',
+																	@configOptionValue	= 1,
+																	@optionIsAvailable	= @optionXPIsAvailable OUT,
+																	@optionCurrentValue	= @optionXPValue OUT,
+																	@optionHasChanged	= @optionXPHasChanged OUT,
+																	@executionLevel		= 0,
+																	@debugMode			= @debugMode
+
+				IF @optionXPIsAvailable = 0
+					begin
+						/* enable show advanced options configuration option */
+						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
+																			@configOptionName	= 'show advanced options',
+																			@configOptionValue	= 1,
+																			@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
+																			@optionCurrentValue	= @optionAdvancedValue OUT,
+																			@optionHasChanged	= @optionAdvancedHasChanged OUT,
+																			@executionLevel		= 0,
+																			@debugMode			= @debugMode
+
+						IF @optionAdvancedIsAvailable = 1 AND (@optionAdvancedValue=1 OR @optionAdvancedHasChanged=1)
+							EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
+																				@configOptionName	= 'xp_cmdshell',
+																				@configOptionValue	= 1,
+																				@optionIsAvailable	= @optionXPIsAvailable OUT,
+																				@optionCurrentValue	= @optionXPValue OUT,
+																				@optionHasChanged	= @optionXPHasChanged OUT,
+																				@executionLevel		= 0,
+																				@debugMode			= @debugMode
+					end
+
+				IF @optionXPIsAvailable=0 OR @optionXPValue=0
+					begin
+						set @queryToRun='xp_cmdshell component is turned off. Cannot continue'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+						RETURN 1
+					end		
+			end											
+		
+		SET @queryToRun=N''
+		SET @queryToRun = @queryToRun + N'SELECT bs.[backup_set_id], bmf.[physical_device_name]
+										FROM [msdb].[dbo].[backupset] bs
+										INNER JOIN [msdb].[dbo].[backupmediafamily] bmf ON bmf.[media_set_id]=bs.[media_set_id]
+										WHERE	(   (    bs.[backup_start_date] <= CONVERT([datetime], ''' + CONVERT([nvarchar](20), @maxAllowedDate, 120) + N''', 120)
+														AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.' + @backupFileExtension + N''')
+														AND (	 (' + CAST(@flgOptions AS [nvarchar]) + N' & 256 = 0) 
+															OR (' + CAST(@errorCode AS [nvarchar]) + N'<>0 AND ' + CAST(@flgOptions AS [nvarchar]) + N' & 256 = 256) 
+															OR (' + CAST(@serverVersionNum AS [nvarchar]) + N'< 9)
+															)
+													)
+													OR (
+															-- when performing cleanup, delete also orphans diff and log backups, when cleanup full database backups(default)
+															bs.[backup_set_id] < ' + CAST(@lastFullBackupSetIDRemaining AS [nvarchar]) + N'
+														AND bs.[database_name] = ''' + @dbName + N'''
+														AND bs.[type] IN (''I'', ''L'')
+														AND bmf.[physical_device_name] LIKE (''' + @backupLocation + N'%'')
+														AND ' + CAST(@flgOptions AS [nvarchar]) + N' & 128 = 128
+													)
+													OR (
+															-- delete incremental and transaction log backups to keep the retention/restore period fixed
+															' + CAST(ISNULL(@lastDiffBackupSetIDRemaining, 0)  AS [nvarchar]) + N' <> 0
+														AND bs.[backup_set_id] < ' + CAST(ISNULL(@lastDiffBackupSetIDRemaining, 0) AS [nvarchar]) + N'
+														AND bs.[database_name] = ''' + @dbName + N'''
+														AND bs.[type] IN (''I'', ''L'')
+														AND bmf.[physical_device_name] LIKE (''' + @backupLocation + N'%'')
+														AND ' + CAST(@flgOptions AS [nvarchar]) + N' & 128 = 128
+													)
+												)														
+												AND bmf.[device_type] = 2'
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+		INSERT	INTO #backupDevice([backup_set_id], [physical_device_name])
+				EXEC (@queryToRun)
+
+		IF @sqlServerName<>@@SERVERNAME
+			begin
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				INSERT	INTO #backupDevice([backup_set_id], [physical_device_name])
+						EXEC (@queryToRun)
+			end
+
+		DECLARE crsCleanupBackupFiles CURSOR FOR	SELECT [physical_device_name]
+													FROM #backupDevice														
+													ORDER BY [backup_set_id] ASC
+		OPEN crsCleanupBackupFiles
+		FETCH NEXT FROM crsCleanupBackupFiles INTO @backupFileName
+		WHILE @@FETCH_STATUS=0
+			begin
+				SET @queryToRun = N'EXEC [' + DB_NAME() + '].[dbo].[usp_mpDeleteFileOnDisk]	@sqlServerName	= ''' + @sqlServerName + N''',
+																							@fileName		= ''' + @backupFileName + N''',
+																							@executionLevel	= ' + CAST(@nestedExecutionLevel AS [nvarchar]) + N',
+																							@debugMode		= ' + CAST(@debugMode AS [nvarchar]) 
+
+				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @@SERVERNAME,
+																@dbName			= NULL,
+																@module			= 'dbo.usp_mpDatabaseBackupCleanup',
+																@eventName		= 'database backup cleanup',
+																@queryToRun  	= @queryToRun,
+																@flgOptions		= @flgOptions,
+																@executionLevel	= @nestedExecutionLevel,
+																@debugMode		= @debugMode
+
+				FETCH NEXT FROM crsCleanupBackupFiles INTO @backupFileName
+			end
+		CLOSE crsCleanupBackupFiles
+		DEALLOCATE crsCleanupBackupFiles
+
+		IF @serverVersionNum>=9 AND (@optionXPHasChanged=1 OR @optionAdvancedHasChanged=1)
+			begin
+				/* disable xp_cmdshell configuration option */
+				IF @optionXPHasChanged = 1
+					EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
+																		@configOptionName	= 'xp_cmdshell',
+																		@configOptionValue	= 0,
+																		@optionIsAvailable	= @optionXPIsAvailable OUT,
+																		@optionCurrentValue	= @optionXPValue OUT,
+																		@optionHasChanged	= @optionXPHasChanged OUT,
+																		@executionLevel		= 0,
+																		@debugMode			= @debugMode
+
+				/* disable show advanced options configuration option */
+				IF @optionAdvancedHasChanged = 1
+						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
+																			@configOptionName	= 'show advanced options',
+																			@configOptionValue	= 0,
+																			@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
+																			@optionCurrentValue	= @optionAdvancedValue OUT,
+																			@optionHasChanged	= @optionAdvancedHasChanged OUT,
+																			@executionLevel		= 0,
+																			@debugMode			= @debugMode
+			end
+	end
+
+RETURN @errorCode
+GO
 
 RAISERROR('Create procedure: [dbo].[usp_mpDatabaseConsistencyCheck]', 10, 1) WITH NOWAIT
 GO
@@ -4014,7 +3636,7 @@ IF @flgActions & 2 = 2 OR @flgActions & 16 = 16 OR @flgActions & 64 = 64 OR @flg
 		--get table list that will be analyzed including materialized views; will pick only tables with reserved pages
 		SET @queryToRun = N''
 		IF @serverVersionNum >= 9
-			SET @queryToRun = @queryToRun + N'SELECT ob.[table_schema], ob.[table_name]
+			SET @queryToRun = @queryToRun + N'SELECT DISTINCT ob.[table_schema], ob.[table_name]
 FROM (
 		SELECT obj.[object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name]
 		FROM [' + @dbName + N'].sys.objects obj WITH (READPAST)
@@ -4192,7 +3814,7 @@ IF @flgActions & 2 = 2
 		SET @queryToRun=N'Tables/views consistency check ' + CASE WHEN @flgOptions & 1 = 1 THEN '(PHYSICAL_ONLY)' ELSE '' END + CASE WHEN @flgOptions & 2 = 2 THEN '(NOINDEX)' ELSE '' END + '...' + ' [' + @dbName + ']'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		DECLARE crsTableList CURSOR FOR	SELECT [table_schema], [table_name] 
+		DECLARE crsTableList CURSOR FOR	SELECT DISTINCT [table_schema], [table_name] 
 										FROM #databaseTableList	
 										ORDER BY [table_name]
 		OPEN crsTableList
@@ -4291,7 +3913,7 @@ IF @flgActions & 16 = 16
 		SET @queryToRun=N'Table constraints consistency check ...' + ' [' + @dbName + ']'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 		
-		DECLARE crsTableList CURSOR FOR	SELECT [table_schema], [table_name] 
+		DECLARE crsTableList CURSOR FOR	SELECT DISTINCT [table_schema], [table_name] 
 										FROM #databaseTableList	
 										ORDER BY [table_name]
 		OPEN crsTableList
@@ -4398,7 +4020,7 @@ IF @flgActions & 32 = 32
 				INSERT	INTO #databaseTableListIdent([table_schema], [table_name])
 						EXEC (@queryToRun)
 
-				DECLARE crsTableList CURSOR FOR	SELECT [table_schema], [table_name] 
+				DECLARE crsTableList CURSOR FOR	SELECT DISTINCT [table_schema], [table_name] 
 												FROM #databaseTableListIdent	
 												ORDER BY [table_name]
 				OPEN crsTableList
@@ -4461,7 +4083,7 @@ IF @flgActions & 64 = 64
 			end
 		ELSE
 			begin
-				DECLARE crsTableList CURSOR FOR	SELECT [table_schema], [table_name] 
+				DECLARE crsTableList CURSOR FOR	SELECT DISTINCT [table_schema], [table_name] 
 												FROM #databaseTableList	
 												ORDER BY [table_name]
 				OPEN crsTableList
@@ -4515,7 +4137,7 @@ IF @flgActions & 128 = 128
 		SET @queryToRun=N'Cleaning wasted space in variable length columns...' + ' [' + @dbName + ']'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		DECLARE crsTableList CURSOR FOR	SELECT [table_schema], [table_name] 
+		DECLARE crsTableList CURSOR FOR	SELECT DISTINCT [table_schema], [table_name] 
 										FROM #databaseTableList	
 										ORDER BY [table_name]
 		OPEN crsTableList
@@ -4548,8 +4170,6 @@ IF @flgActions & 128 = 128
 
 RETURN @errorCode
 GO
-
-
 
 RAISERROR('Create procedure: [dbo].[usp_mpDatabaseOptimize]', 10, 1) WITH NOWAIT
 GO
@@ -4678,9 +4298,10 @@ ELSE
 --get configuration values
 ---------------------------------------------------------------------------------------------
 DECLARE @queryLockTimeOut [int]
-SELECT @queryLockTimeOut=[value] 
-FROM [dbo].[appConfigurations] 
-WHERE [name]='Default lock timeout (ms)'
+SELECT	@queryLockTimeOut=[value] 
+FROM	[dbo].[appConfigurations] 
+WHERE	[name]='Default lock timeout (ms)'
+		AND [module] = 'common'
 
 -----------------------------------------------------------------------------------------
 --get configuration values: Force cleanup of ghost records
@@ -4688,9 +4309,10 @@ WHERE [name]='Default lock timeout (ms)'
 DECLARE   @forceCleanupGhostRecords [nvarchar](128)
 		, @thresholdGhostRecords	[bigint]
 
-SELECT @forceCleanupGhostRecords=[value] 
-FROM [dbo].[appConfigurations] 
-WHERE [name]='Force cleanup of ghost records'
+SELECT	@forceCleanupGhostRecords=[value] 
+FROM	[dbo].[appConfigurations] 
+WHERE	[name]='Force cleanup of ghost records'
+		AND [module] = 'maintenance-plan'
 
 SET @forceCleanupGhostRecords = LOWER(ISNULL(@forceCleanupGhostRecords, 'false'))
 
@@ -4704,9 +4326,10 @@ IF LOWER(@forceCleanupGhostRecords)='true' AND @flgOptions & 65536 = 0
 
 IF LOWER(@forceCleanupGhostRecords)='true' OR @flgOptions & 65536 = 65536
 	begin
-		SELECT @thresholdGhostRecords=[value] 
-		FROM [dbo].[appConfigurations] 
-		WHERE [name]='Ghost records cleanup threshold'
+		SELECT	@thresholdGhostRecords=[value] 
+		FROM	[dbo].[appConfigurations] 
+		WHERE	[name]='Ghost records cleanup threshold'
+				AND [module] = 'maintenance-plan'
 	end
 
 SET @thresholdGhostRecords = ISNULL(@thresholdGhostRecords, 0)
@@ -6012,6 +5635,4 @@ IF object_id('tempdb..#databaseObjectsWithIndexList') IS NOT NULL 	DROP TABLE #d
 
 RETURN @errorCode
 GO
-
-
 
