@@ -285,7 +285,7 @@ CREATE TABLE #databaseObjectsWithIndexList(
 											[index_id]						[int],
 											[index_name]					[sysname]	NULL,													
 											[index_type]					[tinyint],
-											[fill_factor]					[tinyint],
+											[fill_factor]					[tinyint]	NULL,
 											[is_rebuilt]					[bit]		NOT NULL DEFAULT (0),
 											[page_count]					[bigint]	NULL,
 											[avg_fragmentation_in_percent]	[decimal](38,2)	NULL,
@@ -319,17 +319,203 @@ CREATE TABLE #databaseObjectsWithStatisticsList(
 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 --------------------------------------------------------------------------------------------------
---1 / 2 / 4	/ 16 - get current index list: clustered, non-clustered, xml, spatial and heap
+--16 - get current heap tables list
 --------------------------------------------------------------------------------------------------
-IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4) OR (@flgActions & 16 = 16)) AND (GETDATE() <= @stopTimeLimit)
+IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopTimeLimit)
 	begin
-		SET @analyzeIndexType=N''
-		
-		IF (@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)
-			SET @analyzeIndexType=@analyzeIndexType + N'1,2,3,4'
-		IF (@flgActions & 16 = 16)
-			SET @analyzeIndexType=@analyzeIndexType + CASE WHEN @analyzeIndexType<>N'' THEN N',' ELSE N'' END + N'0'
+		SET @analyzeIndexType=N'0'
+
+		SET @queryToRun=N'Create list of heap tables to be analyzed...' + @DBName
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		SET @queryToRun = N''				
+
+		SET @queryToRun = @queryToRun + 
+							N'SELECT DISTINCT 
+										DB_ID(''' + @DBName + ''') AS [database_id]
+									, si.[object_id]
+									, sc.[name] AS [table_schema]
+									, ob.[name] AS [table_name]
+									, si.[index_id]
+									, si.[name] AS [index_name]
+									, si.[type] AS [index_type]
+									, CASE WHEN si.[fill_factor] = 0 THEN 100 ELSE si.[fill_factor] END AS [fill_factor]
+							FROM [' + @DBName + '].[sys].[indexes]				si
+							INNER JOIN [' + @DBName + '].[sys].[objects]		ob	ON ob.[object_id] = si.[object_id]
+							INNER JOIN [' + @DBName + '].[sys].[schemas]		sc	ON sc.[schema_id] = ob.[schema_id]' +
+							CASE WHEN @flgOptions & 32768 = 32768 
+								THEN N'
+							INNER JOIN
+									(
+											SELECT   [object_id]
+												, SUM([reserved_page_count]) as [reserved_page_count]
+											FROM [' + @DBName + '].sys.dm_db_partition_stats
+											GROUP BY [object_id]
+											HAVING SUM([reserved_page_count]) >=' + CAST(@PageThreshold AS [nvarchar](32)) + N'
+									) ps ON ps.[object_id] = ob.[object_id]'
+								ELSE N''
+								END + N'
+							WHERE	ob.[name] LIKE ''' + @TableName + '''
+									AND sc.[name] LIKE ''' + @TableSchema + '''
+									AND si.[type] IN (' + @analyzeIndexType + N')
+									AND ob.[is_ms_shipped]=0
+									AND ob.[type] IN (''U'', ''V'')'
+
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+		INSERT	INTO #databaseObjectsWithIndexList([database_id], [object_id], [table_schema], [table_name], [index_id], [index_name], [index_type], [fill_factor])
+				EXEC (@queryToRun)
+	end
+
+
+UPDATE #databaseObjectsWithIndexList 
+		SET   [table_schema] = LTRIM(RTRIM([table_schema]))
+			, [table_name] = LTRIM(RTRIM([table_name]))
+			, [index_name] = LTRIM(RTRIM([index_name]))
+
 			
+--------------------------------------------------------------------------------------------------
+--1/2	- Analyzing heap tables fragmentation
+--------------------------------------------------------------------------------------------------
+IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopTimeLimit)
+	begin
+		SET @queryToRun='Analyzing heap fragmentation...'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		DECLARE crsObjectsWithIndexes CURSOR LOCAL FAST_FORWARD FOR SELECT [database_id], [object_id], [table_schema], [table_name], [index_id], [index_name], [index_type], [fill_factor]
+																	FROM #databaseObjectsWithIndexList																	
+																	ORDER BY [table_schema], [table_name], [index_id]
+		OPEN crsObjectsWithIndexes
+		FETCH NEXT FROM crsObjectsWithIndexes INTO @DatabaseID, @ObjectID, @CurrentTableSchema, @CurrentTableName, @IndexID, @IndexName, @IndexType, @IndexFillFactor
+		WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
+			begin
+				SET @queryToRun='[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']' + CASE WHEN @IndexName IS NOT NULL THEN N' - [' + @IndexName + ']' ELSE N' (heap)' END
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+				SET @queryToRun=N'SELECT	 OBJECT_NAME(ips.[object_id])	AS [table_name]
+											, ips.[object_id]
+											, si.[name] as index_name
+											, ips.[index_id]
+											, ips.[avg_fragmentation_in_percent]
+											, ips.[page_count]
+											, ips.[record_count]
+											, ips.[forwarded_record_count]
+											, ips.[avg_record_size_in_bytes]
+											, ips.[avg_page_space_used_in_percent]
+											, ips.[ghost_record_count]
+									FROM [' + @DBName + '].sys.dm_db_index_physical_stats (' + CAST(@DatabaseID AS [nvarchar](4000)) + N', ' + CAST(@ObjectID AS [nvarchar](4000)) + N', ' + CAST(@IndexID AS [nvarchar](4000)) + N' , NULL, ''' + 
+													'DETAILED'
+											+ ''') ips
+									INNER JOIN [' + @DBName + '].sys.indexes si ON ips.[object_id]=si.[object_id] AND ips.[index_id]=si.[index_id]
+									WHERE	si.[type] IN (' + @analyzeIndexType + N')'
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+				IF @DebugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+						
+				INSERT	INTO #CurrentIndexFragmentationStats([ObjectName], [ObjectId], [IndexName], [IndexId], [LogicalFragmentation], [Pages], [Rows], [ForwardedRecords], [AverageRecordSize], [AveragePageDensity], [ghost_record_count])  
+						EXEC (@queryToRun)
+
+				FETCH NEXT FROM crsObjectsWithIndexes INTO @DatabaseID, @ObjectID, @CurrentTableSchema, @CurrentTableName, @IndexID, @IndexName, @IndexType, @IndexFillFactor
+			end
+		CLOSE crsObjectsWithIndexes
+		DEALLOCATE crsObjectsWithIndexes
+
+		UPDATE doil
+			SET   doil.[avg_fragmentation_in_percent] = cifs.[LogicalFragmentation]
+				, doil.[page_count] = cifs.[Pages]
+				, doil.[ghost_record_count] = cifs.[ghost_record_count]
+				, doil.[forwarded_records_percentage] = CASE WHEN ISNULL(cifs.[Rows], 0) > 0 
+															 THEN (CAST(cifs.[ForwardedRecords] AS decimal(29,2)) / CAST(cifs.[Rows]  AS decimal(29,2))) * 100
+															 ELSE 0
+														END
+				, doil.[page_density_deviation] =  ABS(CASE WHEN ISNULL(cifs.[AverageRecordSize], 0) > 0
+															THEN ((FLOOR(8060. / ISNULL(cifs.[AverageRecordSize], 0)) * ISNULL(cifs.[AverageRecordSize], 0)) / 8060.) * doil.[fill_factor] - cifs.[AveragePageDensity]
+															ELSE 0
+													   END)
+		FROM	#databaseObjectsWithIndexList doil
+		INNER JOIN #CurrentIndexFragmentationStats cifs ON cifs.[ObjectId] = doil.[object_id] AND cifs.[IndexId] = doil.[index_id]
+	end
+
+
+--------------------------------------------------------------------------------------------------
+-- 16	- Rebuild heap tables (SQL versions +2K5 only)
+-- implemented an algoritm based on Tibor Karaszi's one: http://sqlblog.com/blogs/tibor_karaszi/archive/2014/03/06/how-often-do-you-rebuild-your-heaps.aspx
+-- rebuilding heaps also rebuild its non-clustered indexes. do heap maintenance before index maintenance
+--------------------------------------------------------------------------------------------------
+IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopTimeLimit)
+	begin
+		SET @queryToRun='Rebuilding database heap tables...'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		DECLARE crsTableList CURSOR FOR 	SELECT	DISTINCT doil.[table_schema], doil.[table_name], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[page_density_deviation], doil.[forwarded_records_percentage]
+		   									FROM	#databaseObjectsWithIndexList doil
+											WHERE	(    doil.[avg_fragmentation_in_percent] >= @RebuildIndexThreshold
+													  OR doil.[forwarded_records_percentage] >= @DefragIndexThreshold
+													  OR doil.[page_density_deviation] >= @RebuildIndexThreshold
+													)
+													AND doil.[index_type] IN (0)
+											ORDER BY doil.[table_schema], doil.[table_name]
+		OPEN crsTableList
+		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName, @CurrentFragmentation, @CurrentPageCount, @CurentPageDensityDeviation, @CurrentForwardedRecordsPercent
+		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
+			begin
+				SET @objectName = '[' + @CurrentTableSchema + '].[' + RTRIM(@CurrentTableName) + ']'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+		   		SET @queryToRun=N'Current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar])
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
+
+				--------------------------------------------------------------------------------------------------
+				--log heap fragmentation information
+				SET @eventData='<heap-fragmentation><detail>' + 
+									'<database_name>' + @DBName + '</database_name>' + 
+									'<object_name>' + @objectName + '</object_name>'+ 
+									'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
+									'<page_count>' + CAST(@CurrentPageCount AS [varchar](32)) + '</page_count>' + 
+									'<page_density_deviation>' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + '</page_density_deviation>' + 
+									'<forwarded_records_percentage>' + CAST(@CurrentForwardedRecordsPercent AS [varchar](32)) + '</forwarded_records_percentage>' + 
+								'</detail></heap-fragmentation>'
+
+				EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @SQLServerName,
+													@dbName			= @DBName,
+													@objectName		= @objectName,
+													@module			= 'dbo.usp_mpDatabaseOptimize',
+													@eventName		= 'database maintenance - rebuilding heap',
+													@eventMessage	= @eventData,
+													@eventType		= 0 /* info */
+
+				--------------------------------------------------------------------------------------------------
+				SET @nestExecutionLevel = @executionLevel + 3
+				EXEC [dbo].[usp_mpAlterTableRebuildHeap]	@SQLServerName		= @SQLServerName,
+															@DBName				= @DBName,
+															@TableSchema		= @CurrentTableSchema,
+															@TableName			= @CurrentTableName,
+															@flgActions			= 1,
+															@flgOptions			= @flgOptions,
+															@executionLevel		= @nestExecutionLevel,
+															@DebugMode			= @DebugMode
+
+				--mark heap as being rebuilt
+				UPDATE doil
+					SET [is_rebuilt]=1
+				FROM	#databaseObjectsWithIndexList doil 
+	   			WHERE	doil.[table_name] = @CurrentTableName
+	   					AND doil.[table_schema] = @CurrentTableSchema
+						AND doil.[index_type] = 0
+				
+				FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName, @CurrentFragmentation, @CurrentPageCount, @CurentPageDensityDeviation, @CurrentForwardedRecordsPercent
+			end
+		CLOSE crsTableList
+		DEALLOCATE crsTableList
+	end
+
+
+--------------------------------------------------------------------------------------------------
+--1 / 2 / 4 - get current index list: clustered, non-clustered, xml, spatial
+--------------------------------------------------------------------------------------------------
+IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND (GETDATE() <= @stopTimeLimit)
+	begin
+		SET @analyzeIndexType=N'1,2,3,4'		
 
 		SET @queryToRun=N'Create list of indexes to be analyzed...' + @DBName
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
@@ -561,11 +747,12 @@ UPDATE #databaseObjectsWithStatisticsList
 IF @flgOptions & 32768 = 32768
 	SET @flgOptions = @flgOptions - 32768
 
+
 --------------------------------------------------------------------------------------------------
 --1/2	- Analyzing tables fragmentation
 --		fragmentation information for the data and indexes of the specified table or view
 --------------------------------------------------------------------------------------------------
-IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4) OR (@flgActions & 16 = 16)) AND (GETDATE() <= @stopTimeLimit)
+IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AND (GETDATE() <= @stopTimeLimit)
 	begin
 
 		SET @queryToRun='Analyzing index fragmentation...'
@@ -573,6 +760,7 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4) OR (
 
 		DECLARE crsObjectsWithIndexes CURSOR LOCAL FAST_FORWARD FOR SELECT [database_id], [object_id], [table_schema], [table_name], [index_id], [index_name], [index_type], [fill_factor]
 																	FROM #databaseObjectsWithIndexList																	
+																	WHERE [index_type] <> 0 /* exclude heaps */
 																	ORDER BY [table_schema], [table_name], [index_id]
 		OPEN crsObjectsWithIndexes
 		FETCH NEXT FROM crsObjectsWithIndexes INTO @DatabaseID, @ObjectID, @CurrentTableSchema, @CurrentTableName, @IndexID, @IndexName, @IndexType, @IndexFillFactor
@@ -606,7 +794,7 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4) OR (
 													, ips.[avg_page_space_used_in_percent]
 													, ips.[ghost_record_count]
 											FROM [' + @DBName + '].sys.dm_db_index_physical_stats (' + CAST(@DatabaseID AS [nvarchar](4000)) + N', ' + CAST(@ObjectID AS [nvarchar](4000)) + N', ' + CAST(@IndexID AS [nvarchar](4000)) + N' , NULL, ''' + 
-															CASE WHEN @flgOptions & 1024 = 1024 OR ((@flgActions & 16 = 16) AND @IndexType=0) THEN 'DETAILED' ELSE 'LIMITED' END 
+															CASE WHEN @flgOptions & 1024 = 1024 THEN 'DETAILED' ELSE 'LIMITED' END 
 													+ ''') ips
 											INNER JOIN [' + @DBName + '].sys.indexes si ON ips.[object_id]=si.[object_id] AND ips.[index_id]=si.[index_id]
 											WHERE	si.[type] IN (' + @analyzeIndexType + N')
@@ -1215,77 +1403,6 @@ IF @serverVersionNum >= 9 AND (GETDATE() <= @stopTimeLimit)
 		end
 	end
 
-
---------------------------------------------------------------------------------------------------
--- 16	- Rebuild heap tables (SQL versions +2K5 only)
--- implemented an algoritm based on Tibor Karaszi's one: http://sqlblog.com/blogs/tibor_karaszi/archive/2014/03/06/how-often-do-you-rebuild-your-heaps.aspx
---------------------------------------------------------------------------------------------------
-IF ((@flgActions & 16 = 16) AND (@serverVersionNum >= 9)) AND (GETDATE() <= @stopTimeLimit)
-	begin
-		SET @queryToRun='Rebuilding database heap tables...'
-		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-		DECLARE crsTableList CURSOR FOR 	SELECT	DISTINCT doil.[table_schema], doil.[table_name], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[page_density_deviation], doil.[forwarded_records_percentage]
-		   									FROM	#databaseObjectsWithIndexList doil
-											WHERE	(    doil.[avg_fragmentation_in_percent] >= @RebuildIndexThreshold
-													  OR doil.[forwarded_records_percentage] >= @DefragIndexThreshold
-													  OR doil.[page_density_deviation] >= @RebuildIndexThreshold
-													)
-													AND doil.[index_type] IN (0)
-											ORDER BY doil.[table_schema], doil.[table_name]
-		OPEN crsTableList
-		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName, @CurrentFragmentation, @CurrentPageCount, @CurentPageDensityDeviation, @CurrentForwardedRecordsPercent
-		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
-			begin
-				SET @objectName = '[' + @CurrentTableSchema + '].[' + RTRIM(@CurrentTableName) + ']'
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
-
-		   		SET @queryToRun=N'Current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar])
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
-
-				--------------------------------------------------------------------------------------------------
-				--log heap fragmentation information
-				SET @eventData='<heap-fragmentation><detail>' + 
-									'<database_name>' + @DBName + '</database_name>' + 
-									'<object_name>' + @objectName + '</object_name>'+ 
-									'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
-									'<page_count>' + CAST(@CurrentPageCount AS [varchar](32)) + '</page_count>' + 
-									'<page_density_deviation>' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + '</page_density_deviation>' + 
-									'<forwarded_records_percentage>' + CAST(@CurrentForwardedRecordsPercent AS [varchar](32)) + '</forwarded_records_percentage>' + 
-								'</detail></heap-fragmentation>'
-
-				EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @SQLServerName,
-													@dbName			= @DBName,
-													@objectName		= @objectName,
-													@module			= 'dbo.usp_mpDatabaseOptimize',
-													@eventName		= 'database maintenance - rebuilding heap',
-													@eventMessage	= @eventData,
-													@eventType		= 0 /* info */
-
-				--------------------------------------------------------------------------------------------------
-				SET @nestExecutionLevel = @executionLevel + 3
-				EXEC [dbo].[usp_mpAlterTableRebuildHeap]	@SQLServerName		= @SQLServerName,
-															@DBName				= @DBName,
-															@TableSchema		= @CurrentTableSchema,
-															@TableName			= @CurrentTableName,
-															@flgActions			= 1,
-															@flgOptions			= @flgOptions,
-															@executionLevel		= @nestExecutionLevel,
-															@DebugMode			= @DebugMode
-
-				--mark heap as being rebuilt
-				UPDATE doil
-					SET [is_rebuilt]=1
-				FROM	#databaseObjectsWithIndexList doil 
-	   			WHERE	doil.[table_name] = @CurrentTableName
-	   					AND doil.[table_schema] = @CurrentTableSchema
-						AND doil.[index_type] = 0
-				
-				FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName, @CurrentFragmentation, @CurrentPageCount, @CurentPageDensityDeviation, @CurrentForwardedRecordsPercent
-			end
-		CLOSE crsTableList
-		DEALLOCATE crsTableList
-	end
 
 
 --------------------------------------------------------------------------------------------------

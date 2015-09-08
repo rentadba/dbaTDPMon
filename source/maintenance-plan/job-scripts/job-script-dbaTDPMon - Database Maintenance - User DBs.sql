@@ -455,9 +455,75 @@ IF DATEPART(dw, GETUTCDATE())=2
 												@command=@queryToRun, 
 												@database_name=@databaseName, 
 												@output_file_name=@logFileLocation, 
-			@flags=6
+												@flags=6
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
+	---------------------------------------------------------------------------------------------------
+	SET @queryToRun=N'/* only for SQL versions +2K5 */'	 
+	IF @SQLMajorVersion > 8
+		SET @queryToRun=N'DECLARE @databaseName [sysname]
+	begin
+		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
+									FROM master.dbo.sysdatabases
+									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
+											AND [status] <> 0
+											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
+													 WHEN [status] & 64 = 64 THEN ''PRE RECOVERY''
+													 WHEN [status] & 128 = 128 THEN ''RECOVERING''
+													 WHEN [status] & 256 = 256 THEN ''NOT RECOVERED''
+													 WHEN [status] & 512 = 512 THEN ''OFFLINE''
+													 WHEN [status] & 2097152 = 2097152 THEN ''STANDBY''
+													 WHEN [status] & 1024 = 1024 THEN ''READ ONLY''
+													 WHEN [status] & 2048 = 2048 THEN ''DBO USE ONLY''
+													 WHEN [status] & 4096 = 4096 THEN ''SINGLE USER''
+													 WHEN [status] & 32768 = 32768 THEN ''EMERGENCY MODE''
+													 WHEN [status] & 4194584 = 4194584 THEN ''SUSPECT''
+													 ELSE ''ONLINE''
+												END = ''ONLINE''
+		OPEN crsDatabases
+		FETCH NEXT FROM crsDatabases INTO @databaseName
+		WHILE @@FETCH_STATUS=0
+			begin
+				EXEC [dbo].[usp_mpDatabaseOptimize]			@SQLServerName			= @@SERVERNAME,
+															@DBName					= @databaseName,
+															@TableSchema			= ''%'',
+															@TableName				= ''%'',
+															@flgActions				= 16,
+															@flgOptions				= DEFAULT,
+															@DefragIndexThreshold	= DEFAULT,
+															@RebuildIndexThreshold	= DEFAULT,
+															@DebugMode				= DEFAULT
+				
+				FETCH NEXT FROM crsDatabases INTO @databaseName
+			end
+		CLOSE crsDatabases
+		DEALLOCATE crsDatabases
+	end'
+
+	IF @SQLMajorVersion > 8
+		begin
+			SET @failedJobStep   = 8
+			SET @failedJobAction = 4
+		end
+
+	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
+												@step_name=N'Daily: Rebuild Heap Tables', 
+												@step_id=7, 
+												@cmdexec_success_code=0, 
+												@on_success_action=@successJobAction, 
+												@on_success_step_id=@successJobStep, 
+												@on_fail_action=@failedJobAction, 
+												@on_fail_step_id=@failedJobStep, 
+												@retry_attempts=0, 
+												@retry_interval=0, 
+												@os_run_priority=0, 
+												@subsystem=N'TSQL', 
+												@command=@queryToRun, 
+												@database_name=@databaseName, 
+												@output_file_name=@logFileLocation, 
+												@flags=6
+	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+	
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 	begin
@@ -506,72 +572,6 @@ IF DATEPART(dw, GETUTCDATE())=2
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Daily: Rebuild or Reorganize Indexes', 
-												@step_id=7, 
-												@cmdexec_success_code=0, 
-												@on_success_action=@successJobAction, 
-												@on_success_step_id=@successJobStep, 
-												@on_fail_action=@failedJobAction, 
-												@on_fail_step_id=@failedJobStep, 
-												@retry_attempts=0, 
-												@retry_interval=0, 
-												@os_run_priority=0, 
-												@subsystem=N'TSQL', 
-												@command=@queryToRun, 
-												@database_name=@databaseName, 
-												@output_file_name=@logFileLocation, 
-												@flags=6
-	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
-
-	---------------------------------------------------------------------------------------------------
-	SET @queryToRun=N'/* only for SQL versions +2K5 */'	 
-	IF @SQLMajorVersion > 8
-		SET @queryToRun=N'DECLARE @databaseName [sysname]
-	begin
-		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM master.dbo.sysdatabases
-									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
-											AND [status] <> 0
-											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
-													 WHEN [status] & 64 = 64 THEN ''PRE RECOVERY''
-													 WHEN [status] & 128 = 128 THEN ''RECOVERING''
-													 WHEN [status] & 256 = 256 THEN ''NOT RECOVERED''
-													 WHEN [status] & 512 = 512 THEN ''OFFLINE''
-													 WHEN [status] & 2097152 = 2097152 THEN ''STANDBY''
-													 WHEN [status] & 1024 = 1024 THEN ''READ ONLY''
-													 WHEN [status] & 2048 = 2048 THEN ''DBO USE ONLY''
-													 WHEN [status] & 4096 = 4096 THEN ''SINGLE USER''
-													 WHEN [status] & 32768 = 32768 THEN ''EMERGENCY MODE''
-													 WHEN [status] & 4194584 = 4194584 THEN ''SUSPECT''
-													 ELSE ''ONLINE''
-												END = ''ONLINE''
-		OPEN crsDatabases
-		FETCH NEXT FROM crsDatabases INTO @databaseName
-		WHILE @@FETCH_STATUS=0
-			begin
-				EXEC [dbo].[usp_mpDatabaseOptimize]			@SQLServerName			= @@SERVERNAME,
-															@DBName					= @databaseName,
-															@TableSchema			= ''%'',
-															@TableName				= ''%'',
-															@flgActions				= 16,
-															@flgOptions				= DEFAULT,
-															@DefragIndexThreshold	= DEFAULT,
-															@RebuildIndexThreshold	= DEFAULT,
-															@DebugMode				= DEFAULT
-				
-				FETCH NEXT FROM crsDatabases INTO @databaseName
-			end
-		CLOSE crsDatabases
-		DEALLOCATE crsDatabases
-	end'
-
-	IF @SQLMajorVersion > 8
-		begin
-			SET @failedJobStep   = 9
-			SET @failedJobAction = 4
-		end
-
-	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
-												@step_name=N'Daily: Rebuild Heap Tables', 
 												@step_id=8, 
 												@cmdexec_success_code=0, 
 												@on_success_action=@successJobAction, 
@@ -587,6 +587,7 @@ IF DATEPART(dw, GETUTCDATE())=2
 												@output_file_name=@logFileLocation, 
 												@flags=6
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+
 	
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'DECLARE @databaseName [sysname]

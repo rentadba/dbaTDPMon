@@ -278,3 +278,6 @@
 	- move errorlog messages hardcoded filters to table dbo.catalogHardcodedFilters
 	- add module column to dbo.appConfigurations and dbo.reportHTMLOptions tables
 	- support for collecting OS events for Application, System and Setup logs (dbo.usp_hcCollectOSEventLogs)
+
+/* 08.09.2015 */
+	- optimize flow when rebuilding heaps and also doing index maintenance to avoid multiple operations on indexes

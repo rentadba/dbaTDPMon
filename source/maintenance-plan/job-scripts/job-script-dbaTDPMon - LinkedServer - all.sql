@@ -12,7 +12,7 @@
 -------------------------------------------------------------------------------
 USE [dbaTDPMon]
 GO
-EXEC dbo.usp_addLinkedSQLServer'ANDREI-LAB\TST2012'
+EXEC dbo.usp_addLinkedSQLServer'$(linkedServerName)'
 GO
 
 USE [msdb]
@@ -41,8 +41,8 @@ IF @logFileLocation IS NULL SET @logFileLocation =N'C:\'
 ---------------------------------------------------------------------------------------------------
 /* setting the job name & job log location */
 ---------------------------------------------------------------------------------------------------
-SET @databaseName = N'dbaTDPMon'
-SET @job_name = @databaseName + N' - Database Backup - Full and Diff - [ANDREI-LAB\TST2012]'
+SET @databaseName = N'$(dbName)'
+SET @job_name = @databaseName + N' - Database Backup - Full and Diff - [$(linkedServerName)]'
 SET @logFileLocation = @logFileLocation + N'job-' + REPLACE(@job_name, '\', '-') + N'.log'
 
 ---------------------------------------------------------------------------------------------------
@@ -111,13 +111,13 @@ BEGIN TRANSACTION
 IF DATEPART(dw, GETUTCDATE())=7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM [ANDREI-LAB\TST2012].master.dbo.sysdatabases
+									FROM [$(linkedServerName)].master.dbo.sysdatabases
 									WHERE [name] IN (''master'', ''model'', ''msdb'')
 		OPEN crsDatabases
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseBackup]	@sqlServerName		= ''ANDREI-LAB\TST2012'',
+				EXEC [dbo].[usp_mpDatabaseBackup]	@sqlServerName		= ''$(linkedServerName)'',
 													@dbName				= @databaseName,
 													@backupLocation		= DEFAULT,
 													@flgActions			= 1,	
@@ -169,13 +169,13 @@ IF DATEPART(dw, GETUTCDATE())=7
 IF DATEPART(dw, GETUTCDATE())<>7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM [ANDREI-LAB\TST2012].master.dbo.sysdatabases
+									FROM [$(linkedServerName)].master.dbo.sysdatabases
 									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
 		OPEN crsDatabases
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseBackup]	@sqlServerName		= ''ANDREI-LAB\TST2012'',
+				EXEC [dbo].[usp_mpDatabaseBackup]	@sqlServerName		= ''$(linkedServerName)'',
 													@dbName				= @databaseName,
 													@backupLocation		= DEFAULT,
 													@flgActions			= 2,	
@@ -229,13 +229,13 @@ IF DATEPART(dw, GETUTCDATE())<>7
 IF DATEPART(dw, GETUTCDATE())=7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM [ANDREI-LAB\TST2012].master.dbo.sysdatabases
+									FROM [$(linkedServerName)].master.dbo.sysdatabases
 									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
 		OPEN crsDatabases
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseBackup]	@sqlServerName		= ''ANDREI-LAB\TST2012'',
+				EXEC [dbo].[usp_mpDatabaseBackup]	@sqlServerName		= ''$(linkedServerName)'',
 													@dbName				= @databaseName,
 													@backupLocation		= DEFAULT,
 													@flgActions			= 1,	
@@ -371,7 +371,7 @@ IF @logFileLocation IS NULL SET @logFileLocation =N'C:\'
 /* setting the job name & job log location */
 ---------------------------------------------------------------------------------------------------
 SET @databaseName = N'dbaTDPMon'
-SET @job_name = @databaseName + N' - Database Backup - Log [ANDREI-LAB\TST2012]'
+SET @job_name = @databaseName + N' - Database Backup - Log [$(linkedServerName)]'
 SET @logFileLocation = @logFileLocation + N'job-' + REPLACE(@job_name, '\', '-') + N'.log'
 
 ---------------------------------------------------------------------------------------------------
@@ -436,13 +436,13 @@ BEGIN TRANSACTION
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM [ANDREI-LAB\TST2012].master.dbo.sysdatabases
+									FROM [$(linkedServerName)].master.dbo.sysdatabases
 									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
 		OPEN crsDatabases
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseBackup]	@sqlServerName		= ''ANDREI-LAB\TST2012'',
+				EXEC [dbo].[usp_mpDatabaseBackup]	@sqlServerName		= ''$(linkedServerName)'',
 													@dbName				= @databaseName,
 													@backupLocation		= DEFAULT,
 													@flgActions			= 4,	
@@ -591,7 +591,7 @@ IF @logFileLocation IS NULL SET @logFileLocation =N'C:\'
 /* setting the job name & job log location */
 ---------------------------------------------------------------------------------------------------
 SET @databaseName = N'dbaTDPMon'
-SET @job_name = @databaseName + N' - Database Maintenance - System DBs [ANDREI-LAB\TST2012]'
+SET @job_name = @databaseName + N' - Database Maintenance - System DBs [$(linkedServerName)]'
 SET @logFileLocation = @logFileLocation + N'job-' + REPLACE(@job_name, '\', '-') + N'.log'
 
 
@@ -658,7 +658,7 @@ BEGIN TRANSACTION
 	SET @queryToRun = N'
 /* on the 1st of each month */
 IF (DAY(GETDATE())=1)
-	EXEC [ANDREI-LAB\TST2012].master.dbo.sp_cycle_errorlog'
+	EXEC [$(linkedServerName)].master.dbo.sp_cycle_errorlog'
 
 	IF @SQLMajorVersion > 8
 		begin
@@ -688,7 +688,7 @@ IF (DAY(GETDATE())=1)
 	SET @queryToRun = N'
 /* only once a week on Saturday */
 IF DATEPART(dw, GETUTCDATE())=7
-	EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''ANDREI-LAB\TST2012'',
+	EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''$(linkedServerName)'',
 												@dbName					= ''master'',
 												@tableSchema			= ''%'',
 												@tableName				= ''%'',
@@ -724,7 +724,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 	SET @queryToRun = N'
 /* only once a week on Saturday */
 IF DATEPART(dw, GETUTCDATE())=7
-	EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''ANDREI-LAB\TST2012'',
+	EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''$(linkedServerName)'',
 												@dbName					= ''msdb'',
 												@tableSchema			= ''%'',
 												@tableName				= ''%'',
@@ -761,7 +761,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 	SET @queryToRun = N'
 /* only once a week on Saturday */
 IF DATEPART(dw, GETUTCDATE())=7
-	EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''ANDREI-LAB\TST2012'',
+	EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''$(linkedServerName)'',
 												@dbName					= ''model'',
 												@tableSchema			= ''%'',
 												@tableName				= ''%'',
@@ -797,7 +797,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 	SET @queryToRun = N'
 /* only once a week on Saturday */
 IF DATEPART(dw, GETUTCDATE())=7
-	EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''ANDREI-LAB\TST2012'',
+	EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''$(linkedServerName)'',
 												@dbName					= ''tempdb'',
 												@tableSchema			= ''%'',
 												@tableName				= ''%'',
@@ -995,7 +995,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 	SET @queryToRun = '
 /* only once a week on Sunday */
 IF DATEPART(dw, GETUTCDATE())=1
-	EXEC [dbo].[usp_mpDatabaseOptimize]		@SQLServerName			= ''ANDREI-LAB\TST2012'',
+	EXEC [dbo].[usp_mpDatabaseOptimize]		@SQLServerName			= ''$(linkedServerName)'',
 											@DBName					= ''master'',
 											@TableSchema			= ''%'',
 											@TableName				= ''%'',
@@ -1037,7 +1037,7 @@ IF DATEPART(dw, GETUTCDATE())=1
 	SET @queryToRun = '
 /* only once a week on Sunday */
 IF DATEPART(dw, GETUTCDATE())=1
-	EXEC [dbo].[usp_mpDatabaseOptimize]		@SQLServerName			= ''ANDREI-LAB\TST2012'',
+	EXEC [dbo].[usp_mpDatabaseOptimize]		@SQLServerName			= ''$(linkedServerName)'',
 											@DBName					= ''msdb'',
 											@TableSchema			= ''%'',
 											@TableName				= ''%'',
@@ -1082,7 +1082,7 @@ IF DATEPART(dw, GETUTCDATE())=1
 IF DATEPART(dw, GETUTCDATE())= 2
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM [ANDREI-LAB\TST2012].master.dbo.sysdatabases
+									FROM [$(linkedServerName)].master.dbo.sysdatabases
 									WHERE [name] IN (''master'', ''model'', ''msdb'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
@@ -1101,7 +1101,7 @@ IF DATEPART(dw, GETUTCDATE())= 2
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseShrink]	@SQLServerName		= ''ANDREI-LAB\TST2012'',
+				EXEC [dbo].[usp_mpDatabaseShrink]	@SQLServerName		= ''$(linkedServerName)'',
 													@DBName				= @databaseName,
 													@flgActions			= 2,	
 													@flgOptions			= 1,
@@ -1144,7 +1144,7 @@ IF DATEPART(dw, GETUTCDATE())= 2
 IF DATEPART(dw, GETUTCDATE())=7 AND DATEPART(dd, GETUTCDATE())<=7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM [ANDREI-LAB\TST2012].master.dbo.sysdatabases
+									FROM [$(linkedServerName)].master.dbo.sysdatabases
 									WHERE [name] IN (''master'', ''model'', ''msdb'', ''tempdb'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
@@ -1163,7 +1163,7 @@ IF DATEPART(dw, GETUTCDATE())=7 AND DATEPART(dd, GETUTCDATE())<=7
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseShrink]	@SQLServerName		= ''ANDREI-LAB\TST2012'',
+				EXEC [dbo].[usp_mpDatabaseShrink]	@SQLServerName		= ''$(linkedServerName)'',
 													@DBName				= @databaseName,
 													@flgActions			= 1,	
 													@flgOptions			= 0,
@@ -1338,7 +1338,7 @@ IF @logFileLocation IS NULL SET @logFileLocation =N'C:\'
 /* setting the job name & job log location */
 ---------------------------------------------------------------------------------------------------
 SET @databaseName = N'dbaTDPMon'
-SET @job_name = @databaseName + N' - Database Maintenance - User DBs [ANDREI-LAB\TST2012]'
+SET @job_name = @databaseName + N' - Database Maintenance - User DBs [$(linkedServerName)]'
 SET @logFileLocation = @logFileLocation + N'job-' + REPLACE(@job_name, '\', '-') + N'.log'
 
 ---------------------------------------------------------------------------------------------------
@@ -1403,7 +1403,7 @@ BEGIN TRANSACTION
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'/* only for SQL versions +2K5 */'	 
 	IF @SQLMajorVersion > 8
-		SET @queryToRun=N'EXEC [dbo].[usp_mpDatabaseKillConnections]	@SQLServerName		= ''ANDREI-LAB\TST2012'',
+		SET @queryToRun=N'EXEC [dbo].[usp_mpDatabaseKillConnections]	@SQLServerName		= ''$(linkedServerName)'',
 						@DBName		= DEFAULT,
 						@flgOptions		= DEFAULT,
 						@DebugMode		= DEFAULT'
@@ -1436,7 +1436,7 @@ BEGIN TRANSACTION
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM [ANDREI-LAB\TST2012].master.dbo.sysdatabases
+									FROM [$(linkedServerName)].master.dbo.sysdatabases
 									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
@@ -1454,7 +1454,7 @@ BEGIN TRANSACTION
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''ANDREI-LAB\TST2012'',
+				EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''$(linkedServerName)'',
 															@dbName					= @databaseName,
 															@tableSchema			= ''%'',
 															@tableName				= ''%'',
@@ -1498,7 +1498,7 @@ BEGIN TRANSACTION
 IF DATEPART(dw, GETUTCDATE())=1
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM [ANDREI-LAB\TST2012].master.dbo.sysdatabases
+									FROM [$(linkedServerName)].master.dbo.sysdatabases
 									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
@@ -1516,7 +1516,7 @@ IF DATEPART(dw, GETUTCDATE())=1
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''ANDREI-LAB\TST2012'',
+				EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''$(linkedServerName)'',
 															@dbName					= @databaseName,
 															@tableSchema			= ''%'',
 															@tableName				= ''%'',
@@ -1560,7 +1560,7 @@ IF DATEPART(dw, GETUTCDATE())=1
 IF DATEPART(dw, GETUTCDATE())=1
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM [ANDREI-LAB\TST2012].master.dbo.sysdatabases
+									FROM [$(linkedServerName)].master.dbo.sysdatabases
 									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
@@ -1578,7 +1578,7 @@ IF DATEPART(dw, GETUTCDATE())=1
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''ANDREI-LAB\TST2012'',
+				EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''$(linkedServerName)'',
 															@dbName					= @databaseName,
 															@tableSchema			= ''%'',
 															@tableName				= ''%'',
@@ -1622,7 +1622,7 @@ IF DATEPART(dw, GETUTCDATE())=1
 IF DATEPART(dw, GETUTCDATE())=7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM [ANDREI-LAB\TST2012].master.dbo.sysdatabases
+									FROM [$(linkedServerName)].master.dbo.sysdatabases
 									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
@@ -1640,7 +1640,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''ANDREI-LAB\TST2012'',
+				EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''$(linkedServerName)'',
 															@dbName					= @databaseName,
 															@tableSchema			= ''%'',
 															@tableName				= ''%'',
@@ -1684,7 +1684,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 IF DATEPART(dw, GETUTCDATE())=2
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM [ANDREI-LAB\TST2012].master.dbo.sysdatabases
+									FROM [$(linkedServerName)].master.dbo.sysdatabases
 									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
@@ -1702,7 +1702,7 @@ IF DATEPART(dw, GETUTCDATE())=2
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''ANDREI-LAB\TST2012'',
+				EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= ''$(linkedServerName)'',
 															@dbName					= @databaseName,
 															@tableSchema			= ''%'',
 															@tableName				= ''%'',
@@ -1741,10 +1741,74 @@ IF DATEPART(dw, GETUTCDATE())=2
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
+	SET @queryToRun=N'/* only for SQL versions +2K5 */'	 
+	IF @SQLMajorVersion > 8
+		SET @queryToRun=N'DECLARE @databaseName [sysname]
+	begin
+		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
+									FROM [$(linkedServerName)].master.dbo.sysdatabases
+									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
+											AND [status] <> 0
+											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
+													 WHEN [status] & 128 = 128 THEN ''RECOVERING''
+													 WHEN [status] & 256 = 256 THEN ''NOT RECOVERED''
+													 WHEN [status] & 512 = 512 THEN ''OFFLINE''
+													 WHEN [status] & 2097152 = 2097152 THEN ''STANDBY''
+													 WHEN [status] & 1024 = 1024 THEN ''READ ONLY''
+													 WHEN [status] & 4096 = 4096 THEN ''SINGLE USER''
+													 WHEN [status] & 32768 = 32768 THEN ''EMERGENCY MODE''
+													 WHEN [status] & 4194584 = 4194584 THEN ''SUSPECT''
+													 ELSE ''ONLINE''
+												END = ''ONLINE''
+		OPEN crsDatabases
+		FETCH NEXT FROM crsDatabases INTO @databaseName
+		WHILE @@FETCH_STATUS=0
+			begin
+				EXEC [dbo].[usp_mpDatabaseOptimize]			@SQLServerName			= ''$(linkedServerName)'',
+															@DBName					= @databaseName,
+															@TableSchema			= ''%'',
+															@TableName				= ''%'',
+															@flgActions				= 16,
+															@flgOptions				= DEFAULT,
+															@DefragIndexThreshold	= DEFAULT,
+															@RebuildIndexThreshold	= DEFAULT,
+															@DebugMode				= DEFAULT
+				
+				FETCH NEXT FROM crsDatabases INTO @databaseName
+			end
+		CLOSE crsDatabases
+		DEALLOCATE crsDatabases
+	end'
+
+	IF @SQLMajorVersion > 8
+		begin
+			SET @failedJobStep   = 8
+			SET @failedJobAction = 4
+		end
+
+	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
+												@step_name=N'Daily: Rebuild Heap Tables', 
+												@step_id=7, 
+												@cmdexec_success_code=0, 
+												@on_success_action=@successJobAction, 
+												@on_success_step_id=@successJobStep, 
+												@on_fail_action=@failedJobAction, 
+												@on_fail_step_id=@failedJobStep, 
+												@retry_attempts=0, 
+												@retry_interval=0, 
+												@os_run_priority=0, 
+												@subsystem=N'TSQL', 
+												@command=@queryToRun, 
+												@database_name=@databaseName, 
+												@output_file_name=@logFileLocation, 
+												@flags=6
+	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+	
+	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM [ANDREI-LAB\TST2012].master.dbo.sysdatabases
+									FROM [$(linkedServerName)].master.dbo.sysdatabases
 									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')	
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
@@ -1762,7 +1826,7 @@ IF DATEPART(dw, GETUTCDATE())=2
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseOptimize]			@SQLServerName			= ''ANDREI-LAB\TST2012'',
+				EXEC [dbo].[usp_mpDatabaseOptimize]			@SQLServerName			= ''$(linkedServerName)'',
 															@DBName					= @databaseName,
 															@TableSchema			= ''%'',
 															@TableName				= ''%'',
@@ -1786,70 +1850,6 @@ IF DATEPART(dw, GETUTCDATE())=2
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Daily: Rebuild or Reorganize Indexes', 
-												@step_id=7, 
-												@cmdexec_success_code=0, 
-												@on_success_action=@successJobAction, 
-												@on_success_step_id=@successJobStep, 
-												@on_fail_action=@failedJobAction, 
-												@on_fail_step_id=@failedJobStep, 
-												@retry_attempts=0, 
-												@retry_interval=0, 
-												@os_run_priority=0, 
-												@subsystem=N'TSQL', 
-												@command=@queryToRun, 
-												@database_name=@databaseName, 
-												@output_file_name=@logFileLocation, 
-												@flags=6
-	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
-
-	---------------------------------------------------------------------------------------------------
-	SET @queryToRun=N'/* only for SQL versions +2K5 */'	 
-	IF @SQLMajorVersion > 8
-		SET @queryToRun=N'DECLARE @databaseName [sysname]
-	begin
-		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM [ANDREI-LAB\TST2012].master.dbo.sysdatabases
-									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
-											AND [status] <> 0
-											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
-													 WHEN [status] & 128 = 128 THEN ''RECOVERING''
-													 WHEN [status] & 256 = 256 THEN ''NOT RECOVERED''
-													 WHEN [status] & 512 = 512 THEN ''OFFLINE''
-													 WHEN [status] & 2097152 = 2097152 THEN ''STANDBY''
-													 WHEN [status] & 1024 = 1024 THEN ''READ ONLY''
-													 WHEN [status] & 4096 = 4096 THEN ''SINGLE USER''
-													 WHEN [status] & 32768 = 32768 THEN ''EMERGENCY MODE''
-													 WHEN [status] & 4194584 = 4194584 THEN ''SUSPECT''
-													 ELSE ''ONLINE''
-												END = ''ONLINE''
-		OPEN crsDatabases
-		FETCH NEXT FROM crsDatabases INTO @databaseName
-		WHILE @@FETCH_STATUS=0
-			begin
-				EXEC [dbo].[usp_mpDatabaseOptimize]			@SQLServerName			= ''ANDREI-LAB\TST2012'',
-															@DBName					= @databaseName,
-															@TableSchema			= ''%'',
-															@TableName				= ''%'',
-															@flgActions				= 16,
-															@flgOptions				= DEFAULT,
-															@DefragIndexThreshold	= DEFAULT,
-															@RebuildIndexThreshold	= DEFAULT,
-															@DebugMode				= DEFAULT
-				
-				FETCH NEXT FROM crsDatabases INTO @databaseName
-			end
-		CLOSE crsDatabases
-		DEALLOCATE crsDatabases
-	end'
-
-	IF @SQLMajorVersion > 8
-		begin
-			SET @failedJobStep   = 9
-			SET @failedJobAction = 4
-		end
-
-	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
-												@step_name=N'Daily: Rebuild Heap Tables', 
 												@step_id=8, 
 												@cmdexec_success_code=0, 
 												@on_success_action=@successJobAction, 
@@ -1865,12 +1865,12 @@ IF DATEPART(dw, GETUTCDATE())=2
 												@output_file_name=@logFileLocation, 
 												@flags=6
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
-	
+
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM [ANDREI-LAB\TST2012].master.dbo.sysdatabases
+									FROM [$(linkedServerName)].master.dbo.sysdatabases
 									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
@@ -1888,7 +1888,7 @@ IF DATEPART(dw, GETUTCDATE())=2
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseOptimize]			@SQLServerName			= ''ANDREI-LAB\TST2012'',
+				EXEC [dbo].[usp_mpDatabaseOptimize]			@SQLServerName			= ''$(linkedServerName)'',
 															@DBName					= @databaseName,
 															@TableSchema			= ''%'',
 															@TableName				= ''%'',
@@ -1935,7 +1935,7 @@ IF DATEPART(dw, GETUTCDATE())=2
 IF DATEPART(dw, GETUTCDATE())= 2
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM [ANDREI-LAB\TST2012].master.dbo.sysdatabases
+									FROM [$(linkedServerName)].master.dbo.sysdatabases
 									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
@@ -1953,7 +1953,7 @@ IF DATEPART(dw, GETUTCDATE())= 2
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseShrink]	@SQLServerName		= ''ANDREI-LAB\TST2012'',
+				EXEC [dbo].[usp_mpDatabaseShrink]	@SQLServerName		= ''$(linkedServerName)'',
 													@DBName				= @databaseName,
 													@flgActions			= 2,	
 													@flgOptions			= 1,
@@ -1996,7 +1996,7 @@ IF DATEPART(dw, GETUTCDATE())= 2
 IF DATEPART(dw, GETUTCDATE())=7 AND DATEPART(dd, GETUTCDATE())<=7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
-									FROM [ANDREI-LAB\TST2012].master.dbo.sysdatabases
+									FROM [$(linkedServerName)].master.dbo.sysdatabases
 									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
@@ -2014,7 +2014,7 @@ IF DATEPART(dw, GETUTCDATE())=7 AND DATEPART(dd, GETUTCDATE())<=7
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseShrink]	@SQLServerName		= ''ANDREI-LAB\TST2012'',
+				EXEC [dbo].[usp_mpDatabaseShrink]	@SQLServerName		= ''$(linkedServerName)'',
 													@DBName				= @databaseName,
 													@flgActions			= 1,	
 													@flgOptions			= 0,
