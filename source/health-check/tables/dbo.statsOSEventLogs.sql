@@ -32,7 +32,7 @@ CREATE TABLE [dbo].[statsOSEventLogs]
 	[thread_id]				[int]				NULL,
 	[machine_name]			[sysname]			NULL,
 	[user_id]				[nvarchar](256)		NULL,
-	[time_created]			[datetime]			NULL,
+	[time_created]			[varchar](32)		NULL,
 	[message] 				[nvarchar](max)		NULL
 	CONSTRAINT [PK_statsOSEventLogs] PRIMARY KEY  CLUSTERED 
 	(

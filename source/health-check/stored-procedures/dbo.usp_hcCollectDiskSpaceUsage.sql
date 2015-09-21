@@ -172,7 +172,7 @@ WHERE cin.[project_id] = @projectID
 		AND lsam.[descriptor]='dbo.usp_hcCollectDiskSpaceUsage'
 
 -------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Step 2: Get Database Details Information....', 10, 1) WITH NOWAIT
+RAISERROR('--Step 2: Get Instance Details Information....', 10, 1) WITH NOWAIT
 		
 DECLARE crsActiveInstances CURSOR LOCAL FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
 												FROM	[dbo].[vw_catalogInstanceNames] cin

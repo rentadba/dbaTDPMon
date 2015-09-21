@@ -61,7 +61,8 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 		  SELECT 'health-check'		AS [module], 'Collect SQL Agent jobs step details'											AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'health-check'		AS [module], 'Collect Information OS Events'												AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'health-check'		AS [module], 'Collect OS Events timeout (seconds)'											AS [name], '600'		AS [value]		UNION ALL
-		  SELECT 'health-check'		AS [module], 'Collect OS Events from last hours'											AS [name], '24'			AS [value]
+		  SELECT 'health-check'		AS [module], 'Collect OS Events from last hours'											AS [name], '24'			AS [value]		UNION ALL
+		  SELECT 'health-check'		AS [module], 'Parallel Data Collecting Jobs'												AS [name], '10'			AS [value]
 GO
 
 ---------------------------------------------------------------------------------------------

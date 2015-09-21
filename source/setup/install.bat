@@ -109,6 +109,9 @@ if errorlevel 1 goto install_err
 if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.catalogHardcodedFilters.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.jobExecutionQueue.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 
 sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_catalogInstanceNames.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
@@ -121,6 +124,10 @@ if errorlevel 1 goto install_err
 
 if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_logServerAnalysisMessages.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
+
+if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionQueue.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 
 
 echo *-----------------------------------------------------------------------------*

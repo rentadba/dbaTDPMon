@@ -378,7 +378,29 @@ WHILE @@FETCH_STATUS=0
 				SET @strMessage=N'analyzing data...'
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
 
-				--IF @debugMode=1 SELECT * FROM #psOutput 
+				IF @debugMode=1 
+					SELECT * FROM #psOutput 
+				IF @debugMode=1 
+					SELECT    @instanceID, @projectID, @machineID, GETUTCDATE(), @psLogTypeID
+							, [Id] AS [EventID], [Level], [RecordId], [Task] AS [Category], [TaskDisplayName] AS [CategoryName]
+							, [ProviderName] AS [Source]
+							, [ProcessId], [ThreadId], [MachineName], [UserId], [TimeCreated], [Message]
+					FROM (
+							SELECT [value], [attribute], [unique_object] AS [idX]
+							FROM (
+									SELECT	[property].value('(./text())[1]', 'Varchar(1024)') AS [value],
+											[property].value('@Name', 'Varchar(1024)') AS [attribute],
+											DENSE_RANK() OVER (ORDER BY [object]) AS unique_object
+									FROM @eventLogXML.nodes('Objects/Object') AS b ([object])
+									CROSS APPLY b.object.nodes('./Property') AS c (property)
+								)X
+							WHERE [attribute] IN ('Id', 'Level', 'RecordId', 'Task', 'TaskDisplayName', 'ProviderName', 'LogName', 'ProcessId', 'ThreadId', 'MachineName', 'UserId', 'TimeCreated', 'LevelDisplayName', 'Message')
+						)P
+					PIVOT
+						(
+							MAX([value])
+							FOR [attribute] IN ([Id], [Level], [RecordId], [Task], [TaskDisplayName], [ProviderName], [LogName], [ProcessId], [ThreadId], [MachineName], [UserId], [TimeCreated], [LevelDisplayName], [Message])
+						)pvt
 
 				IF	EXISTS (SELECT * FROM #psOutput WHERE [xml] LIKE '%Objects%')
 					AND NOT EXISTS(SELECT * FROM #psOutput WHERE [xml] LIKE '%No events were found that match the specified selection criteria%')
