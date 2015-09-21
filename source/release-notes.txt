@@ -281,3 +281,6 @@
 
 /* 08.09.2015 */
 	- optimize flow when rebuilding heaps and also doing index maintenance to avoid multiple operations on indexes
+
+/* 21.09.2015 */
+	- fixed small bug (incorrect index type reported) on xml logging in maintenance-plan module

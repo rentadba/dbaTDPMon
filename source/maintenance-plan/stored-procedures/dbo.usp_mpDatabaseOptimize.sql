@@ -873,7 +873,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 				SET @queryToRun=N'[' + @CurrentTableSchema+ '].[' + @CurrentTableName + ']'
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
-				DECLARE crsIndexesToDegfragment CURSOR FOR 	SELECT	DISTINCT doil.[index_name], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[object_id], doil.[index_id], doil.[page_density_deviation], doil.[fill_factor] 
+				DECLARE crsIndexesToDegfragment CURSOR FOR 	SELECT	DISTINCT doil.[index_name], doil.[index_type], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[object_id], doil.[index_id], doil.[page_density_deviation], doil.[fill_factor]
 							   								FROM	#databaseObjectsWithIndexList doil
    															WHERE	doil.[table_name] = @CurrentTableName
 																	AND doil.[table_schema] = @CurrentTableSchema
@@ -905,7 +905,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 																		)																		
 															ORDER BY doil.[index_id]
 				OPEN crsIndexesToDegfragment
-				FETCH NEXT FROM crsIndexesToDegfragment INTO @IndexName, @CurrentFragmentation, @CurrentPageCount, @ObjectID, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor
+				FETCH NEXT FROM crsIndexesToDegfragment INTO @IndexName, @IndexType, @CurrentFragmentation, @CurrentPageCount, @ObjectID, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor
 				WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 					begin
 						SET @IndexTypeDesc=CASE @IndexType	WHEN 0 THEN 'Heap' 
@@ -980,7 +980,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 																				@debugMode		= @DebugMode
 
 							end
-	   					FETCH NEXT FROM crsIndexesToDegfragment INTO @IndexName, @CurrentFragmentation, @CurrentPageCount, @ObjectID, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor
+	   					FETCH NEXT FROM crsIndexesToDegfragment INTO @IndexName, @IndexType, @CurrentFragmentation, @CurrentPageCount, @ObjectID, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor
 					end		
 				CLOSE crsIndexesToDegfragment
 				DEALLOCATE crsIndexesToDegfragment
