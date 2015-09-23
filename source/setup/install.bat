@@ -205,6 +205,12 @@ if errorlevel 1 goto install_err
 if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_sqlAgentJobStartAndWatch.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_JobQueueGetStatus.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_JobQueueExecute.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_refreshMachineCatalogs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -288,6 +294,9 @@ sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_r
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcChangeFillFactorForIndexesFrequentlyFragmented.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcJobQueueCreate.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 

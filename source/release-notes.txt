@@ -284,3 +284,6 @@
 
 /* 21.09.2015 */
 	- fixed small bug (incorrect index type reported) on xml logging in maintenance-plan module
+
+/* 23.09.2015 */
+	- add support for internal parallellsm (defining and running multiple SQL Agent jobs, number limited by a configuration value)

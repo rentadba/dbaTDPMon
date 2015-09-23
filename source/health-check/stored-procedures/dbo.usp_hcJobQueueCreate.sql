@@ -25,7 +25,7 @@ AS
 -- Create date		 : 21.09.2015
 -- Module			 : Database Analysis & Performance Monitoring
 -- ============================================================================
---SET NOCOUNT ON
+SET NOCOUNT ON
 
 DECLARE   @codeDescriptor		[varchar](260)
 		, @strMessage			[varchar](1024)
