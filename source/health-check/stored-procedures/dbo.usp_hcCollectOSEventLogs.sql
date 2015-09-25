@@ -40,7 +40,8 @@ DECLARE   @eventDescriptor				[varchar](256)
 		, @machineID					[smallint]
 		, @machineName					[nvarchar](512)
 		, @instanceName					[sysname]
-		, @logFileLocation				[nvarchar](512)
+		, @psFileLocation				[nvarchar](260)
+		, @psFileName					[nvarchar](260)
 		, @configEventsInLastHours		[smallint]
 		, @configEventsTimeOutSeconds	[int]
 		, @startTime					[datetime]
@@ -64,14 +65,12 @@ CREATE TABLE #psOutput
 	)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-SELECT @logFileLocation = REVERSE(SUBSTRING(REVERSE([value]), CHARINDEX('\', REVERSE([value])), LEN(REVERSE([value]))))
+SELECT @psFileLocation = REVERSE(SUBSTRING(REVERSE([value]), CHARINDEX('\', REVERSE([value])), LEN(REVERSE([value]))))
 FROM (
 		SELECT CAST(SERVERPROPERTY('ErrorLogFileName') AS [nvarchar](1024)) AS [value]
 	)er
-
-
-IF @logFileLocation IS NULL SET @logFileLocation =N'C:\'
-SET @logFileLocation = @logFileLocation + 'GetOSSystemEvents.ps1'
+	
+IF @psFileLocation IS NULL SET @psFileLocation =N'C:\'
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default project code
@@ -339,10 +338,11 @@ WHILE @@FETCH_STATUS=0
 				IF NOT (@optionXPIsAvailable=0 OR @optionXPValue=0)
 					begin
 						-- save powershell script
-						SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [message] FROM [' + DB_NAME() + '].[dbo].[logServerAnalysisMessages] WHERE [descriptor]=''''' + @eventDescriptor + ''''' AND [instance_id]=' + CAST(@instanceID AS [varchar]) + ' AND [project_id]=' + CAST(@projectID AS [varchar]) + '" queryout ' + @logFileLocation + ' -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'', no_output'
+						SET @psFileName = 'GetOSSystemEvents_' + REPLACE(@machineName, '\', '_') + '_' + @psLogTypeName + '.ps1'
+						SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [message] FROM [' + DB_NAME() + '].[dbo].[logServerAnalysisMessages] WHERE [descriptor]=''''' + @eventDescriptor + ''''' AND [instance_id]=' + CAST(@instanceID AS [varchar]) + ' AND [project_id]=' + CAST(@projectID AS [varchar]) + '" queryout ' + @psFileLocation + @psFileName + ' -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'', no_output'
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
 
-						EXEC (@queryToRun)
+						EXEC (@queryToRun) 
 					end
 
 				-------------------------------------------------------------------------------------------------------------------------
@@ -352,13 +352,30 @@ WHILE @@FETCH_STATUS=0
 						SET @strMessage=N'running powershell script - get OS events...'
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
 
-						SET @queryToRun='master.dbo.xp_cmdshell N''@PowerShell ' + @logFileLocation + ''''
+						SET @queryToRun='master.dbo.xp_cmdshell N''@PowerShell ' + @psFileLocation + @psFileName + ''''
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
 
 						TRUNCATE TABLE #psOutput
 						BEGIN TRY
 							INSERT	INTO #psOutput([xml])
 									EXEC (@queryToRun)
+						END TRY
+						BEGIN CATCH
+							SET @strMessage = ERROR_MESSAGE()
+							PRINT @strMessage
+			
+							INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+									SELECT  @instanceID
+											, @projectID
+											, GETUTCDATE()
+											, 'dbo.usp_hcCollectOSEventLogs'
+											, @strMessage
+						END CATCH
+
+						BEGIN TRY
+							SET @queryToRun=N'master.dbo.xp_cmdshell ''del "' + @psFileLocation + @psFileName + '"'', no_output'
+							IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
+							EXEC (@queryToRun) 
 						END TRY
 						BEGIN CATCH
 							SET @strMessage = ERROR_MESSAGE()

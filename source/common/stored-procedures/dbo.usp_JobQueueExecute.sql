@@ -95,7 +95,6 @@ WHERE  [project_id] = @projectID
 SET @strMessage='Number of jobs in the queue to be executed : ' + CAST(@jobQueueCount AS [varchar]) 
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-SET @executedJobs = 0
 SET @runningJobs  = 0
 
 ------------------------------------------------------------------------------------------------------------------------------------------
@@ -109,9 +108,9 @@ DECLARE crsJobQueue CURSOR FOR	SELECT  [id], [instance_name]
 								ORDER BY [id]
 OPEN crsJobQueue
 FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand
+SET @executedJobs = 1
 WHILE @@FETCH_STATUS=0
 	begin
-		SET @executedJobs = @executedJobs + 1
 		SET @strMessage='Executing job# : ' + CAST(@executedJobs AS [varchar]) + ' / ' + CAST(@jobQueueCount AS [varchar])
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
@@ -173,7 +172,10 @@ WHILE @@FETCH_STATUS=0
 														@debugMode				= @debugMode
 		---------------------------------------------------------------------------------------------------
 		IF @runningJobs < @jobQueueCount
-			FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand
+			begin
+				FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand
+				SET @executedJobs = @executedJobs + 1
+			end
 	end
 CLOSE crsJobQueue
 DEALLOCATE crsJobQueue

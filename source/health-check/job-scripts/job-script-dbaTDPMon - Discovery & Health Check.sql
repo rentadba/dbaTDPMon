@@ -66,7 +66,7 @@ BEGIN TRANSACTION
 											@notify_level_netsend=0, 
 											@notify_level_page=0, 
 											@delete_level=0, 
-											@description=N'SQL Server instance discovery and monitoring utils, part of tdpMon solution', 
+											@description=N'SQL Server instance discovery and monitoring utils, part of dbaTDPMon solution', 
 											@category_name=N'Database Maintenance', 
 											@owner_login_name=N'sa', 
 											@job_id = @jobId OUTPUT
@@ -99,13 +99,14 @@ BEGIN TRANSACTION
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'EXEC [dbo].[usp_hcCollectDatabaseDetails]	@projectCode		= ''' + @projectCode + N''',
-																	@sqlServerNameFilter= ''%'',
-																	@databaseNameFilter	= ''%'',
-																	@debugMode			= 0'
+	SET @queryToRun = N'EXEC [dbo].[usp_hcJobQueueCreate]	@projectCode			= ''' + @projectCode + N''',
+															@sqlServerNameFilter	= ''%'',
+															@collectorDescriptor	= ''%'',
+															@enableXPCMDSHELL		= 1,
+															@debugMode				= 0'
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
-												@step_name=N'Collect Database Status & Details', 
+												@step_name=N'Generate Data Collector Job Queue', 
 												@step_id=2, 
 												@cmdexec_success_code=0, 
 												@on_success_action=4, 
@@ -123,85 +124,15 @@ BEGIN TRANSACTION
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 	
 	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'EXEC [dbo].[usp_hcCollectSQLServerAgentJobsStatus]	@projectCode		= ''' + @projectCode + N''',
-																			@sqlServerNameFilter= ''%'',
-																			@jobNameFilter		= ''%'',
-																			@debugMode			= 0'
+	SET @queryToRun = N'exec dbo.usp_JobQueueExecute	@projectCode			= ''' + @projectCode + N''',
+														@moduleFilter			= ''%'',
+														@descriptorFilter		= ''%'',
+														@waitForDelay			= ''00:00:05'',
+														@debugMode				= 0'
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
-												@step_name=N'Collect SQL Server Agent job status', 
+												@step_name=N'Run Job Queue', 
 												@step_id=3, 
-												@cmdexec_success_code=0, 
-												@on_success_action=4, 
-												@on_success_step_id=4, 
-												@on_fail_action=2, 
-												@on_fail_step_id=0, 
-												@retry_attempts=0, 
-												@retry_interval=0, 
-												@os_run_priority=0, 
-												@subsystem=N'TSQL', 
-												@command=@queryToRun, 
-												@database_name=@databaseName, 
-												@output_file_name=@logFileLocation, 
-												@flags=2
-	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
-
-	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'EXEC [dbo].[usp_hcCollectDiskSpaceUsage]	@projectCode		= ''' + @projectCode + N''',
-																	@sqlServerNameFilter= ''%'',
-																	@enableXPCMDSHELL	= 1,
-																	@debugMode			= 0'
-
-	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
-												@step_name=N'Collect Disk Space Usage information', 
-												@step_id=4, 
-												@cmdexec_success_code=0, 
-												@on_success_action=4, 
-												@on_success_step_id=5, 
-												@on_fail_action=2, 
-												@on_fail_step_id=0, 
-												@retry_attempts=0, 
-												@retry_interval=0, 
-												@os_run_priority=0, 
-												@subsystem=N'TSQL', 
-												@command=@queryToRun, 
-												@database_name=@databaseName, 
-												@output_file_name=@logFileLocation, 
-												@flags=2
-	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
-
-
-	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'EXEC [dbo].[usp_hcCollectErrorlogMessages]	@projectCode		= ''' + @projectCode + N''',
-																	@sqlServerNameFilter= ''%'',
-																	@debugMode			= 0'
-
-	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
-												@step_name=N'Collect Errorlog Messages', 
-												@step_id=5, 
-												@cmdexec_success_code=0, 
-												@on_success_action=4, 
-												@on_success_step_id=6, 
-												@on_fail_action=2, 
-												@on_fail_step_id=0, 
-												@retry_attempts=0, 
-												@retry_interval=0, 
-												@os_run_priority=0, 
-												@subsystem=N'TSQL', 
-												@command=@queryToRun, 
-												@database_name=@databaseName, 
-												@output_file_name=@logFileLocation, 
-												@flags=2
-	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
-
-	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'EXEC [dbo].[usp_hcCollectEventMessages]	@projectCode		= ''' + @projectCode + N''',
-																@sqlServerNameFilter= ''%'',
-																@debugMode			= 0'
-
-	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
-												@step_name=N'Collect Event Messages', 
-												@step_id=6, 
 												@cmdexec_success_code=0, 
 												@on_success_action=1, 
 												@on_success_step_id=0, 

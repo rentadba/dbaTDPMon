@@ -62,7 +62,7 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 		  SELECT 'health-check'		AS [module], 'Collect Information OS Events'												AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'health-check'		AS [module], 'Collect OS Events timeout (seconds)'											AS [name], '600'		AS [value]		UNION ALL
 		  SELECT 'health-check'		AS [module], 'Collect OS Events from last hours'											AS [name], '24'			AS [value]		UNION ALL
-		  SELECT 'health-check'		AS [module], 'Parallel Data Collecting Jobs'												AS [name], '10'			AS [value]
+		  SELECT 'health-check'		AS [module], 'Parallel Data Collecting Jobs'												AS [name], '16'			AS [value]
 GO
 
 ---------------------------------------------------------------------------------------------
@@ -93,4 +93,16 @@ EXEC master.dbo.xp_instance_regread N'HKEY_LOCAL_MACHINE',N'Software\Microsoft\M
 
 IF @defaultBackupDirectory IS NOT NULL
 	UPDATE [dbo].[appConfigurations] SET [value] = @defaultBackupDirectory WHERE [module] = 'maintenance-plan' AND [name] = 'Default backup location'
+GO
+
+
+---------------------------------------------------------------------------------------------
+--enable Parallel Data Collecting Jobs
+---------------------------------------------------------------------------------------------
+UPDATE [dbo].[appConfigurations] 
+	SET [value]= CASE WHEN 4 * (SELECT [cpu_count] FROM sys.dm_os_sys_info)  > 32 
+						THEN 32
+						ELSE 4 * (SELECT [cpu_count] FROM sys.dm_os_sys_info)
+				END
+WHERE [module] = 'health-check' AND [name] = 'Parallel Data Collecting Jobs'
 GO

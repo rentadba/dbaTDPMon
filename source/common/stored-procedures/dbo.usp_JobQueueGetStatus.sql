@@ -71,7 +71,7 @@ WHERE  [project_id] = @projectID
 		AND [descriptor] LIKE @descriptorFilter
 		AND [status]=4
 
-WHILE @runningJobs > @minJobToRunBeforeExit
+WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) OR (@runningJobs > @minJobToRunBeforeExit AND @minJobToRunBeforeExit = 0)
 	begin
 		---------------------------------------------------------------------------------------------------
 		/* check running job status and make updates */
@@ -148,11 +148,69 @@ WHILE @runningJobs > @minJobToRunBeforeExit
 		DEALLOCATE crsRunningJobs
 
 		SET @strMessage='Currently running jobs : ' + CAST(@runningJobs AS [varchar])
-		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
-		--EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 						
 		IF @runningJobs > @minJobToRunBeforeExit
 			WAITFOR DELAY @waitForDelay
 	end
-	RETURN @runningJobs
+
+IF @minJobToRunBeforeExit=0
+	begin
+		SET @strMessage='Performing cleanup...'
+		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+
+		SET @runningJobs = 0
+		DECLARE crsRunningJobs CURSOR FOR	SELECT  [id], [instance_name], [job_name]
+											FROM [dbo].[vw_jobExecutionQueue]
+											WHERE  [project_id] = @projectID 
+													AND [module] LIKE @moduleFilter
+													AND [descriptor] LIKE @descriptorFilter
+													AND [status]<>-1
+											ORDER BY [id]
+		OPEN crsRunningJobs
+		FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName
+		WHILE @@FETCH_STATUS=0
+			begin
+				SET @strMessage			= NULL
+				SET @currentRunning		= NULL
+				SET @lastExecutionStatus= NULL
+				SET @lastExecutionDate	= NULL
+				SET @lastExecutionTime 	= NULL
+				SET @runningTimeSec		= NULL
+
+				EXEC dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
+													@jobName				= @jobName,
+													@strMessage				= @strMessage OUTPUT,
+													@currentRunning			= @currentRunning OUTPUT,
+													@lastExecutionStatus	= @lastExecutionStatus OUTPUT,
+													@lastExecutionDate		= @lastExecutionDate OUTPUT,
+													@lastExecutionTime 		= @lastExecutionTime OUTPUT,
+													@runningTimeSec			= @runningTimeSec OUTPUT,
+													@selectResult			= 0,
+													@extentedStepDetails	= 0,		
+													@debugMode				= @debugMode
+
+				IF @currentRunning = 0
+					begin
+						/* removing job */
+						EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
+														@jobName		= @jobName,
+														@operation		= 'Clean',
+														@dbName			= @jobDBName, 
+														@jobStepName 	= '',
+														@debugMode		= @debugMode
+					end
+				ELSE
+					SET @runningJobs = @runningJobs + 1
+
+				FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName
+			end
+		CLOSE crsRunningJobs
+		DEALLOCATE crsRunningJobs
+
+		SET @strMessage='Currently running jobs : ' + CAST(@runningJobs AS [varchar])
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+	end
+
+RETURN @runningJobs
 GO

@@ -258,7 +258,7 @@ WHILE @@FETCH_STATUS=0
 								WHERE 	cin.[project_id] = @projectID
 										AND cin.[instance_active]=1
 										AND cin.[instance_name] LIKE @sqlServerNameFilter
-										AND cin.[instance_name] <> @@SERVERNAME
+										--AND cin.[instance_name] <> @@SERVERNAME
 										AND @configParallelJobs <> 1
 								
 								UNION ALL
@@ -266,6 +266,39 @@ WHILE @@FETCH_STATUS=0
 								SELECT @instanceID AS [instance_id], '%' AS [instance_name]
 								WHERE @configParallelJobs = 1
 							)X
+
+				--cleaning machine names with multi-instance; keep only one instance, since machine logs will be fetched
+				DELETE jeq1
+				FROM [dbo].[jobExecutionQueue] jeq1
+				INNER JOIN 
+					(
+						SELECT jeq.[id], ROW_NUMBER() OVER(PARTITION BY cin.[machine_id] ORDER BY cin.[instance_id]) AS row_no
+						FROM [dbo].[jobExecutionQueue] jeq
+						INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[project_id] = jeq.[project_id] 
+																		AND cin.[instance_id] = jeq.[for_instance_id]
+						INNER JOIN
+							(
+								SELECT cin.[machine_id], cin.[machine_name], COUNT(*) AS cnt
+								FROM [dbo].[jobExecutionQueue] jeq
+								INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[project_id] = jeq.[project_id] 
+																				AND cin.[instance_id] = jeq.[for_instance_id]
+								WHERE	jeq.[descriptor]=@codeDescriptor
+										AND jeq.[instance_id] = @instanceID
+										AND jeq.[status]=-1
+										AND cin.[project_id] = @projectID
+										AND cin.[instance_active] = 1
+										AND cin.[instance_name] LIKE @sqlServerNameFilter
+								GROUP BY cin.[machine_id], cin.[machine_name]		
+								HAVING COUNT(*)>1
+							)x ON x.[machine_id] = cin.[machine_id] AND x.[machine_name] = cin.[machine_name] 
+						WHERE	jeq.[descriptor]=@codeDescriptor
+								AND jeq.[instance_id] = @instanceID
+								AND jeq.[status]=-1
+								AND cin.[project_id] = @projectID
+								AND cin.[instance_active] = 1
+								AND cin.[instance_name] LIKE @sqlServerNameFilter
+					) y  on jeq1.[id] = y.[id]
+				WHERE y.[row_no] <> 1
 			end
 			
 		FETCH NEXT FROM crsCollectorDescriptior INTO @codeDescriptor

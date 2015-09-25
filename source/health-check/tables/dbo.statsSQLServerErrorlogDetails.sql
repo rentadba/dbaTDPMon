@@ -51,10 +51,7 @@ GO
 
 CREATE INDEX [IX_statsSQLServerErrorlogDetails_InstanceID] ON [dbo].[statsSQLServerErrorlogDetails]([instance_id], [project_id]) ON [FG_Statistics_Index]
 GO
-CREATE INDEX [IX_statsSQLServerErrorlogDetails_ProjecteID] ON [dbo].[statsSQLServerErrorlogDetails] ([project_id], [log_date]) INCLUDE ([instance_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsSQLServerErrorlogDetails_ProjectID] ON [dbo].[statsSQLServerErrorlogDetails] ([instance_id], [project_id], [log_date]) ON [FG_Statistics_Index]
 GO
 CREATE INDEX [IX_statsSQLServerErrorlogDetails_LogDate] ON [dbo].[statsSQLServerErrorlogDetails]([log_date], [instance_id], [project_id]) ON [FG_Statistics_Index]
 GO
-
-
-

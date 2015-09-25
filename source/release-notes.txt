@@ -287,3 +287,6 @@
 
 /* 23.09.2015 */
 	- add support for internal parallellsm (defining and running multiple SQL Agent jobs, number limited by a configuration value)
+
+/* 25.09.2015 */
+	- modified health-check discovery & collect job to use the internal parallelism mechanisms
