@@ -86,8 +86,8 @@ BEGIN TRANSACTION
 												@cmdexec_success_code=0, 
 												@on_success_action=4, 
 												@on_success_step_id=2, 
-												@on_fail_action=2, 
-												@on_fail_step_id=0, 
+												@on_fail_action=4, 
+												@on_fail_step_id=5, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
 												@os_run_priority=0, 
@@ -111,8 +111,8 @@ BEGIN TRANSACTION
 												@cmdexec_success_code=0, 
 												@on_success_action=4, 
 												@on_success_step_id=3, 
-												@on_fail_action=2, 
-												@on_fail_step_id=0, 
+												@on_fail_action=4, 
+												@on_fail_step_id=5, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
 												@os_run_priority=0, 
@@ -134,6 +134,61 @@ BEGIN TRANSACTION
 												@step_name=N'Run Job Queue', 
 												@step_id=3, 
 												@cmdexec_success_code=0, 
+												@on_success_action=4, 
+												@on_success_step_id=4, 
+												@on_fail_action=4, 
+												@on_fail_step_id=5, 
+												@retry_attempts=3, 
+												@retry_interval=1, 
+												@os_run_priority=0, 
+												@subsystem=N'TSQL', 
+												@command=@queryToRun, 
+												@database_name=@databaseName, 
+												@output_file_name=@logFileLocation, 
+												@flags=2
+	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+
+	---------------------------------------------------------------------------------------------------
+	SET @queryToRun = N'EXEC  [dbo].[usp_reportHTMLBuildHealthCheck]	@projectCode		= ''' + @projectCode + ''',
+							@flgActions		= DEFAULT,	
+							@flgOptions		= DEFAULT,
+							@reportDescription		= NULL,
+							@reportFileName		= NULL,	/* if file name is null, than the name will be generated */
+							@localStoragePath		= NULL,
+							@dbMailProfileName	= DEFAULT,		
+							@recipientsList		= DEFAULT,
+							@sendReportAsAttachment	= 1		/* if set to 1, the report file will always be attached */'
+
+	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
+												@step_name=N'Generate Daily Health Check Reports', 
+												@step_id=4, 
+												@cmdexec_success_code=0, 
+												@on_success_action=4, 
+												@on_success_step_id=5, 
+												@on_fail_action=4, 
+												@on_fail_step_id=5, 
+												@retry_attempts=0, 
+												@retry_interval=0, 
+												@os_run_priority=0, 
+												@subsystem=N'TSQL', 
+												@command=@queryToRun, 
+												@database_name=@databaseName, 
+												@output_file_name=@logFileLocation, 
+												@flags=6
+	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+	
+	---------------------------------------------------------------------------------------------------
+	SET @queryToRun=N'
+EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
+												@logFileLocation=''' + @logFileLocation + ''',
+												@module			=''daily health check'',
+												@sendLogAsAttachment = 1,
+												@eventType		= 2'
+
+	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
+												@step_name=N'Send email', 
+												@step_id=5, 
+												@cmdexec_success_code=0, 
 												@on_success_action=1, 
 												@on_success_step_id=0, 
 												@on_fail_action=2, 
@@ -144,13 +199,28 @@ BEGIN TRANSACTION
 												@subsystem=N'TSQL', 
 												@command=@queryToRun, 
 												@database_name=@databaseName, 
-												@output_file_name=@logFileLocation, 
-												@flags=2
+												@flags=0
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
 	EXEC @ReturnCode = msdb.dbo.sp_update_job	@job_id = @jobId, 
 												@start_step_id = 1
+	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+
+	---------------------------------------------------------------------------------------------------
+	EXEC @ReturnCode = msdb.dbo.sp_add_jobschedule	@job_id=@jobId, 
+													@name=N'Daily', 
+													@enabled=1, 
+													@freq_type=4, 
+													@freq_interval=1, 
+													@freq_subday_type=1, 
+													@freq_subday_interval=0, 
+													@freq_relative_interval=0, 
+													@freq_recurrence_factor=0, 
+													@active_start_date=20141219, 
+													@active_end_date=99991231, 
+													@active_start_time=40000, 
+													@active_end_time=235959
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------

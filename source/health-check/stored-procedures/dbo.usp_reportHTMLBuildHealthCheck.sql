@@ -10,7 +10,6 @@ GO
 
 CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 		@projectCode			[varchar](32)=NULL,
-		@analysisJobName		[sysname]		= 'dbaTDPMon - Discovery & Health Check',
 		@flgActions				[int]			= 31,		/*	1 - Instance Availability 
 																2 - Databases status
 																4 - SQL Server Agent Job status
@@ -663,33 +662,6 @@ BEGIN TRY
 		}	
 </style>'
 	
-
-	-----------------------------------------------------------------------------------------------------
-	--discovery & health check job status
-	-----------------------------------------------------------------------------------------------------
-
-	DECLARE @strMessage				[varchar](8000),
-			@currentRunning			[int],	
-			@lastExecutionStatus	[int],
-			@lastExecutionDate		[varchar](10),
-			@lastExecutionTime 		[varchar](8),
-			@runningTimeSec			[bigint]
-
-	EXEC [dbo].[usp_sqlAgentJobCheckStatus]	@sqlServerName			= @@SERVERNAME,
-											@jobName				= @analysisJobName,
-											@strMessage				= @strMessage OUT,
-											@currentRunning			= @currentRunning OUT,
-											@lastExecutionStatus	= @lastExecutionStatus OUT,
-											@lastExecutionDate		= @lastExecutionDate OUT,
-											@lastExecutionTime 		= @lastExecutionTime OUT,
-											@runningTimeSec			= @runningTimeSec OUT,
-											@selectResult			= 0,
-											@extentedStepDetails	= 0,		
-											@debugMode				= 0
-
-	SET @strMessage = CASE WHEN LEFT(@strMessage, 2) = '--' THEN SUBSTRING(@strMessage, 3, LEN(@strMessage)) ELSE @strMessage END
-	SET @strMessage = ISNULL([dbo].[ufn_reportHTMLPrepareText](@strMessage, 0), N'&nbsp;')
-	SET @strMessage = REPLACE(@strMessage, '--', N'<BR>')
 	
 	-----------------------------------------------------------------------------------------------------
 	--report header
@@ -772,7 +744,7 @@ BEGIN TRY
 				<TD WIDTH="360px">
 					<TABLE CELLSPACING=0 CELLPADDING="1px" border=0 width="360px" class="with-border">
 						<TR VALIGN="TOP" class="color-2">
-							<TD class="details-very-small" ALIGN="LEFT">' + @strMessage + N'</TD>
+							<TD class="details-very-small" ALIGN="LEFT">&nbsp;</TD>
 						</TR>
 					</TABLE>
 				</TD>

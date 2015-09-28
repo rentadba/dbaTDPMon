@@ -307,9 +307,6 @@ echo *--------------------------------------------------------------------------
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\job-scripts\job-script-dbaTDPMon - Discovery & Health Check.sql" -d %dbname% -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\job-scripts\job-script-dbaTDPMon - Generate Reports.sql" -d %dbname% -v dbName=%dbname% -b -r 1
-if errorlevel 1 goto install_err
-
 if %module%=="all" goto mp
 if %module%=="health-check" goto done
 goto done

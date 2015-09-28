@@ -290,3 +290,6 @@
 
 /* 25.09.2015 */
 	- modified health-check discovery & collect job to use the internal parallelism mechanisms
+
+/* 28.09.2015 */
+	- merged SQL Agent jobs "dbaTDPMon - Discovery & Health Check" and "dbaTDPMon - Generate Reports"
