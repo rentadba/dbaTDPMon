@@ -21,6 +21,7 @@ CREATE TABLE [dbo].[jobExecutionQueue]
 	[project_id]			[smallint]		NOT NULL,
 	[module]				[varchar](32)	NOT NULL,
 	[descriptor]			[varchar](256)	NOT NULL,
+	[filter]				[sysname]		NULL,
 	[for_instance_id]		[smallint]		NOT NULL,
 	[job_name]				[sysname]		NOT NULL,
 	[job_step_name]			[sysname]		NOT NULL,
@@ -40,7 +41,8 @@ CREATE TABLE [dbo].[jobExecutionQueue]
 		[project_id],
 		[instance_id],
 		[job_name],
-		[job_step_name]
+		[job_step_name],
+		[filter]
 	) ON [FG_Statistics_Data],
 	CONSTRAINT [FK_jobExecutionQueue_catalogProjects] FOREIGN KEY 
 	(

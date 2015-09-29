@@ -242,15 +242,15 @@ WHILE @@FETCH_STATUS=0
 		------------------------------------------------------------------------------------------------------------------------------------------
 		IF @codeDescriptor = 'dbo.usp_hcCollectOSEventLogs'
 			begin
-				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
+				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor], [filter]
 													   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 													   , [job_command])
-						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], 'health-check' AS [module], @codeDescriptor AS [descriptor],
+						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], 'health-check' AS [module], @codeDescriptor AS [descriptor], L.[log_type_name],
 								X.[instance_id] AS [for_instance_id], 
-								DB_NAME() + ' - ' + 'hcCollectOSEventLogs' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END AS [job_name],
+								DB_NAME() + ' - ' + 'hcCollectOSEventLogs' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END  + ' (' + L.[log_type_name] + ')' AS [job_name],
 								'Run Collect'	AS [job_step_name],
 								DB_NAME()		AS [job_database_name],
-								'EXEC [dbo].[usp_hcCollectOSEventLogs] @projectCode = ''' + @projectCode + ''', @sqlServerNameFilter = ''' + X.[instance_name] + ''', @enableXPCMDSHELL = ' + CAST(@enableXPCMDSHELL AS [varchar]) + ', @debugMode = ' + CAST(@debugMode AS [varchar])
+								'EXEC [dbo].[usp_hcCollectOSEventLogs] @projectCode = ''' + @projectCode + ''', @sqlServerNameFilter = ''' + X.[instance_name] + ''', @logNameFilter = ''' + L.[log_type_name] + ''', @enableXPCMDSHELL = ' + CAST(@enableXPCMDSHELL AS [varchar]) + ', @debugMode = ' + CAST(@debugMode AS [varchar])
 						FROM
 							(
 								SELECT	DISTINCT cin.[instance_id], cin.[instance_name]
@@ -265,20 +265,25 @@ WHILE @@FETCH_STATUS=0
 
 								SELECT @instanceID AS [instance_id], '%' AS [instance_name]
 								WHERE @configParallelJobs = 1
-							)X
+							)X,
+							(
+								SELECT 'Application' AS [log_type_name], 1 AS [log_type_id] UNION ALL
+								SELECT 'System'		 AS [log_type_name], 2 AS [log_type_id] UNION ALL
+								SELECT 'Setup'		 AS [log_type_name], 3 AS [log_type_id] 
+							)L
 
 				--cleaning machine names with multi-instance; keep only one instance, since machine logs will be fetched
 				DELETE jeq1
 				FROM [dbo].[jobExecutionQueue] jeq1
 				INNER JOIN 
 					(
-						SELECT jeq.[id], ROW_NUMBER() OVER(PARTITION BY cin.[machine_id] ORDER BY cin.[instance_id]) AS row_no
+						SELECT jeq.[id], ROW_NUMBER() OVER(PARTITION BY cin.[machine_id], jeq.[filter] ORDER BY cin.[instance_id]) AS row_no
 						FROM [dbo].[jobExecutionQueue] jeq
 						INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[project_id] = jeq.[project_id] 
 																		AND cin.[instance_id] = jeq.[for_instance_id]
 						INNER JOIN
 							(
-								SELECT cin.[machine_id], cin.[machine_name], COUNT(*) AS cnt
+								SELECT cin.[machine_id], cin.[machine_name], jeq.[filter], COUNT(*) AS cnt
 								FROM [dbo].[jobExecutionQueue] jeq
 								INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[project_id] = jeq.[project_id] 
 																				AND cin.[instance_id] = jeq.[for_instance_id]
@@ -288,9 +293,9 @@ WHILE @@FETCH_STATUS=0
 										AND cin.[project_id] = @projectID
 										AND cin.[instance_active] = 1
 										AND cin.[instance_name] LIKE @sqlServerNameFilter
-								GROUP BY cin.[machine_id], cin.[machine_name]		
+								GROUP BY cin.[machine_id], cin.[machine_name], jeq.[filter]		
 								HAVING COUNT(*)>1
-							)x ON x.[machine_id] = cin.[machine_id] AND x.[machine_name] = cin.[machine_name] 
+							)x ON x.[machine_id] = cin.[machine_id] AND x.[machine_name] = cin.[machine_name] AND x.[filter] = jeq.[filter]
 						WHERE	jeq.[descriptor]=@codeDescriptor
 								AND jeq.[instance_id] = @instanceID
 								AND jeq.[status]=-1

@@ -107,7 +107,7 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 													@extentedStepDetails	= 0,		
 													@debugMode				= @debugMode
 
-				IF @currentRunning = 0
+				IF @currentRunning = 0 AND @lastExecutionStatus<>5 /* Unknown */
 					begin
 						--double check
 						WAITFOR DELAY '00:00:01'						
@@ -122,7 +122,7 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 															@selectResult			= 0,
 															@extentedStepDetails	= 0,		
 															@debugMode				= @debugMode
-						IF @currentRunning = 0
+						IF @currentRunning = 0 AND @lastExecutionStatus<>5 /* Unknown */
 							begin
 								UPDATE [dbo].[jobExecutionQueue]
 									SET [status] = @lastExecutionStatus,
@@ -138,6 +138,8 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 																@jobStepName 	= '',
 																@debugMode		= @debugMode
 							end
+						ELSE
+							SET @runningJobs = @runningJobs + 1
 					end
 				ELSE
 					SET @runningJobs = @runningJobs + 1

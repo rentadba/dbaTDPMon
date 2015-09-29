@@ -11,6 +11,7 @@ GO
 CREATE PROCEDURE [dbo].[usp_hcCollectOSEventLogs]
 		@projectCode			[varchar](32)=NULL,
 		@sqlServerNameFilter	[sysname]='%',
+		@logNameFilter			[sysname]='%',
 		@enableXPCMDSHELL		[bit]=1,
 		@debugMode				[bit]=0
 
@@ -47,6 +48,7 @@ DECLARE   @eventDescriptor				[varchar](256)
 		, @startTime					[datetime]
 		, @endTime						[datetime]
 		, @getInformationEvent			[bit]=0
+		, @getWarningsEvent				[bit]=0
 		
 
 DECLARE @optionXPIsAvailable		[bit],
@@ -117,6 +119,21 @@ BEGIN CATCH
 END CATCH
 
 SET @getInformationEvent = ISNULL(@getInformationEvent, 0)
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--option to fetch also warnings OS events
+BEGIN TRY
+	SELECT	@getWarningsEvent = CASE WHEN LOWER([value])='true' THEN 1 ELSE 0 END
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Collect Warning OS Events'
+			AND [module] = 'health-check'
+END TRY
+BEGIN CATCH
+	SET @getWarningsEvent = 0
+END CATCH
+
+SET @getWarningsEvent = ISNULL(@getWarningsEvent, 0)
+
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --option for timeout when fetching OS events
@@ -211,10 +228,11 @@ EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrin
 
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
-SET @logEntryType='1,2,3' /*Critical, Error, Warnings*/
+SET @logEntryType='1,2' /*Critical, Error*/
+IF @getWarningsEvent=1
+	SET @logEntryType=@logEntryType + ',3'
 IF @getInformationEvent=1
 	SET @logEntryType=@logEntryType + ',4'
-
 
 SET @eventDescriptor = 'dbo.usp_hcCollectOSEventLogs-Powershell'
 
@@ -249,9 +267,14 @@ WHILE @@FETCH_STATUS=0
 
 
 		-------------------------------------------------------------------------------------------------------------------------
-		DECLARE crsLogName CURSOR READ_ONLY FOR SELECT 'Application' AS [log_type_name], 1 AS [log_type_id] UNION ALL
-												SELECT 'System'		 AS [log_type_name], 2 AS [log_type_id] UNION ALL
-												SELECT 'Setup'		 AS [log_type_name], 3 AS [log_type_id] 
+		DECLARE crsLogName CURSOR READ_ONLY FOR SELECT [log_type_name], [log_type_id]
+												FROM (
+														SELECT 'Application' AS [log_type_name], 1 AS [log_type_id] UNION ALL
+														SELECT 'System'		 AS [log_type_name], 2 AS [log_type_id] UNION ALL
+														SELECT 'Setup'		 AS [log_type_name], 3 AS [log_type_id] 
+													)l
+												WHERE [log_type_name] LIKE @logNameFilter
+
 		OPEN crsLogName
 		FETCH NEXT FROM crsLogName INTO @psLogTypeName, @psLogTypeID
 		WHILE @@FETCH_STATUS=0
@@ -375,7 +398,7 @@ WHILE @@FETCH_STATUS=0
 						BEGIN TRY
 							SET @queryToRun=N'master.dbo.xp_cmdshell ''del "' + @psFileLocation + @psFileName + '"'', no_output'
 							IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
-							--EXEC (@queryToRun) 
+							EXEC (@queryToRun) 
 						END TRY
 						BEGIN CATCH
 							SET @strMessage = ERROR_MESSAGE()
@@ -466,7 +489,7 @@ WHILE @@FETCH_STATUS=0
 											, @projectID
 											, GETUTCDATE()
 											, 'dbo.usp_hcCollectOSEventLogs'
-											, 'Timeout occured while running powershell script.'
+											, 'Timeout occured while running powershell script. (LogName = ' + @psLogTypeName + ')'
 
 						IF EXISTS(SELECT * FROM #psOutput WHERE [xml] LIKE '%There are no more endpoints available from the endpoint mapper%')
 							INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])

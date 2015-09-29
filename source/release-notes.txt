@@ -293,3 +293,6 @@
 
 /* 28.09.2015 */
 	- merged SQL Agent jobs "dbaTDPMon - Discovery & Health Check" and "dbaTDPMon - Generate Reports"
+
+/* 29.09.2015 */
+	- split OS Event messages collection into 3 jobs / machine, if internal parallelism is enabled (one per log name)

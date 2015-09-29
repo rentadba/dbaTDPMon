@@ -10,13 +10,14 @@ GO
 
 CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 		@projectCode			[varchar](32)=NULL,
-		@flgActions				[int]			= 31,		/*	1 - Instance Availability 
+		@flgActions				[int]			= 63,		/*	1 - Instance Availability 
 																2 - Databases status
 																4 - SQL Server Agent Job status
 																8 - Disk Space information
 															   16 - Errorlog messages
+															   32 - OS Event messages
 															*/
-		@flgOptions				[int]			= 65011711,	/*	 1 - Instances - Offline
+		@flgOptions				[int]			= 266338303,/*	 1 - Instances - Offline
 																 2 - Instances - Online
 																 4 - Databases Status - Issues Detected
 																 8 - Databases Status - Complete Details
@@ -42,6 +43,9 @@ CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 														   8388608 - Databases with (Page Verify not CHECKSUM) or (Page Verify is NONE)
 														  16777216 - Frequently Fragmented Indexes (consider lowering the fill-factor)
 														  33554432 - SQL Server Agent Jobs - Long Running SQL Agent Jobs
+														  67108864 - OS Event messages - Permission errors
+														 134217728 - OS Event messages - Issues Detected
+														 268435456 - OS Event messages - Complete Details
 															*/
 		@reportDescription		[nvarchar](256) = NULL,
 		@reportFileName			[nvarchar](max) = NULL,	/* if file name is null, than the name will be generated */
@@ -734,17 +738,8 @@ BEGIN TRY
 						<TR VALIGN="TOP" class="color-1">
 							<TD WIDTH="180px" class="details-very-small" ALIGN="LEFT">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + CASE WHEN @flgActions &  16 =  16  THEN [dbo].[ufn_reportHTMLGetImage]('check-checked') ELSE [dbo].[ufn_reportHTMLGetImage]('check-unchecked') END  + N'&nbsp;&nbsp;Errorlog messages</TD>
 						</TR>
-					</TABLE>
-				</TD>
-			</TR>
-			</TABLE>
-
-			<TABLE CELLSPACING=0 CELLPADDING="3px" border=0 width="360px">
-			<TR VALIGN="TOP">
-				<TD WIDTH="360px">
-					<TABLE CELLSPACING=0 CELLPADDING="1px" border=0 width="360px" class="with-border">
 						<TR VALIGN="TOP" class="color-2">
-							<TD class="details-very-small" ALIGN="LEFT">&nbsp;</TD>
+							<TD WIDTH="180px" class="details-very-small" ALIGN="LEFT">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + CASE WHEN @flgActions &  32 =  32  THEN [dbo].[ufn_reportHTMLGetImage]('check-checked') ELSE [dbo].[ufn_reportHTMLGetImage]('check-unchecked') END  + N'&nbsp;&nbsp;OS Event messages</TD>
 						</TR>
 					</TABLE>
 				</TD>
@@ -873,6 +868,27 @@ BEGIN TRY
 					<TD ALIGN=CENTER class="summary-style add-border color-2">' +
 					CASE WHEN (@flgOptions & 524288 = 524288)
 						  THEN N'<A HREF="#ErrorlogMessagesPermissionErrors" class="summary-style color-2">Permission Errors {ErrorlogMessagesPermissionErrorsCount}</A>'
+						  ELSE N'Permission Errors;'
+					END + N'
+					</TD>
+				</TR>'
+				ELSE N''
+			END + 
+ 			CASE WHEN (@flgActions & 32 = 32) 
+				 THEN N'
+				<TR VALIGN="TOP" class="color-1">
+					<TD ALIGN=LEFT class="summary-style add-border color-1">
+						OS Event Messages
+					</TD>
+					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
+					CASE WHEN (@flgOptions & 268435456 = 268435456)
+						  THEN N'<A HREF="#OSEventMessagesCompleteDetails" class="summary-style color-1">Complete Details</A>'
+						  ELSE N'Complete Details'
+					END + N'
+					</TD>
+					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
+					CASE WHEN (@flgOptions & 67108864 = 67108864)
+						  THEN N'<A HREF="#OSEventMessagesPermissionErrors" class="summary-style color-1">Permission Errors {OSEventMessagesPermissionErrorsCount}</A>'
 						  ELSE N'Permission Errors;'
 					END + N'
 					</TD>
@@ -2989,6 +3005,70 @@ BEGIN TRY
 		end
 
 		
+	-----------------------------------------------------------------------------------------------------
+	--OS Event Messages - Permission Errors
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 32 = 32) AND (@flgOptions & 67108864 = 67108864)
+		begin
+			RAISERROR('	...Build Report: OS Event Messages - Permission Errors', 10, 1) WITH NOWAIT
+			
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea =@HTMLReportArea + 
+							N'<A NAME="OSEventMessagesPermissionErrors" class="category-style">OS Event Messages - Permission Errors</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="120px" class="details-bold" nowrap>Machine Name</TH>
+											<TH WIDTH="120px" class="details-bold" nowrap>Clustered</TH>
+											<TH WIDTH="150px" class="details-bold" nowrap>Event Date (UTC)</TH>
+											<TH WIDTH="740px" class="details-bold">Message</TH>'
+
+			SET @idx=1		
+			SET @tmpHTMLReport=N''
+
+			DECLARE crsOSEventMessagesPermissionErrors CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name]
+																							, MAX(lsam.[event_date_utc]) [event_date_utc]
+																							, lsam.[message]
+																					FROM [dbo].[vw_catalogInstanceNames]  cin
+																					INNER JOIN [dbo].[vw_logServerAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+																					WHERE	cin.[instance_active]=1
+																							AND cin.[project_id] = @projectID
+																							AND lsam.descriptor IN (N'dbo.usp_hcCollectOSEventLogs')
+																					GROUP BY cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
+																					ORDER BY cin.[machine_name], [event_date_utc]
+			OPEN crsOSEventMessagesPermissionErrors
+			FETCH NEXT FROM crsOSEventMessagesPermissionErrors INTO @machineName, @isClustered, @clusterNodeName, @eventDate, @message
+			WHILE @@FETCH_STATUS=0
+				begin
+					SET @tmpHTMLReport=@tmpHTMLReport + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + @machineName + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes<BR>' + ISNULL(N'[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
+										N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @eventDate, 121), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="740px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') + N'</TD>' + 
+									N'</TR>'
+					SET @idx=@idx+1
+
+					FETCH NEXT FROM crsOSEventMessagesPermissionErrors INTO @machineName, @isClustered, @clusterNodeName, @eventDate, @message
+				end
+			CLOSE crsOSEventMessagesPermissionErrors
+			DEALLOCATE crsOSEventMessagesPermissionErrors
+
+			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
+			SET @HTMLReportArea =@HTMLReportArea + N'
+								</TD>
+							</TR>
+						</TABLE>'
+
+			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesPermissionErrorsCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
+		end
+
+
 	-----------------------------------------------------------------------------------------------------
 	--Databases Status - Complete Details
 	-----------------------------------------------------------------------------------------------------
