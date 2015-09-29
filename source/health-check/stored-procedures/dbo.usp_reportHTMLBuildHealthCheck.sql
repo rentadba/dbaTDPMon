@@ -106,7 +106,8 @@ DECLARE   @databaseName							[sysname]
 		, @configErrorlogMessageLastHours		[int]
 		, @configErrorlogMessageLimit			[int]
 		, @configMaxJobRunningTimeInHours		[int]
-
+		, @configOSEventMessageLastHours		[int]
+		, @configOSEventMessageLimit			[int]
 
 		, @logSizeMB							[numeric](20,3)
 		, @dataSizeMB							[numeric](18,3)
@@ -403,6 +404,34 @@ BEGIN TRY
 	END CATCH
 	SET @configMaxJobRunningTimeInHours = ISNULL(@configMaxJobRunningTimeInHours, 3)
 
+	-----------------------------------------------------------------------------------------------------
+	BEGIN TRY
+		SELECT	@configOSEventMessageLastHours = [value]
+		FROM	[dbo].[appConfigurations]
+		WHERE	[name] = N'Collect OS Events from last hours'
+				AND [module] = 'health-check'
+	END TRY
+	BEGIN CATCH
+		SET @configOSEventMessageLastHours = 24
+	END CATCH
+	SET @configOSEventMessageLastHours = ISNULL(@configOSEventMessageLastHours, 24)
+
+
+	-----------------------------------------------------------------------------------------------------
+	BEGIN TRY
+		SELECT	@configOSEventMessageLimit = [value]
+		FROM	[dbo].[reportHTMLOptions]
+		WHERE	[name] = N'OS Event Messages Limit to Max'
+				AND [module] = 'health-check'
+	END TRY
+	BEGIN CATCH
+		SET @configOSEventMessageLimit = 1000
+	END CATCH
+	SET @configOSEventMessageLimit = ISNULL(@configOSEventMessageLimit, 1000)
+
+	IF @configOSEventMessageLimit= 0 SET @configOSEventMessageLimit=2147483647
+	
+	
 	
 	-----------------------------------------------------------------------------------------------------
 	--setting styles used in html report
@@ -1005,9 +1034,9 @@ BEGIN TRY
 				</TR> 
 				<TR VALIGN="TOP" class="color-2">
 					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
-					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 16777216 = 16777216)
-						  THEN N'<A HREF="#FrequentlyFragmentedIndexesIssuesDetected" class="summary-style color-2">Frequently Fragmented Indexes {FrequentlyFragmentedIndexesIssuesDetectedCount}</A>'
-						  ELSE N'>Frequently Fragmented Indexes (N/A)'
+					CASE WHEN (@flgActions & 32 = 32) AND (@flgOptions & 134217728 = 134217728)
+						  THEN N'<A HREF="#OSEventsMessagesIssuesDetected" class="summary-style color-2">OS Event messages - Issues Detected {OSEventsMessagesIssuesDetectedCount}</A>'
+						  ELSE N'>OS Event messages - Issues Detecteds (N/A)'
 					END + N'
 					</TD>
 					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
@@ -1017,11 +1046,24 @@ BEGIN TRY
 					END + N'
 					</TD>
 				</TR>
+				</TR> 
+				<TR VALIGN="TOP" class="color-1">
+					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
+					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 16777216 = 16777216)
+						  THEN N'<A HREF="#FrequentlyFragmentedIndexesIssuesDetected" class="summary-style color-1">Frequently Fragmented Indexes {FrequentlyFragmentedIndexesIssuesDetectedCount}</A>'
+						  ELSE N'>Frequently Fragmented Indexes (N/A)'
+					END + N'
+					</TD>
+					<TD ALIGN=LEFT class="summary-style add-border color-1">
+						&nbsp;
+					</TD>
+				</TR>
 			</table>
 		</TD>
 	</TR>
 	</TABLE>			
 	<HR WIDTH="1130px" ALIGN=LEFT><br>'
+
 
 
 	-----------------------------------------------------------------------------------------------------
@@ -1187,7 +1229,7 @@ BEGIN TRY
 												ELSE N''
 										END +
 										CASE WHEN @hasDiskSpaceInfo<>0 AND @flgOptions & 65536 = 65536
-												THEN N'<BR><A HREF="#DiskSpaceInformationCompleteDetails' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'">Disk Space</A>'
+												THEN N'<BR><A HREF="#DiskSpaceInformationCompleteDetails' + CASE WHEN @isClustered=0 THEN @machineName ELSE @clusterNodeName END + N'">Disk Space</A>'
 												ELSE N''
 										END +  
 										CASE WHEN @hasErrorlogMessages<>0 AND @flgOptions & 2097152 = 2097152
@@ -3070,6 +3112,106 @@ BEGIN TRY
 
 
 	-----------------------------------------------------------------------------------------------------
+	--OS Event Messages - Issues Detected
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 32 = 32) AND (@flgOptions & 134217728 = 134217728)
+		begin
+			RAISERROR('	...Build Report: OS Event Messages - Issues Detected', 10, 1) WITH NOWAIT
+			
+			TRUNCATE TABLE #htmlReport
+			INSERT	INTO #htmlReport([html]) 
+					SELECT
+							N'<A NAME="OSEventMessagesIssuesDetected" class="category-style">OS Event Messages - Issues Detected (last ' + CAST(@configOSEventMessageLastHours AS [nvarchar]) + N'h)</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="7">limit messages per machine to maximum ' + CAST(@configOSEventMessageLimit AS [nvarchar](32)) + N' </TD>
+							</TR>
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
+											<TH WIDTH="160px" class="details-bold" nowrap>Log Date</TH>
+											<TH WIDTH= "60px" class="details-bold" nowrap>Process Info</TH>
+											<TH WIDTH="710px" class="details-bold">Message</TH>'
+			SET @idx=1		
+
+			DECLARE   @logDate				[datetime]
+					, @processInfo			[sysname]
+					, @issuesDetectedCount	[int]
+			
+			SET @dateTimeLowerLimit = DATEADD(hh, -@configOSEventMessageLastHours, GETUTCDATE())
+			SET @issuesDetectedCount = 0 
+			DECLARE crsOSEventMessagesInstanceName CURSOR READ_ONLY LOCAL FOR	SELECT DISTINCT
+																						  oel.[machine_name]
+																						, COUNT(*) AS [messages_count]
+																				FROM [dbo].[vw_catalogInstanceNames]	cin
+																				INNER JOIN [dbo].[vw_statsOSEventLogs]	oel	ON oel.[project_id] = cin.[project_id] AND oel.[instance_id] = cin.[instance_id]
+																				WHERE cin.[instance_active]=1
+																						AND cin.[project_id] = @projectID																							
+																				GROUP BY oel.[machine_name]
+																				ORDER BY oel.[machine_name]
+			OPEN crsOSEventMessagesInstanceName
+			FETCH NEXT FROM crsOSEventMessagesInstanceName INTO @machineName, @messageCount
+			WHILE @@FETCH_STATUS=0
+				begin
+					IF @messageCount > @configOSEventMessageLimit SET @messageCount = @configOSEventMessageLimit
+					SET @issuesDetectedCount = @issuesDetectedCount + @messageCount
+
+					UPDATE #htmlReport SET [html] = [html] + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + '"><A NAME="OSEventMessagesCompleteDetails' + @instanceName + N'">' + @instanceName + N'</A></TD>' 
+
+					DECLARE crsOSEventMessagesCompleteDetails CURSOR READ_ONLY LOCAL FOR	SELECT  TOP (@configOSEventMessageLimit)
+																									oel.[machine_name], oel.[time_created], oel.[log_type_desc], oel.[level_desc], oel.[event_id], oel.[source], oel.[message]
+																							FROM [dbo].[vw_statsOSEventLogs]	oel
+																							WHERE	oel.[project_id]=@projectID
+																									AND oel.[machine_name] = @machineName
+																							ORDER BY oel.[time_created], oel.[record_id]
+					OPEN crsOSEventMessagesCompleteDetails
+					FETCH NEXT FROM crsOSEventMessagesCompleteDetails INTO @logDate, @processInfo, @message
+					WHILE @@FETCH_STATUS=0
+						begin
+							SET @message = ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') 
+
+							UPDATE #htmlReport SET [html] = [html] + 
+										N'<TD WIDTH="160px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @logDate, 121), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="60px" class="details" ALIGN="LEFT">' + ISNULL(@processInfo, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="710px" class="details" ALIGN="LEFT">' + @message + N'</TD>' + 
+									N'</TR>'
+
+							SET @messageCount = @messageCount-1
+							IF @messageCount>0
+								UPDATE #htmlReport SET [html] = [html] + N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+
+							FETCH NEXT FROM crsOSEventMessagesCompleteDetails INTO @logDate, @processInfo, @message
+						end
+					CLOSE crsOSEventMessagesCompleteDetails
+					DEALLOCATE crsOSEventMessagesCompleteDetails
+
+					SET @idx=@idx+1
+
+					FETCH NEXT FROM crsOSEventMessagesInstanceName INTO @instanceName, @messageCount
+				end
+			CLOSE crsOSEventMessagesInstanceName
+			DEALLOCATE crsOSEventMessagesInstanceName
+
+
+			UPDATE #htmlReport SET [html] = [html] + N'</TABLE>';
+			UPDATE #htmlReport SET [html] = [html] + N'
+								</TD>
+							</TR>
+						</TABLE>'
+
+			UPDATE #htmlReport SET [html] = [html] + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SELECT @HTMLReport = @HTMLReport + [html]
+			FROM #htmlReport
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesIssuesDetectedCount}', '(' + CAST((@issuesDetectedCount) AS [nvarchar]) + ')')
+		end
+		
+	
+	-----------------------------------------------------------------------------------------------------
 	--Databases Status - Complete Details
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2) AND (@flgOptions & 8 = 8)
@@ -3328,7 +3470,7 @@ BEGIN TRY
 				begin
 					SET @tmpHTMLReport=@tmpHTMLReport + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" ROWSPAN="' + CAST(@volumeCount AS [nvarchar](64)) + N'"><A NAME="DiskSpaceInformationCompleteDetails' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'">' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</A></TD>'
+										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" ROWSPAN="' + CAST(@volumeCount AS [nvarchar](64)) + N'"><A NAME="DiskSpaceInformationCompleteDetails' + CASE WHEN @isClustered=0 THEN @machineName ELSE @clusterNodeName END + N'">' + CASE WHEN @isClustered=0 THEN @machineName ELSE @clusterNodeName END + N'</A></TD>'
 
 					DECLARE crsDiskSpaceInformationDisks CURSOR READ_ONLY LOCAL FOR		SELECT  DISTINCT
 																								      dsi.[logical_drive]

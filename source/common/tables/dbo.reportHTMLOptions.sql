@@ -56,6 +56,7 @@ INSERT	INTO [dbo].[reportHTMLOptions] ([module], [name], [value], [description])
 		  SELECT 'health-check' AS [module], N'Free Disk Space Min Space (mb)'					AS [name], '3000'				AS [value], 'minimum allowed free disk space in mb, default 3000'						AS [description] UNION ALL
 		  SELECT 'health-check' AS [module], N'Errorlog Messages in last hours'					AS [name], '24'					AS [value], 'report errorlog messaged in the last hours; default 24'				    AS [description] UNION ALL
 		  SELECT 'health-check' AS [module], N'Errorlog Messages Limit to Max'					AS [name], '500'				AS [value], 'limit errorlog messages to a maximum number; default 500'				    AS [description] UNION ALL
+		  SELECT 'health-check' AS [module], N'OS Event Messages Limit to Max'					AS [name], '500'				AS [value], 'limit os event messages to a maximum number; default 500'				    AS [description] UNION ALL
 		  SELECT 'health-check' AS [module], N'Minimum Index Maintenance Frequency (days)'		AS [name], '2'					AS [value], 'interval between 2 index maintenance operations for the same HoBT; default 2' AS [description] UNION ALL
 		  SELECT 'health-check' AS [module], N'Analyze Index Maintenance Operation'				AS [name], 'REBUILD'			AS [value], 'which index maintenance operation to analyze (REBUILD and/or REORGANIZE)'	AS [description] UNION ALL
 		  SELECT 'health-check' AS [module], N'Analyze Only Messages from the last hours'		AS [name], '24'					AS [value], 'analyze only messages raised in the last hours; default 24'				AS [description] UNION ALL
