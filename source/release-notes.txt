@@ -296,3 +296,8 @@
 
 /* 29.09.2015 */
 	- split OS Event messages collection into 3 jobs / machine, if internal parallelism is enabled (one per log name)
+
+/* 30.09.2015 */
+	- add option to skip an instance or machine name from being included in the health-check report rules
+	- add OS event messages information to health check report
+	- version 2015.10 released

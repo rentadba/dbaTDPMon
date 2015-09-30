@@ -426,7 +426,7 @@ IF @errorCode=0
 	begin
 		SET @queryToRun = '	SELECT TOP 1  bs.[backup_start_date]
 										, DATEDIFF(ss, bs.[backup_start_date], bs.[backup_finish_date]) AS [backup_duration_sec]
-										, bs.[backup_size]
+										, ' + CASE WHEN @optionBackupWithCompression=1 THEN 'bs.[compressed_backup_size]' ELSE 'bs.[backup_size]' END + ' AS [backup_size]
 							FROM msdb.dbo.backupset bs
 							INNER JOIN msdb.dbo.backupmediafamily bmf ON bmf.[media_set_id] = bs.[media_set_id]
 							WHERE bmf.[physical_device_name] = (''' + @backupLocation + @backupFileName + N''')

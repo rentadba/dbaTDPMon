@@ -44,8 +44,7 @@ CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 														  16777216 - Frequently Fragmented Indexes (consider lowering the fill-factor)
 														  33554432 - SQL Server Agent Jobs - Long Running SQL Agent Jobs
 														  67108864 - OS Event messages - Permission errors
-														 134217728 - OS Event messages - Issues Detected
-														 268435456 - OS Event messages - Complete Details
+														 134217728 - OS Event messages - Complete Details
 															*/
 		@reportDescription		[nvarchar](256) = NULL,
 		@reportFileName			[nvarchar](max) = NULL,	/* if file name is null, than the name will be generated */
@@ -910,7 +909,7 @@ BEGIN TRY
 						OS Event Messages
 					</TD>
 					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
-					CASE WHEN (@flgOptions & 268435456 = 268435456)
+					CASE WHEN (@flgOptions & 134217728 = 134217728)
 						  THEN N'<A HREF="#OSEventMessagesCompleteDetails" class="summary-style color-1">Complete Details</A>'
 						  ELSE N'Complete Details'
 					END + N'
@@ -1034,9 +1033,9 @@ BEGIN TRY
 				</TR> 
 				<TR VALIGN="TOP" class="color-2">
 					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
-					CASE WHEN (@flgActions & 32 = 32) AND (@flgOptions & 134217728 = 134217728)
-						  THEN N'<A HREF="#OSEventsMessagesIssuesDetected" class="summary-style color-2">OS Event messages - Issues Detected {OSEventsMessagesIssuesDetectedCount}</A>'
-						  ELSE N'>OS Event messages - Issues Detecteds (N/A)'
+					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 16777216 = 16777216)
+						  THEN N'<A HREF="#FrequentlyFragmentedIndexesIssuesDetected" class="summary-style color-2">Frequently Fragmented Indexes {FrequentlyFragmentedIndexesIssuesDetectedCount}</A>'
+						  ELSE N'>Frequently Fragmented Indexes (N/A)'
 					END + N'
 					</TD>
 					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
@@ -1044,18 +1043,6 @@ BEGIN TRY
 						  THEN N'<A HREF="#DatabasePageVerifyIssuesDetected" class="summary-style color-2">Databases with Improper Page Verify Option {DatabasePageVerifyIssuesDetectedCount}</A>'
 						  ELSE N'>Databases with Improper Page Verify Option (N/A)'
 					END + N'
-					</TD>
-				</TR>
-				</TR> 
-				<TR VALIGN="TOP" class="color-1">
-					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
-					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 16777216 = 16777216)
-						  THEN N'<A HREF="#FrequentlyFragmentedIndexesIssuesDetected" class="summary-style color-1">Frequently Fragmented Indexes {FrequentlyFragmentedIndexesIssuesDetectedCount}</A>'
-						  ELSE N'>Frequently Fragmented Indexes (N/A)'
-					END + N'
-					</TD>
-					<TD ALIGN=LEFT class="summary-style add-border color-1">
-						&nbsp;
 					</TD>
 				</TR>
 			</table>
@@ -1103,11 +1090,17 @@ BEGIN TRY
 																			, lsam.[message]
 																	FROM [dbo].[vw_catalogInstanceNames]  cin
 																	INNER JOIN [dbo].[vw_logServerAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+																	LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																													AND rsr.[rule_id] = 1
+																													AND rsr.[active] = 1
+																													AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																	WHERE	cin.[instance_active]=0
 																			AND cin.[project_id] = @projectID
 																			AND lsam.[descriptor] IN (N'dbo.usp_refreshMachineCatalogs - Offline')
+																			AND rsr.[id] IS NULL
+
 																	GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
-																	ORDER BY cin.[machine_name], cin.[instance_name], [event_date_utc]
+																	ORDER BY cin.[instance_name], cin.[machine_name], [event_date_utc]
 			OPEN crsInstancesOffline
 			FETCH NEXT FROM crsInstancesOffline INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @eventDate, @message
 			WHILE @@FETCH_STATUS=0
@@ -1170,6 +1163,7 @@ BEGIN TRY
 					, @hasSQLagentJob		[int]
 					, @hasDiskSpaceInfo		[int]
 					, @hasErrorlogMessages	[int]
+					, @hasOSEventMessages	[int]
 					, @lastRefreshDate		[datetime]
 					, @dbSize				[numeric](20,3)
 
@@ -1189,9 +1183,14 @@ BEGIN TRY
 																			WHERE [project_id] = @projectID
 																			GROUP BY [project_id], [instance_id]
 																		) shcdd ON shcdd.[instance_id] = cin.[instance_id] AND shcdd.[project_id] = cin.[project_id]
+																	LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																													AND rsr.[rule_id] = 2
+																													AND rsr.[active] = 1
+																													AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
-																	ORDER BY cin.[machine_name], cin.[instance_name]
+																			AND rsr.[id] IS NULL
+																	ORDER BY cin.[instance_name], cin.[machine_name]
 			OPEN crsInstancesOffline
 			FETCH NEXT FROM crsInstancesOffline INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @version, @edition, @lastRefreshDate, @dbSize
 			WHILE @@FETCH_STATUS=0
@@ -1215,6 +1214,11 @@ BEGIN TRY
 					FROM	[dbo].[vw_statsSQLServerErrorlogDetails]
 					WHERE	[project_id]=@projectID
 							AND [instance_name] = @instanceName
+
+					SELECT	@hasOSEventMessages = COUNT(*)
+					FROM	[dbo].[vw_statsOSEventLogs] 
+					WHERE	[project_id]=@projectID
+							AND [instance_name] = @machineName
 																				  
 
 					SET @tmpHTMLReport=@tmpHTMLReport + 
@@ -1297,11 +1301,16 @@ BEGIN TRY
 																							, COUNT(DISTINCT lsam.[message]) AS [message_count]
 																					FROM [dbo].[vw_catalogInstanceNames]  cin
 																					INNER JOIN [dbo].[vw_logServerAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+																					LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 256
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																					WHERE	cin.[instance_active]=1
 																							AND cin.[project_id] = @projectID
 																							AND lsam.descriptor IN (N'dbo.usp_hcCollectDatabaseDetails')
+																							AND rsr.[id] IS NULL
 																					GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name]
-																					ORDER BY cin.[machine_name], cin.[instance_name]
+																					ORDER BY cin.[instance_name], cin.[machine_name]
 			OPEN crsDatabasesStatusPermissionErrors
 			FETCH NEXT FROM crsDatabasesStatusPermissionErrors INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @messageCount
 			WHILE @@FETCH_STATUS=0
@@ -1322,7 +1331,7 @@ BEGIN TRY
 																											AND cin.[machine_name] = @machineName
 																											AND lsam.descriptor IN (N'dbo.usp_hcCollectDatabaseDetails')
 																									GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
-																									ORDER BY cin.[machine_name], cin.[instance_name], [event_date_utc]
+																									ORDER BY cin.[instance_name], cin.[machine_name], [event_date_utc]
 
 					OPEN crsDatabasesStatusPermissionErrorDetails
 					FETCH NEXT FROM crsDatabasesStatusPermissionErrorDetails INTO @message, @eventDate
@@ -1408,11 +1417,16 @@ BEGIN TRY
 																						, cdn.[state_desc]
 																				FROM [dbo].[vw_catalogInstanceNames]  cin
 																				INNER JOIN [dbo].[vw_catalogDatabaseNames] cdn ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																				LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																AND rsr.[rule_id] = 4
+																																AND rsr.[active] = 1
+																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																				WHERE cin.[instance_active]=1
 																						AND cdn.[active]=1
 																						AND cin.[project_id] = @projectID	
 																						AND CHARINDEX(cdn.[state_desc], @configAdmittedState)=0
-																				ORDER BY cin.[machine_name], cin.[instance_name], cdn.[database_name]
+																						AND rsr.[id] IS NULL
+																				ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
 			OPEN crsDatabasesStatusIssuesDetected
 			FETCH NEXT FROM crsDatabasesStatusIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @stateDesc
 			WHILE @@FETCH_STATUS=0
@@ -1476,11 +1490,16 @@ BEGIN TRY
 																									, lsam.[message]
 																							FROM [dbo].[vw_catalogInstanceNames]  cin
 																							INNER JOIN [dbo].[vw_logServerAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+																							LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																			AND rsr.[rule_id] = 64
+																																			AND rsr.[active] = 1
+																																			AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																							WHERE	cin.[instance_active]=1
 																									AND cin.[project_id] = @projectID
 																									AND lsam.descriptor IN (N'dbo.usp_hcCollectSQLServerAgentJobsStatus')
+																									AND rsr.[id] IS NULL
 																							GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
-																							ORDER BY cin.[machine_name], cin.[instance_name], [event_date_utc]
+																							ORDER BY cin.[instance_name], cin.[machine_name], [event_date_utc]
 			OPEN crsSQLServerAgentJobsStatusPermissionErrors
 			FETCH NEXT FROM crsSQLServerAgentJobsStatusPermissionErrors INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @eventDate, @message
 			WHILE @@FETCH_STATUS=0
@@ -1548,12 +1567,18 @@ BEGIN TRY
 					, @lastExecTime		[varchar](8)
 			
 			SET @dateTimeLowerLimit = DATEADD(hh, -@configFailuresInLastHours, GETUTCDATE())
-			DECLARE crsSQLServerAgentJobsStatusIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT	[instance_name], [job_name], [last_execution_status], [last_execution_date], [last_execution_time], [message]
-																							FROM	[dbo].[vw_statsSQLServerAgentJobsHistory]
-																							WHERE	[project_id]=@projectID
-																									AND [last_execution_status] NOT IN (1, 4) /* 1 = Succeded; 4 = In progress */
-																									AND CONVERT([datetime], [last_execution_date] + ' ' + [last_execution_time], 120) >= @dateTimeLowerLimit
-																							ORDER BY [instance_name], [job_name], [last_execution_date], [last_execution_time]
+			DECLARE crsSQLServerAgentJobsStatusIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT	ssajh.[instance_name], ssajh.[job_name], ssajh.[last_execution_status], ssajh.[last_execution_date], ssajh.[last_execution_time], ssajh.[message]
+																							FROM	[dbo].[vw_statsSQLServerAgentJobsHistory] ssajh
+																							LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																			AND rsr.[rule_id] = 16
+																																			AND rsr.[active] = 1
+																																			AND (rsr.[skip_value]=ssajh.[instance_name])
+
+																							WHERE	ssajh.[project_id]=@projectID
+																									AND ssajh.[last_execution_status] NOT IN (1, 4) /* 1 = Succeded; 4 = In progress */
+																									AND CONVERT([datetime], ssajh.[last_execution_date] + ' ' + ssajh.[last_execution_time], 120) >= @dateTimeLowerLimit
+																									AND rsr.[id] IS NULL
+																							ORDER BY ssajh.[instance_name], ssajh.[job_name], ssajh.[last_execution_date], ssajh.[last_execution_time]
 			OPEN crsSQLServerAgentJobsStatusIssuesDetected
 			FETCH NEXT FROM crsSQLServerAgentJobsStatusIssuesDetected INTO @instanceName, @jobName, @lastExecStatus, @lastExecDate, @lastExecTime, @message
 			WHILE @@FETCH_STATUS=0
@@ -1633,15 +1658,20 @@ BEGIN TRY
 			DECLARE   @runningTime		[varchar](32)
 			
 			SET @dateTimeLowerLimit = DATEADD(hh, -@configFailuresInLastHours, GETUTCDATE())
-			DECLARE crsLongRunningSQLAgentJobsIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT	  [instance_name], [job_name]
-																								, [last_execution_date] AS [start_date], [last_execution_time] AS [start_time]
-																								, [dbo].[ufn_reportHTMLFormatTimeValue](CAST([running_time_sec]*1000 AS [bigint])) AS [running_time]
-																								, [message]
-																						FROM [dbo].[vw_statsSQLServerAgentJobsHistory]
-																						WHERE [last_execution_status] = 4
-																								AND [last_execution_date] IS NOT NULL
-																								AND [last_execution_time] IS NOT NULL
-																								AND ([running_time_sec]/3600) >= @configMaxJobRunningTimeInHours
+			DECLARE crsLongRunningSQLAgentJobsIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT	  ssajh.[instance_name], ssajh.[job_name]
+																								, ssajh.[last_execution_date] AS [start_date], ssajh.[last_execution_time] AS [start_time]
+																								, [dbo].[ufn_reportHTMLFormatTimeValue](CAST(ssajh.[running_time_sec]*1000 AS [bigint])) AS [running_time]
+																								, ssajh.[message]
+																						FROM [dbo].[vw_statsSQLServerAgentJobsHistory] ssajh
+																						LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																		AND rsr.[rule_id] = 33554432
+																																		AND rsr.[active] = 1
+																																		AND (rsr.[skip_value]=ssajh.[instance_name])
+																						WHERE ssajh.[last_execution_status] = 4
+																								AND ssajh.[last_execution_date] IS NOT NULL
+																								AND ssajh.[last_execution_time] IS NOT NULL
+																								AND (ssajh.[running_time_sec]/3600) >= @configMaxJobRunningTimeInHours
+																								AND rsr.[id] IS NULL
 																						ORDER BY [start_date], [start_time]
 
 			OPEN crsLongRunningSQLAgentJobsIssuesDetected
@@ -1715,11 +1745,16 @@ BEGIN TRY
 																								, COUNT(DISTINCT lsam.[message]) AS [message_count]
 																						FROM [dbo].[vw_catalogInstanceNames]  cin
 																						INNER JOIN [dbo].[vw_logServerAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+																						LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																		AND rsr.[rule_id] = 131072
+																																		AND rsr.[active] = 1
+																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																						WHERE	cin.[instance_active]=1
 																								AND cin.[project_id] = @projectID
 																								AND lsam.descriptor IN (N'dbo.usp_hcCollectDiskSpaceUsage')
+																								AND rsr.[id] IS NULL
 																						GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name]
-																						ORDER BY cin.[machine_name], cin.[instance_name]
+																						ORDER BY cin.[instance_name], cin.[machine_name]
 			OPEN crsDiskSpaceInformationPermissionErrors
 			FETCH NEXT FROM crsDiskSpaceInformationPermissionErrors INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @messageCount
 			WHILE @@FETCH_STATUS=0
@@ -1740,7 +1775,7 @@ BEGIN TRY
 																													AND cin.[machine_name] = @machineName
 																													AND lsam.descriptor IN (N'dbo.usp_hcCollectDiskSpaceUsage')
 																											GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
-																											ORDER BY cin.[machine_name], cin.[instance_name], [event_date_utc]
+																											ORDER BY cin.[instance_name], cin.[machine_name], [event_date_utc]
 					OPEN crsDiskSpaceInformationPermissionErrorsDetails
 					FETCH NEXT FROM crsDiskSpaceInformationPermissionErrorsDetails INTO @message, @eventDate
 					WHILE @@FETCH_STATUS=0
@@ -1833,6 +1868,10 @@ BEGIN TRY
 																										SELECT DISTINCT [project_id], [instance_id], [physical_drives] 
 																										FROM [dbo].[vw_statsHealthCheckDatabaseDetails]
 																									)   cdd ON cdd.[project_id] = cin.[project_id] AND cdd.[instance_id] = cin.[instance_id]
+																						LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																		AND rsr.[rule_id] = 262144
+																																		AND rsr.[active] = 1
+																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																						WHERE cin.[instance_active]=1
 																								AND cin.[project_id] = @projectID
 																								AND (    (	  dsi.[percent_available] IS NOT NULL 
@@ -1845,7 +1884,8 @@ BEGIN TRY
 																										)
 																									)
 																								AND (dsi.[logical_drive] IN ('C') OR CHARINDEX(dsi.[logical_drive], cdd.[physical_drives])>0)
-																						ORDER BY cin.[machine_name], cin.[instance_name]
+																								AND rsr.[id] IS NULL
+																						ORDER BY cin.[instance_name], cin.[machine_name]
 			OPEN crsDiskSpaceInformationIssuesDetected
 			FETCH NEXT FROM crsDiskSpaceInformationIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @logicalDrive, @volumeMountPoint, @diskTotalSizeMB, @diskAvailableSpaceMB, @diskPercentAvailable
 			WHILE @@FETCH_STATUS=0
@@ -1916,13 +1956,18 @@ BEGIN TRY
 																				FROM [dbo].[vw_catalogInstanceNames]  cin
 																				INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
 																				LEFT  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																				LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																AND rsr.[rule_id] = 128
+																																AND rsr.[active] = 1
+																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																				WHERE cin.[instance_active]=1
 																						AND cdn.[active]=1
 																						AND cin.[project_id] = @projectID	
 																						AND (   (cdn.[database_name]='master' AND shcdd.[size_mb] >= @configDBMaxSizeMaster AND @configDBMaxSizeMaster<>0)
 																							 OR (cdn.[database_name]='msdb'   AND shcdd.[size_mb] >= @configDBMaxSizeMSDB   AND @configDBMaxSizeMSDB<>0)
 																							)
-																				ORDER BY shcdd.[size_mb] DESC, cin.[machine_name], cin.[instance_name], cdn.[database_name]
+																						AND rsr.[id] IS NULL
+																				ORDER BY shcdd.[size_mb] DESC, cin.[instance_name], cin.[machine_name], cdn.[database_name]
 			OPEN crsDatabasesStatusIssuesDetected
 			FETCH NEXT FROM crsDatabasesStatusIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize
 			WHILE @@FETCH_STATUS=0
@@ -1992,11 +2037,16 @@ BEGIN TRY
 																				FROM [dbo].[vw_catalogInstanceNames]  cin
 																				INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
 																				INNER JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																				LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																AND rsr.[rule_id] = 512
+																																AND rsr.[active] = 1
+																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																				WHERE cin.[instance_active]=1
 																						AND cdn.[active]=1
 																						AND cin.[project_id] = @projectID
 																						AND (shcdd.[is_auto_close]=1 OR shcdd.[is_auto_shrink]=1)
-																				ORDER BY cin.[machine_name], cin.[instance_name], cdn.[database_name]
+																						AND rsr.[id] IS NULL
+																				ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
 			OPEN crsDatabasesStatusIssuesDetected
 			FETCH NEXT FROM crsDatabasesStatusIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @isAutoClose, @isAutoShrink
 			WHILE @@FETCH_STATUS=0
@@ -2067,11 +2117,16 @@ BEGIN TRY
 																					FROM [dbo].[vw_catalogInstanceNames]  cin
 																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
 																					INNER  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																					LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 1024
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
 																							AND cin.[project_id] = @projectID	
 																							AND shcdd.[log_size_mb] >= @configLogMaxSize 
-																					ORDER BY shcdd.[log_size_mb] DESC, cin.[machine_name], cin.[instance_name], cdn.[database_name]
+																							AND rsr.[id] IS NULL
+																					ORDER BY shcdd.[log_size_mb] DESC, cin.[instance_name], cin.[machine_name], cdn.[database_name]
 			OPEN crsDatabaseMaxLogSizeIssuesDetected
 			FETCH NEXT FROM crsDatabaseMaxLogSizeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @logSizeMB, @logSpaceUsedPercent
 			WHILE @@FETCH_STATUS=0
@@ -2147,6 +2202,10 @@ BEGIN TRY
 																					FROM [dbo].[vw_catalogInstanceNames]  cin
 																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
 																					INNER  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																					LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 2048
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
 																							AND cin.[project_id] = @projectID	
@@ -2154,8 +2213,9 @@ BEGIN TRY
 																							AND shcdd.[data_space_used_percent] <= @configDataSpaceMinPercent 
 																							AND @configDataSpaceMinPercent<>0
 																							AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb')
+																							AND rsr.[id] IS NULL
 																					ORDER BY --[reclaimable_space_mb] DESC, 
-																							 cin.[machine_name], cin.[instance_name], shcdd.[data_space_used_percent] DESC, cdn.[database_name]
+																							 cin.[instance_name], cin.[machine_name], shcdd.[data_space_used_percent] DESC, cdn.[database_name]
 			OPEN crsDatabaseMinDataSpaceIssuesDetected
 			FETCH NEXT FROM crsDatabaseMinDataSpaceIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @dataSizeMB, @dataSpaceUsedPercent, @reclaimableSpaceMB
 			WHILE @@FETCH_STATUS=0
@@ -2233,6 +2293,10 @@ BEGIN TRY
 																					FROM [dbo].[vw_catalogInstanceNames]  cin
 																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
 																					INNER  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																					LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 32768
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
 																							AND cin.[project_id] = @projectID	
@@ -2240,8 +2304,9 @@ BEGIN TRY
 																							AND shcdd.[log_space_used_percent] >= @configLogSpaceMaxPercent 
 																							AND @configLogSpaceMaxPercent<>0
 																							AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb')
+																							AND rsr.[id] IS NULL
 																					ORDER BY --[available_space_mb] DESC, 
-																							 cin.[machine_name], cin.[instance_name], shcdd.[data_space_used_percent] DESC, cdn.[database_name]
+																							 cin.[instance_name], cin.[machine_name], shcdd.[data_space_used_percent] DESC, cdn.[database_name]
 			OPEN crsDatabaseMaxLogSpaceIssuesDetected
 			FETCH NEXT FROM crsDatabaseMaxLogSpaceIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @logSizeMB, @logSpaceUsedPercent, @reclaimableSpaceMB
 			WHILE @@FETCH_STATUS=0
@@ -2322,6 +2387,10 @@ BEGIN TRY
 																								FROM [dbo].[vw_catalogInstanceNames]  cin
 																								INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
 																								INNER  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																								LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																				AND rsr.[rule_id] = 4096
+																																				AND rsr.[active] = 1
+																																				AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																								WHERE cin.[instance_active]=1
 																										AND cdn.[active]=1
 																										AND cin.[project_id] = @projectID	
@@ -2329,9 +2398,10 @@ BEGIN TRY
 																										AND (shcdd.[log_size_mb] / shcdd.[data_size_mb] * 100.) > @configLogVsDataPercent
 																										AND shcdd.[size_mb]>=@configDBMinSizeForAnalysis
 																										AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb')
+																										AND rsr.[id] IS NULL
 																							)X
 																						WHERE [log_vs_data] >= @configLogVsDataPercent
-																						ORDER BY [machine_name], [instance_name], [log_vs_data] DESC, [database_name]
+																						ORDER BY [instance_name], [machine_name], [log_vs_data] DESC, [database_name]
 			OPEN crsDatabaseLogVsDataSizeIssuesDetected
 			FETCH NEXT FROM crsDatabaseLogVsDataSizeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @dataSizeMB, @logSizeMB, @logVSDataPercent
 			WHILE @@FETCH_STATUS=0
@@ -2404,10 +2474,15 @@ BEGIN TRY
 																				FROM [dbo].[vw_catalogInstanceNames] cin
 																				INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
 																				LEFT  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																				LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																AND rsr.[rule_id] = 4194304
+																																AND rsr.[active] = 1
+																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																				WHERE	cin.[instance_active]=1
 																						AND cdn.[active]=1
 																						AND cin.[project_id] = @projectID	
 																						AND shcdd.[is_growth_limited]=1
+																						AND rsr.[id] IS NULL
 																				ORDER BY cdn.[database_name]
 			OPEN crsDatabaseFixedFileSizeIssuesDetected
 			FETCH NEXT FROM crsDatabaseFixedFileSizeIssuesDetected INTO  @instanceName, @databaseName, @stateDesc, @dbSize, @dataSizeMB, @dataSpaceUsedPercent, @logSizeMB, @logSpaceUsedPercent
@@ -2483,6 +2558,10 @@ BEGIN TRY
 																					FROM [dbo].[vw_catalogInstanceNames]  cin
 																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
 																					INNER JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																					LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 8388608
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
 																							AND cin.[project_id] = @projectID
@@ -2496,7 +2575,8 @@ BEGIN TRY
 																									)
 																								)
 																							AND CHARINDEX(cdn.[state_desc], @configAdmittedState)<>0
-																					ORDER BY cin.[machine_name], cin.[instance_name], cdn.[database_name]
+																							AND rsr.[id] IS NULL
+																					ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
 			OPEN crsDatabasePageVerifyIssuesDetected
 			FETCH NEXT FROM crsDatabasePageVerifyIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @version, @pageVerify, @compatibilityLevel
 			WHILE @@FETCH_STATUS=0
@@ -2610,11 +2690,15 @@ BEGIN TRY
 			SET @tmpHTMLReport=N''
 			SET @indexAnalyzedCount=0
 
-			DECLARE crsFrequentlyFragmentedIndexesMachineNames CURSOR READ_ONLY LOCAL FOR		SELECT    [instance_name]
+			DECLARE crsFrequentlyFragmentedIndexesMachineNames CURSOR READ_ONLY LOCAL FOR		SELECT    iff.[instance_name]
 																										, COUNT(*) AS [index_count]
-																								FROM [dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectCode, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, @analyzeIndexMaintenanceOperation)
-																								GROUP BY [instance_name]
-																								ORDER BY [instance_name]
+																								FROM [dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectCode, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, @analyzeIndexMaintenanceOperation) iff
+																								LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																				AND rsr.[rule_id] = 16777216
+																																				AND rsr.[active] = 1
+																																				AND (rsr.[skip_value]=iff.[instance_name])
+																								GROUP BY iff.[instance_name]
+																								ORDER BY iff.[instance_name]
 			OPEN crsFrequentlyFragmentedIndexesMachineNames
 			FETCH NEXT FROM crsFrequentlyFragmentedIndexesMachineNames INTO  @instanceName, @indexesPerInstance
 			WHILE @@FETCH_STATUS=0
@@ -2717,6 +2801,10 @@ BEGIN TRY
 																					FROM [dbo].[vw_catalogInstanceNames]  cin
 																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
 																					INNER  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																					LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 8192
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
 																							AND cin.[project_id] = @projectID	
@@ -2733,7 +2821,8 @@ BEGIN TRY
 																									)
 																								)
 																							AND CHARINDEX(cdn.[state_desc], @configAdmittedState)<>0
-																					ORDER BY [machine_name], [instance_name], [backup_age_days] DESC, [database_name]
+																							AND rsr.[id] IS NULL
+																					ORDER BY [instance_name], [machine_name], [backup_age_days] DESC, [database_name]
 			OPEN crsDatabaseBACKUPAgeIssuesDetected
 			FETCH NEXT FROM crsDatabaseBACKUPAgeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @lastBackupDate, @lastDatabaseEventAgeDays
 			WHILE @@FETCH_STATUS=0
@@ -2809,6 +2898,10 @@ BEGIN TRY
 																						FROM [dbo].[vw_catalogInstanceNames]  cin
 																						INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
 																						INNER  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																						LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																		AND rsr.[rule_id] = 16384
+																																		AND rsr.[active] = 1
+																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																						WHERE cin.[instance_active]=1
 																								AND cdn.[active]=1
 																								AND cin.[project_id] = @projectID	
@@ -2826,7 +2919,8 @@ BEGIN TRY
 																									)
 																								AND CHARINDEX(cdn.[state_desc], 'ONLINE')<>0
 																								AND cin.[version] NOT LIKE '8.%'
-																						ORDER BY [machine_name], [instance_name], [dbcc_checkdb_age_days] DESC, [database_name]
+																								AND rsr.[id] IS NULL
+																						ORDER BY [instance_name], [machine_name], [dbcc_checkdb_age_days] DESC, [database_name]
 			OPEN crsDatabaseDBCCCHECKDBAgeIssuesDetected
 			FETCH NEXT FROM crsDatabaseDBCCCHECKDBAgeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @lastCheckDBDate, @lastDatabaseEventAgeDays
 			WHILE @@FETCH_STATUS=0
@@ -2892,11 +2986,16 @@ BEGIN TRY
 																							, lsam.[message]
 																					FROM [dbo].[vw_catalogInstanceNames]  cin
 																					INNER JOIN [dbo].[vw_logServerAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+																					LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 524288
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																					WHERE	cin.[instance_active]=1
 																							AND cin.[project_id] = @projectID
 																							AND lsam.descriptor IN (N'dbo.usp_hcCollectErrorlogMessages')
+																							AND rsr.[id] IS NULL
 																					GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
-																					ORDER BY cin.[machine_name], cin.[instance_name], [event_date_utc]
+																					ORDER BY cin.[instance_name], cin.[machine_name], [event_date_utc]
 			OPEN crsErrorlogMessagesPermissionErrors
 			FETCH NEXT FROM crsErrorlogMessagesPermissionErrors INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @eventDate, @message
 			WHILE @@FETCH_STATUS=0
@@ -2965,6 +3064,10 @@ BEGIN TRY
 																						, COUNT(*) AS [messages_count]
 																				FROM [dbo].[vw_catalogInstanceNames]  cin
 																				INNER JOIN [dbo].[vw_statsSQLServerErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
+																				LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																AND rsr.[rule_id] = 1048576
+																																AND rsr.[active] = 1
+																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																				WHERE cin.[instance_active]=1
 																						AND cin.[project_id] = @projectID																							
 																						AND eld.[log_date] >= @dateTimeLowerLimit
@@ -2976,6 +3079,7 @@ BEGIN TRY
 																													AND chf.[active] = 1
 																													AND PATINDEX(chf.[filter_pattern], eld.[text]) > 0
 																										)
+																						AND rsr.[id] IS NULL
 																				GROUP BY cin.[instance_name]
 																				ORDER BY cin.[instance_name]
 			OPEN crsErrorlogMessagesInstanceName
@@ -3046,170 +3150,6 @@ BEGIN TRY
 			SET @HTMLReport = REPLACE(@HTMLReport, '{ErrorlogMessagesIssuesDetectedCount}', '(' + CAST((@issuesDetectedCount) AS [nvarchar]) + ')')
 		end
 
-		
-	-----------------------------------------------------------------------------------------------------
-	--OS Event Messages - Permission Errors
-	-----------------------------------------------------------------------------------------------------
-	IF (@flgActions & 32 = 32) AND (@flgOptions & 67108864 = 67108864)
-		begin
-			RAISERROR('	...Build Report: OS Event Messages - Permission Errors', 10, 1) WITH NOWAIT
-			
-			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
-							N'<A NAME="OSEventMessagesPermissionErrors" class="category-style">OS Event Messages - Permission Errors</A><br>
-							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
-							<TR VALIGN=TOP>
-								<TD WIDTH="1130px">
-									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
-										N'<TR class="color-3">
-											<TH WIDTH="120px" class="details-bold" nowrap>Machine Name</TH>
-											<TH WIDTH="120px" class="details-bold" nowrap>Clustered</TH>
-											<TH WIDTH="150px" class="details-bold" nowrap>Event Date (UTC)</TH>
-											<TH WIDTH="740px" class="details-bold">Message</TH>'
-
-			SET @idx=1		
-			SET @tmpHTMLReport=N''
-
-			DECLARE crsOSEventMessagesPermissionErrors CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name]
-																							, MAX(lsam.[event_date_utc]) [event_date_utc]
-																							, lsam.[message]
-																					FROM [dbo].[vw_catalogInstanceNames]  cin
-																					INNER JOIN [dbo].[vw_logServerAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
-																					WHERE	cin.[instance_active]=1
-																							AND cin.[project_id] = @projectID
-																							AND lsam.descriptor IN (N'dbo.usp_hcCollectOSEventLogs')
-																					GROUP BY cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
-																					ORDER BY cin.[machine_name], [event_date_utc]
-			OPEN crsOSEventMessagesPermissionErrors
-			FETCH NEXT FROM crsOSEventMessagesPermissionErrors INTO @machineName, @isClustered, @clusterNodeName, @eventDate, @message
-			WHILE @@FETCH_STATUS=0
-				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + @machineName + N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes<BR>' + ISNULL(N'[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
-										N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @eventDate, 121), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="740px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') + N'</TD>' + 
-									N'</TR>'
-					SET @idx=@idx+1
-
-					FETCH NEXT FROM crsOSEventMessagesPermissionErrors INTO @machineName, @isClustered, @clusterNodeName, @eventDate, @message
-				end
-			CLOSE crsOSEventMessagesPermissionErrors
-			DEALLOCATE crsOSEventMessagesPermissionErrors
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
-								</TD>
-							</TR>
-						</TABLE>'
-
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
-			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
-
-			SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesPermissionErrorsCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
-		end
-
-
-	-----------------------------------------------------------------------------------------------------
-	--OS Event Messages - Issues Detected
-	-----------------------------------------------------------------------------------------------------
-	IF (@flgActions & 32 = 32) AND (@flgOptions & 134217728 = 134217728)
-		begin
-			RAISERROR('	...Build Report: OS Event Messages - Issues Detected', 10, 1) WITH NOWAIT
-			
-			TRUNCATE TABLE #htmlReport
-			INSERT	INTO #htmlReport([html]) 
-					SELECT
-							N'<A NAME="OSEventMessagesIssuesDetected" class="category-style">OS Event Messages - Issues Detected (last ' + CAST(@configOSEventMessageLastHours AS [nvarchar]) + N'h)</A><br>
-							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
-							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="7">limit messages per machine to maximum ' + CAST(@configOSEventMessageLimit AS [nvarchar](32)) + N' </TD>
-							</TR>
-							<TR VALIGN=TOP>
-								<TD WIDTH="1130px">
-									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
-										N'<TR class="color-3">
-											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
-											<TH WIDTH="160px" class="details-bold" nowrap>Log Date</TH>
-											<TH WIDTH= "60px" class="details-bold" nowrap>Process Info</TH>
-											<TH WIDTH="710px" class="details-bold">Message</TH>'
-			SET @idx=1		
-
-			DECLARE   @logDate				[datetime]
-					, @processInfo			[sysname]
-					, @issuesDetectedCount	[int]
-			
-			SET @dateTimeLowerLimit = DATEADD(hh, -@configOSEventMessageLastHours, GETUTCDATE())
-			SET @issuesDetectedCount = 0 
-			DECLARE crsOSEventMessagesInstanceName CURSOR READ_ONLY LOCAL FOR	SELECT DISTINCT
-																						  oel.[machine_name]
-																						, COUNT(*) AS [messages_count]
-																				FROM [dbo].[vw_catalogInstanceNames]	cin
-																				INNER JOIN [dbo].[vw_statsOSEventLogs]	oel	ON oel.[project_id] = cin.[project_id] AND oel.[instance_id] = cin.[instance_id]
-																				WHERE cin.[instance_active]=1
-																						AND cin.[project_id] = @projectID																							
-																				GROUP BY oel.[machine_name]
-																				ORDER BY oel.[machine_name]
-			OPEN crsOSEventMessagesInstanceName
-			FETCH NEXT FROM crsOSEventMessagesInstanceName INTO @machineName, @messageCount
-			WHILE @@FETCH_STATUS=0
-				begin
-					IF @messageCount > @configOSEventMessageLimit SET @messageCount = @configOSEventMessageLimit
-					SET @issuesDetectedCount = @issuesDetectedCount + @messageCount
-
-					UPDATE #htmlReport SET [html] = [html] + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + '"><A NAME="OSEventMessagesCompleteDetails' + @instanceName + N'">' + @instanceName + N'</A></TD>' 
-
-					DECLARE crsOSEventMessagesCompleteDetails CURSOR READ_ONLY LOCAL FOR	SELECT  TOP (@configOSEventMessageLimit)
-																									oel.[machine_name], oel.[time_created], oel.[log_type_desc], oel.[level_desc], oel.[event_id], oel.[source], oel.[message]
-																							FROM [dbo].[vw_statsOSEventLogs]	oel
-																							WHERE	oel.[project_id]=@projectID
-																									AND oel.[machine_name] = @machineName
-																							ORDER BY oel.[time_created], oel.[record_id]
-					OPEN crsOSEventMessagesCompleteDetails
-					FETCH NEXT FROM crsOSEventMessagesCompleteDetails INTO @logDate, @processInfo, @message
-					WHILE @@FETCH_STATUS=0
-						begin
-							SET @message = ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') 
-
-							UPDATE #htmlReport SET [html] = [html] + 
-										N'<TD WIDTH="160px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @logDate, 121), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="60px" class="details" ALIGN="LEFT">' + ISNULL(@processInfo, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="710px" class="details" ALIGN="LEFT">' + @message + N'</TD>' + 
-									N'</TR>'
-
-							SET @messageCount = @messageCount-1
-							IF @messageCount>0
-								UPDATE #htmlReport SET [html] = [html] + N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
-
-							FETCH NEXT FROM crsOSEventMessagesCompleteDetails INTO @logDate, @processInfo, @message
-						end
-					CLOSE crsOSEventMessagesCompleteDetails
-					DEALLOCATE crsOSEventMessagesCompleteDetails
-
-					SET @idx=@idx+1
-
-					FETCH NEXT FROM crsOSEventMessagesInstanceName INTO @instanceName, @messageCount
-				end
-			CLOSE crsOSEventMessagesInstanceName
-			DEALLOCATE crsOSEventMessagesInstanceName
-
-
-			UPDATE #htmlReport SET [html] = [html] + N'</TABLE>';
-			UPDATE #htmlReport SET [html] = [html] + N'
-								</TD>
-							</TR>
-						</TABLE>'
-
-			UPDATE #htmlReport SET [html] = [html] + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
-			SELECT @HTMLReport = @HTMLReport + [html]
-			FROM #htmlReport
-
-			SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesIssuesDetectedCount}', '(' + CAST((@issuesDetectedCount) AS [nvarchar]) + ')')
-		end
-		
 	
 	-----------------------------------------------------------------------------------------------------
 	--Databases Status - Complete Details
@@ -3247,12 +3187,18 @@ BEGIN TRY
 																							, COUNT(*) AS [database_count]
 																					FROM [dbo].[vw_catalogInstanceNames]  cin
 																					INNER JOIN [dbo].[vw_catalogDatabaseNames] cdn ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																					LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 8
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
 																							AND cin.[project_id] = @projectID	
+																							AND rsr.[id] IS NULL
 																					GROUP BY cin.[machine_name], cin.[instance_name]
 																							, cin.[is_clustered], cin.[cluster_node_machine_name]
-																					ORDER BY cin.[machine_name], cin.[instance_name]
+																					ORDER BY cin.[instance_name], cin.[machine_name]
 			OPEN crsDatabasesStatusMachineNames
 			FETCH NEXT FROM crsDatabasesStatusMachineNames INTO  @machineName, @instanceName, @dbCount
 			WHILE @@FETCH_STATUS=0
@@ -3350,11 +3296,16 @@ BEGIN TRY
 			SET @idx=1		
 			SET @tmpHTMLReport=N''
 			
-			DECLARE crsSQLServerAgentJobsInstanceName CURSOR READ_ONLY LOCAL FOR	SELECT	[instance_name], COUNT(*) AS [job_count]
-																					FROM	[dbo].[vw_statsSQLServerAgentJobsHistory]
-																					WHERE	[project_id]=@projectID
-																					GROUP BY [instance_name]
-																					ORDER BY [instance_name]
+			DECLARE crsSQLServerAgentJobsInstanceName CURSOR READ_ONLY LOCAL FOR	SELECT	ssajh.[instance_name], COUNT(*) AS [job_count]
+																					FROM	[dbo].[vw_statsSQLServerAgentJobsHistory] ssajh
+																					LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 32
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value]=ssajh.[instance_name])
+																					WHERE	ssajh.[project_id]=@projectID
+																							AND rsr.[id] IS NULL
+																					GROUP BY ssajh.[instance_name]
+																					ORDER BY ssajh.[instance_name]
 			OPEN crsSQLServerAgentJobsInstanceName
 			FETCH NEXT FROM crsSQLServerAgentJobsInstanceName INTO @instanceName, @jobCount
 			WHILE @@FETCH_STATUS=0
@@ -3460,8 +3411,13 @@ BEGIN TRY
 																								, COUNT(*) AS [volume_count]
 																						FROM [dbo].[vw_catalogInstanceNames]  cin
 																						INNER JOIN [dbo].[vw_statsHealthCheckDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
+																						LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																		AND rsr.[rule_id] = 65536
+																																		AND rsr.[active] = 1
+																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																						WHERE cin.[instance_active]=1
-																								AND cin.[project_id] = @projectID	
+																								AND cin.[project_id] = @projectID
+																								AND rsr.[id] IS NULL	
 																						GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name]
 																						ORDER BY cin.[machine_name]/*, cin.[instance_name]*/
 			OPEN crsDiskSpaceInformationMachineNames
@@ -3558,9 +3514,14 @@ BEGIN TRY
 																						, COUNT(*) AS [messages_count]
 																				FROM [dbo].[vw_catalogInstanceNames]  cin
 																				INNER JOIN [dbo].[vw_statsSQLServerErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
+																				LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																AND rsr.[rule_id] = 2097152
+																																AND rsr.[active] = 1
+																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																				WHERE cin.[instance_active]=1
 																						AND cin.[project_id] = @projectID	
 																						AND eld.[log_date] >= @dateTimeLowerLimit
+																						AND rsr.[id] IS NULL
 																				GROUP BY cin.[instance_name]
 																				ORDER BY cin.[instance_name]
 			OPEN crsErrorlogMessagesInstanceName
@@ -3621,6 +3582,188 @@ BEGIN TRY
 			UPDATE #htmlReport SET [html] = [html] + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SELECT @HTMLReport = @HTMLReport + [html]
 			FROM #htmlReport				
+		end
+
+
+	-----------------------------------------------------------------------------------------------------
+	--OS Event Messages - Permission Errors
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 32 = 32) AND (@flgOptions & 67108864 = 67108864)
+		begin
+			RAISERROR('	...Build Report: OS Event Messages - Permission Errors', 10, 1) WITH NOWAIT
+			
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea =@HTMLReportArea + 
+							N'<A NAME="OSEventMessagesPermissionErrors" class="category-style">OS Event Messages - Permission Errors</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="120px" class="details-bold" nowrap>Machine Name</TH>
+											<TH WIDTH="120px" class="details-bold" nowrap>Clustered</TH>
+											<TH WIDTH="150px" class="details-bold" nowrap>Event Date (UTC)</TH>
+											<TH WIDTH="740px" class="details-bold">Message</TH>'
+
+			SET @idx=1		
+			SET @tmpHTMLReport=N''
+
+			DECLARE crsOSEventMessagesPermissionErrors CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name]
+																							, MAX(lsam.[event_date_utc]) [event_date_utc]
+																							, lsam.[message]
+																					FROM [dbo].[vw_catalogInstanceNames]  cin
+																					INNER JOIN [dbo].[vw_logServerAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+																					LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 67108864
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																					WHERE	cin.[instance_active]=1
+																							AND cin.[project_id] = @projectID
+																							AND lsam.descriptor IN (N'dbo.usp_hcCollectOSEventLogs')
+																							AND rsr.[id] IS NULL
+																					GROUP BY cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
+																					ORDER BY cin.[machine_name], [event_date_utc]
+			OPEN crsOSEventMessagesPermissionErrors
+			FETCH NEXT FROM crsOSEventMessagesPermissionErrors INTO @machineName, @isClustered, @clusterNodeName, @eventDate, @message
+			WHILE @@FETCH_STATUS=0
+				begin
+					SET @tmpHTMLReport=@tmpHTMLReport + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + @machineName + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes<BR>' + ISNULL(N'[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
+										N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @eventDate, 121), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="740px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') + N'</TD>' + 
+									N'</TR>'
+					SET @idx=@idx+1
+
+					FETCH NEXT FROM crsOSEventMessagesPermissionErrors INTO @machineName, @isClustered, @clusterNodeName, @eventDate, @message
+				end
+			CLOSE crsOSEventMessagesPermissionErrors
+			DEALLOCATE crsOSEventMessagesPermissionErrors
+
+			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
+			SET @HTMLReportArea =@HTMLReportArea + N'
+								</TD>
+							</TR>
+						</TABLE>'
+
+			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesPermissionErrorsCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
+		end
+
+
+	-----------------------------------------------------------------------------------------------------
+	--OS Event messages - Complete Details
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 32 = 32) AND (@flgOptions & 134217728 = 134217728)
+		begin
+			RAISERROR('	...Build Report: OS Event messages - Complete Details', 10, 1) WITH NOWAIT
+			
+			TRUNCATE TABLE #htmlReport
+			INSERT	INTO #htmlReport([html]) 
+					SELECT
+							N'<A NAME="OSEventMessagesCompleteDetails" class="category-style">OS Event messages - Complete Details (last ' + CAST(@configOSEventMessageLastHours AS [nvarchar]) + N'h)</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="7">limit messages per machine to maximum ' + CAST(@configOSEventMessageLimit AS [nvarchar](32)) + N' </TD>
+							</TR>
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="200px" class="details-bold" nowrap>Machine Name</TH>
+											<TH WIDTH="120px" class="details-bold" nowrap>Event Time</TH>
+											<TH WIDTH=" 80px" class="details-bold" nowrap>Log Name</TH>
+											<TH WIDTH=" 60px" class="details-bold" nowrap>Level</TH>
+											<TH WIDTH=" 60px" class="details-bold" nowrap>Event ID</TH>
+											<TH WIDTH="120px" class="details-bold">Source</TH>
+											<TH WIDTH="480px" class="details-bold">Message</TH>'
+			SET @idx=1		
+			
+			DECLARE   @logType		[sysname]
+					, @logLevel		[sysname]
+					, @eventID		[int]
+					, @source		[nvarchar](512)
+
+			SET @dateTimeLowerLimit = DATEADD(hh, -@configOSEventMessageLastHours, GETUTCDATE())
+			SET @issuesDetectedCount = 0 
+			DECLARE crsOSEventMessagesInstanceName CURSOR READ_ONLY LOCAL FOR	SELECT DISTINCT
+																						  oel.[machine_name]
+																						, COUNT(*) AS [messages_count]
+																				FROM [dbo].[vw_catalogInstanceNames]	cin
+																				INNER JOIN [dbo].[vw_statsOSEventLogs]	oel	ON oel.[project_id] = cin.[project_id] AND oel.[instance_id] = cin.[instance_id]
+																				LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																AND rsr.[rule_id] = 134217728
+																																AND rsr.[active] = 1
+																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																				WHERE cin.[instance_active]=1
+																						AND cin.[project_id] = @projectID
+																						AND rsr.[id] IS NULL
+																				GROUP BY oel.[machine_name]
+																				ORDER BY oel.[machine_name]
+			OPEN crsOSEventMessagesInstanceName
+			FETCH NEXT FROM crsOSEventMessagesInstanceName INTO @machineName, @messageCount
+			WHILE @@FETCH_STATUS=0
+				begin
+					IF @messageCount > @configOSEventMessageLimit SET @messageCount = @configOSEventMessageLimit
+					SET @issuesDetectedCount = @issuesDetectedCount + @messageCount
+
+					UPDATE #htmlReport SET [html] = [html] + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + '"><A NAME="OSEventMessagesCompleteDetails' + @machineName + N'">' + @machineName + N'</A></TD>' 
+
+					DECLARE crsOSEventMessagesCompleteDetails CURSOR READ_ONLY LOCAL FOR	SELECT  TOP (@configOSEventMessageLimit)
+																									oel.[time_created], oel.[log_type_desc], oel.[level_desc], 
+																									oel.[event_id], oel.[source], oel.[message]
+																							FROM [dbo].[vw_statsOSEventLogs]	oel
+																							WHERE	oel.[project_id]=@projectID
+																									AND oel.[machine_name] = @machineName
+																							ORDER BY oel.[time_created], oel.[record_id]
+					OPEN crsOSEventMessagesCompleteDetails
+					FETCH NEXT FROM crsOSEventMessagesCompleteDetails INTO @logDate, @logType, @logLevel, @eventID, @source, @message
+					WHILE @@FETCH_STATUS=0
+						begin
+							SET @message = ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') 
+
+							UPDATE #htmlReport SET [html] = [html] + 
+										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @logDate, 121), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH=" 80px" class="details" ALIGN="LEFT" >' + ISNULL(@logType, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH=" 60px" class="details" ALIGN="LEFT">' + ISNULL(@logLevel, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH=" 60px" class="details" ALIGN="LEFT">' + ISNULL(CAST(@eventID AS [nvarchar]), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL(@source, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="480px" class="details" ALIGN="LEFT">' + @message + N'</TD>' + 
+									N'</TR>'
+
+							SET @messageCount = @messageCount-1
+							IF @messageCount>0
+								UPDATE #htmlReport SET [html] = [html] + N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+
+							FETCH NEXT FROM crsOSEventMessagesCompleteDetails INTO @logDate, @logType, @logLevel, @eventID, @source, @message
+						end
+					CLOSE crsOSEventMessagesCompleteDetails
+					DEALLOCATE crsOSEventMessagesCompleteDetails
+
+					SET @idx=@idx+1
+
+					FETCH NEXT FROM crsOSEventMessagesInstanceName INTO @machineName, @messageCount
+				end
+			CLOSE crsOSEventMessagesInstanceName
+			DEALLOCATE crsOSEventMessagesInstanceName
+
+
+			UPDATE #htmlReport SET [html] = [html] + N'</TABLE>';
+			UPDATE #htmlReport SET [html] = [html] + N'
+								</TD>
+							</TR>
+						</TABLE>'
+
+			UPDATE #htmlReport SET [html] = [html] + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SELECT @HTMLReport = @HTMLReport + [html]
+			FROM #htmlReport
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesIssuesDetectedCount}', '(' + CAST((@issuesDetectedCount) AS [nvarchar]) + ')')
 		end
 
 

@@ -77,8 +77,6 @@ GO
 
 CREATE INDEX [IX_jobExecutionQueue_InstanceID] ON [dbo].[jobExecutionQueue]([instance_id], [project_id]) ON [FG_Statistics_Index]
 GO
-CREATE INDEX [IX_jobExecutionQueue_ForInstanceID] ON [dbo].[jobExecutionQueue]([for_instance_id], [project_id]) ON [FG_Statistics_Index]
-GO
 CREATE INDEX [IX_jobExecutionQueue_ProjectID] ON [dbo].[jobExecutionQueue] ([project_id], [event_date_utc]) INCLUDE ([instance_id]) ON [FG_Statistics_Index]
 GO
 CREATE INDEX [IX_jobExecutionQueue_JobName] ON [dbo].[jobExecutionQueue]([job_name], [job_step_name]) ON [FG_Statistics_Index]

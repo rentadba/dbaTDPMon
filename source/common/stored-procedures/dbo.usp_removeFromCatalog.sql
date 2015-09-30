@@ -61,6 +61,20 @@ BEGIN TRY
 
 	BEGIN TRANSACTION
 		-----------------------------------------------------------------------------------------------------
+		DELETE jeq
+		FROM dbo.jobExecutionQueue jeq
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = jeq.[project_id] AND cin.[id] = jeq.[instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[id] = @instanceID
+
+		-----------------------------------------------------------------------------------------------------
+		DELETE jeq
+		FROM dbo.jobExecutionQueue jeq
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = jeq.[project_id] AND cin.[id] = jeq.[for_instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[id] = @instanceID
+	
+		-----------------------------------------------------------------------------------------------------
 		DELETE lem
 		FROM dbo.logEventMessages lem
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = lem.[project_id] AND cin.[id] = lem.[instance_id]
@@ -71,6 +85,13 @@ BEGIN TRY
 		DELETE lsam
 		FROM dbo.logServerAnalysisMessages lsam
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = lsam.[project_id] AND cin.[id] = lsam.[instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[id] = @instanceID
+
+		-----------------------------------------------------------------------------------------------------
+		DELETE sosel
+		FROM dbo.statsOSEventLogs sosel
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = sosel.[project_id] AND cin.[id] = sosel.[instance_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[id] = @instanceID
 

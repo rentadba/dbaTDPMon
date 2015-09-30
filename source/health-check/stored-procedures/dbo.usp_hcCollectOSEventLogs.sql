@@ -220,6 +220,7 @@ FROM [dbo].[logServerAnalysisMessages]	lsam
 INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = lsam.[instance_id] AND cin.[project_id] = lsam.[project_id]
 WHERE cin.[project_id] = @projectID
 		AND cin.[name] LIKE @sqlServerNameFilter
+		AND lsam.[descriptor]='dbo.usp_hcCollectOSEventLogs'
 
 
 -------------------------------------------------------------------------------------------------------------------------
@@ -291,8 +292,7 @@ WHILE @@FETCH_STATUS=0
 				WHERE cin.[project_id] = @projectID
 						AND cin.[id]= @instanceID
 						AND lsam.[descriptor]=@eventDescriptor
-
-
+						
 				SET @queryToRun='SELECT CONVERT([varchar](20), GETDATE(), 120) AS [current_date]'
 				SET @queryToRun = dbo.ufn_formatSQLQueryForLinkedServer(@instanceName, @queryToRun)
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
@@ -522,6 +522,7 @@ DELETE lsam
 FROM [dbo].[logServerAnalysisMessages]	lsam
 INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = lsam.[instance_id] AND cin.[project_id] = lsam.[project_id]
 WHERE cin.[project_id] = @projectID
+		AND cin.[name] LIKE @sqlServerNameFilter
 		AND lsam.[descriptor]=@eventDescriptor
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/

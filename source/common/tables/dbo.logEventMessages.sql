@@ -65,9 +65,6 @@ CREATE TABLE [dbo].[logEventMessages]
 
 EXEC (@queryToRun)
 
-SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_ProjecteID] ON [dbo].[logEventMessages]([project_id]) ON [FG_Statistics_Index]'
-EXEC (@queryToRun)
-
 SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_InstanceID] ON [dbo].[logEventMessages]([instance_id], [project_id])' + CASE WHEN @SQLMajorVersion>8 THEN ' INCLUDE ([remote_event_id])' ELSE '' END + ' ON [FG_Statistics_Index]'
 EXEC (@queryToRun)
 

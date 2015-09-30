@@ -27,10 +27,9 @@ begin
 			, @nodeName			[sysname]
 
 	SET @clusterNodes = N''
-	DECLARE crsClusterNodes CURSOR LOCAL READ_ONLY FOR	SELECT	cmn.[name]
-														FROM	[dbo].[catalogMachineNames] cmn
-														INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[machine_id] = cmn.[id] AND cin.[project_id] = cmn.[project_id]
-														WHERE	cin.[name] = @instanceName
+	DECLARE crsClusterNodes CURSOR LOCAL READ_ONLY FOR	SELECT	cin.[machine_name]
+														FROM	[dbo].[vw_catalogInstanceNames] cin
+														WHERE	cin.[instance_name] = @instanceName
 																AND cin.[project_id] = @projectID
 																AND cin.[is_clustered] = 1
 	OPEN crsClusterNodes
