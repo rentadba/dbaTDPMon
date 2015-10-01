@@ -10,12 +10,6 @@ IF NOT EXISTS(SELECT * FROM [dbo].[appConfigurations] WHERE [name] = 'Parallel D
 			SELECT 'health-check'		AS [module], 'Parallel Data Collecting Jobs'												AS [name], '16'			AS [value]
 GO
 
-IF NOT EXISTS(SELECT * FROM [dbo].[reportHTMLOptions] WHERE [name] = 'OS Event Messages Limit to Max')
-	INSERT	INTO [dbo].[reportHTMLOptions] ([module], [name], [value], [description])
-			SELECT 'health-check' AS [module], N'OS Event Messages Limit to Max'					AS [name], '500'				AS [value], 'limit os event messages to a maximum number; default 500'				    AS [description]
-GO
-
-
 RAISERROR('Create procedure: [dbo].[usp_createFolderOnDisk]', 10, 1) WITH NOWAIT
 GO
 IF  EXISTS (
