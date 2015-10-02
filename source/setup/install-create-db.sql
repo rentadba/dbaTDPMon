@@ -5,19 +5,44 @@ USE [master]
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-CREATE DATABASE [$(dbName)] ON  PRIMARY 
-( NAME = N'Primary', FILENAME = N'$(data_files_path)$(dbName)_primary.mdf' , SIZE = 8MB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024MB ), 
+
+DECLARE   @dataFilePath [nvarchar](260)
+        , @logFilePath	[nvarchar](260)
+		, @queryToRun	[nvarchar](4000)
+
+SET @dataFilePath = '$(data_files_path)'
+SET @logFilePath = '$(data_files_path)'
+
+/* try to read default data and log file location from registry */
+IF ISNULL(@dataFilePath, '')=''
+	EXEC master.dbo.xp_instance_regread   N'HKEY_LOCAL_MACHINE'
+										, N'Software\Microsoft\MSSQLServer\MSSQLServer'
+										, N'DefaultData'
+										, @dataFilePath output;
+
+IF ISNULL(@logFilePath, '')=''
+	EXEC master.dbo.xp_instance_regread	  N'HKEY_LOCAL_MACHINE'
+										, N'Software\Microsoft\MSSQLServer\MSSQLServer'
+										, N'DefaultLog'
+										, @logFilePath output;
+
+IF RIGHT(@dataFilePath, 1)<>'\' SET @dataFilePath = @dataFilePath + '\'
+IF RIGHT(@logFilePath, 1)<>'\'	SET @logFilePath = @logFilePath + '\'
+
+SET @queryToRun = N'CREATE DATABASE [$(dbName)] ON  PRIMARY 
+( NAME = N''Primary'', FILENAME = ''' + @dataFilePath + N'$(dbName)_primary.mdf'' , SIZE = 8MB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024MB ), 
  FILEGROUP [FG_Snapshots_Data] 
-( NAME = N'Snapshots_Data_1', FILENAME = N'$(data_files_path)$(dbName)_data_snapshots_1.ndf' , SIZE = 8MB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024MB ), 
+( NAME = N''Snapshots_Data_1'', FILENAME = ''' + @dataFilePath + N'$(dbName)_data_snapshots_1.ndf'' , SIZE = 8MB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024MB ), 
  FILEGROUP [FG_Snapshots_Index] 
-( NAME = N'Snapshots_Index_1', FILENAME = N'$(data_files_path)$(dbName)_index_snapshots_1.ndf' , SIZE = 8MB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024MB ),
+( NAME = N''Snapshots_Index_1'', FILENAME = ''' + @dataFilePath + N'$(dbName)_index_snapshots_1.ndf'' , SIZE = 8MB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024MB ),
  FILEGROUP [FG_Statistics_Data] 
-( NAME = N'Statistics_Data_1', FILENAME = N'$(data_files_path)$(dbName)_data_statistics_1.ndf' , SIZE = 8MB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024MB ), 
+( NAME = N''Statistics_Data_1'', FILENAME = ''' + @dataFilePath + N'$(dbName)_data_statistics_1.ndf'' , SIZE = 8MB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024MB ), 
  FILEGROUP [FG_Statistics_Index] 
-( NAME = N'Statistics_Index_1', FILENAME = N'$(data_files_path)$(dbName)_index_statistics_1.ndf' , SIZE = 8MB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024MB )
+( NAME = N''Statistics_Index_1'', FILENAME = ''' + @dataFilePath + N'$(dbName)_index_statistics_1.ndf'' , SIZE = 8MB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024MB )
  LOG ON 
-( NAME = N'Log_1', FILENAME = N'$(log_files_path)$(dbName)_log_1.ldf' , SIZE = 32MB , MAXSIZE = UNLIMITED , FILEGROWTH = 1024MB)
---COLLATE SQL_Latin1_General_CP1_CS_AS
+( NAME = N''Log_1'', FILENAME = ''' + @logFilePath + N'$(dbName)_log_1.ldf'' , SIZE = 32MB , MAXSIZE = UNLIMITED , FILEGROWTH = 1024MB)'
+
+EXEC (@queryToRun)
 GO
 
 

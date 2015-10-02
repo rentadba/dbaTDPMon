@@ -8,8 +8,6 @@ if "%1" == "/?" goto help
 if  !%1==! goto error
 if  !%2==! goto error
 if  !%3==! goto error
-if  !%4==! goto error
-if  !%5==! goto error
 
 set server=%1
 set dbname=%2
@@ -19,7 +17,9 @@ set log_files_path=%5
 set userid=%6
 set password=%7
 
-if  !%6==! goto trusted_connection
+if !%4==! set data_files_path=""
+if !%5==! set log_files_path=""
+if !%6==! goto trusted_connection
 
 set autentif=-U%userid% -P%password%
 
@@ -228,91 +228,11 @@ if errorlevel 1 goto install_err
 
 
 
-if %module%=="all" goto hc
+if %module%=="all" goto mp
 if %module%=="health-check" goto hc
 if %module%=="maintenance-plan" goto mp
 if %module%=="maintenance-plan-2k" goto mp
 goto help
-
-:hc
-echo *-----------------------------------------------------------------------------*
-echo Health Check: Creating Table / Views and Indexes...
-echo *-----------------------------------------------------------------------------*
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsHealthCheckDatabaseDetails.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsSQLServerAgentJobsHistory.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsHealthCheckDiskSpaceInfo.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsSQLServerErrorlogDetails.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsOSEventLogs.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsHealthCheckDatabaseDetails.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsSQLServerAgentJobsHistory.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsHealthCheckDiskSpaceInfo.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsSQLServerErrorlogDetails.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsOSEventLogs.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-
-echo Health Check: Creating Functions / Stored Procedures
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\functions\dbo.ufn_hcGetIndexesFrequentlyFragmented.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectDatabaseDetails.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectSQLServerAgentJobsStatus.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectDiskSpaceUsage.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectEventMessages.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectErrorlogMessages.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectOSEventLogs.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_reportHTMLBuildHealthCheck.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcChangeFillFactorForIndexesFrequentlyFragmented.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcJobQueueCreate.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-
-echo *-----------------------------------------------------------------------------*
-echo Health Check: Creating SQL Server Agent Jobs
-echo *-----------------------------------------------------------------------------*
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\job-scripts\job-script-dbaTDPMon - Discovery & Health Check.sql" -d %dbname% -v dbName=%dbname% -b -r 1
-if errorlevel 1 goto install_err
-
-if %module%=="all" goto mp
-if %module%=="health-check" goto done
-goto done
 
 
 :mp
@@ -399,10 +319,87 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Log.sql" -d %dbname% -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
-if %module%=="all" goto done
-if %module%=="health-check" goto done
+if %module%=="all" goto hc
 goto done
 
+:hc
+echo *-----------------------------------------------------------------------------*
+echo Health Check: Creating Table / Views and Indexes...
+echo *-----------------------------------------------------------------------------*
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsHealthCheckDatabaseDetails.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsSQLServerAgentJobsHistory.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsHealthCheckDiskSpaceInfo.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsSQLServerErrorlogDetails.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsOSEventLogs.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsHealthCheckDatabaseDetails.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsSQLServerAgentJobsHistory.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsHealthCheckDiskSpaceInfo.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsSQLServerErrorlogDetails.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsOSEventLogs.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+
+echo Health Check: Creating Functions / Stored Procedures
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\functions\dbo.ufn_hcGetIndexesFrequentlyFragmented.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectDatabaseDetails.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectSQLServerAgentJobsStatus.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectDiskSpaceUsage.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectEventMessages.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectErrorlogMessages.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectOSEventLogs.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_reportHTMLBuildHealthCheck.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcChangeFillFactorForIndexesFrequentlyFragmented.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcJobQueueCreate.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+
+echo *-----------------------------------------------------------------------------*
+echo Health Check: Creating SQL Server Agent Jobs
+echo *-----------------------------------------------------------------------------*
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\job-scripts\job-script-dbaTDPMon - Discovery & Health Check.sql" -d %dbname% -v dbName=%dbname% -b -r 1
+if errorlevel 1 goto install_err
+
+if %module%=="all" goto done
+goto done
 
 :done
 echo The installation was successful.

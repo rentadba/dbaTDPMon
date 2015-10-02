@@ -310,3 +310,4 @@
 
 /* 02.10.2015 */
 	- add option to read last N errorlog files (to avoid losing messages while cycling the log frequently)
+	- change install to use DefaultData and DefaultLog registry key for database files path, if not specified
