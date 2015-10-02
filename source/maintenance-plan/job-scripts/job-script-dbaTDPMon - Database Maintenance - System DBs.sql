@@ -277,10 +277,22 @@ IF DATEPART(dw, GETUTCDATE())=7
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'
 /* keep only last 6 months of backup history */
-DECLARE   @oldestDate	[datetime]
+DECLARE		@oldestDate	[datetime],
+			@str		[varchar](32)
 
-SET @oldestDate=DATEADD(month, -6, GETDATE())
-EXEC msdb.dbo.sp_delete_backuphistory @oldest_date = @oldestDate'
+SELECT @oldestDate=MIN([backup_finish_date])
+FROM [msdb].[dbo].[backupset]
+
+WHILE @oldestDate <= DATEADD(month, -6, GETDATE())
+	begin
+		SET @oldestDate=DATEADD(day, 1, @oldestDate)
+		SET @str=CONVERT([varchar](20), @oldestDate, 120)
+
+		RAISERROR(@str, 10, 1) WITH NOWAIT
+
+		EXEC msdb.dbo.sp_delete_backuphistory @oldest_date = @oldestDate
+	end
+'
 	
 	IF @SQLMajorVersion > 8
 		begin

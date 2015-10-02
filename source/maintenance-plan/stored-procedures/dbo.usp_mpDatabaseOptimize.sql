@@ -358,7 +358,6 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 							WHERE	ob.[name] LIKE ''' + @TableName + '''
 									AND sc.[name] LIKE ''' + @TableSchema + '''
 									AND si.[type] IN (' + @analyzeIndexType + N')
-									AND ob.[is_ms_shipped]=0
 									AND ob.[type] IN (''U'', ''V'')'
 
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
@@ -552,7 +551,6 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 										AND sc.[name] LIKE ''' + @TableSchema + '''
 										AND si.[type] IN (' + @analyzeIndexType + N')
 										AND si.[is_disabled]=0
-										AND ob.[is_ms_shipped]=0
 										AND ob.[type] IN (''U'', ''V'')'
 		ELSE
 			SET @queryToRun = @queryToRun + 
@@ -636,7 +634,6 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 										CROSS APPLY [' + @DBName + '].sys.dm_db_stats_properties(ss.object_id, ss.stats_id) AS sp
 										WHERE	ob.[name] LIKE ''' + @TableName + '''
 												AND sc.[name] LIKE ''' + @TableSchema + '''
-												AND ob.[is_ms_shipped] = 0
 												AND sp.[rows] > 0
 												AND (    (    DATEDIFF(dd, sp.[last_updated], GETDATE()) >= ' + CAST(@StatsAgeDays AS [nvarchar](32)) + N' 
 														  AND sp.[modification_counter] <> 0
@@ -681,7 +678,6 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 											END + N'
 										WHERE	ob.[name] LIKE ''' + @TableName + '''
 												AND sc.[name] LIKE ''' + @TableSchema + '''
-												AND ob.[is_ms_shipped] = 0
 												AND si.[rowcnt] > 0
 												AND (    (    DATEDIFF(dd, STATS_DATE(si.[id], si.[indid]), GETDATE()) >= ' + CAST(@StatsAgeDays AS [nvarchar](32)) + N'
 														  AND si.[rowmodctr] <> 0

@@ -301,3 +301,12 @@
 	- add option to skip an instance or machine name from being included in the health-check report rules
 	- add OS event messages information to health check report
 	- version 2015.10 released
+
+/*----------------------------------------------------------------------*/
+/* October 2015 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 01.10.2015 */
+	- add script for creating additional indexes on msdb to help improving system maintenance execution times (http://sqlperformance.com/2015/07/sql-maintenance/msdb)
+
+/* 02.10.2015 */
+	- add option to read last N errorlog files (to avoid losing messages while cycling the log frequently)

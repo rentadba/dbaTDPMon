@@ -40,7 +40,8 @@ DECLARE @projectID				[smallint],
 		@lineID					[int]
 
 DECLARE @SQLMajorVersion		[int],
-		@sqlServerVersion		[sysname]
+		@sqlServerVersion		[sysname],
+		@configErrorlogFileNo	[int]
 
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
@@ -74,6 +75,20 @@ IF @projectID IS NULL
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=1
 	end
 
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--check the option for number of errorlog files to be analyzed
+BEGIN TRY
+	SELECT	@configErrorlogFileNo = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = N'Collect SQL Errorlog last files'
+			AND [module] = 'health-check'
+END TRY
+BEGIN CATCH
+	SET @configErrorlogFileNo = 1
+END CATCH
+
+SET @configErrorlogFileNo = ISNULL(@configErrorlogFileNo, 1)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --
@@ -118,37 +133,44 @@ WHILE @@FETCH_STATUS=0
 			SET @SQLMajorVersion = 8
 		END CATCH
 
-		/* get errorlog messages */
-		IF @sqlServerName <> @@SERVERNAME
-			begin
-				IF @SQLMajorVersion < 11
-					SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog'')x'
-				ELSE
-					SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog WITH RESULT SETS(([log_date] [datetime] NULL, [process_info] [sysname] NULL, [text] [varchar](max) NULL))'')x'
-			end
-		ELSE
-			SET @queryToRun = N'xp_readerrorlog'
-
 		TRUNCATE TABLE #xpReadErrorLog
-		BEGIN TRY
-			IF @SQLMajorVersion > 8 
-				INSERT	INTO #xpReadErrorLog([log_date], [process_info], [text])
-						EXEC (@queryToRun)
-			ELSE
-				INSERT	INTO #xpReadErrorLog([text], [continuation_row])
-						EXEC (@queryToRun)
-		END TRY
-		BEGIN CATCH
-			SET @strMessage = ERROR_MESSAGE()
-			PRINT @strMessage
 
-			INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
-					SELECT  @instanceID
-							, @projectID
-							, GETUTCDATE()
-							, 'dbo.usp_hcCollectErrorlogMessages'
-							, @strMessage
-		END CATCH
+		/* get errorlog messages */
+		WHILE @configErrorlogFileNo > 0
+			begin
+				IF @sqlServerName <> @@SERVERNAME
+					begin
+						IF @SQLMajorVersion < 11
+							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@configErrorlogFileNo-1) AS [nvarchar]) + ''')x'
+						ELSE
+							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@configErrorlogFileNo-1) AS [nvarchar]) + ' WITH RESULT SETS(([log_date] [datetime] NULL, [process_info] [sysname] NULL, [text] [varchar](max) NULL))'')x'
+					end
+				ELSE
+					SET @queryToRun = N'xp_readerrorlog ' + CAST((@configErrorlogFileNo-1) AS [nvarchar])
+				IF @debugMode=1	PRINT @queryToRun
+
+				BEGIN TRY
+					IF @SQLMajorVersion > 8 
+						INSERT	INTO #xpReadErrorLog([log_date], [process_info], [text])
+								EXEC (@queryToRun)
+					ELSE
+						INSERT	INTO #xpReadErrorLog([text], [continuation_row])
+								EXEC (@queryToRun)
+				END TRY
+				BEGIN CATCH
+					SET @strMessage = ERROR_MESSAGE()
+					PRINT @strMessage
+
+					INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+							SELECT  @instanceID
+									, @projectID
+									, GETUTCDATE()
+									, 'dbo.usp_hcCollectErrorlogMessages'
+									, @strMessage
+				END CATCH
+
+				SET @configErrorlogFileNo = @configErrorlogFileNo - 1
+			end
 
 		/* re-parse messages for 2k version */
 		IF @SQLMajorVersion = 8 
