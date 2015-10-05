@@ -107,6 +107,9 @@ DECLARE   @databaseName							[sysname]
 		, @configMaxJobRunningTimeInHours		[int]
 		, @configOSEventMessageLastHours		[int]
 		, @configOSEventMessageLimit			[int]
+		, @configOSEventGetInformationEvent		[bit]
+		, @configOSEventGetWarningsEvent		[bit]
+		, @configOSEventsTimeOutSeconds			[int]
 
 		, @logSizeMB							[numeric](20,3)
 		, @dataSizeMB							[numeric](18,3)
@@ -415,7 +418,6 @@ BEGIN TRY
 	END CATCH
 	SET @configOSEventMessageLastHours = ISNULL(@configOSEventMessageLastHours, 24)
 
-
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
 		SELECT	@configOSEventMessageLimit = [value]
@@ -429,8 +431,50 @@ BEGIN TRY
 	SET @configOSEventMessageLimit = ISNULL(@configOSEventMessageLimit, 1000)
 
 	IF @configOSEventMessageLimit= 0 SET @configOSEventMessageLimit=2147483647
+		
+	------------------------------------------------------------------------------------------------------------------------------------------
+	--option for timeout when fetching OS events
+	BEGIN TRY
+		SELECT	@configOSEventsTimeOutSeconds = [value]
+		FROM	[dbo].[appConfigurations]
+		WHERE	[name] = 'Collect OS Events timeout (seconds)'
+				AND [module] = 'health-check'
+	END TRY
+	BEGIN CATCH
+		SET @configOSEventsTimeOutSeconds = 600
+	END CATCH
+
+	SET @configOSEventsTimeOutSeconds = ISNULL(@configOSEventsTimeOutSeconds, 600)
 	
-	
+	------------------------------------------------------------------------------------------------------------------------------------------
+	--option to fetch also information OS events
+	BEGIN TRY
+		SELECT	@configOSEventGetInformationEvent = CASE WHEN LOWER([value])='true' THEN 1 ELSE 0 END
+		FROM	[dbo].[appConfigurations]
+		WHERE	[name] = 'Collect Information OS Events'
+				AND [module] = 'health-check'
+	END TRY
+	BEGIN CATCH
+		SET @configOSEventGetInformationEvent = 0
+	END CATCH
+
+	SET @configOSEventGetInformationEvent = ISNULL(@configOSEventGetInformationEvent, 0)
+
+	------------------------------------------------------------------------------------------------------------------------------------------
+	--option to fetch also warnings OS events
+	BEGIN TRY
+		SELECT	@configOSEventGetWarningsEvent = CASE WHEN LOWER([value])='true' THEN 1 ELSE 0 END
+		FROM	[dbo].[appConfigurations]
+		WHERE	[name] = 'Collect Warning OS Events'
+				AND [module] = 'health-check'
+	END TRY
+	BEGIN CATCH
+		SET @configOSEventGetWarningsEvent = 0
+	END CATCH
+
+	SET @configOSEventGetWarningsEvent = ISNULL(@configOSEventGetWarningsEvent, 0)
+
+		
 	
 	-----------------------------------------------------------------------------------------------------
 	--setting styles used in html report
@@ -3597,6 +3641,9 @@ BEGIN TRY
 							N'<A NAME="OSEventMessagesPermissionErrors" class="category-style">OS Event Messages - Permission Errors</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="7">powershell script timeout value = ' + CAST(@configOSEventsTimeOutSeconds AS [nvarchar](32)) + N' seconds </TD>
+							</TR>
+							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
 									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
 										N'<TR class="color-3">
@@ -3668,6 +3715,9 @@ BEGIN TRY
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
 								<TD class="small-size" COLLSPAN="7">limit messages per machine to maximum ' + CAST(@configOSEventMessageLimit AS [nvarchar](32)) + N' </TD>
+							</TR>
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="7">Severity: Critical, Error' + CASE WHEN @configOSEventGetWarningsEvent=1 THEN N', Warning' ELSE N'' END + CASE WHEN @configOSEventGetInformationEvent=1 THEN N', Information' ELSE N'' END + N' </TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">

@@ -219,7 +219,7 @@ EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
 													@freq_recurrence_factor=0, 
 													@active_start_date=20141219, 
 													@active_end_date=99991231, 
-													@active_start_time=40000, 
+													@active_start_time=50000, 
 													@active_end_time=235959
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
