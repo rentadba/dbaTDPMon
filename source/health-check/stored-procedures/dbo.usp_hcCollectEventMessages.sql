@@ -36,7 +36,7 @@ DECLARE @projectID				[smallint],
 		@sqlServerVersion		[varchar](32),
 		@instanceID				[smallint],
 		@queryToRun				[nvarchar](4000),
-		@strMessage				[nvarchar](max),
+		@strMessage				[nvarchar](4000),
 		@maxRemoteEventID		[bigint]
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/

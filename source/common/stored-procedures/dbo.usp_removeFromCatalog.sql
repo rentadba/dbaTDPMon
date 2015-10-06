@@ -26,7 +26,7 @@ AS
 SET NOCOUNT ON
 
 DECLARE   @returnValue			[smallint]
-		, @errMessage			[nvarchar](max)
+		, @errMessage			[nvarchar](4000)
 
 DECLARE   @projectID			[smallint]
 		, @instanceID			[smallint]

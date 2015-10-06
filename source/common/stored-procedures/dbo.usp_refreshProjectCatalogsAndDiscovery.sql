@@ -31,7 +31,7 @@ DECLARE   @queryToRun				[nvarchar](1024)
 		, @existingServerID			[int]
 		, @projectID				[smallint]
 		, @instanceID				[smallint]
-		, @errMessage				[nvarchar](max)
+		, @errMessage				[nvarchar](4000)
 		, @errorCode				[int]
 
 DECLARE @optionXPIsAvailable		[bit],

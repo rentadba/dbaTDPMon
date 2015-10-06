@@ -30,7 +30,7 @@ AS
 SET NOCOUNT ON
 
 DECLARE   @returnValue			[smallint]
-		, @errMessage			[nvarchar](max)
+		, @errMessage			[nvarchar](4000)
 		, @errDescriptor		[nvarchar](256)
 		, @errNumber			[int]
 

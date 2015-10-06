@@ -47,7 +47,7 @@ AS
 -- 1 : Succes  -1 : Fail 
 -----------------------------------------------------------------------------------------
 
-DECLARE		@tmpSQL    				[nvarchar](max),
+DECLARE		@queryToRun   				[nvarchar](max),
 			@objectName				[varchar](512),
 			@childObjectName		[sysname],
 			@crtTableSchema			[sysname],
@@ -72,15 +72,15 @@ BEGIN TRY
 					[table_name]	[sysname]
 				)
 
-		SET @tmpSQL = N'SELECT TABLE_SCHEMA, TABLE_NAME FROM [' + @DBName + N'].INFORMATION_SCHEMA.TABLES
+		SET @queryToRun = N'SELECT TABLE_SCHEMA, TABLE_NAME FROM [' + @DBName + N'].INFORMATION_SCHEMA.TABLES
 						WHERE	TABLE_TYPE = ''BASE TABLE'' 
 								AND TABLE_NAME LIKE ''' + @TableName + N''' 
 								AND TABLE_SCHEMA LIKE ''' + @TableSchema + N''''
-		SET @tmpSQL = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @tmpSQL)
-		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		INSERT	INTO #tmpTableList ([table_schema], [table_name])
-				EXEC (@tmpSQL)
+				EXEC (@queryToRun)
 
 		---------------------------------------------------------------------------------------------
 		IF EXISTS(SELECT 1 FROM #tmpTableList)
@@ -99,14 +99,14 @@ BEGIN TRY
 
 				WHILE @@FETCH_STATUS=0
 					begin
-						SET @tmpSQL= CASE WHEN @flgAction=1  THEN 'Enable'
+						SET @queryToRun= CASE WHEN @flgAction=1  THEN 'Enable'
 																ELSE 'Disable'
 										END + ' triggers for: [' + @crtTableSchema + N'].[' + @crtTableName + ']'
-						EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 						--if current action is to disable triggers, will get only enabled triggers
 						--if current action is to enable triggers, will get only disabled triggers
-						SET @tmpSQL=N'SELECT DISTINCT st.[name]
+						SET @queryToRun=N'SELECT DISTINCT st.[name]
 									FROM [' + @DBName + '].[sys].[triggers] st
 									INNER JOIN [' + @DBName + '].[sys].[objects] so ON so.[object_id] = st.[parent_id] 
 									INNER JOIN [' + @DBName + '].[sys].[schemas] sch ON sch.[schema_id] = so.[schema_id] 
@@ -115,12 +115,12 @@ BEGIN TRY
 											AND st.[is_disabled]=' + CAST(@flgAction AS [varchar]) + '
 											AND st.[is_ms_shipped] = 0
 											AND st.[name] LIKE ''' + @TriggerName + ''''
-						SET @tmpSQL = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @tmpSQL)
-						IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+						IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 						TRUNCATE TABLE #tmpTableToAlterTriggers
 						INSERT	INTO #tmpTableToAlterTriggers([TriggerName])
-								EXEC (@tmpSQL)
+								EXEC (@queryToRun)
 								
 						DECLARE crsTableToAlterTriggers CURSOR	LOCAL FAST_FORWARD FOR	SELECT DISTINCT [TriggerName]
 																						FROM #tmpTableToAlterTriggers
@@ -129,14 +129,14 @@ BEGIN TRY
 						FETCH NEXT FROM crsTableToAlterTriggers INTO @crtTriggerName
 						WHILE @@FETCH_STATUS=0
 							begin
-								SET @tmpSQL= @crtTriggerName
-								EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+								SET @queryToRun= @crtTriggerName
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
-								SET @tmpSQL=N'ALTER TABLE [' + @DBName + N'].[' + @crtTableSchema + N'].[' + @crtTableName + '] ' + 
+								SET @queryToRun=N'ALTER TABLE [' + @DBName + N'].[' + @crtTableSchema + N'].[' + @crtTableName + '] ' + 
 													CASE WHEN @flgAction=1  THEN N'ENABLE'
 																			ELSE N'DISABLE'
 													END + N' TRIGGER [' + @crtTriggerName + ']'
-								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 								--
 								SET @objectName = '[' + @crtTableSchema + '].[' + @crtTableName + ']'
@@ -149,7 +149,7 @@ BEGIN TRY
 																				@childObjectName= @childObjectName,
 																				@module			= 'dbo.usp_mpAlterTableTriggers',
 																				@eventName		= 'database maintenance - alter triggers',
-																				@queryToRun  	= @tmpSQL,
+																				@queryToRun  	= @queryToRun,
 																				@flgOptions		= @flgOptions,
 																				@executionLevel	= @nestedExecutionLevel,
 																				@debugMode		= @DebugMode

@@ -61,8 +61,8 @@ AS
 --						 0 - no statements will be displayed (default)
 -----------------------------------------------------------------------------------------
 
-DECLARE		@tmpSQL    				[nvarchar](max),
-			@strMessage				[nvarchar](max),
+DECLARE		@queryToRun   				[nvarchar](max),
+			@strMessage				[nvarchar](4000),
 			@sqlIndexCreate			[nvarchar](max),
 			@sqlScriptOnline		[nvarchar](512),
 			@objectName				[nvarchar](512),
@@ -83,7 +83,6 @@ DECLARE		@tmpSQL    				[nvarchar](max),
 			@nestedExecutionLevel	[tinyint]
 
 DECLARE   @flgRaiseErrorAndStop [bit]
-		, @errorString			[nvarchar](max)
 		, @errorCode			[int]
 
 DECLARE @DependentIndexes TABLE	(
@@ -128,16 +127,16 @@ BEGIN TRY
 					[table_name] [sysname]
 				)
 
-		SET @tmpSQL = N'SELECT TABLE_SCHEMA, TABLE_NAME 
+		SET @queryToRun = N'SELECT TABLE_SCHEMA, TABLE_NAME 
 						FROM [' + @DBName + '].INFORMATION_SCHEMA.TABLES 
 						WHERE	TABLE_TYPE = ''BASE TABLE'' 
 								AND TABLE_NAME LIKE ''' + @TableName + ''' 
 								AND TABLE_SCHEMA LIKE ''' + @TableSchema + ''''
-		SET @tmpSQL = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @tmpSQL)
-		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		INSERT	INTO #tmpTableList ([table_schema], [table_name])
-				EXEC (@tmpSQL)
+				EXEC (@queryToRun)
 
 		---------------------------------------------------------------------------------------------
 		IF EXISTS(SELECT 1 FROM #tmpTableList)
@@ -159,8 +158,8 @@ BEGIN TRY
 
 						--if current action is to disable/reorganize indexes, will get only enabled indexes
 						--if current action is to rebuild, will get both enabled/disabled indexes
-						SET @tmpSQL = N''
-						SET @tmpSQL = @tmpSQL + N'SELECT  si.[index_id]
+						SET @queryToRun = N''
+						SET @queryToRun = @queryToRun + N'SELECT  si.[index_id]
 														, si.[name]
 														, si.[type]
 														, si.[allow_page_locks]
@@ -193,12 +192,12 @@ BEGIN TRY
 															, CASE WHEN xi.[type]=3 AND xi.[using_xml_index_id] IS NULL THEN 1 ELSE 0 END
 															, ISNULL(st.[is_replicated], 0) | ISNULL(st.[is_merge_published], 0) | ISNULL(st.[is_published], 0)'
 
-						SET @tmpSQL = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @tmpSQL)
-						IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+						IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 						DELETE FROM @tmpTableToAlterIndexes
 						INSERT	INTO @tmpTableToAlterIndexes([index_id], [index_name], [index_type], [allow_page_locks], [is_disabled], [is_primary_xml], [has_dependent_fk], [is_replicated])
-								EXEC (@tmpSQL)
+								EXEC (@queryToRun)
 
 						FETCH NEXT FROM crsTableList INTO @crtTableSchema, @crtTableName
 					end
@@ -267,8 +266,8 @@ BEGIN TRY
 										IF @flgOptions & 4 = 4
 											begin
 												--get all enabled non-clustered/xml/spatial indexes for current table
-												SET @tmpSQL = N''
-												SET @tmpSQL = @tmpSQL + N'SELECT  si.[name]
+												SET @queryToRun = N''
+												SET @queryToRun = @queryToRun + N'SELECT  si.[name]
 																				, CASE WHEN xi.[type]=3 AND xi.[using_xml_index_id] IS NULL THEN 1 ELSE 0 END AS [is_primary_xml]
 																			FROM [' + @DBName + '].[sys].[indexes]				si
 																			INNER JOIN [' + @DBName + '].[sys].[objects]		so ON  si.[object_id] = so.[object_id]
@@ -278,11 +277,11 @@ BEGIN TRY
 																					AND sch.[name] = ''' + @crtTableSchema + ''' 
 																					AND si.[type] in (2,3,4)
 																					AND si.[is_disabled] = 0'
-												SET @tmpSQL = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @tmpSQL)
-												IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+												SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+												IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 												INSERT INTO @DependentIndexes ([index_name], [is_primary_xml])
-													EXEC (@tmpSQL)
+													EXEC (@queryToRun)
 											end
 
 										--8  - Disable non-clustered index before rebuild (save space)
@@ -326,8 +325,8 @@ BEGIN TRY
 											IF @flgOptions & 4 = 4
 												begin
 													--get all enabled secondary xml indexes for current table
-													SET @tmpSQL = N''
-													SET @tmpSQL = @tmpSQL + N'SELECT  si.[name]
+													SET @queryToRun = N''
+													SET @queryToRun = @queryToRun + N'SELECT  si.[name]
 																				FROM [' + @DBName + '].[sys].[indexes]				si
 																				INNER JOIN [' + @DBName + '].[sys].[objects]		so ON  si.[object_id] = so.[object_id]
 																				INNER JOIN [' + @DBName + '].[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
@@ -337,11 +336,11 @@ BEGIN TRY
 																						AND si.[type] = 3
 																						AND xi.[using_xml_index_id] = ''' + CAST(@crtIndexID AS [sysname]) + '''
 																						AND si.[is_disabled] = 0'
-													SET @tmpSQL = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @tmpSQL)
-													IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+													SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+													IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 													INSERT INTO @DependentIndexes ([index_name])
-														EXEC (@tmpSQL)
+														EXEC (@queryToRun)
 												end
 
 											--8  - Disable non-clustered index before rebuild (save space)
@@ -422,21 +421,21 @@ BEGIN TRY
 
 								---------------------------------------------------------------------------------------------
 								--generate rebuild index script
-								SET @tmpSQL = N''
+								SET @queryToRun = N''
 
-								SET @tmpSQL = @tmpSQL + N'SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-								SET @tmpSQL = @tmpSQL + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX [' + @crtIndexName + '] ON [' + @crtTableSchema + '].[' + @crtTableName + '] REBUILD'
+								SET @queryToRun = @queryToRun + N'SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
+								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX [' + @crtIndexName + '] ON [' + @crtTableSchema + '].[' + @crtTableName + '] REBUILD'
 					
 								--rebuild options
-								SET @tmpSQL = @tmpSQL + N' WITH (SORT_IN_TEMPDB = ON' + CASE WHEN ISNULL(@MaxDOP, 0) <> 0 THEN N', MAXDOP = ' + CAST(@MaxDOP AS [nvarchar]) ELSE N'' END + 
+								SET @queryToRun = @queryToRun + N' WITH (SORT_IN_TEMPDB = ON' + CASE WHEN ISNULL(@MaxDOP, 0) <> 0 THEN N', MAXDOP = ' + CAST(@MaxDOP AS [nvarchar]) ELSE N'' END + 
 																						CASE WHEN ISNULL(@sqlScriptOnline, N'')<>N'' THEN N', ' + @sqlScriptOnline ELSE N'' END + 
 																						CASE WHEN ISNULL(@FillFactor, 0) <> 0 THEN N', FILLFACTOR = ' + CAST(@FillFactor AS [nvarchar]) ELSE N'' END +
 																N')'
 
 								IF @PartitionNumber>1
-									SET @tmpSQL = @tmpSQL + N' PARTITION ' + CAST(@PartitionNumber AS [nvarchar])
+									SET @queryToRun = @queryToRun + N' PARTITION ' + CAST(@PartitionNumber AS [nvarchar])
 
-								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								IF @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline = N'ONLINE = ON'))
 									begin
@@ -455,7 +454,7 @@ BEGIN TRY
 																				@childObjectName= @childObjectName,
 																				@module			= 'dbo.usp_mpAlterTableIndexes',
 																				@eventName		= 'database maintenance - rebuilding index',
-																				@queryToRun  	= @tmpSQL,
+																				@queryToRun  	= @queryToRun,
 																				@flgOptions		= @flgOptions,
 																				@executionLevel	= @nestedExecutionLevel,
 																				@debugMode		= @DebugMode
@@ -557,19 +556,19 @@ BEGIN TRY
 						IF @flgAction = 2
 							IF @crtIndexAllowPageLocks=1
 								begin
-									SET @tmpSQL = N''
-									SET @tmpSQL = @tmpSQL + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-									SET @tmpSQL = @tmpSQL + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX [' + @crtIndexName + '] ON [' + @crtTableSchema + '].[' + @crtTableName + '] REORGANIZE'
+									SET @queryToRun = N''
+									SET @queryToRun = @queryToRun + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
+									SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX [' + @crtIndexName + '] ON [' + @crtTableSchema + '].[' + @crtTableName + '] REORGANIZE'
 				
 									--  1  - Compact large objects (LOB) (default)
 									IF @flgOptions & 1 = 1
-										SET @tmpSQL = @tmpSQL + N' WITH (LOB_COMPACTION = ON) '
+										SET @queryToRun = @queryToRun + N' WITH (LOB_COMPACTION = ON) '
 									ELSE
-										SET @tmpSQL = @tmpSQL + N' WITH (LOB_COMPACTION = OFF) '
+										SET @queryToRun = @queryToRun + N' WITH (LOB_COMPACTION = OFF) '
 				
 									IF @PartitionNumber>1
-										SET @tmpSQL = @tmpSQL + N' PARTITION ' + CAST(@PartitionNumber AS [nvarchar])
-									IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+										SET @queryToRun = @queryToRun + N' PARTITION ' + CAST(@PartitionNumber AS [nvarchar])
+									IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 
 									SET @objectName = '[' + @crtTableSchema + '].[' + @crtTableName + ']'
@@ -582,7 +581,7 @@ BEGIN TRY
 																					@childObjectName= @childObjectName,
 																					@module			= 'dbo.usp_mpAlterTableIndexes',
 																					@eventName		= 'database maintenance - reorganize index',
-																					@queryToRun  	= @tmpSQL,
+																					@queryToRun  	= @queryToRun,
 																					@flgOptions		= @flgOptions,
 																					@executionLevel	= @nestedExecutionLevel,
 																					@debugMode		= @DebugMode
@@ -598,11 +597,11 @@ BEGIN TRY
 						---------------------------------------------------------------------------------------------
 						IF @flgAction = 4
 							begin
-								SET @tmpSQL = N''
-								SET @tmpSQL = @tmpSQL + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-								SET @tmpSQL = @tmpSQL + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX [' + @crtIndexName + '] ON [' + @crtTableSchema + '].[' + @crtTableName + '] DISABLE'
+								SET @queryToRun = N''
+								SET @queryToRun = @queryToRun + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
+								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX [' + @crtIndexName + '] ON [' + @crtTableSchema + '].[' + @crtTableName + '] DISABLE'
 				
-								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								SET @objectName = '[' + @crtTableSchema + '].[' + @crtTableName + ']'
 								SET @childObjectName = QUOTENAME(@crtIndexName)
@@ -614,7 +613,7 @@ BEGIN TRY
 																				@childObjectName= @childObjectName,
 																				@module			= 'dbo.usp_mpAlterTableIndexes',
 																				@eventName		= 'database maintenance - disable index',
-																				@queryToRun  	= @tmpSQL,
+																				@queryToRun  	= @queryToRun,
 																				@flgOptions		= @flgOptions,
 																				@executionLevel	= @nestedExecutionLevel,
 																				@debugMode		= @DebugMode

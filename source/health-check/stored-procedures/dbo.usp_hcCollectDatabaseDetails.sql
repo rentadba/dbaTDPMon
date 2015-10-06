@@ -39,7 +39,7 @@ DECLARE @projectID				[smallint],
 		@databaseID				[int],
 		@databaseName			[sysname],
 		@queryToRun				[nvarchar](4000),
-		@strMessage				[nvarchar](max)
+		@strMessage				[nvarchar](4000)
 
 DECLARE @SQLMajorVersion		[int],
 		@sqlServerVersion		[sysname],

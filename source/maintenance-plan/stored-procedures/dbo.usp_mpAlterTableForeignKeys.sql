@@ -51,7 +51,7 @@ AS
 -- 1 : Succes  -1 : Fail 
 -----------------------------------------------------------------------------------------
 
-DECLARE		@tmpSQL    				[nvarchar](max),
+DECLARE		@queryToRun    				[nvarchar](max),
 			@crtTableSchema 		[sysname],
 			@crtTableName 			[sysname],
 			@tmpSchemaName			[sysname],
@@ -78,16 +78,16 @@ BEGIN TRY
 					[table_name] [sysname]
 				)
 
-		SET @tmpSQL = N'SELECT TABLE_SCHEMA, TABLE_NAME 
+		SET @queryToRun = N'SELECT TABLE_SCHEMA, TABLE_NAME 
 						FROM [' + @DBName + '].INFORMATION_SCHEMA.TABLES 
 						WHERE	TABLE_TYPE = ''BASE TABLE'' 
 								AND TABLE_NAME LIKE ''' + @TableName + ''' 
 								AND TABLE_SCHEMA LIKE ''' + @TableSchema + ''''
-		SET @tmpSQL = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @tmpSQL)
-		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		INSERT	INTO #tmpTableList ([table_schema], [table_name])
-				EXEC (@tmpSQL)
+				EXEC (@queryToRun)
 
 		---------------------------------------------------------------------------------------------
 		IF EXISTS(SELECT 1 FROM #tmpTableList)
@@ -107,17 +107,17 @@ BEGIN TRY
 				FETCH NEXT FROM crsTableList INTO @crtTableSchema, @crtTableName
 				WHILE @@FETCH_STATUS=0
 					begin
-						SET @tmpSQL= CASE WHEN @flgAction=1	THEN 'Enable'
+						SET @queryToRun= CASE WHEN @flgAction=1	THEN 'Enable'
 																ELSE 'Disable'
 										END + ' foreign key constraints for: [' + @crtTableSchema + '].[' + @crtTableName + ']'
-						EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 						--if current action is to disable foreign key constraint, will get only enabled constraints
 						--if current action is to enable foreign key constraint, will get only disabled constraints
 						IF (@flgOptions & 1 = 1)
 							begin
 								--list all tables that have foreign key constraints that reffers current table					
-								SET @tmpSQL=N'SELECT DISTINCT sch.[name] AS [schema_name], so.[name] AS [table_name], sfk.[name] AS [constraint_name]
+								SET @queryToRun=N'SELECT DISTINCT sch.[name] AS [schema_name], so.[name] AS [table_name], sfk.[name] AS [constraint_name]
 												FROM [' + @DBName + '].[sys].[objects] so
 												INNER JOIN [' + @DBName + '].[sys].[schemas]		sch  ON sch.[schema_id] = so.[schema_id]
 												INNER JOIN [' + @DBName + '].[sys].[foreign_keys]	sfk  ON so.[object_id] = sfk.[parent_object_id]
@@ -127,17 +127,17 @@ BEGIN TRY
 														AND sch2.[name] = ''' + @crtTableSchema + '''
 														AND sfk.[is_disabled]=' + CAST(@flgAction AS [varchar]) + '
 														AND sfk.[name] LIKE ''' + @ConstraintName + ''''
-								SET @tmpSQL = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @tmpSQL)
-								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								INSERT	INTO #tmpTableToAlterConstraints([TableSchema], [TableName], [ConstraintName])
-										EXEC (@tmpSQL)
+										EXEC (@queryToRun)
 							end
 
 						IF (@flgOptions & 2 = 2)
 							begin
 								--list all tables that current table foreign key constraints reffers 
-								SET @tmpSQL='SELECT DISTINCT sch2.[name] AS [schema_name], so2.[name] AS [table_name], sfk.[name] AS [constraint_name]
+								SET @queryToRun='SELECT DISTINCT sch2.[name] AS [schema_name], so2.[name] AS [table_name], sfk.[name] AS [constraint_name]
 												FROM [' + @DBName + '].[sys].[objects] so
 												INNER JOIN [' + @DBName + '].[sys].[schemas]		sch  ON sch.[schema_id] = so.[schema_id]
 												INNER JOIN [' + @DBName + '].[sys].[foreign_keys]	sfk ON so.[object_id] = sfk.[referenced_object_id]
@@ -148,11 +148,11 @@ BEGIN TRY
 														AND sfk.[is_disabled]=' + CAST(@flgAction AS [varchar])+ '
 														AND sfk.[name] LIKE ''' + @ConstraintName + ''''
 
-								SET @tmpSQL = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @tmpSQL)
-								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								INSERT	INTO #tmpTableToAlterConstraints ([TableSchema], [TableName], [ConstraintName])
-										EXEC (@tmpSQL)
+										EXEC (@queryToRun)
 							end
 
 						DECLARE crsTableToAlterConstraints CURSOR	LOCAL FAST_FORWARD FOR	SELECT DISTINCT [TableSchema], [TableName], [ConstraintName]
@@ -162,11 +162,11 @@ BEGIN TRY
 						FETCH NEXT FROM crsTableToAlterConstraints INTO @tmpSchemaName, @tmpTableName, @tmpConstraintName
 						WHILE @@FETCH_STATUS=0
 							begin
-								SET @tmpSQL= '[' + @tmpSchemaName + '].[' + @tmpTableName + ']'
-								EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+								SET @queryToRun= '[' + @tmpSchemaName + '].[' + @tmpTableName + ']'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 								--enable/disable foreign key constraints
-								SET @tmpSQL='ALTER TABLE [' + @DBName + '].[' + @tmpSchemaName + '].[' + @tmpTableName + ']' + 
+								SET @queryToRun='ALTER TABLE [' + @DBName + '].[' + @tmpSchemaName + '].[' + @tmpTableName + ']' + 
 												CASE WHEN @flgAction=1	
 													 THEN ' WITH ' + 
 															CASE WHEN @flgOptions & 4 = 4	THEN 'NOCHECK'
@@ -174,7 +174,7 @@ BEGIN TRY
 															END + ' CHECK '	
 													 ELSE ' NOCHECK '
 												END + 'CONSTRAINT [' + @tmpConstraintName + ']'
-								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								--
 								SET @objectName = '[' + @tmpSchemaName + '].[' + @tmpTableName + ']'
@@ -187,7 +187,7 @@ BEGIN TRY
 																				@childObjectName= @childObjectName,
 																				@module			= 'dbo.usp_mpAlterTableForeignKeys',
 																				@eventName		= 'database maintenance - alter constraints',
-																				@queryToRun  	= @tmpSQL,
+																				@queryToRun  	= @queryToRun,
 																				@flgOptions		= @flgOptions,
 																				@executionLevel	= @nestedExecutionLevel,
 																				@debugMode		= @DebugMode

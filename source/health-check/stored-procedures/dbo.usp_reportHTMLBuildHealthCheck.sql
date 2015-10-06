@@ -65,26 +65,25 @@ AS
 
 SET NOCOUNT ON
 
-DECLARE @HTMLReport					[nvarchar](max),
-		@HTMLReportArea				[nvarchar](max),
-		@CSSClass					[nvarchar](max),
+DECLARE   @HTMLReport							[nvarchar](max)
+		, @HTMLReportArea						[nvarchar](max)
+		, @CSSClass								[nvarchar](max)
+		, @tmpHTMLReport						[nvarchar](max)
+		, @file_attachments						[nvarchar](1024)
 		
-		@tmpHTMLReport				[nvarchar](max),
-		@file_attachments			[nvarchar](1024),
-		
-		@ReturnValue				[int],
-		@ErrMessage					[nvarchar](256),
-		@idx						[int]
+		, @ReturnValue							[int]
+		, @ErrMessage							[nvarchar](256)
+		, @idx									[int]
 
-DECLARE @queryToRun					[nvarchar](max)
+DECLARE   @queryToRun							[nvarchar](max)
 
-DECLARE @reportID				[int],
-		@HTMLReportFileName		[nvarchar](260),
-		@reportFilePath			[nvarchar](260),
-		@relativeStoragePath	[nvarchar](260),
-		@projectID				[int],
-		@projectName			[nvarchar](128),
-		@reportBuildStartTime	[datetime]
+DECLARE   @reportID								[int]
+		, @HTMLReportFileName					[nvarchar](260)
+		, @reportFilePath						[nvarchar](260)
+		, @relativeStoragePath					[nvarchar](260)
+		, @projectID							[int]
+		, @projectName							[nvarchar](128)
+		, @reportBuildStartTime					[datetime]
 	
 DECLARE   @databaseName							[sysname]
 		, @configAdmittedState					[sysname]
@@ -129,16 +128,11 @@ DECLARE   @databaseName							[sysname]
 		, @dateTimeLowerLimit					[datetime]
 
 		, @messageCount							[int]
+		, @issuesDetectedCount					[int]
 
 DECLARE @eventMessageData						[varchar](8000)
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
-IF object_id('#htmlReport') IS NOT NULL DROP TABLE #htmlReport
-CREATE TABLE #htmlReport
-	(
-		[html]	[nvarchar](max)
-	)
-			
 -- { sql_statement | statement_block }
 BEGIN TRY
 	SET @reportBuildStartTime = GETUTCDATE()
@@ -744,7 +738,7 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	RAISERROR('	...Build Report: Header', 10, 1) WITH NOWAIT
 
-	SET @HTMLReport =N''	
+	SET @HTMLReport = N''	
 	SET @HTMLReport = @HTMLReport + N'<html><head>
 											<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 											<title>dbaTDPMon: Daily Health Check Report for ' + @projectName + N'</title>
@@ -819,15 +813,15 @@ BEGIN TRY
 			</TABLE>
 			'
 
-	SET @tmpHTMLReport=N''
-	SET @tmpHTMLReport = @tmpHTMLReport + N'				
+	SET @HTMLReportArea=N''
+	SET @HTMLReportArea = @HTMLReportArea + N'				
 			<P class="disclaimer">Browser support: IE 8, Firefox 3.5 and Google Chrome 7 (on lower versions, some features may be missing).</P>
 		</TD>
 	</TR>
 	</TABLE>
 	<HR WIDTH="1130px" ALIGN=LEFT><br>'
 	
-	SET @HTMLReport = @HTMLReport + @tmpHTMLReport
+	SET @HTMLReport = @HTMLReport + @HTMLReportArea
 
 	SET @HTMLReport = @HTMLReport + N'
 	<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px">
@@ -1105,7 +1099,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: Instance Availability - Offline', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="InstancesOffline" class="category-style">Instance Availability - Offline</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -1126,7 +1120,6 @@ BEGIN TRY
 					, @message			[nvarchar](max)
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 
 			DECLARE crsInstancesOffline CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																			, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -1149,7 +1142,7 @@ BEGIN TRY
 			FETCH NEXT FROM crsInstancesOffline INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @eventDate, @message
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
@@ -1164,13 +1157,12 @@ BEGIN TRY
 			CLOSE crsInstancesOffline
 			DEALLOCATE crsInstancesOffline
 
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{InstancesOfflineCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -1185,7 +1177,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: Instance Availability - Online', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="InstancesOnline" class="category-style">Instance Availability - Online</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -1212,7 +1204,6 @@ BEGIN TRY
 					, @dbSize				[numeric](20,3)
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 
 			DECLARE crsInstancesOffline CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																			, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -1265,7 +1256,7 @@ BEGIN TRY
 							AND [instance_name] = @machineName
 																				  
 
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="CENTER" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="100px" class="details" ALIGN="CENTER">' + 
 										CASE	WHEN @hasDatabaseDetails<>0 AND @flgOptions & 8 = 8
@@ -1301,13 +1292,12 @@ BEGIN TRY
 			CLOSE crsInstancesOffline
 			DEALLOCATE crsInstancesOffline
 
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{InstancesOnlineCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -1324,7 +1314,7 @@ BEGIN TRY
 			SET @messageCount=0
 
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="DatabasesStatusPermissionErrors" class="category-style">Databases Status - Permission Errors</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -1338,7 +1328,6 @@ BEGIN TRY
 											<TH WIDTH="540px" class="details-bold">Message</TH>'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 			
 			DECLARE crsDatabasesStatusPermissionErrors CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																							, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -1359,61 +1348,61 @@ BEGIN TRY
 			FETCH NEXT FROM crsDatabasesStatusPermissionErrors INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @messageCount
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + N'"><A NAME="DatabasesStatusPermissionErrors' + @instanceName + N'">' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</A></TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + N'">' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + N'">' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' 
 
-					DECLARE crsDatabasesStatusPermissionErrorDetails CURSOR READ_ONLY LOCAL FOR		SELECT    lsam.[message]
-																											, MAX(lsam.[event_date_utc]) [event_date_utc]
-																									FROM [dbo].[vw_catalogInstanceNames]  cin
-																									INNER JOIN [dbo].[vw_logServerAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
-																									WHERE	cin.[instance_active]=1
-																											AND cin.[project_id] = @projectID	
-																											AND cin.[instance_name] = @instanceName
-																											AND cin.[machine_name] = @machineName
-																											AND lsam.descriptor IN (N'dbo.usp_hcCollectDatabaseDetails')
-																									GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
-																									ORDER BY cin.[instance_name], cin.[machine_name], [event_date_utc]
+					SET @tmpHTMLReport=N''
+					SELECT @tmpHTMLReport=((
+											SELECT	N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), [event_date_utc], 121), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH="540px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText]([message], 0), N'&nbsp;') + N'</TD>' + 
+													N'</TR>' + 
+													CASE WHEN [row_count] > [row_no]
+														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+														 ELSE N''
+													END
+											FROM (
+													SELECT [message], [event_date_utc]
+															, ROW_NUMBER() OVER(ORDER BY [event_date_utc]) [row_no]
+															, SUM(1) OVER() AS [row_count]
+													FROM (
+															SELECT    lsam.[message]
+																	, MAX(lsam.[event_date_utc]) [event_date_utc]
+															FROM [dbo].[vw_catalogInstanceNames]  cin
+															INNER JOIN [dbo].[vw_logServerAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+															WHERE	cin.[instance_active]=1
+																	AND cin.[project_id] = @projectID	
+																	AND cin.[instance_name] = @instanceName
+																	AND cin.[machine_name] = @machineName
+																	AND lsam.descriptor IN (N'dbo.usp_hcCollectDatabaseDetails')
+															GROUP BY lsam.[message]
+														)Z
+												)X
+											ORDER BY [event_date_utc]
+											FOR XML PATH(''), TYPE
+											).value('.', 'nvarchar(max)'))
 
-					OPEN crsDatabasesStatusPermissionErrorDetails
-					FETCH NEXT FROM crsDatabasesStatusPermissionErrorDetails INTO @message, @eventDate
-					WHILE @@FETCH_STATUS=0
-						begin
-							SET @tmpHTMLReport=@tmpHTMLReport + 
-										N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @eventDate, 121), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="540px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') + N'</TD>' + 
-								N'</TR>'
-							
-							SET @messageCount = @messageCount-1
-							IF @messageCount>0
-								SET @tmpHTMLReport=@tmpHTMLReport + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
-
-							FETCH NEXT FROM crsDatabasesStatusPermissionErrorDetails INTO @message, @eventDate
-						end
-					CLOSE crsDatabasesStatusPermissionErrorDetails
-					DEALLOCATE crsDatabasesStatusPermissionErrorDetails
-					
 					SET @idx=@idx+1
-					SET @tmpHTMLReport=@tmpHTMLReport + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
-																<TD class="details" COLSPAN=5>&nbsp;</TD>
-														</TR>'
+					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
 
 					FETCH NEXT FROM crsDatabasesStatusPermissionErrors INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @messageCount
+
+					IF @@FETCH_STATUS=0
+						SET @HTMLReportArea = @HTMLReportArea + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
+																	<TD class="details" COLSPAN=5>&nbsp;</TD>
+															</TR>'
 				end
 			CLOSE crsDatabasesStatusPermissionErrors
 			DEALLOCATE crsDatabasesStatusPermissionErrors
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SELECT    @idx = COUNT(*)
@@ -1435,7 +1424,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: Databases Status - Issues Detected', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="DatabasesStatusIssuesDetected" class="category-style">Databases Status - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">	
 							<TR VALIGN=TOP>
@@ -1453,7 +1442,6 @@ BEGIN TRY
 
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 
 			DECLARE crsDatabasesStatusIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																						, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -1475,7 +1463,7 @@ BEGIN TRY
 			FETCH NEXT FROM crsDatabasesStatusIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @stateDesc
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
@@ -1490,14 +1478,12 @@ BEGIN TRY
 			CLOSE crsDatabasesStatusIssuesDetected
 			DEALLOCATE crsDatabasesStatusIssuesDetected
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasesStatusIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -1512,7 +1498,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: SQL Server Agent Jobs Status - Permission Errors', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="SQLServerAgentJobsStatusPermissionErrors" class="category-style">SQL Server Agent Jobs Status - Permission Errors</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -1526,7 +1512,6 @@ BEGIN TRY
 											<TH WIDTH="540px" class="details-bold">Message</TH>'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 
 			DECLARE crsSQLServerAgentJobsStatusPermissionErrors CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																									, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -1548,7 +1533,7 @@ BEGIN TRY
 			FETCH NEXT FROM crsSQLServerAgentJobsStatusPermissionErrors INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @eventDate, @message
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
@@ -1563,13 +1548,12 @@ BEGIN TRY
 			CLOSE crsSQLServerAgentJobsStatusPermissionErrors
 			DEALLOCATE crsSQLServerAgentJobsStatusPermissionErrors
 
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{SQLServerAgentJobsStatusPermissionErrorsCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -1584,7 +1568,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: SQL Server Agent Jobs Status - Issues Detected', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="SQLServerAgentJobsStatusIssuesDetected" class="category-style">SQL Server Agent Jobs Status - Issues Detected (last ' + CAST(@configFailuresInLastHours AS [nvarchar]) + N'h)</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -1603,7 +1587,6 @@ BEGIN TRY
 
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 
 			DECLARE   @jobName			[sysname]
 					, @lastExecStatus	[int]
@@ -1633,7 +1616,7 @@ BEGIN TRY
 					SET @message = REPLACE(@message, '--', N'<BR>')
 					SET @message = REPLACE(@message, N'<BR><BR>', N'<BR>')
 
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @jobName + N'</TD>' + 
@@ -1656,14 +1639,12 @@ BEGIN TRY
 			CLOSE crsSQLServerAgentJobsStatusIssuesDetected
 			DEALLOCATE crsSQLServerAgentJobsStatusIssuesDetected
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{SQLServerAgentJobsStatusIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -1678,7 +1659,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: Long Running SQL Agent Jobs - Issues Detected', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="LongRunningSQLAgentJobsIssuesDetected" class="category-style">Long Running SQL Agent Jobs - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -1697,7 +1678,6 @@ BEGIN TRY
 
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 
 			DECLARE   @runningTime		[varchar](32)
 			
@@ -1728,7 +1708,7 @@ BEGIN TRY
 					SET @message = REPLACE(@message, '--', N'<BR>')
 					SET @message = REPLACE(@message, N'<BR><BR>', N'<BR>')
 
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @jobName + N'</TD>' + 
@@ -1744,14 +1724,12 @@ BEGIN TRY
 			CLOSE crsLongRunningSQLAgentJobsIssuesDetected
 			DEALLOCATE crsLongRunningSQLAgentJobsIssuesDetected
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{LongRunningSQLAgentJobsIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -1768,7 +1746,7 @@ BEGIN TRY
 			SET @messageCount=0
 
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="DiskSpaceInformationPermissionErrors" class="category-style">Low Free Disk Space - Permission Errors</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -1782,7 +1760,6 @@ BEGIN TRY
 											<TH WIDTH="540px" class="details-bold">Message</TH>'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 			
 			DECLARE crsDiskSpaceInformationPermissionErrors CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																								, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -1803,60 +1780,62 @@ BEGIN TRY
 			FETCH NEXT FROM crsDiskSpaceInformationPermissionErrors INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @messageCount
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + N'"><A NAME="DiskSpaceInformationPermissionErrors' + @instanceName + N'">' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</A></TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + N'">' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + N'">' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' 
 
-					DECLARE crsDiskSpaceInformationPermissionErrorsDetails CURSOR READ_ONLY LOCAL FOR		SELECT    lsam.[message]
-																													, MAX(lsam.[event_date_utc]) [event_date_utc]
-																											FROM [dbo].[vw_catalogInstanceNames]  cin
-																											INNER JOIN [dbo].[vw_logServerAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
-																												WHERE	cin.[instance_active]=1
-																													AND cin.[project_id] = @projectID	
-																													AND cin.[instance_name] = @instanceName
-																													AND cin.[machine_name] = @machineName
-																													AND lsam.descriptor IN (N'dbo.usp_hcCollectDiskSpaceUsage')
-																											GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
-																											ORDER BY cin.[instance_name], cin.[machine_name], [event_date_utc]
-					OPEN crsDiskSpaceInformationPermissionErrorsDetails
-					FETCH NEXT FROM crsDiskSpaceInformationPermissionErrorsDetails INTO @message, @eventDate
-					WHILE @@FETCH_STATUS=0
-						begin
-							SET @tmpHTMLReport=@tmpHTMLReport + 
-										N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @eventDate, 121), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="540px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') + N'</TD>' + 
-								N'</TR>'
-							
-							SET @messageCount = @messageCount-1
-							IF @messageCount>0
-								SET @tmpHTMLReport=@tmpHTMLReport + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
 
-							FETCH NEXT FROM crsDiskSpaceInformationPermissionErrorsDetails INTO @message, @eventDate
-						end
-					CLOSE crsDiskSpaceInformationPermissionErrorsDetails
-					DEALLOCATE crsDiskSpaceInformationPermissionErrorsDetails
-					
+					SET @tmpHTMLReport=N''
+					SELECT @tmpHTMLReport=((
+											SELECT	N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), [event_date_utc], 121), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH="540px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText]([message], 0), N'&nbsp;') + N'</TD>' + 
+													N'</TR>' + 
+													CASE WHEN [row_count] > [row_no]
+														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+														 ELSE N''
+													END
+											FROM (
+													SELECT	[message], [event_date_utc]
+															, ROW_NUMBER() OVER(ORDER BY [event_date_utc]) [row_no]
+															, SUM(1) OVER() AS [row_count]
+													FROM (
+															SELECT    lsam.[message]
+																	, MAX(lsam.[event_date_utc]) [event_date_utc]
+															FROM [dbo].[vw_catalogInstanceNames]  cin
+															INNER JOIN [dbo].[vw_logServerAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+																WHERE	cin.[instance_active]=1
+																	AND cin.[project_id] = @projectID	
+																	AND cin.[instance_name] = @instanceName
+																	AND cin.[machine_name] = @machineName
+																	AND lsam.descriptor IN (N'dbo.usp_hcCollectDiskSpaceUsage')
+															GROUP BY lsam.[message]
+														)Z
+												)X
+											ORDER BY [event_date_utc]
+											FOR XML PATH(''), TYPE
+											).value('.', 'nvarchar(max)'))
+
 					SET @idx=@idx+1
-					SET @tmpHTMLReport=@tmpHTMLReport + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
-																<TD class="details" COLSPAN=5>&nbsp;</TD>
-														</TR>'
+					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
 
 					FETCH NEXT FROM crsDiskSpaceInformationPermissionErrors INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @messageCount
+
+					IF @@FETCH_STATUS=0
+						SET @HTMLReportArea = @HTMLReportArea + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
+																<TD class="details" COLSPAN=5>&nbsp;</TD>
+														</TR>'
 				end
 			CLOSE crsDiskSpaceInformationPermissionErrors
 			DEALLOCATE crsDiskSpaceInformationPermissionErrors
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SELECT    @idx = COUNT(*) + 1
@@ -1878,7 +1857,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: Low Free Disk Space - Issues Detected', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="DiskSpaceInformationIssuesDetected" class="category-style">Low Free Disk Space - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -1898,7 +1877,6 @@ BEGIN TRY
 											<TH WIDTH="120px" class="details-bold" nowrap>Percent Available (%)</TH>'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 
 			DECLARE crsDiskSpaceInformationIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT  DISTINCT
 																								  cin.[machine_name], cin.[instance_name]
@@ -1934,7 +1912,7 @@ BEGIN TRY
 			FETCH NEXT FROM crsDiskSpaceInformationIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @logicalDrive, @volumeMountPoint, @diskTotalSizeMB, @diskAvailableSpaceMB, @diskPercentAvailable
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
@@ -1952,14 +1930,12 @@ BEGIN TRY
 			CLOSE crsDiskSpaceInformationIssuesDetected
 			DEALLOCATE crsDiskSpaceInformationIssuesDetected
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DiskSpaceInformationIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -1974,7 +1950,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: System Databases Size - Issues Detected', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="SystemDatabasesSizeIssuesDetected" class="category-style">System Databases Size - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -1991,7 +1967,6 @@ BEGIN TRY
 											<TH WIDTH="200px" class="details-bold" nowrap>Size (MB)</TH>'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 
 			DECLARE crsDatabasesStatusIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																						, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -2016,7 +1991,7 @@ BEGIN TRY
 			FETCH NEXT FROM crsDatabasesStatusIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
@@ -2031,14 +2006,12 @@ BEGIN TRY
 			CLOSE crsDatabasesStatusIssuesDetected
 			DEALLOCATE crsDatabasesStatusIssuesDetected
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{SystemDatabasesSizeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -2053,7 +2026,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: Databases with Auto Close / Shrink - Issues Detected', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="DatabasesWithAutoCloseShrinkIssuesDetected" class="category-style">Databases with Auto Close / Shrink - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -2068,7 +2041,6 @@ BEGIN TRY
 											<TH WIDTH="100px" class="details-bold" nowrap>Auto Shrink</TH>'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 
 			DECLARE   @isAutoClose		[bit]
 					, @isAutoShrink		[bit]
@@ -2095,7 +2067,7 @@ BEGIN TRY
 			FETCH NEXT FROM crsDatabasesStatusIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @isAutoClose, @isAutoShrink
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
@@ -2111,14 +2083,12 @@ BEGIN TRY
 			CLOSE crsDatabasesStatusIssuesDetected
 			DEALLOCATE crsDatabasesStatusIssuesDetected
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasesWithAutoCloseShrinkIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -2133,7 +2103,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: Big Size for Database Log files - Issues Detected', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="DatabaseMaxLogSizeIssuesDetected" class="category-style">Big Size for Database Log files - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -2151,7 +2121,6 @@ BEGIN TRY
 											<TH WIDTH="120px" class="details-bold" nowrap>Log Used (%)</TH>'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 
 			DECLARE crsDatabaseMaxLogSizeIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																							, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -2175,7 +2144,7 @@ BEGIN TRY
 			FETCH NEXT FROM crsDatabaseMaxLogSizeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @logSizeMB, @logSpaceUsedPercent
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
@@ -2191,14 +2160,12 @@ BEGIN TRY
 			CLOSE crsDatabaseMaxLogSizeIssuesDetected
 			DEALLOCATE crsDatabaseMaxLogSizeIssuesDetected
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseMaxLogSizeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -2213,7 +2180,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: Low Usage of Data Space - Issues Detected', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="DatabaseMinDataSpaceIssuesDetected" class="category-style">Low Usage of Data Space - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -2234,7 +2201,6 @@ BEGIN TRY
 											'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 					
 			DECLARE crsDatabaseMinDataSpaceIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																							, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -2264,7 +2230,7 @@ BEGIN TRY
 			FETCH NEXT FROM crsDatabaseMinDataSpaceIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @dataSizeMB, @dataSpaceUsedPercent, @reclaimableSpaceMB
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
@@ -2282,14 +2248,12 @@ BEGIN TRY
 			CLOSE crsDatabaseMinDataSpaceIssuesDetected
 			DEALLOCATE crsDatabaseMinDataSpaceIssuesDetected
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseMinDataSpaceIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -2304,7 +2268,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: High Usage of Log Space - Issues Detected', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="DatabaseMaxLogSpaceIssuesDetected" class="category-style">High Usage of Log Space - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -2325,7 +2289,6 @@ BEGIN TRY
 											'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 					
 			DECLARE crsDatabaseMaxLogSpaceIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																							, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -2355,7 +2318,7 @@ BEGIN TRY
 			FETCH NEXT FROM crsDatabaseMaxLogSpaceIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @logSizeMB, @logSpaceUsedPercent, @reclaimableSpaceMB
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
@@ -2373,14 +2336,12 @@ BEGIN TRY
 			CLOSE crsDatabaseMaxLogSpaceIssuesDetected
 			DEALLOCATE crsDatabaseMaxLogSpaceIssuesDetected
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseMaxLogSpaceIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -2395,7 +2356,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: Log vs. Data - Allocated Size - Issues Detected', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="DatabaseLogVsDataSizeIssuesDetected" class="category-style">Log vs. Data - Allocated Size - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -2415,7 +2376,6 @@ BEGIN TRY
 											<TH WIDTH="80px" class="details-bold" nowrap>Log vs. Data (%)</TH>'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 
 			DECLARE crsDatabaseLogVsDataSizeIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    [machine_name], [instance_name], [is_clustered], [cluster_node_machine_name], [database_name]
 																								, [size_mb], [data_size_mb], [log_size_mb]
@@ -2450,7 +2410,7 @@ BEGIN TRY
 			FETCH NEXT FROM crsDatabaseLogVsDataSizeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @dataSizeMB, @logSizeMB, @logVSDataPercent
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
@@ -2468,14 +2428,12 @@ BEGIN TRY
 			CLOSE crsDatabaseLogVsDataSizeIssuesDetected
 			DEALLOCATE crsDatabaseLogVsDataSizeIssuesDetected
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseLogVsDataSizeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -2490,7 +2448,7 @@ BEGIN TRY
 			RAISERROR('	...Databases with Fixed File(s) Size - Issues Detected', 10, 1) WITH NOWAIT
 		
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="DatabaseFixedFileSizeIssuesDetected" class="category-style">Databases with Fixed File(s) Size</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -2507,7 +2465,6 @@ BEGIN TRY
 											<TH WIDTH="150px" class="details-bold">State</TH>'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 			
 			DECLARE crsDatabaseFixedFileSizeIssuesDetected CURSOR READ_ONLY LOCAL FOR	
 																				SELECT    cin.[instance_name]
@@ -2532,7 +2489,7 @@ BEGIN TRY
 			FETCH NEXT FROM crsDatabaseFixedFileSizeIssuesDetected INTO  @instanceName, @databaseName, @stateDesc, @dbSize, @dataSizeMB, @dataSpaceUsedPercent, @logSizeMB, @logSpaceUsedPercent
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="220px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
@@ -2550,14 +2507,12 @@ BEGIN TRY
 			CLOSE crsDatabaseFixedFileSizeIssuesDetected
 			DEALLOCATE crsDatabaseFixedFileSizeIssuesDetected
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseFixedFileSizeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -2572,7 +2527,7 @@ BEGIN TRY
 			RAISERROR('	...Databases with Improper Page Verify Option - Issues Detected', 10, 1) WITH NOWAIT
 		
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="DatabasePageVerifyIssuesDetected" class="category-style">Databases with Improper Page Verify Option</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -2588,7 +2543,6 @@ BEGIN TRY
 											<TH WIDTH="160px" class="details-bold" nowrap>Page Verify</TH>'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 
 			DECLARE @pageVerify			[sysname],
 					@compatibilityLevel	[tinyint]
@@ -2625,7 +2579,7 @@ BEGIN TRY
 			FETCH NEXT FROM crsDatabasePageVerifyIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @version, @pageVerify, @compatibilityLevel
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
@@ -2642,14 +2596,12 @@ BEGIN TRY
 			CLOSE crsDatabasePageVerifyIssuesDetected
 			DEALLOCATE crsDatabasePageVerifyIssuesDetected
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasePageVerifyIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')			
@@ -2667,16 +2619,7 @@ BEGIN TRY
 					@indexesPerInstance						[int],
 					@minimumIndexMaintenanceFrequencyDays	[tinyint] = 2,
 					@analyzeOnlyMessagesFromTheLastHours	[tinyint] = 24 ,
-					@analyzeIndexMaintenanceOperation		[nvarchar](128) = 'REBUILD',
-					@objectName								[nvarchar](256), 
-					@indexName								[sysname], 
-					@intervalDays							[tinyint], 
-					@indexType								[sysname], 
-					@indexFragmentation						[numeric](38,2), 
-					@indexPageCount							[int], 
-					@indexFillFactor						[int], 
-					@indexPageDensityDeviation				[numeric](38,2),	
-					@lastActionName							[nvarchar](128)
+					@analyzeIndexMaintenanceOperation		[nvarchar](128) = 'REBUILD'
 
 		
 			-----------------------------------------------------------------------------------------------------
@@ -2704,7 +2647,7 @@ BEGIN TRY
 
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="FrequentlyFragmentedIndexesIssuesDetected" class="category-style">Frequently Fragmented Indexes</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -2731,16 +2674,30 @@ BEGIN TRY
 											<TH WIDTH="120px" class="details-bold">Last Action</TH>
 											'
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
+
+			-----------------------------------------------------------------------------------------------------
+			RAISERROR('		...analyzing fragmentation logs', 10, 1) WITH NOWAIT
+
+			IF OBJECT_ID('tempdb..#filteredStatsIndexesFrequentlyFragmented]') IS NOT NULL
+				DROP TABLE #filteredStatsIndexesFrequentlyFragmented
+
+			SELECT *
+			INTO #filteredStatsIndexesFrequentlyFragmented
+			FROM [dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectCode, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, @analyzeIndexMaintenanceOperation) iff
+			LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+															AND rsr.[rule_id] = 16777216
+															AND rsr.[active] = 1
+															AND (rsr.[skip_value]=iff.[instance_name])
+
+			CREATE INDEX IX_filteredStatsIndexesFrequentlyFragmented_InstanceName ON #filteredStatsIndexesFrequentlyFragmented([instance_name])
+
+			RAISERROR('		...done', 10, 1) WITH NOWAIT
+			-----------------------------------------------------------------------------------------------------
 			SET @indexAnalyzedCount=0
 
 			DECLARE crsFrequentlyFragmentedIndexesMachineNames CURSOR READ_ONLY LOCAL FOR		SELECT    iff.[instance_name]
 																										, COUNT(*) AS [index_count]
-																								FROM [dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectCode, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, @analyzeIndexMaintenanceOperation) iff
-																								LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																				AND rsr.[rule_id] = 16777216
-																																				AND rsr.[active] = 1
-																																				AND (rsr.[skip_value]=iff.[instance_name])
+																								FROM #filteredStatsIndexesFrequentlyFragmented iff
 																								GROUP BY iff.[instance_name]
 																								ORDER BY iff.[instance_name]
 			OPEN crsFrequentlyFragmentedIndexesMachineNames
@@ -2748,60 +2705,58 @@ BEGIN TRY
 			WHILE @@FETCH_STATUS=0
 				begin
 					SET @indexAnalyzedCount = @indexAnalyzedCount + @indexesPerInstance
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" ROWSPAN="' + CAST(@indexesPerInstance AS [nvarchar](64)) + N'"><A NAME="FrequentlyFragmentedIndexesCompleteDetails' + @instanceName + N'">' + @instanceName + N'</A></TD>' 
 
-					DECLARE crsFrequentlyFragmentedIndexesIssuesDetected CURSOR READ_ONLY LOCAL FOR		SELECT    [event_date_utc], [database_name], [object_name], [index_name]
-																												, [interval_days], [index_type], [fragmentation], [page_count], [fill_factor], [page_density_deviation], [last_action_made]
-																										FROM	[dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectCode, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, @analyzeIndexMaintenanceOperation)
-																										WHERE	[instance_name] =  @instanceName
-																										ORDER BY [database_name], [object_name], [index_name]
-					OPEN crsFrequentlyFragmentedIndexesIssuesDetected
-					FETCH NEXT FROM crsFrequentlyFragmentedIndexesIssuesDetected INTO @eventDate, @databaseName, @objectName, @indexName, @intervalDays, @indexType, @indexFragmentation, @indexPageCount, @indexFillFactor, @indexPageDensityDeviation, @lastActionName
-					WHILE @@FETCH_STATUS=0
-						begin
-							SET @tmpHTMLReport=@tmpHTMLReport + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL(@objectName, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" >' + ISNULL(@indexName, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="100px" class="details" ALIGN="LEFT" >' + ISNULL(@indexType, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH= "80px" class="details" ALIGN="CENTER" >' + ISNULL(CAST(@intervalDays AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST(@indexPageCount AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH= "90px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST(@indexFragmentation AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="100px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST(@indexPageDensityDeviation AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST(@indexFillFactor AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL(@lastActionName, N'&nbsp;') + N'</TD>' + 
-								N'</TR>'
-							
-							SET @indexesPerInstance = @indexesPerInstance-1
-							IF @indexesPerInstance>0
-								SET @tmpHTMLReport=@tmpHTMLReport + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+					SET @tmpHTMLReport=N''
+					SELECT @tmpHTMLReport=((
+											SELECT	N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL([database_name], N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL([object_name], N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH="120px" class="details" ALIGN="LEFT" >' + ISNULL([index_name], N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH="100px" class="details" ALIGN="LEFT" >' + ISNULL([index_type], N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH= "80px" class="details" ALIGN="CENTER" >' + ISNULL(CAST([interval_days] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST([page_count] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH= "90px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST([fragmentation] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH="100px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST([page_density_deviation] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST([fill_factor] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL([last_action_made], N'&nbsp;') + N'</TD>' + 
+													N'</TR>' + 
+													CASE WHEN [row_count] > [row_no]
+														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+														 ELSE N''
+													END
+											FROM (
+													SELECT    [event_date_utc], [database_name], [object_name], [index_name]
+															, [interval_days], [index_type], [fragmentation], [page_count], [fill_factor], [page_density_deviation], [last_action_made]
+															, ROW_NUMBER() OVER(ORDER BY [database_name], [object_name], [index_name]) [row_no]
+															, SUM(1) OVER() AS [row_count]
+													FROM	#filteredStatsIndexesFrequentlyFragmented
+													WHERE	[instance_name] =  @instanceName
+												)X
+											ORDER BY [database_name], [object_name], [index_name]
+											FOR XML PATH(''), TYPE
+											).value('.', 'nvarchar(max)'))
 
-							FETCH NEXT FROM crsFrequentlyFragmentedIndexesIssuesDetected INTO @eventDate, @databaseName, @objectName, @indexName, @intervalDays, @indexType, @indexFragmentation, @indexPageCount, @indexFillFactor, @indexPageDensityDeviation, @lastActionName
-						end
-					CLOSE crsFrequentlyFragmentedIndexesIssuesDetected
-					DEALLOCATE crsFrequentlyFragmentedIndexesIssuesDetected
-					
 					SET @idx=@idx+1
-					FETCH NEXT FROM crsFrequentlyFragmentedIndexesMachineNames INTO @instanceName, @indexesPerInstance
+					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
+
+					FETCH NEXT FROM crsFrequentlyFragmentedIndexesMachineNames INTO  @instanceName, @indexesPerInstance
 
 					IF @@FETCH_STATUS=0
-						SET @tmpHTMLReport=@tmpHTMLReport + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
+						SET @HTMLReportArea = @HTMLReportArea + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
 												<TD class="details" COLSPAN=11>&nbsp;</TD>
 										</TR>'
 				end
 			CLOSE crsFrequentlyFragmentedIndexesMachineNames
 			DEALLOCATE crsFrequentlyFragmentedIndexesMachineNames
 
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea						
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{FrequentlyFragmentedIndexesIssuesDetectedCount}', '(' + CAST((@indexAnalyzedCount) AS [nvarchar]) + ')')			
@@ -2816,7 +2771,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: Outdated Backup for Databases - Issues Detected', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="DatabaseBACKUPAgeIssuesDetected" class="category-style">Outdated Backup for Databases - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -2834,7 +2789,6 @@ BEGIN TRY
 											<TH WIDTH="150px" class="details-bold" nowrap>Last Backup Date</TH>
 											<TH WIDTH="80px" class="details-bold" nowrap>Backup Age (Days)</TH>'
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 
 			DECLARE crsDatabaseBACKUPAgeIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																							, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -2871,7 +2825,7 @@ BEGIN TRY
 			FETCH NEXT FROM crsDatabaseBACKUPAgeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @lastBackupDate, @lastDatabaseEventAgeDays
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
@@ -2888,14 +2842,12 @@ BEGIN TRY
 			CLOSE crsDatabaseBACKUPAgeIssuesDetected
 			DEALLOCATE crsDatabaseBACKUPAgeIssuesDetected
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseBACKUPAgeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -2910,7 +2862,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: Outdated DBCC CHECKDB Databases - Issues Detected', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="DatabaseDBCCCHECKDBAgeIssuesDetected" class="category-style">Outdated DBCC CHECKDB Databases - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -2928,7 +2880,6 @@ BEGIN TRY
 											<TH WIDTH="150px" class="details-bold" nowrap>Last CHECKDB Date</TH>
 											<TH WIDTH="80px" class="details-bold" nowrap>CHECKDB Age (Days)</TH>'
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 
 			DECLARE crsDatabaseDBCCCHECKDBAgeIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																								, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -2969,7 +2920,7 @@ BEGIN TRY
 			FETCH NEXT FROM crsDatabaseDBCCCHECKDBAgeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @lastCheckDBDate, @lastDatabaseEventAgeDays
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
@@ -2986,14 +2937,12 @@ BEGIN TRY
 			CLOSE crsDatabaseDBCCCHECKDBAgeIssuesDetected
 			DEALLOCATE crsDatabaseDBCCCHECKDBAgeIssuesDetected
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseDBCCCHECKDBAgeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -3008,7 +2957,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: Errorlog Messages - Permission Errors', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="ErrorlogMessagesPermissionErrors" class="category-style">Errorlog Messages - Permission Errors</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -3022,7 +2971,6 @@ BEGIN TRY
 											<TH WIDTH="540px" class="details-bold">Message</TH>'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 
 			DECLARE crsErrorlogMessagesPermissionErrors CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																							, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -3044,7 +2992,7 @@ BEGIN TRY
 			FETCH NEXT FROM crsErrorlogMessagesPermissionErrors INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @eventDate, @message
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
@@ -3059,13 +3007,12 @@ BEGIN TRY
 			CLOSE crsErrorlogMessagesPermissionErrors
 			DEALLOCATE crsErrorlogMessagesPermissionErrors
 
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{ErrorlogMessagesPermissionErrorsCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -3079,9 +3026,8 @@ BEGIN TRY
 		begin
 			RAISERROR('	...Build Report: Errorlog Messages - Issues Detected', 10, 1) WITH NOWAIT
 			
-			TRUNCATE TABLE #htmlReport
-			INSERT	INTO #htmlReport([html]) 
-					SELECT
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="ErrorlogMessagesIssuesDetected" class="category-style">Errorlog Messages - Issues Detected (last ' + CAST(@configErrorlogMessageLastHours AS [nvarchar]) + N'h)</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -3095,37 +3041,53 @@ BEGIN TRY
 											<TH WIDTH="160px" class="details-bold" nowrap>Log Date</TH>
 											<TH WIDTH= "60px" class="details-bold" nowrap>Process Info</TH>
 											<TH WIDTH="710px" class="details-bold">Message</TH>'
+
 			SET @idx=1		
 
-			DECLARE   @logDate				[datetime]
-					, @processInfo			[sysname]
-					, @issuesDetectedCount	[int]
-			
+			-----------------------------------------------------------------------------------------------------
+			RAISERROR('		...analyzing errorlog messages', 10, 1) WITH NOWAIT
+
+			IF OBJECT_ID('tempdb..#filteredStatsSQLServerErrorlogDetail') IS NOT NULL
+				DROP TABLE #filteredStatsSQLServerErrorlogDetail
+
 			SET @dateTimeLowerLimit = DATEADD(hh, -@configErrorlogMessageLastHours, GETUTCDATE())
+
+			SELECT DISTINCT 
+					cin.[instance_name], 
+					eld.[log_date], eld.[id], 
+					eld.[process_info], eld.[text]
+			INTO #filteredStatsSQLServerErrorlogDetail
+			FROM [dbo].[vw_catalogInstanceNames]  cin
+			INNER JOIN [dbo].[vw_statsSQLServerErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
+			LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
+															AND rsr.[rule_id] = 1048576
+															AND rsr.[active] = 1
+															AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+			WHERE cin.[instance_active]=1
+					AND cin.[project_id] = @projectID																							
+					AND eld.[log_date] >= @dateTimeLowerLimit
+					AND NOT EXISTS	( 
+										SELECT 1
+										FROM	[dbo].[catalogHardcodedFilters] chf 
+										WHERE	chf.[module] = 'health-check'
+												AND chf.[object_name] = 'dbo.statsSQLServerErrorlogDetails'
+												AND chf.[active] = 1
+												AND PATINDEX(chf.[filter_pattern], eld.[text]) > 0
+									)
+					AND rsr.[id] IS NULL
+			
+			CREATE INDEX IX_filteredStatsSQLServerErrorlogDetail_InstanceName ON #filteredStatsSQLServerErrorlogDetail([instance_name])
+
+			RAISERROR('		...done', 10, 1) WITH NOWAIT
+
+			-----------------------------------------------------------------------------------------------------
 			SET @issuesDetectedCount = 0 
 			DECLARE crsErrorlogMessagesInstanceName CURSOR READ_ONLY LOCAL FOR	SELECT DISTINCT
-																						  cin.[instance_name]
+																						  [instance_name]
 																						, COUNT(*) AS [messages_count]
-																				FROM [dbo].[vw_catalogInstanceNames]  cin
-																				INNER JOIN [dbo].[vw_statsSQLServerErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
-																				LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																AND rsr.[rule_id] = 1048576
-																																AND rsr.[active] = 1
-																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																				WHERE cin.[instance_active]=1
-																						AND cin.[project_id] = @projectID																							
-																						AND eld.[log_date] >= @dateTimeLowerLimit
-																						AND NOT EXISTS	( 
-																											SELECT 1
-																											FROM	[dbo].[catalogHardcodedFilters] chf 
-																											WHERE	chf.[module] = 'health-check'
-																													AND chf.[object_name] = 'dbo.statsSQLServerErrorlogDetails'
-																													AND chf.[active] = 1
-																													AND PATINDEX(chf.[filter_pattern], eld.[text]) > 0
-																										)
-																						AND rsr.[id] IS NULL
-																				GROUP BY cin.[instance_name]
-																				ORDER BY cin.[instance_name]
+																				FROM #filteredStatsSQLServerErrorlogDetail
+																				GROUP BY [instance_name]
+																				ORDER BY [instance_name]
 			OPEN crsErrorlogMessagesInstanceName
 			FETCH NEXT FROM crsErrorlogMessagesInstanceName INTO @instanceName, @messageCount
 			WHILE @@FETCH_STATUS=0
@@ -3133,63 +3095,49 @@ BEGIN TRY
 					IF @messageCount > @configErrorlogMessageLimit SET @messageCount = @configErrorlogMessageLimit
 					SET @issuesDetectedCount = @issuesDetectedCount + @messageCount
 
-					UPDATE #htmlReport SET [html] = [html] + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + '"><A NAME="ErrorlogMessagesCompleteDetails' + @instanceName + N'">' + @instanceName + N'</A></TD>' 
 
-					DECLARE crsErrorlogMessagesCompleteDetails CURSOR READ_ONLY LOCAL FOR	SELECT	TOP (@configErrorlogMessageLimit)
-																									eld.[log_date], eld.[process_info], eld.[text]
-																							FROM	[dbo].[vw_statsSQLServerErrorlogDetails] eld
-																							WHERE	eld.[project_id]=@projectID
-																									AND eld.[instance_name] = @instanceName
-																									AND eld.[log_date] >= @dateTimeLowerLimit
-																									AND NOT EXISTS	( 
-																														SELECT 1
-																														FROM	[dbo].[catalogHardcodedFilters] chf 
-																														WHERE	chf.[module] = 'health-check'
-																																AND chf.[object_name] = 'dbo.statsSQLServerErrorlogDetails'
-																																AND chf.[active] = 1
-																																AND PATINDEX(chf.[filter_pattern], eld.[text]) > 0
-																													)
-																							ORDER BY eld.[log_date], eld.[id]
-					OPEN crsErrorlogMessagesCompleteDetails
-					FETCH NEXT FROM crsErrorlogMessagesCompleteDetails INTO @logDate, @processInfo, @message
-					WHILE @@FETCH_STATUS=0
-						begin
-							SET @message = ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') 
+					SET @tmpHTMLReport=N''
+					SELECT @tmpHTMLReport=((
+											SELECT N'<TD WIDTH="160px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), [log_date], 121), N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH="60px" class="details" ALIGN="LEFT">' + ISNULL([process_info], N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH="710px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText]([text], 0), N'&nbsp;')  + N'</TD>' + 
+													N'</TR>' + 
+													CASE WHEN [row_count] > [row_no]
+														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+														 ELSE N''
+													END
 
-							UPDATE #htmlReport SET [html] = [html] + 
-										N'<TD WIDTH="160px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @logDate, 121), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="60px" class="details" ALIGN="LEFT">' + ISNULL(@processInfo, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="710px" class="details" ALIGN="LEFT">' + @message + N'</TD>' + 
-									N'</TR>'
+											FROM (
+													SELECT	TOP (@messageCount)
+															[log_date], [id], 
+															[process_info], [text],
+															ROW_NUMBER() OVER(ORDER BY [log_date], [id]) [row_no],
+															SUM(1) OVER() AS [row_count]
+													FROM	#filteredStatsSQLServerErrorlogDetail													
+													WHERE	[instance_name] = @instanceName
+												)X
+											ORDER BY [log_date], [id]
+											FOR XML PATH(''), TYPE
+											).value('.', 'nvarchar(max)'))
 
-							SET @messageCount = @messageCount-1
-							IF @messageCount>0
-								UPDATE #htmlReport SET [html] = [html] + N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
-
-							FETCH NEXT FROM crsErrorlogMessagesCompleteDetails INTO @logDate, @processInfo, @message
-						end
-					CLOSE crsErrorlogMessagesCompleteDetails
-					DEALLOCATE crsErrorlogMessagesCompleteDetails
-
-					SET @idx=@idx+1
+					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
+					SET @idx=@idx + 1
 
 					FETCH NEXT FROM crsErrorlogMessagesInstanceName INTO @instanceName, @messageCount
 				end
 			CLOSE crsErrorlogMessagesInstanceName
 			DEALLOCATE crsErrorlogMessagesInstanceName
 
-
-			UPDATE #htmlReport SET [html] = [html] + N'</TABLE>';
-			UPDATE #htmlReport SET [html] = [html] + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			UPDATE #htmlReport SET [html] = [html] + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
-			SELECT @HTMLReport = @HTMLReport + [html]
-			FROM #htmlReport
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{ErrorlogMessagesIssuesDetectedCount}', '(' + CAST((@issuesDetectedCount) AS [nvarchar]) + ')')
 		end
@@ -3205,7 +3153,7 @@ BEGIN TRY
 			DECLARE   @dbCount		[int]
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="DatabasesStatusCompleteDetails" class="category-style">Databases Status - Complete Details</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -3225,7 +3173,6 @@ BEGIN TRY
 											'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 			
 			DECLARE crsDatabasesStatusMachineNames CURSOR READ_ONLY LOCAL FOR		SELECT    cin.[machine_name], cin.[instance_name]
 																							, COUNT(*) AS [database_count]
@@ -3247,68 +3194,66 @@ BEGIN TRY
 			FETCH NEXT FROM crsDatabasesStatusMachineNames INTO  @machineName, @instanceName, @dbCount
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" ROWSPAN="' + CAST(@dbCount AS [nvarchar](64)) + N'"><A NAME="DatabasesStatusCompleteDetails' + @instanceName + N'">' + @instanceName + N'</A></TD>' 
 
-					DECLARE crsDatabasesNames CURSOR READ_ONLY LOCAL FOR		SELECT    cdn.[database_name], cdn.[state_desc]
-																						, shcdd.[size_mb]
-																						, shcdd.[data_size_mb], shcdd.[data_space_used_percent]
-																						, shcdd.[log_size_mb], shcdd.[log_space_used_percent] 
-																						, shcdd.[last_backup_time], shcdd.[last_dbcc checkdb_time]
-																				FROM [dbo].[vw_catalogInstanceNames] cin
-																				INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																				LEFT  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
-																				WHERE	cin.[instance_active]=1
-																						AND cdn.[active]=1
-																						AND cin.[project_id] = @projectID	
-																						AND cin.[instance_name] =  @instanceName
-																						AND cin.[machine_name] = @machineName
-																				ORDER BY cdn.[database_name]
-					OPEN crsDatabasesNames
-					FETCH NEXT FROM crsDatabasesNames INTO @databaseName, @stateDesc, @dbSize, @dataSizeMB, @dataSpaceUsedPercent, @logSizeMB, @logSpaceUsedPercent, @lastBackupDate, @lastCheckDBDate
-					WHILE @@FETCH_STATUS=0
-						begin
-							SET @tmpHTMLReport=@tmpHTMLReport + 
-										N'<TD WIDTH="200px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbSize AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dataSizeMB AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH= "60px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dataSpaceUsedPercent AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@logSizeMB AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH= "60px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@logSpaceUsedPercent AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @lastBackupDate, 121), N'N/A') + N'</TD>' + 
-										N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @lastCheckDBDate, 121), N'N/A') + N'</TD>' + 
-										N'<TD WIDTH="150px" class="details" ALIGN="LEFT">' + ISNULL(@stateDesc, N'&nbsp;') + N'</TD>' + 
-								N'</TR>'
-							
-							SET @dbCount = @dbCount-1
-							IF @dbCount>0
-								SET @tmpHTMLReport=@tmpHTMLReport + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+					SET @tmpHTMLReport=N''
+					SELECT @tmpHTMLReport=((
+											SELECT N'<TD WIDTH="200px" class="details" ALIGN="LEFT">' + ISNULL([database_name], N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST([size_mb] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST([data_size_mb] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH= "60px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST([data_space_used_percent] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST([log_size_mb] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH= "60px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST([data_space_used_percent] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), [last_backup_time], 121), N'N/A') + N'</TD>' + 
+													N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), [last_dbcc checkdb_time], 121), N'N/A') + N'</TD>' + 
+													N'<TD WIDTH="150px" class="details" ALIGN="LEFT">' + ISNULL([state_desc], N'&nbsp;') + N'</TD>' + 
+													N'</TR>' + 
+													CASE WHEN [row_count] > [row_no]
+														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+														 ELSE N''
+													END
+											FROM (
+													SELECT    cdn.[database_name], cdn.[state_desc]
+															, shcdd.[size_mb]
+															, shcdd.[data_size_mb], shcdd.[data_space_used_percent]
+															, shcdd.[log_size_mb], shcdd.[log_space_used_percent] 
+															, shcdd.[last_backup_time], shcdd.[last_dbcc checkdb_time]
+															, ROW_NUMBER() OVER(ORDER BY cdn.[database_name]) [row_no]
+															, SUM(1) OVER() AS [row_count]
+													FROM [dbo].[vw_catalogInstanceNames] cin
+													INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+													LEFT  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+													WHERE	cin.[instance_active]=1
+															AND cdn.[active]=1
+															AND cin.[project_id] = @projectID	
+															AND cin.[instance_name] =  @instanceName
+															AND cin.[machine_name] = @machineName
+												)X
+											ORDER BY [database_name]
+											FOR XML PATH(''), TYPE
+											).value('.', 'nvarchar(max)'))
 
-							FETCH NEXT FROM crsDatabasesNames INTO @databaseName, @stateDesc, @dbSize, @dataSizeMB, @dataSpaceUsedPercent, @logSizeMB, @logSpaceUsedPercent, @lastBackupDate, @lastCheckDBDate
-						end
-					CLOSE crsDatabasesNames
-					DEALLOCATE crsDatabasesNames
-					
+					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
 					SET @idx=@idx+1
+
 					FETCH NEXT FROM crsDatabasesStatusMachineNames INTO @machineName, @instanceName, @dbCount
 
 					IF @@FETCH_STATUS=0
-						SET @tmpHTMLReport=@tmpHTMLReport + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
+						SET @HTMLReportArea = @HTMLReportArea + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
 												<TD class="details" COLSPAN=10>&nbsp;</TD>
 										</TR>'
 				end
 			CLOSE crsDatabasesStatusMachineNames
 			DEALLOCATE crsDatabasesStatusMachineNames
 
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 		end
 
@@ -3323,7 +3268,7 @@ BEGIN TRY
 			DECLARE @jobCount [int]
 
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="SQLServerAgentJobsStatusCompleteDetails" class="category-style">SQL Server Agent Jobs Status - Complete Details</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -3338,7 +3283,6 @@ BEGIN TRY
 											<TH WIDTH="490px" class="details-bold">Message</TH>'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 			
 			DECLARE crsSQLServerAgentJobsInstanceName CURSOR READ_ONLY LOCAL FOR	SELECT	ssajh.[instance_name], COUNT(*) AS [job_count]
 																					FROM	[dbo].[vw_statsSQLServerAgentJobsHistory] ssajh
@@ -3354,70 +3298,61 @@ BEGIN TRY
 			FETCH NEXT FROM crsSQLServerAgentJobsInstanceName INTO @instanceName, @jobCount
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@jobCount AS [nvarchar](64)) + '"><A NAME="SQLServerAgentJobsStatusCompleteDetails' + @instanceName + N'">' + @instanceName + N'</A></TD>' 
 
-					DECLARE crsSQLServerAgentJobsStatusCompleteDetails CURSOR READ_ONLY LOCAL FOR	SELECT	[job_name], [last_execution_status], [last_execution_date], [last_execution_time], [message]
-																									FROM	[dbo].[vw_statsSQLServerAgentJobsHistory]
-																									WHERE	[project_id]=@projectID
-																											AND [instance_name] = @instanceName
-																									ORDER BY [job_name]
+					SET @tmpHTMLReport=N''
+					SELECT @tmpHTMLReport=((
+											SELECT	N'<TD WIDTH="200px" class="details" ALIGN="LEFT">' + [job_name] + N'</TD>' + 
+													N'<TD WIDTH="80px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN [last_execution_status] = 0 THEN N'Failed'
+																														WHEN [last_execution_status] = 1 THEN N'Succeded'
+																														WHEN [last_execution_status] = 2 THEN N'Retry'
+																														WHEN [last_execution_status] = 3 THEN N'Canceled'
+																														WHEN [last_execution_status] = 4 THEN N'In progress'
+																														ELSE N'&nbsp;'
+																													END
+																+ N'</TD>' + 
+													N'<TD WIDTH= "80px" class="details" ALIGN="CENTER" nowrap>' + isnull([last_execution_date], N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH= "80px" class="details" ALIGN="CENTER" nowrap>' + isnull([last_execution_time], N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH="490px" class="details" ALIGN="LEFT">' + REPLACE(REPLACE(REPLACE(ISNULL([dbo].[ufn_reportHTMLPrepareText](CASE WHEN LEFT([message], 2) = '--' THEN SUBSTRING([message], 3, LEN([message])) ELSE [message] END, 0), N'&nbsp;') , CHAR(13), N'<BR>'), '--', N'<BR>'), N'<BR><BR>', N'<BR>') + N'</TD>' + 
+													N'</TR>' + 
+													CASE WHEN [row_count] > [row_no]
+														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+														 ELSE N''
+													END
 
-					OPEN crsSQLServerAgentJobsStatusCompleteDetails
-					FETCH NEXT FROM crsSQLServerAgentJobsStatusCompleteDetails INTO @jobName, @lastExecStatus, @lastExecDate, @lastExecTime, @message
-					WHILE @@FETCH_STATUS=0
-						begin
-							SET @message = CASE WHEN LEFT(@message, 2) = '--' THEN SUBSTRING(@message, 3, LEN(@message)) ELSE @message END
-							SET @message = ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') 
-							SET @message = REPLACE(@message, CHAR(13), N'<BR>')
-							SET @message = REPLACE(@message, '--', N'<BR>')
-							SET @message = REPLACE(@message, N'<BR><BR>', N'<BR>')
-
-							SET @tmpHTMLReport=@tmpHTMLReport + 
-										N'<TD WIDTH="200px" class="details" ALIGN="LEFT">' + @jobName + N'</TD>' + 
-										N'<TD WIDTH="80px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @lastExecStatus = 0 THEN N'Failed'
-																											WHEN @lastExecStatus = 1 THEN N'Succeded'
-																											WHEN @lastExecStatus = 2 THEN N'Retry'
-																											WHEN @lastExecStatus = 3 THEN N'Canceled'
-																											WHEN @lastExecStatus = 4 THEN N'In progress'
-																											ELSE N'&nbsp;'
-																										END
-													+ N'</TD>' + 
-										N'<TD WIDTH= "80px" class="details" ALIGN="CENTER" nowrap>' + isnull(@lastExecDate, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH= "80px" class="details" ALIGN="CENTER" nowrap>' + isnull(@lastExecTime, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="490px" class="details" ALIGN="LEFT">' + @message + N'</TD>' + 
-									N'</TR>'
-
-							SET @jobCount = @jobCount-1
-							IF @jobCount>0
-								SET @tmpHTMLReport=@tmpHTMLReport + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
-
-							FETCH NEXT FROM crsSQLServerAgentJobsStatusCompleteDetails INTO @jobName, @lastExecStatus, @lastExecDate, @lastExecTime, @message
-						end
-					CLOSE crsSQLServerAgentJobsStatusCompleteDetails
-					DEALLOCATE crsSQLServerAgentJobsStatusCompleteDetails
+											FROM (
+													SELECT	[job_name], [last_execution_status], [last_execution_date], [last_execution_time], [message]
+															, ROW_NUMBER() OVER(ORDER BY [job_name]) [row_no]
+															, SUM(1) OVER() AS [row_count]
+													FROM	[dbo].[vw_statsSQLServerAgentJobsHistory]
+													WHERE	[project_id]=@projectID
+															AND [instance_name] = @instanceName
+												)X
+											ORDER BY [job_name]
+											FOR XML PATH(''), TYPE
+											).value('.', 'nvarchar(max)'))
 
 					SET @idx=@idx+1
+					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
+
 					FETCH NEXT FROM crsSQLServerAgentJobsInstanceName INTO @instanceName, @jobCount
 
 					IF @@FETCH_STATUS=0
-						SET @tmpHTMLReport=@tmpHTMLReport + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
+						SET @HTMLReportArea = @HTMLReportArea + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
 																	<TD class="details" COLSPAN=6>&nbsp;</TD>
 															</TR>'
 				end
 			CLOSE crsSQLServerAgentJobsInstanceName
 			DEALLOCATE crsSQLServerAgentJobsInstanceName
 
-
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 		end
 
@@ -3432,7 +3367,7 @@ BEGIN TRY
 			DECLARE   @volumeCount		[int]
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="DiskSpaceInformationCompleteDetails" class="category-style">Disk Space Information - Complete Details</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -3447,8 +3382,7 @@ BEGIN TRY
 											<TH WIDTH="120px" class="details-bold" nowrap>Percent Available (%)</TH>'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
-			
+
 			DECLARE crsDiskSpaceInformationMachineNames CURSOR READ_ONLY LOCAL FOR		SELECT DISTINCT
 																								  cin.[machine_name]/*, cin.[instance_name]*/
 																								, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -3468,64 +3402,63 @@ BEGIN TRY
 			FETCH NEXT FROM crsDiskSpaceInformationMachineNames INTO  @machineName, /*@instanceName, */@isClustered, @clusterNodeName, @volumeCount
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" ROWSPAN="' + CAST(@volumeCount AS [nvarchar](64)) + N'"><A NAME="DiskSpaceInformationCompleteDetails' + CASE WHEN @isClustered=0 THEN @machineName ELSE @clusterNodeName END + N'">' + CASE WHEN @isClustered=0 THEN @machineName ELSE @clusterNodeName END + N'</A></TD>'
 
-					DECLARE crsDiskSpaceInformationDisks CURSOR READ_ONLY LOCAL FOR		SELECT  DISTINCT
-																								      dsi.[logical_drive]
-																									, dsi.[volume_mount_point]
-																									, MAX(dsi.[total_size_mb])		AS [total_size_mb]
-																									, MIN(dsi.[available_space_mb]) AS [available_space_mb]
-																									, MIN(dsi.[percent_available])	AS [percent_available]
-																						FROM [dbo].[vw_catalogInstanceNames] cin
-																						INNER JOIN [dbo].[vw_statsHealthCheckDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
-																						WHERE	cin.[instance_active]=1
-																								AND cin.[project_id] = @projectID	
-																								/*AND cin.[instance_name] =  @instanceName*/
-																								AND cin.[machine_name] = @machineName
-																						GROUP BY dsi.[logical_drive], dsi.[volume_mount_point]
-																						ORDER BY dsi.[logical_drive], dsi.[volume_mount_point]
-					OPEN crsDiskSpaceInformationDisks
-					FETCH NEXT FROM crsDiskSpaceInformationDisks INTO @logicalDrive, @volumeMountPoint, @diskTotalSizeMB, @diskAvailableSpaceMB, @diskPercentAvailable
-					WHILE @@FETCH_STATUS=0
-						begin
-							SET @tmpHTMLReport=@tmpHTMLReport + 
-										N'<TD WIDTH="100px" class="details" ALIGN="CENTER">' + ISNULL(@logicalDrive, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="270px" class="details" ALIGN="LEFT">' + ISNULL(@volumeMountPoint, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@diskTotalSizeMB AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@diskAvailableSpaceMB AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@diskPercentAvailable AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-								N'</TR>'
-							
-							SET @volumeCount = @volumeCount-1
-							IF @volumeCount>0
-								SET @tmpHTMLReport=@tmpHTMLReport + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+					SET @tmpHTMLReport=N''
+					SELECT @tmpHTMLReport=((
+											SELECT	N'<TD WIDTH="100px" class="details" ALIGN="CENTER">' + ISNULL([logical_drive], N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH="270px" class="details" ALIGN="LEFT">' + ISNULL([volume_mount_point], N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST([total_size_mb] AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+													N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST([available_space_mb] AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+													N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST([percent_available] AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+													N'</TR>' + 
+													CASE WHEN [row_count] > [row_no]
+														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+														 ELSE N''
+													END
 
-							FETCH NEXT FROM crsDiskSpaceInformationDisks INTO @logicalDrive, @volumeMountPoint, @diskTotalSizeMB, @diskAvailableSpaceMB, @diskPercentAvailable
-						end
-					CLOSE crsDiskSpaceInformationDisks
-					DEALLOCATE crsDiskSpaceInformationDisks
-					
-					SET @idx=@idx+1
+											FROM (
+													SELECT  DISTINCT
+																  dsi.[logical_drive]
+																, dsi.[volume_mount_point]
+																, MAX(dsi.[total_size_mb])		AS [total_size_mb]
+																, MIN(dsi.[available_space_mb]) AS [available_space_mb]
+																, MIN(dsi.[percent_available])	AS [percent_available]
+																, ROW_NUMBER() OVER(ORDER BY dsi.[logical_drive], dsi.[volume_mount_point]) [row_no]
+																, SUM(1) OVER() AS [row_count]
+													FROM [dbo].[vw_catalogInstanceNames] cin
+													INNER JOIN [dbo].[vw_statsHealthCheckDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
+													WHERE	cin.[instance_active]=1
+															AND cin.[project_id] = @projectID	
+															/*AND cin.[instance_name] =  @instanceName*/
+															AND cin.[machine_name] = @machineName
+													GROUP BY dsi.[logical_drive], dsi.[volume_mount_point]
+												)X
+											ORDER BY [logical_drive], [volume_mount_point]
+											FOR XML PATH(''), TYPE
+											).value('.', 'nvarchar(max)'))
+
+					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
+					SET @idx=@idx + 1
+
 					FETCH NEXT FROM crsDiskSpaceInformationMachineNames INTO @machineName, /*@instanceName, */@isClustered, @clusterNodeName, @volumeCount
 
 					IF @@FETCH_STATUS=0
-						SET @tmpHTMLReport=@tmpHTMLReport + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
+						SET @HTMLReportArea = @HTMLReportArea + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
 																	<TD class="details" COLSPAN=6>&nbsp;</TD>
 															</TR>'
 				end
 			CLOSE crsDiskSpaceInformationMachineNames
 			DEALLOCATE crsDiskSpaceInformationMachineNames
 
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 		end
 
@@ -3539,9 +3472,9 @@ BEGIN TRY
 
 			SET @idx=1		
 			
-			TRUNCATE TABLE #htmlReport
-			INSERT INTO #htmlReport([html]) 
-					SELECT N'<A NAME="ErrorlogMessagesCompleteDetails" class="category-style">Errorlog Messages - Complete Details (last ' + CAST(@configErrorlogMessageLastHours AS [nvarchar]) + N'h)</A><br>
+			SET @HTMLReportArea = N''
+			SET @HTMLReportArea = @HTMLReportArea + 
+					N'<A NAME="ErrorlogMessagesCompleteDetails" class="category-style">Errorlog Messages - Complete Details (last ' + CAST(@configErrorlogMessageLastHours AS [nvarchar]) + N'h)</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -3553,6 +3486,7 @@ BEGIN TRY
 											<TH WIDTH="710px" class="details-bold">Message</TH>'
 
 			SET @dateTimeLowerLimit = DATEADD(hh, -@configErrorlogMessageLastHours, GETUTCDATE())
+			
 			DECLARE crsErrorlogMessagesInstanceName CURSOR READ_ONLY LOCAL FOR	SELECT DISTINCT
 																						  cin.[instance_name]
 																						, COUNT(*) AS [messages_count]
@@ -3572,60 +3506,54 @@ BEGIN TRY
 			FETCH NEXT FROM crsErrorlogMessagesInstanceName INTO @instanceName, @messageCount
 			WHILE @@FETCH_STATUS=0
 				begin
-					UPDATE #htmlReport SET [html] = [html] + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + '"><A NAME="ErrorlogMessagesCompleteDetails' + @instanceName + N'">' + @instanceName + N'</A></TD>' 
 
-					DECLARE crsErrorlogMessagesCompleteDetails CURSOR READ_ONLY LOCAL FOR	SELECT	eld.[log_date], eld.[process_info], eld.[text]
-																									FROM	[dbo].[vw_statsSQLServerErrorlogDetails] eld
-																									WHERE	eld.[project_id]=@projectID
-																											AND eld.[instance_name] = @instanceName
-																											AND eld.[log_date] >= @dateTimeLowerLimit
-																									ORDER BY eld.[log_date], eld.[id]
+					SET @tmpHTMLReport=N''
+					SELECT @tmpHTMLReport=((
+											SELECT	N'<TD WIDTH="160px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), [log_date], 121), N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH="60px" class="details" ALIGN="LEFT">' + ISNULL([process_info], N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH="710px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText]([text], 0), N'&nbsp;') + N'</TD>' + 
+													N'</TR>' + 
+													CASE WHEN [row_count] > [row_no]
+														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+														 ELSE N''
+													END
 
-					OPEN crsErrorlogMessagesCompleteDetails
-					FETCH NEXT FROM crsErrorlogMessagesCompleteDetails INTO @logDate, @processInfo, @message
-					WHILE @@FETCH_STATUS=0
-						begin
-							SET @message = ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') 
+											FROM (
+													SELECT	eld.[log_date], eld.[id], eld.[process_info], eld.[text]
+															, ROW_NUMBER() OVER(ORDER BY eld.[log_date], eld.[id]) [row_no]
+															, SUM(1) OVER() AS [row_count]
+													FROM	[dbo].[vw_statsSQLServerErrorlogDetails] eld
+													WHERE	eld.[project_id]=@projectID
+															AND eld.[instance_name] = @instanceName
+															AND eld.[log_date] >= @dateTimeLowerLimit
+												)X
+											ORDER BY [log_date], [id]
+											FOR XML PATH(''), TYPE
+											).value('.', 'nvarchar(max)'))
 
-							UPDATE #htmlReport SET [html] = [html] + 
-										N'<TD WIDTH="160px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @logDate, 121), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="60px" class="details" ALIGN="LEFT">' + ISNULL(@processInfo, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="710px" class="details" ALIGN="LEFT">' + @message + N'</TD>' + 
-									N'</TR>'
+					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
+					SET @idx=@idx + 1
 
-							SET @messageCount = @messageCount-1
-							IF @messageCount>0
-								UPDATE #htmlReport SET [html] = [html] + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
-
-							FETCH NEXT FROM crsErrorlogMessagesCompleteDetails INTO @logDate, @processInfo, @message
-						end
-					CLOSE crsErrorlogMessagesCompleteDetails
-					DEALLOCATE crsErrorlogMessagesCompleteDetails
-
-					SET @idx=@idx+1
 					FETCH NEXT FROM crsErrorlogMessagesInstanceName INTO @instanceName, @messageCount
 
 					IF @@FETCH_STATUS=0
-						UPDATE #htmlReport SET [html] = [html] + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
+						SET @HTMLReportArea = @HTMLReportArea + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
 											<TD class="details" COLSPAN=4>&nbsp;</TD>
 									</TR>'
 				end
 			CLOSE crsErrorlogMessagesInstanceName
 			DEALLOCATE crsErrorlogMessagesInstanceName
 
-
-			UPDATE #htmlReport SET [html] = [html] + N'</TABLE>';
-			UPDATE #htmlReport SET [html] = [html] + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			UPDATE #htmlReport SET [html] = [html] + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
-			SELECT @HTMLReport = @HTMLReport + [html]
-			FROM #htmlReport				
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea						
 		end
 
 
@@ -3637,7 +3565,7 @@ BEGIN TRY
 			RAISERROR('	...Build Report: OS Event Messages - Permission Errors', 10, 1) WITH NOWAIT
 			
 			SET @HTMLReportArea=N''
-			SET @HTMLReportArea =@HTMLReportArea + 
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="OSEventMessagesPermissionErrors" class="category-style">OS Event Messages - Permission Errors</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -3653,7 +3581,6 @@ BEGIN TRY
 											<TH WIDTH="740px" class="details-bold">Message</TH>'
 
 			SET @idx=1		
-			SET @tmpHTMLReport=N''
 
 			DECLARE crsOSEventMessagesPermissionErrors CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name]
 																							, MAX(lsam.[event_date_utc]) [event_date_utc]
@@ -3674,7 +3601,7 @@ BEGIN TRY
 			FETCH NEXT FROM crsOSEventMessagesPermissionErrors INTO @machineName, @isClustered, @clusterNodeName, @eventDate, @message
 			WHILE @@FETCH_STATUS=0
 				begin
-					SET @tmpHTMLReport=@tmpHTMLReport + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + @machineName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes<BR>' + ISNULL(N'[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
@@ -3688,13 +3615,12 @@ BEGIN TRY
 			CLOSE crsOSEventMessagesPermissionErrors
 			DEALLOCATE crsOSEventMessagesPermissionErrors
 
-			SET @HTMLReportArea =@HTMLReportArea + COALESCE(@tmpHTMLReport, '') + N'</TABLE>';
-			SET @HTMLReportArea =@HTMLReportArea + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			SET @HTMLReportArea =@HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesPermissionErrorsCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -3708,9 +3634,8 @@ BEGIN TRY
 		begin
 			RAISERROR('	...Build Report: OS Event messages - Complete Details', 10, 1) WITH NOWAIT
 			
-			TRUNCATE TABLE #htmlReport
-			INSERT	INTO #htmlReport([html]) 
-					SELECT
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="OSEventMessagesCompleteDetails" class="category-style">OS Event messages - Complete Details (last ' + CAST(@configOSEventMessageLastHours AS [nvarchar]) + N'h)</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
@@ -3731,14 +3656,10 @@ BEGIN TRY
 											<TH WIDTH="120px" class="details-bold">Source</TH>
 											<TH WIDTH="480px" class="details-bold">Message</TH>'
 			SET @idx=1		
-			
-			DECLARE   @logType		[sysname]
-					, @logLevel		[sysname]
-					, @eventID		[int]
-					, @source		[nvarchar](512)
 
 			SET @dateTimeLowerLimit = DATEADD(hh, -@configOSEventMessageLastHours, GETUTCDATE())
 			SET @issuesDetectedCount = 0 
+			
 			DECLARE crsOSEventMessagesInstanceName CURSOR READ_ONLY LOCAL FOR	SELECT DISTINCT
 																						  oel.[machine_name]
 																						, COUNT(*) AS [messages_count]
@@ -3760,58 +3681,53 @@ BEGIN TRY
 					IF @messageCount > @configOSEventMessageLimit SET @messageCount = @configOSEventMessageLimit
 					SET @issuesDetectedCount = @issuesDetectedCount + @messageCount
 
-					UPDATE #htmlReport SET [html] = [html] + 
+					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + '"><A NAME="OSEventMessagesCompleteDetails' + @machineName + N'">' + @machineName + N'</A></TD>' 
 
-					DECLARE crsOSEventMessagesCompleteDetails CURSOR READ_ONLY LOCAL FOR	SELECT  TOP (@configOSEventMessageLimit)
-																									oel.[time_created], oel.[log_type_desc], oel.[level_desc], 
-																									oel.[event_id], oel.[source], oel.[message]
-																							FROM [dbo].[vw_statsOSEventLogs]	oel
-																							WHERE	oel.[project_id]=@projectID
-																									AND oel.[machine_name] = @machineName
-																							ORDER BY oel.[time_created], oel.[record_id]
-					OPEN crsOSEventMessagesCompleteDetails
-					FETCH NEXT FROM crsOSEventMessagesCompleteDetails INTO @logDate, @logType, @logLevel, @eventID, @source, @message
-					WHILE @@FETCH_STATUS=0
-						begin
-							SET @message = ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') 
+					SET @tmpHTMLReport=N''
+					SELECT @tmpHTMLReport=((
+											SELECT	N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), [time_created], 121), N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH=" 80px" class="details" ALIGN="LEFT" >' + ISNULL([log_type_desc], N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH=" 60px" class="details" ALIGN="LEFT">' + ISNULL([level_desc], N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH=" 60px" class="details" ALIGN="LEFT">' + ISNULL(CAST([event_id] AS [nvarchar]), N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL([source], N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH="480px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText]([message], 0), N'&nbsp;')  + N'</TD>' + 
+													N'</TR>' + 
+													CASE WHEN [row_count] > [row_no]
+														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+														 ELSE N''
+													END
 
-							UPDATE #htmlReport SET [html] = [html] + 
-										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @logDate, 121), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH=" 80px" class="details" ALIGN="LEFT" >' + ISNULL(@logType, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH=" 60px" class="details" ALIGN="LEFT">' + ISNULL(@logLevel, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH=" 60px" class="details" ALIGN="LEFT">' + ISNULL(CAST(@eventID AS [nvarchar]), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL(@source, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="480px" class="details" ALIGN="LEFT">' + @message + N'</TD>' + 
-									N'</TR>'
+											FROM (
+													SELECT  TOP (@configOSEventMessageLimit)
+															oel.[time_created], oel.[log_type_desc], oel.[level_desc], 
+															oel.[event_id], oel.[record_id], oel.[source], oel.[message]
+															, ROW_NUMBER() OVER(ORDER BY oel.[time_created], oel.[record_id]) [row_no]
+															, SUM(1) OVER() AS [row_count]
+													FROM [dbo].[vw_statsOSEventLogs]	oel
+													WHERE	oel.[project_id]=@projectID
+															AND oel.[machine_name] = @machineName
+												)X
+											ORDER BY [time_created], [record_id]
+											FOR XML PATH(''), TYPE
+											).value('.', 'nvarchar(max)'))
 
-							SET @messageCount = @messageCount-1
-							IF @messageCount>0
-								UPDATE #htmlReport SET [html] = [html] + N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
-
-							FETCH NEXT FROM crsOSEventMessagesCompleteDetails INTO @logDate, @logType, @logLevel, @eventID, @source, @message
-						end
-					CLOSE crsOSEventMessagesCompleteDetails
-					DEALLOCATE crsOSEventMessagesCompleteDetails
-
-					SET @idx=@idx+1
-
+					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
+					SET @idx=@idx + 1
+				
 					FETCH NEXT FROM crsOSEventMessagesInstanceName INTO @machineName, @messageCount
 				end
 			CLOSE crsOSEventMessagesInstanceName
 			DEALLOCATE crsOSEventMessagesInstanceName
 
-
-			UPDATE #htmlReport SET [html] = [html] + N'</TABLE>';
-			UPDATE #htmlReport SET [html] = [html] + N'
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
 							</TR>
 						</TABLE>'
 
-			UPDATE #htmlReport SET [html] = [html] + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
-			SELECT @HTMLReport = @HTMLReport + [html]
-			FROM #htmlReport
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea						
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesIssuesDetectedCount}', '(' + CAST((@issuesDetectedCount) AS [nvarchar]) + ')')
 		end

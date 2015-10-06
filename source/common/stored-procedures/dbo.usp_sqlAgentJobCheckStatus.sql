@@ -91,14 +91,14 @@ SET	@runningTimeSec		= NULL
 ---------------------------------------------------------------------------------------------
 SET @ReturnValue	= 5 --Unknown
 
-SET @queryToRun=N'SELECT Count(*) FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + @jobName + ''''
+SET @queryToRun=N'SELECT  CAST([job_id] AS [varchar](255)) AS [job_id] FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + @jobName + ''''
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 IF @debugMode = 1 PRINT @queryToRun
 
 TRUNCATE TABLE #tmpCheck
 INSERT INTO #tmpCheck EXEC (@queryToRun)
 ------------------------------------------------------------------------------------------------------------------------------------------
-IF (SELECT TOP 1 Result FROM #tmpCheck)=0
+IF (SELECT COUNT(*) FROM #tmpCheck)=0
 	begin
 		SET @strMessage='--SQL Server Agent: The specified job name [' + @jobName + '] does not exists on this server [' + @sqlServerName + ']'
 		IF @debugMode=1
@@ -108,6 +108,8 @@ IF (SELECT TOP 1 Result FROM #tmpCheck)=0
 	end
 ELSE
 	begin
+		SELECT TOP 1 @JobID = [Result] FROM #tmpCheck
+			
 		IF OBJECT_ID('tempdb..#runningSQLAgentJobsProcess') IS NOT NULL DROP TABLE #runningSQLAgentJobsProcess
 		CREATE TABLE #runningSQLAgentJobsProcess
 			(
@@ -146,7 +148,6 @@ ELSE
 				EXEC (@queryToRun)
 
 		SET @StepID = NULL
-		SET @JobID  = NULL
 		SET @JobSessionID = NULL
 
 		SELECT @currentRunning = COUNT(*) FROM #runningSQLAgentJobsProcess
@@ -186,15 +187,13 @@ ELSE
 											, CAST(h.[run_time] AS varchar) AS [start_time]
 											, NULL AS [run_status]
 											, GETDATE() AS [event_time]
-								FROM [msdb].[dbo].[sysjobs] j 
-								INNER JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-								WHERE j.[name]=''' + @jobName + N''' 
+								FROM [msdb].[dbo].[sysjobhistory] h
+								WHERE h.[job_id]=''' + @JobID + N''' 
 										AND h.[instance_id] > (
 																/* last job completion id */
 																SELECT TOP 1 h1.[instance_id]
-																FROM [msdb].[dbo].[sysjobs] j1 
-																RIGHT JOIN [msdb].[dbo].[sysjobhistory] h1 ON j1.[job_id] = h1.[job_id] 
-																WHERE j1.[name]=''' + @jobName + N''' 
+																FROM [msdb].[dbo].[sysjobhistory] h1
+																WHERE h1.[job_id]=''' + @JobID + N''' 
 																		AND [step_name] =''(Job outcome)''
 																ORDER BY h1.[instance_id] DESC
 																)
@@ -215,15 +214,13 @@ ELSE
 															, CAST(h.[run_time] AS varchar) AS [start_time]
 															, h.[run_status]
 															, GETDATE() AS [event_time]
-												FROM [msdb].[dbo].[sysjobs] j 
-												RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-												WHERE j.[name]=''' + @jobName + N''' 
+												FROM [msdb].[dbo].[sysjobhistory] h
+												WHERE h.[job_id]=''' + @JobID + N''' 
 														AND h.[instance_id] = (
 																				/* last job completion id */
 																				SELECT TOP 1 h1.[instance_id]
-																				FROM [msdb].[dbo].[sysjobs] j1 
-																				RIGHT JOIN [msdb].[dbo].[sysjobhistory] h1 ON j1.[job_id] = h1.[job_id] 
-																				WHERE j1.[name]=''' + @jobName + N''' 
+																				FROM [msdb].[dbo].[sysjobhistory] h1
+																				WHERE h1.[job_id]=''' + @JobID + N''' 
 																						AND [step_name] =''(Job outcome)''
 																				ORDER BY h1.[instance_id] DESC
 																				)
@@ -291,9 +288,8 @@ ELSE
 				SET @queryToRun=N'SELECT TOP 1 h.[message], h.[step_id], h.[step_name], h.[run_status]
 											, CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
 											, GETDATE() AS [event_time]
-								FROM [msdb].[dbo].[sysjobs] j 
-								RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-								WHERE	j.[name]=''' + @jobName + N''' 
+								FROM [msdb].[dbo].[sysjobhistory] h
+								WHERE	h.[job_id]=''' + @JobID + N''' 
 										AND h.[step_name] <> ''(Job outcome)''
 								ORDER BY h.[instance_id] DESC'
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
@@ -322,9 +318,7 @@ ELSE
 				
 				SET @queryToRun=N'SELECT TOP 1 NULL AS [message], NULL AS [step_id], NULL AS [step_name], [run_status], NULL AS [run_date], NULL AS [run_time], CAST([run_duration] AS varchar) AS [RunDuration], NULL AS [event_time]
 								FROM [msdb].[dbo].[sysjobhistory]
-								WHERE	[job_id] IN (
-													 SELECT [job_id] FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + @jobName + N'''
-													)
+								WHERE	[job_id] = ''' + @JobID + N'''
 										AND [step_name] =''(Job outcome)''
 								ORDER BY [instance_id] DESC'
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
@@ -345,9 +339,8 @@ ELSE
 				IF @RunStatus=0
 					begin
 						SET @queryToRun='SELECT TOP 1 h.[message], NULL AS [step_id], NULL AS [step_name], NULL AS [run_status], NULL AS [run_date], NULL AS [run_time], NULL AS [run_duration], NULL AS [event_time]
-									FROM [msdb].[dbo].[sysjobs] j 
-									RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-									WHERE j.[name]=''' + @jobName + ''' 
+									FROM [msdb].[dbo].[sysjobhistory] h
+									WHERE h.[job_id]=''' + @JobID + ''' 
 											AND h.[step_name] <> ''(Job outcome)'' 
 											AND h.[run_status]=0
 									ORDER BY h.[instance_id] DESC'
@@ -423,15 +416,13 @@ ELSE
 						SET @queryToRun=N'SELECT   h.[message], h.[step_id], h.[step_name], h.[run_status]
 												, CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
 												, GETDATE() AS [event_time]
-										FROM [msdb].[dbo].[sysjobs] j 
-										RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
+										FROM [msdb].[dbo].[sysjobhistory] h
 										WHERE	 h.[instance_id] < (
 																	SELECT TOP 1 [instance_id] 
 																	FROM (	
 																			SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-																			FROM [msdb].[dbo].[sysjobs] j 
-																			RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-																			WHERE	j.[name]=''' + @jobName + N''' 
+																			FROM [msdb].[dbo].[sysjobhistory] h
+																			WHERE	h.[job_id]=''' + @JobID + N''' 
 																					AND h.[step_name] =''(Job outcome)''
 																			ORDER BY h.[instance_id] DESC
 																		)A
@@ -440,9 +431,8 @@ ELSE
 																	( SELECT [instance_id] 
 																	FROM (	
 																			SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-																			FROM [msdb].[dbo].[sysjobs] j 
-																			RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-																			WHERE	j.[name]=''' + @jobName + N''' 
+																			FROM [msdb].[dbo].[sysjobhistory] h
+																			WHERE	h.[job_id]=''' + @JobID + N''' 
 																					AND h.[step_name] =''(Job outcome)''
 																			ORDER BY h.[instance_id] DESC
 																		)A
@@ -450,37 +440,30 @@ ELSE
 																		(
 																		SELECT TOP 1 [instance_id] 
 																		FROM (	SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-																				FROM [msdb].[dbo].[sysjobs] j 
-																				RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-																				WHERE	j.[name]=''' + @jobName + N''' 
+																				FROM [msdb].[dbo].[sysjobhistory] h
+																				WHERE	h.[job_id]=''' + @JobID + N''' 
 																						AND h.[step_name] =''(Job outcome)''
 																				ORDER BY h.[instance_id] DESC
 																			)A
 																		)),0)
-												AND j.[job_id] IN (
-																	SELECT [job_id] FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + @jobName + N''' 
-																)
+												AND h.[job_id] = ''' + @JobID + N'''
 											ORDER BY h.[instance_id]'
 					ELSE
 						SET @queryToRun=N'SELECT   h.[message], h.[step_id], h.[step_name], h.[run_status]
 												, CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
 												, GETDATE() AS [event_time]
-										FROM [msdb].[dbo].[sysjobs] j 
-										RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
+										FROM [msdb].[dbo].[sysjobhistory] h
 										WHERE	 h.[instance_id] > (
 																	SELECT TOP 1 [instance_id] 
 																	FROM (	
 																			SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-																			FROM [msdb].[dbo].[sysjobs] j 
-																			RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-																			WHERE	j.[name]=''' + @jobName + N''' 
+																			FROM [msdb].[dbo].[sysjobhistory] h
+																			WHERE	h.[job_id]=''' + @JobID + N''' 
 																					AND h.[step_name] =''(Job outcome)''
 																			ORDER BY h.[instance_id] DESC
 																		)A
 																	) 
-												AND j.[job_id] IN (
-																	SELECT [job_id] FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + @jobName + N''' 
-																)
+												AND j.[job_id] = ''' + @JobID + N'''
 											ORDER BY h.[instance_id]'
 
 					SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)

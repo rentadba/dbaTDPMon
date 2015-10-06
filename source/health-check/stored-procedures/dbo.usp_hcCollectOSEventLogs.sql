@@ -37,7 +37,7 @@ DECLARE   @eventDescriptor				[varchar](256)
 		, @eventLogXML					[XML]
 		, @projectID					[smallint]
 		, @instanceID					[smallint]
-		, @strMessage					[nvarchar](max)
+		, @strMessage					[nvarchar](4000)
 		, @machineID					[smallint]
 		, @machineName					[nvarchar](512)
 		, @instanceName					[sysname]
@@ -420,27 +420,6 @@ WHILE @@FETCH_STATUS=0
 
 				IF @debugMode=1 
 					SELECT * FROM #psOutput 
-				IF @debugMode=1 
-					SELECT    @instanceID, @projectID, @machineID, GETUTCDATE(), @psLogTypeID
-							, [Id] AS [EventID], [Level], [RecordId], [Task] AS [Category], [TaskDisplayName] AS [CategoryName]
-							, [ProviderName] AS [Source]
-							, [ProcessId], [ThreadId], [MachineName], [UserId], [TimeCreated], [Message]
-					FROM (
-							SELECT [value], [attribute], [unique_object] AS [idX]
-							FROM (
-									SELECT	[property].value('(./text())[1]', 'Varchar(1024)') AS [value],
-											[property].value('@Name', 'Varchar(1024)') AS [attribute],
-											DENSE_RANK() OVER (ORDER BY [object]) AS unique_object
-									FROM @eventLogXML.nodes('Objects/Object') AS b ([object])
-									CROSS APPLY b.object.nodes('./Property') AS c (property)
-								)X
-							WHERE [attribute] IN ('Id', 'Level', 'RecordId', 'Task', 'TaskDisplayName', 'ProviderName', 'LogName', 'ProcessId', 'ThreadId', 'MachineName', 'UserId', 'TimeCreated', 'LevelDisplayName', 'Message')
-						)P
-					PIVOT
-						(
-							MAX([value])
-							FOR [attribute] IN ([Id], [Level], [RecordId], [Task], [TaskDisplayName], [ProviderName], [LogName], [ProcessId], [ThreadId], [MachineName], [UserId], [TimeCreated], [LevelDisplayName], [Message])
-						)pvt
 
 				IF	EXISTS (SELECT * FROM #psOutput WHERE [xml] LIKE '%Objects%')
 					AND NOT EXISTS(SELECT * FROM #psOutput WHERE [xml] LIKE '%No events were found that match the specified selection criteria%')
@@ -448,12 +427,41 @@ WHILE @@FETCH_STATUS=0
 					AND NOT EXISTS(SELECT * FROM #psOutput WHERE [xml] LIKE '%The RPC server is unavailable%')
 					begin
 						SET @eventLog=''
+						SELECT @eventLog = ((
+												SELECT [xml]
+												FROM #psOutput
+												ORDER BY [id]
+												FOR XML PATH(''), TYPE
+											).value('.', 'nvarchar(max)'))
+						/*
 						SELECT @eventLog=@eventLog + [xml] 
 						FROM #psOutput 
 						WHERE [xml] IS NOT NULL 
 						ORDER BY [id] 
-				  	
+				  		*/
 						SET @eventLogXML = @eventLog
+
+						IF @debugMode=1 
+							SELECT    @instanceID, @projectID, @machineID, GETUTCDATE(), @psLogTypeID
+									, [Id] AS [EventID], [Level], [RecordId], [Task] AS [Category], [TaskDisplayName] AS [CategoryName]
+									, [ProviderName] AS [Source]
+									, [ProcessId], [ThreadId], [MachineName], [UserId], [TimeCreated], [Message]
+							FROM (
+									SELECT [value], [attribute], [unique_object] AS [idX]
+									FROM (
+											SELECT	[property].value('(./text())[1]', 'Varchar(1024)') AS [value],
+													[property].value('@Name', 'Varchar(1024)') AS [attribute],
+													DENSE_RANK() OVER (ORDER BY [object]) AS unique_object
+											FROM @eventLogXML.nodes('Objects/Object') AS b ([object])
+											CROSS APPLY b.object.nodes('./Property') AS c (property)
+										)X
+									WHERE [attribute] IN ('Id', 'Level', 'RecordId', 'Task', 'TaskDisplayName', 'ProviderName', 'LogName', 'ProcessId', 'ThreadId', 'MachineName', 'UserId', 'TimeCreated', 'LevelDisplayName', 'Message')
+								)P
+							PIVOT
+								(
+									MAX([value])
+									FOR [attribute] IN ([Id], [Level], [RecordId], [Task], [TaskDisplayName], [ProviderName], [LogName], [ProcessId], [ThreadId], [MachineName], [UserId], [TimeCreated], [LevelDisplayName], [Message])
+								)pvt
 
 						/* save results to stats table */
 						INSERT	INTO [dbo].[statsOSEventLogs](  [instance_id], [project_id], [machine_id], [event_date_utc], [log_type_id]

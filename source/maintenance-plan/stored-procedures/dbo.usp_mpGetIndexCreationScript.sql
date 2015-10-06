@@ -53,7 +53,7 @@ AS
 -- 1 : Succes  -1 : Fail 
 -----------------------------------------------------------------------------------------
 
-DECLARE @tmpSQL				[nvarchar](max),
+DECLARE @queryToRun			[nvarchar](max),
 		@sqlIndexInclude	[nvarchar](max),
 		@sqlIndexWithClause [nvarchar](max),
 		@sqlScriptOnline	[nvarchar](512),
@@ -102,8 +102,8 @@ BEGIN TRY
 		SET @ReturnValue	 = 1
 
 		--get current index properties
-		SET @tmpSQL = N''
-		SET @tmpSQL = @tmpSQL + N'SELECT  idx.[name]
+		SET @queryToRun = N''
+		SET @queryToRun = @queryToRun + N'SELECT  idx.[name]
 										, idx.[type]
 										, idx.[fill_factor]
 										, dSp.[name] AS [file_group_name]
@@ -134,12 +134,12 @@ BEGIN TRY
 																		)'
 												ELSE ''
 											END
-		SET @tmpSQL = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @tmpSQL)
-		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		DELETE FROM @IndexDetails
 		INSERT INTO @IndexDetails ([IndexName], [IndexType], [FillFactor], [FileGroupName], [IsUniqueConstraint], [IsPadded], [AllowRowLocks], [AllowPageLocks], [IgnoreDupKey])
-			EXEC (@tmpSQL)
+			EXEC (@queryToRun)
 
 		--get index fill factor and file group
 		SELECT	  @crtIndexName		= ISNULL(@IndexName, [IndexName])
@@ -154,8 +154,8 @@ BEGIN TRY
 		FROM @IndexDetails
 		
 		--get current index key columns and include columns and their properties
-		SET @tmpSQL = N''
-		SET @tmpSQL = @tmpSQL + N'SELECT    
+		SET @queryToRun = N''
+		SET @queryToRun = @queryToRun + N'SELECT    
 										  idxCol.[key_ordinal]
 										, idxCol.[index_column_id]
 										, idxCol.[is_included_column]
@@ -186,12 +186,12 @@ BEGIN TRY
 																	)'
 											ELSE ''
 										END
-		SET @tmpSQL = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @tmpSQL)
-		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		DELETE FROM @IndexColumnDetails
 		INSERT INTO @IndexColumnDetails ([KeyOrdinal], [IndexColumnID], [IsIncludedColumn], [IsDescendingKey], [ColumnName])
-			EXEC (@tmpSQL)
+			EXEC (@queryToRun)
 
 		SET @sqlIndexCreate=N''
 		IF EXISTS (SELECT 1 FROM @IndexColumnDetails)
