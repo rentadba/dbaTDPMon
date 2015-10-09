@@ -57,6 +57,7 @@ DROP TABLE #xpCMDShellOutput
 
 CREATE TABLE #xpCMDShellOutput
 (
+	[id]		[int] IDENTITY(1,1),
 	[output]	[nvarchar](max)			NULL
 )
 
@@ -78,6 +79,7 @@ CREATE TABLE #diskSpaceInfo
 	[volume_mount_point]	[nvarchar](512)		NULL,
 	[total_size_mb]			[numeric](18,3)		NULL,
 	[available_space_mb]	[numeric](18,3)		NULL,
+	[block_size]			[int]				NULL,
 	[percent_available]		[numeric](6,2)		NULL
 )
 
@@ -159,7 +161,7 @@ IF @enableXPCMDSHELL=1
 RAISERROR('--Step 1: Delete existing information....', 10, 1) WITH NOWAIT
 
 DELETE dsi
-FROM [dbo].[statsHealthCheckDiskSpaceInfo]		dsi
+FROM [dbo].[statsDiskSpaceInfo]		dsi
 INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = dsi.[instance_id] AND cin.[project_id] = dsi.[project_id]
 WHERE cin.[project_id] = @projectID
 		AND cin.[name] LIKE @sqlServerNameFilter
@@ -234,7 +236,8 @@ WHILE @@FETCH_STATUS=0
 					begin
 						BEGIN TRY
 								SET @queryToRun = N''
-								SET @queryToRun = @queryToRun + N'DECLARE @cmdQuery [varchar](102); SET @cmdQuery=''wmic logicaldisk get Caption, FreeSpace, Size''; EXEC xp_cmdshell @cmdQuery;'
+								--SET @queryToRun = @queryToRun + N'DECLARE @cmdQuery [varchar](102); SET @cmdQuery=''wmic logicaldisk get Caption, FreeSpace, Size''; EXEC xp_cmdshell @cmdQuery;'
+								SET @queryToRun = @queryToRun + N'DECLARE @cmdQuery [varchar](102); SET @cmdQuery=''wmic volume get Name, Capacity, FreeSpace, BlockSize, DriveType''; EXEC xp_cmdshell @cmdQuery;'
 			
 								IF @sqlServerName<>@@SERVERNAME
 									SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
@@ -243,19 +246,33 @@ WHILE @@FETCH_STATUS=0
 								INSERT	INTO #xpCMDShellOutput([output])
 										EXEC (@queryToRun)
 
-								DELETE FROM #xpCMDShellOutput WHERE LEN([output])<=3
+								DELETE FROM #xpCMDShellOutput WHERE LEN([output])<=3 OR [output] LIKE '%\\?\Volume%' OR [output] IS NULL
 
-								INSERT	INTO #diskSpaceInfo([logical_drive], [available_space_mb], [total_size_mb])
-										SELECT	[drive]
-												, CAST(LTRIM(RTRIM(CASE WHEN CHARINDEX(' ', [total_size])>0 THEN SUBSTRING([total_size], 1, CHARINDEX(' ', [total_size])) END)) AS [bigint]) / (1024 * 1024.) AS [free_bytes]
-												, CAST(LTRIM(RTRIM(CASE WHEN CHARINDEX(' ', [total_size])>0 THEN SUBSTRING([total_size], CHARINDEX(' ', [total_size]), 100) END))  AS [bigint]) / (1024 * 1024.) AS [size_bytes]
+								INSERT	INTO #diskSpaceInfo([logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [block_size])
+										SELECT	  LEFT([name], 1) AS [drive]
+												, [name]
+												, CAST(REPLACE([capacity], ' ', '') AS [bigint]) / (1024 * 1024.) AS [total_size_mb]
+												, CAST(REPLACE([free_space], ' ', '') AS [bigint]) / (1024 * 1024.) AS [available_space_mb]
+												, [block_size]
 										FROM (
-												SELECT    SUBSTRING([output], 1, 1) AS [drive]
-														, LTRIM(RTRIM(SUBSTRING([output], 3, LEN([output])-3))) AS [total_size]
-												FROM	#xpCMDShellOutput 
-												WHERE	SUBSTRING([output], 2, 1)=':'
-														AND LEN(LTRIM(RTRIM(SUBSTRING([output], 3, LEN([output])-3))))<>0					
-											)X
+												SELECT SUBSTRING([output], [block_size_start_pos], [capacity_start_pos] - [block_size_start_pos] - 1)	 AS [block_size],
+														SUBSTRING([output], [capacity_start_pos], [drive_type_start_pos] - [capacity_start_pos] - 1)	 AS [capacity],
+														SUBSTRING([output], [drive_type_start_pos], [free_space_start_pos] - [drive_type_start_pos] - 1) AS [drive_type],
+														SUBSTRING([output], [free_space_start_pos], [name_start_pos] - [free_space_start_pos] - 1)		 AS [free_space],
+														SUBSTRING([output], [name_start_pos], LEN([output]) - [name_start_pos] - 1)						 AS [name]
+												FROM #xpCMDShellOutput X
+												INNER JOIN (
+															SELECT  CHARINDEX('BlockSize', [output]) AS [block_size_start_pos],
+																	CHARINDEX('Capacity', [output])	 AS [capacity_start_pos],
+																	CHARINDEX('DriveType', [output]) AS [drive_type_start_pos],
+																	CHARINDEX('FreeSpace', [output]) AS [free_space_start_pos],
+																	CHARINDEX('Name', [output])		 AS [name_start_pos]
+															FROM	#xpCMDShellOutput 
+															WHERE [id]=1
+															) P ON 1=1
+												WHERE X.[id]>1
+											)A
+										WHERE [drive_type]=3
 
 								DELETE FROM #diskSpaceInfo WHERE [total_size_mb]=0
 
@@ -321,9 +338,9 @@ WHILE @@FETCH_STATUS=0
 			end
 				
 		/* save results to stats table */
-		INSERT	INTO [dbo].[statsHealthCheckDiskSpaceInfo]([instance_id], [project_id], [event_date_utc], [logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [percent_available])
+		INSERT	INTO [dbo].[statsDiskSpaceInfo]([instance_id], [project_id], [event_date_utc], [logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [percent_available], [block_size])
 				SELECT    @instanceID, @projectID, GETUTCDATE()
-						, [logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [percent_available]
+						, [logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [percent_available], [block_size]
 				FROM #diskSpaceInfo
 							
 		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion

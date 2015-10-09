@@ -314,3 +314,7 @@
 
 /* 06.10.2015 */
 	- improve performance for health-check data collect and report generation process
+
+/* 09.10.2015 */
+	- collect mounted volumes information for systems lower than 2008R2 (thank you Tomasz Kozielski - tomasz.kozielski@atos.net)
+	

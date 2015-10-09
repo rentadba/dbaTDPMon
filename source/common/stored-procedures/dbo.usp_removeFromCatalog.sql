@@ -111,7 +111,7 @@ BEGIN TRY
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE shcdsi
-		FROM dbo.statsHealthCheckDiskSpaceInfo shcdsi
+		FROM dbo.statsDiskSpaceInfo shcdsi
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = shcdsi.[project_id] AND cin.[id] = shcdsi.[instance_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[id] = @instanceID

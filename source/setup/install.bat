@@ -336,6 +336,9 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsHealthCheckDiskSpaceInfo.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsDiskSpaceInfo.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsSQLServerErrorlogDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -349,6 +352,9 @@ sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsSQLServer
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsHealthCheckDiskSpaceInfo.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsDiskSpaceInfo.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsSQLServerErrorlogDetails.sql" -d %dbname%  -b -r 1
