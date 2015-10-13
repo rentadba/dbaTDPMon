@@ -93,7 +93,8 @@ BEGIN TRANSACTION
 											@notify_level_netsend=0, 
 											@notify_level_page=0, 
 											@delete_level=0, 
-											@description=N'Custom Maintenance Plan for User Databases', 
+											@description=N'Custom Maintenance Plan for User Databases
+http://dbaTDPMon.codeple.com', 
 											@category_name=N'Database Maintenance', 
 											@owner_login_name=N'sa', 
 											@job_id = @jobId OUTPUT

@@ -321,3 +321,4 @@
 
 /* 13.10.2015 */
 	- fix small bugs on maintenance-plan (check database state when performing backup)
+	- add monitoring module and first custom alert - free disk/volume space on project infrastructure

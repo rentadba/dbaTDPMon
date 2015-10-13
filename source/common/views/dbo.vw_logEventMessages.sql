@@ -41,6 +41,7 @@ SELECT    am.[id]		AS [event_message_id]
 								WHEN 3 THEN 'report-html'
 								WHEN 4 THEN 'action' 
 								WHEN 5 THEN 'backup-job-history'
+								WHEN 6 THEN 'alert-custom' 
 								ELSE NULL END AS [event_type_desc]
 		, am.[is_email_sent]
 		, am.[flood_control]

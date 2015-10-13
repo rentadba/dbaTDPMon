@@ -40,6 +40,7 @@ if %module%=="all" goto common
 if %module%=="health-check" goto common
 if %module%=="maintenance-plan" goto common
 if %module%=="maintenance-plan-2k" goto common
+if %module%=="monitoring" goto common
 goto help
 
      
@@ -232,6 +233,7 @@ if %module%=="all" goto mp
 if %module%=="health-check" goto hc
 if %module%=="maintenance-plan" goto mp
 if %module%=="maintenance-plan-2k" goto mp
+if %module%=="monitoring" goto mon
 goto help
 
 
@@ -404,6 +406,32 @@ echo *--------------------------------------------------------------------------
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\job-scripts\job-script-dbaTDPMon - Discovery & Health Check.sql" -d %dbname% -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
+if %module%=="all" goto mon
+goto done
+
+
+:mon
+echo *-----------------------------------------------------------------------------*
+echo Monitoring: Creating Table / Views and Indexes...
+echo *-----------------------------------------------------------------------------*
+
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\dbo.monitoringAlertThresholds.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+
+echo Monitoring: Creating Functions / Stored Procedures
+
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\alarm-custom\dbo.usp_monAlarmCustomFreeDiskSpace.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+
+echo *-----------------------------------------------------------------------------*
+echo Monitoring: Creating SQL Server Agent Jobs
+echo *-----------------------------------------------------------------------------*
+
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - Disk Space.sql" -d %dbname% -v dbName=%dbname% -b -r 1
+if errorlevel 1 goto install_err
+
 if %module%=="all" goto done
 goto done
 
@@ -433,7 +461,7 @@ echo .
 echo USAGE : Windows Authentication
 echo install.bat "server_name" "db_name" "module" "data_files_path" "log_files_path"
 echo .
-echo "module: {all | health-check | maintenance-plan | maintenance-plan-2k}"
+echo "module: {all | health-check | maintenance-plan | maintenance-plan-2k | monitoring}"
 echo .
 echo Example Call : SQL Server Authentication
 echo install.bat . "dbaTDPMon" "all" "D:\SQLData\Data\" "D:\SQLData\Log\" "testuser" "testpassword"

@@ -134,7 +134,7 @@ SET @nestedExecutionLevel = @executionLevel + 1
 
 --------------------------------------------------------------------------------------------------
 --get database status
-SET @queryToRun = N'SELECT DATABASEPROPERTYEX(''' + @dbName + N''', ''Status'') AS [state]' 
+SET @queryToRun = N'SELECT CONVERT([sysname], DATABASEPROPERTYEX(''' + @dbName + N''', ''Status'')) AS [state]' 
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 

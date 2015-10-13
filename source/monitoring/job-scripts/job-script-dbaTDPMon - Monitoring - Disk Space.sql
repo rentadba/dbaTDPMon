@@ -2,9 +2,9 @@
 -- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
 -- ============================================================================
 -- Author			 : Dan Andrei STEFAN
--- Create date		 : 22.01.2015
--- Module			 : SQL Server 2005/2008/2008R2/2012+
--- Description		 : run analysis for Discovery & Health Check
+-- Create date		 : 13.10.2015
+-- Module			 : SQL Server 2005/2008/2008R2/2012/2014+
+-- Description		 : monitor disk/volume free space and alert
 -------------------------------------------------------------------------------
 -- Change date		 : 
 -- Description		 : 
@@ -33,7 +33,7 @@ SET @projectCode  = NULL	/* add local project code here */
 IF @projectCode IS NULL	SET @projectCode = 'DEFAULT'
 
 SET @databaseName = N'$(dbName)'
-SET @job_name = @databaseName + N' - Discovery & Health Check'
+SET @job_name = @databaseName + N' - Monitoring - Disk Space'
 SET @logFileLocation = @logFileLocation + N'job-' + @job_name + N'.log'
 
 
@@ -46,7 +46,6 @@ IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = @job_name)
 
 ---------------------------------------------------------------------------------------------------
 /* creating the job */
----------------------------------------------------------------------------------------------------
 BEGIN TRANSACTION
 	DECLARE @ReturnCode INT
 	SELECT @ReturnCode = 0
@@ -62,133 +61,99 @@ BEGIN TRANSACTION
 	EXEC @ReturnCode =  msdb.dbo.sp_add_job @job_name=@job_name, 
 											@enabled=1, 
 											@notify_level_eventlog=0, 
-											@notify_level_email=0, 
+											@notify_level_email=2, 
 											@notify_level_netsend=0, 
 											@notify_level_page=0, 
 											@delete_level=0, 
-											@description=N'SQL Server instance discovery and daily health check report
-http://dbaTDPMon.codeple.com', 
+											@description=N'Free Disk/Volume Space custom monitoring and alarms
+http://dbaTDPMon.codeplex.com', 
 											@category_name=N'Database Maintenance', 
 											@owner_login_name=N'sa', 
 											@job_id = @jobId OUTPUT
-
+	
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'TRUNCATE TABLE [dbo].[logServerAnalysisMessages]
-	EXEC [dbo].[usp_refreshProjectCatalogsAndDiscovery] @projectCode	 = ''' + @projectCode + N''',
-														@runDiscovery	 = 0,
-														@enableXPCMDSHELL= 1,
-														@debugMode		 = 0'
-
-	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
-												@step_name=N'Catalog Upsert: Discovery & Update', 
-												@step_id=1, 
-												@cmdexec_success_code=0, 
-												@on_success_action=4, 
-												@on_success_step_id=2, 
-												@on_fail_action=4, 
-												@on_fail_step_id=5, 
-												@retry_attempts=0, 
-												@retry_interval=0, 
-												@os_run_priority=0, 
-												@subsystem=N'TSQL', 
-												@command=@queryToRun, 
-												@database_name=@databaseName, 
-												@output_file_name=@logFileLocation, 
-												@flags=4
-	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
-
-	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'EXEC [dbo].[usp_hcJobQueueCreate]	@projectCode			= ''' + @projectCode + N''',
+	SET @queryToRun = N'EXEC [dbo].[usp_hcJobQueueCreate]	@projectCode			= ''' + @projectCode + ''',
 															@sqlServerNameFilter	= ''%'',
-															@collectorDescriptor	= ''%'',
+															@collectorDescriptor	= ''dbo.usp_hcCollectDiskSpaceUsage'',
 															@enableXPCMDSHELL		= 1,
 															@debugMode				= 0'
-
+	
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Generate Data Collector Job Queue', 
-												@step_id=2, 
+												@step_id=1, 
 												@cmdexec_success_code=0, 
-												@on_success_action=4, 
-												@on_success_step_id=3, 
+												@on_success_action=3, 
+												@on_success_step_id=0, 
 												@on_fail_action=4, 
-												@on_fail_step_id=5, 
+												@on_fail_step_id=4, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
-												@os_run_priority=0, 
-												@subsystem=N'TSQL', 
+												@os_run_priority=0, @subsystem=N'TSQL', 
 												@command=@queryToRun, 
 												@database_name=@databaseName, 
 												@output_file_name=@logFileLocation, 
 												@flags=2
-	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 	
+	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+
 	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'exec dbo.usp_JobQueueExecute	@projectCode			= ''' + @projectCode + N''',
+	SET @queryToRun = N'EXEC dbo.usp_JobQueueExecute	@projectCode			= ''' + @projectCode + ''',
 														@moduleFilter			= ''%'',
 														@descriptorFilter		= ''%'',
 														@waitForDelay			= ''00:00:05'',
 														@debugMode				= 0'
-
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Run Job Queue', 
-												@step_id=3, 
+												@step_id=2, 
 												@cmdexec_success_code=0, 
-												@on_success_action=4, 
-												@on_success_step_id=4, 
+												@on_success_action=3, 
+												@on_success_step_id=0, 
 												@on_fail_action=4, 
-												@on_fail_step_id=5, 
+												@on_fail_step_id=4, 
 												@retry_attempts=3, 
 												@retry_interval=1, 
-												@os_run_priority=0, 
-												@subsystem=N'TSQL', 
+												@os_run_priority=0, @subsystem=N'TSQL', 
 												@command=@queryToRun, 
 												@database_name=@databaseName, 
 												@output_file_name=@logFileLocation, 
 												@flags=2
-	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
+	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'EXEC  [dbo].[usp_reportHTMLBuildHealthCheck]	@projectCode		= ''' + @projectCode + ''',
-							@flgActions		= DEFAULT,	
-							@flgOptions		= DEFAULT,
-							@reportDescription		= NULL,
-							@reportFileName		= NULL,	/* if file name is null, than the name will be generated */
-							@localStoragePath		= NULL,
-							@dbMailProfileName	= DEFAULT,		
-							@recipientsList		= DEFAULT,
-							@sendReportAsAttachment	= 1		/* if set to 1, the report file will always be attached */'
+	SET @queryToRun = N'EXEC [dbo].[usp_monAlarmCustomFreeDiskSpace] @projectCode	= ''' + @projectCode + ''',
+																	@sqlServerName	= ''%'''
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
-												@step_name=N'Generate Daily Health Check Reports', 
-												@step_id=4, 
+												@step_name=N'Raise Alarms', 
+												@step_id=3, 
 												@cmdexec_success_code=0, 
-												@on_success_action=4, 
-												@on_success_step_id=5, 
+												@on_success_action=3, 
+												@on_success_step_id=0, 
 												@on_fail_action=4, 
-												@on_fail_step_id=5, 
+												@on_fail_step_id=4, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
-												@os_run_priority=0, 
-												@subsystem=N'TSQL', 
+												@os_run_priority=0, @subsystem=N'TSQL', 
 												@command=@queryToRun, 
 												@database_name=@databaseName, 
 												@output_file_name=@logFileLocation, 
-												@flags=6
-	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+												@flags=0
 	
+	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+
 	---------------------------------------------------------------------------------------------------
-	SET @queryToRun=N'
+	SET @queryToRun = N'
 EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
 												@logFileLocation=''' + @logFileLocation + ''',
-												@module			=''daily health check'',
+												@module			=''monitoring'',
 												@sendLogAsAttachment = 1,
 												@eventType		= 2'
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Send email', 
-												@step_id=5, 
+												@step_id=4, 
 												@cmdexec_success_code=0, 
 												@on_success_action=1, 
 												@on_success_step_id=0, 
@@ -196,36 +161,73 @@ EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
 												@on_fail_step_id=0, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
-												@os_run_priority=0, 
-												@subsystem=N'TSQL', 
+												@os_run_priority=0, @subsystem=N'TSQL', 
 												@command=@queryToRun, 
 												@database_name=@databaseName, 
 												@flags=0
+
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
 	EXEC @ReturnCode = msdb.dbo.sp_update_job	@job_id = @jobId, 
 												@start_step_id = 1
+
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobschedule	@job_id=@jobId, 
-													@name=N'Daily', 
+													@name=N'Business Time - Every 15 minutes', 
 													@enabled=1, 
 													@freq_type=4, 
 													@freq_interval=1, 
-													@freq_subday_type=1, 
-													@freq_subday_interval=0, 
+													@freq_subday_type=4, 
+													@freq_subday_interval=15, 
 													@freq_relative_interval=0, 
 													@freq_recurrence_factor=0, 
-													@active_start_date=20141219, 
+													@active_start_date=20151012, 
 													@active_end_date=99991231, 
-													@active_start_time=50000, 
+													@active_start_time=63000, 
+													@active_end_time=223000
+
+	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+
+	---------------------------------------------------------------------------------------------------
+	EXEC @ReturnCode = msdb.dbo.sp_add_jobschedule	@job_id=@jobId, 
+													@name=N'Early Morning - Every 30 minutes', 
+													@enabled=1, 
+													@freq_type=4, 
+													@freq_interval=1, 
+													@freq_subday_type=4, 
+													@freq_subday_interval=30, 
+													@freq_relative_interval=0, 
+													@freq_recurrence_factor=0, 
+													@active_start_date=20151012, 
+													@active_end_date=99991231, 
+													@active_start_time=0, 
+													@active_end_time=53000
+
+	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+
+	---------------------------------------------------------------------------------------------------
+	EXEC @ReturnCode = msdb.dbo.sp_add_jobschedule	@job_id=@jobId, 
+													@name=N'Late Evening - Every 30 minutes', 
+													@enabled=1, 
+													@freq_type=4, 
+													@freq_interval=1, 
+													@freq_subday_type=4, 
+													@freq_subday_interval=30, 
+													@freq_relative_interval=0, 
+													@freq_recurrence_factor=0, 
+													@active_start_date=20151012, 
+													@active_end_date=99991231, 
+													@active_start_time=223000, 
 													@active_end_time=235959
+
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobserver @job_id = @jobId, @server_name = N'(local)'
+	
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 ---------------------------------------------------------------------------------------------------
@@ -238,5 +240,3 @@ EndSave:
 
 ---------------------------------------------------------------------------------------------------
 GO
-
-

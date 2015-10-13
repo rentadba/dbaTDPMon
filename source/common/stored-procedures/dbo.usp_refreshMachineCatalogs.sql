@@ -346,7 +346,9 @@ BEGIN TRY
 
 						INSERT	INTO #xpCMDShellOutput([output])
 								EXEC (@queryToRun)
-			
+
+						SELECT * FROM #xpCMDShellOutput
+									
 						UPDATE #xpCMDShellOutput SET [output]=LTRIM(RTRIM([output]))
 			
 						DELETE FROM #xpCMDShellOutput WHERE LEN([output])<=3 OR [output] IS NULL
@@ -357,7 +359,9 @@ BEGIN TRY
 						SELECT TOP 1 @domainName = LOWER([output])
 						FROM #xpCMDShellOutput
 
-						UPDATE #catalogMachineNames SET [domain] = @domainName
+						SELECT REPLACE(@domainName, ' ', '')
+						SELECT 'AA'
+						UPDATE #catalogMachineNames SET [domain] = LTRIM(RTRIM(@domainName))
 					end
 
 				IF @SQLMajorVersion>8 AND (@optionXPHasChanged=1 OR @optionAdvancedHasChanged=1)
