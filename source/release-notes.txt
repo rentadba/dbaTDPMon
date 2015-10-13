@@ -316,5 +316,8 @@
 	- improve performance for health-check data collect and report generation process
 
 /* 09.10.2015 */
+	- fix small bugs on maintenance-plan (compute statistics for system tables)
 	- collect mounted volumes information for systems lower than 2008R2 (thank you Tomasz Kozielski - tomasz.kozielski@atos.net)
-	
+
+/* 13.10.2015 */
+	- fix small bugs on maintenance-plan (check database state when performing backup)

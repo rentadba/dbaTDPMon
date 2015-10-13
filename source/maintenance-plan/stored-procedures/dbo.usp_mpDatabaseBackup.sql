@@ -67,7 +67,7 @@ DECLARE		@backupFileName					[nvarchar](1024),
 			@serverVersionNum				[numeric](9,6),
 			@errorCode						[int],
 			@currentDate					[datetime],
-			@databaseStatus					[int]
+			@databaseStateDesc				[sysname]
 
 DECLARE		@backupStartDate				[datetime],
 			@backupDurationSec				[int],
@@ -134,7 +134,7 @@ SET @nestedExecutionLevel = @executionLevel + 1
 
 --------------------------------------------------------------------------------------------------
 --get database status
-SET @queryToRun = N'SELECT [status] FROM master.dbo.sysdatabases WHERE [name]=''' + @dbName + N'''' 
+SET @queryToRun = N'SELECT DATABASEPROPERTYEX(''' + @dbName + N''', ''Status'') AS [state]' 
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -142,25 +142,17 @@ DELETE FROM #serverPropertyConfig
 INSERT	INTO #serverPropertyConfig([value])
 		EXEC (@queryToRun)
 
-SELECT @databaseStatus = [value]
+SELECT @databaseStateDesc = [value]
 FROM #serverPropertyConfig
 
-IF	@databaseStatus & 32 = 32				/* LOADING */
-	OR @databaseStatus & 64 = 64			/* PRE RECOVERY */
-	OR @databaseStatus & 128 = 128			/* RECOVERING */
-	OR @databaseStatus & 256 = 256			/* NOT RECOVERED */
-	OR @databaseStatus & 512 = 512			/* OFFLINE */
-	OR @databaseStatus & 2048 = 2048		/* DBO USE ONLY */
-	OR @databaseStatus & 4096 = 4096		/* SINGLE USER */
-	OR @databaseStatus & 32768 = 32768		/* EMERGENCY MODE */
-	OR @databaseStatus & 2097152 = 2097152	/* STANDBY */
-	OR @databaseStatus & 4194584 = 4194584	/* SUSPECT */
-	OR @databaseStatus = 0					/* unknown */
+SET @databaseStateDesc = ISNULL(@databaseStateDesc, 'NULL')
+IF @databaseStateDesc NOT IN ('ONLINE')
 begin
-	SET @queryToRun='Current database state does not allow backup. It will be skipped.'
+	SET @queryToRun='Current database state (' + @databaseStateDesc + ') does not allow backup. It will be skipped.'
 	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 	RETURN
 end
+
 
 --------------------------------------------------------------------------------------------------
 --skip databases involved in log shipping (primary or secondary or logs, secondary for full/diff backups)
