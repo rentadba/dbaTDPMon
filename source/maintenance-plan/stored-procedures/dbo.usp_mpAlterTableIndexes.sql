@@ -480,7 +480,7 @@ BEGIN TRY
 												DECLARE crsNonClusteredIndexes	CURSOR LOCAL FAST_FORWARD FOR
 																				SELECT DISTINCT di.[index_name], di.[is_primary_xml]
 																				FROM @DependentIndexes di
-																				LEFT JOIN [maintenance-plan].[statsMaintenancePlanInternals] smpi ON	smpi.[name]=N'index-made-disable'
+																				LEFT JOIN [maintenance-plan].[logInternalAction] smpi ON	smpi.[name]=N'index-made-disable'
 																																					AND smpi.[server_name]=@SQLServerName
 																																					AND smpi.[database_name]=@DBName
 																																					AND smpi.[schema_name]=@crtTableSchema

@@ -247,9 +247,8 @@ echo *--------------------------------------------------------------------------
 if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\schema\create-schema-maintenance-plan.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.statsMaintenancePlanInternals.sql" -d %dbname%  -b -r 1
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.logInternalAction.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
-
 
 echo *-----------------------------------------------------------------------------*
 echo Maintenance Plan: Creating Functions / Stored Procedures

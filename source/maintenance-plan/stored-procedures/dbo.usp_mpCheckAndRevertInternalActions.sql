@@ -76,12 +76,12 @@ SET @queryToRun=N'Rebuilding previously disabled indexes...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 SET @nestExecutionLevel = @executionLevel + 1
-DECLARE crsStatsMaintenancePlanInternals CURSOR FOR SELECT	[database_name], [schema_name], [object_name], [child_object_name]
-													FROM	[maintenance-plan].[statsMaintenancePlanInternals]
+DECLARE crslogInternalAction CURSOR FOR SELECT	[database_name], [schema_name], [object_name], [child_object_name]
+													FROM	[maintenance-plan].[logInternalAction]
 													WHERE	[name] = 'index-made-disable'
 															AND [server_name] = @sqlServerName
-OPEN crsStatsMaintenancePlanInternals
-FETCH NEXT FROM crsStatsMaintenancePlanInternals INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+OPEN crslogInternalAction
+FETCH NEXT FROM crslogInternalAction INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
 WHILE @@FETCH_STATUS=0
 	begin
 		EXEC [dbo].[usp_mpAlterTableIndexes]		@SQLServerName				= @sqlServerName,
@@ -98,22 +98,22 @@ WHILE @@FETCH_STATUS=0
 													@affectedDependentObjects	= @affectedDependentObjects OUT,
 													@debugMode					= @debugMode
 
-		FETCH NEXT FROM crsStatsMaintenancePlanInternals INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+		FETCH NEXT FROM crslogInternalAction INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
 	end
-CLOSE crsStatsMaintenancePlanInternals
-DEALLOCATE crsStatsMaintenancePlanInternals
+CLOSE crslogInternalAction
+DEALLOCATE crslogInternalAction
 
 
 -----------------------------------------------------------------------------------------
 SET @queryToRun=N'Rebuilding previously disabled foreign key constraints...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-DECLARE crsStatsMaintenancePlanInternals CURSOR FOR SELECT	[database_name], [schema_name], [object_name], [child_object_name]
-													FROM	[maintenance-plan].[statsMaintenancePlanInternals]
+DECLARE crslogInternalAction CURSOR FOR SELECT	[database_name], [schema_name], [object_name], [child_object_name]
+													FROM	[maintenance-plan].[logInternalAction]
 													WHERE	[name] = 'foreign-key-made-disable'
 															AND [server_name] = @sqlServerName
-OPEN crsStatsMaintenancePlanInternals
-FETCH NEXT FROM crsStatsMaintenancePlanInternals INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+OPEN crslogInternalAction
+FETCH NEXT FROM crslogInternalAction INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
 WHILE @@FETCH_STATUS=0
 	begin
 		EXEC [dbo].[usp_mpAlterTableForeignKeys]	@SQLServerName		= @sqlServerName,
@@ -125,10 +125,10 @@ WHILE @@FETCH_STATUS=0
 													@flgOptions			= @flgOptions,
 													@executionLevel		= @nestExecutionLevel,
 													@debugMode			= @debugMode
-		FETCH NEXT FROM crsStatsMaintenancePlanInternals INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+		FETCH NEXT FROM crslogInternalAction INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
 	end
-CLOSE crsStatsMaintenancePlanInternals
-DEALLOCATE crsStatsMaintenancePlanInternals
+CLOSE crslogInternalAction
+DEALLOCATE crslogInternalAction
 
 
 -----------------------------------------------------------------------------------------

@@ -630,12 +630,6 @@ INNER JOIN [health-check].[statsDatabaseDetails] shcdd ON shcdd.[catalog_databas
 GO
 
 
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[statsMaintenancePlanInternals]') AND type in (N'U'))
-	begin
-		DROP TABLE [dbo].[statsMaintenancePlanInternals]
-	end
-GO
-
 -- ============================================================================
 -- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
 -- ============================================================================
@@ -649,40 +643,52 @@ GO
 -----------------------------------------------------------------------------------------------------
 --
 -----------------------------------------------------------------------------------------------------
-RAISERROR('Create table: [maintenance-plan].[statsMaintenancePlanInternals]', 10, 1) WITH NOWAIT
+RAISERROR('Create table: [maintenance-plan].[logInternalAction]', 10, 1) WITH NOWAIT
 GO
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[maintenance-plan].[statsMaintenancePlanInternals]') AND type in (N'U'))
-DROP TABLE [maintenance-plan].[statsMaintenancePlanInternals]
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[maintenance-plan].[logInternalAction]') AND type in (N'U'))
+DROP TABLE [maintenance-plan].[logInternalAction]
 GO
-CREATE TABLE [maintenance-plan].[statsMaintenancePlanInternals]
+CREATE TABLE [maintenance-plan].[logInternalAction]
 (
 	[id]				[bigint] IDENTITY (1, 1)NOT NULL,
-	[event_date_utc]	[datetime]				NOT NULL CONSTRAINT [DF_statsMaintenancePlanInternals_EventDateUTC] DEFAULT (GETUTCDATE()),
-	[session_id]		[smallint]				NOT NULL CONSTRAINT [DF_statsMaintenancePlanInternals_SessionID] DEFAULT (@@SPID),
+	[event_date_utc]	[datetime]				NOT NULL CONSTRAINT [DF_logInternalAction_EventDateUTC] DEFAULT (GETUTCDATE()),
+	[session_id]		[smallint]				NOT NULL CONSTRAINT [DF_logInternalAction_SessionID] DEFAULT (@@SPID),
 	[name]				[sysname]				NOT NULL,
 	[server_name]		[sysname]				NOT NULL,
 	[database_name]		[sysname]				NULL,
 	[schema_name]		[sysname]				NULL,
 	[object_name]		[sysname]				NULL,
 	[child_object_name]	[sysname]				NULL,
-	CONSTRAINT [PK_statsMaintenancePlanInternals] PRIMARY KEY  CLUSTERED 
+	CONSTRAINT [PK_logInternalAction] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
 	) ON [FG_Statistics_Data]
 ) ON [FG_Statistics_Data]
 GO
 
-CREATE INDEX [IX_statsMaintenancePlanInternals_SessionID_Name] ON [maintenance-plan].[statsMaintenancePlanInternals]
+CREATE INDEX [IX_logInternalAction_SessionID_Name] ON [maintenance-plan].[logInternalAction]
 		([session_id], [name]) 
 	INCLUDE 
 		([server_name], [database_name]) 
 	ON [FG_Statistics_Index]
 GO
 
-CREATE INDEX [IX_statsMaintenancePlanInternals_Name] ON [maintenance-plan].[statsMaintenancePlanInternals]
+CREATE INDEX [IX_logInternalAction_Name] ON [maintenance-plan].[logInternalAction]
 		([name], [server_name], [database_name])
 	ON [FG_Statistics_Index]
 GO
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[statsMaintenancePlanInternals]') AND type in (N'U'))
+	begin
+		--keeping current records, if any
+		INSERT	INTO [maintenance-plan].[logInternalAction]([event_date_utc], [session_id], [name], [server_name], [database_name], [schema_name], [object_name], [child_object_name])
+				SELECT [event_date_utc], [session_id], [name], [server_name], [database_name], [schema_name], [object_name], [child_object_name]
+				FROM [dbo].[statsMaintenancePlanInternals]
+
+		DROP TABLE [dbo].[statsMaintenancePlanInternals]
+	end
+GO
+
 
 
 IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[monitoringAlertThresholds]') AND type in (N'U'))
@@ -7361,7 +7367,7 @@ SET NOCOUNT ON
 --insert action
 IF @flgOperation = 1
 	begin
-		INSERT	INTO [maintenance-plan].[statsMaintenancePlanInternals]([name], [server_name], [database_name], [schema_name], [object_name], [child_object_name])
+		INSERT	INTO [maintenance-plan].[logInternalAction]([name], [server_name], [database_name], [schema_name], [object_name], [child_object_name])
 				SELECT @actionName, @server_name, @database_name, @schema_name, @object_name, @child_object_name
 	end
 
@@ -7369,7 +7375,7 @@ IF @flgOperation = 1
 IF @flgOperation = 2
 	begin
 		IF @database_name <> '%'
-			DELETE	FROM [maintenance-plan].[statsMaintenancePlanInternals]
+			DELETE	FROM [maintenance-plan].[logInternalAction]
 			WHERE	[name] = @actionName
 					AND [server_name] = @server_name
 					AND ([database_name] = @database_name OR ([database_name] IS NULL AND @database_name IS NULL))
@@ -7377,7 +7383,7 @@ IF @flgOperation = 2
 					AND ([object_name] = @object_name OR ([object_name] IS NULL AND @object_name IS NULL))
 					AND ([child_object_name] = @child_object_name OR ([child_object_name] IS NULL AND @child_object_name IS NULL))
 		ELSE
-			DELETE	FROM [maintenance-plan].[statsMaintenancePlanInternals]
+			DELETE	FROM [maintenance-plan].[logInternalAction]
 			WHERE	[name] = @actionName
 					AND [server_name] = @server_name
 
@@ -7463,12 +7469,12 @@ SET @queryToRun=N'Rebuilding previously disabled indexes...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 SET @nestExecutionLevel = @executionLevel + 1
-DECLARE crsStatsMaintenancePlanInternals CURSOR FOR SELECT	[database_name], [schema_name], [object_name], [child_object_name]
-													FROM	[maintenance-plan].[statsMaintenancePlanInternals]
+DECLARE crslogInternalAction CURSOR FOR SELECT	[database_name], [schema_name], [object_name], [child_object_name]
+													FROM	[maintenance-plan].[logInternalAction]
 													WHERE	[name] = 'index-made-disable'
 															AND [server_name] = @sqlServerName
-OPEN crsStatsMaintenancePlanInternals
-FETCH NEXT FROM crsStatsMaintenancePlanInternals INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+OPEN crslogInternalAction
+FETCH NEXT FROM crslogInternalAction INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
 WHILE @@FETCH_STATUS=0
 	begin
 		EXEC [dbo].[usp_mpAlterTableIndexes]		@SQLServerName				= @sqlServerName,
@@ -7485,22 +7491,22 @@ WHILE @@FETCH_STATUS=0
 													@affectedDependentObjects	= @affectedDependentObjects OUT,
 													@debugMode					= @debugMode
 
-		FETCH NEXT FROM crsStatsMaintenancePlanInternals INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+		FETCH NEXT FROM crslogInternalAction INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
 	end
-CLOSE crsStatsMaintenancePlanInternals
-DEALLOCATE crsStatsMaintenancePlanInternals
+CLOSE crslogInternalAction
+DEALLOCATE crslogInternalAction
 
 
 -----------------------------------------------------------------------------------------
 SET @queryToRun=N'Rebuilding previously disabled foreign key constraints...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-DECLARE crsStatsMaintenancePlanInternals CURSOR FOR SELECT	[database_name], [schema_name], [object_name], [child_object_name]
-													FROM	[maintenance-plan].[statsMaintenancePlanInternals]
+DECLARE crslogInternalAction CURSOR FOR SELECT	[database_name], [schema_name], [object_name], [child_object_name]
+													FROM	[maintenance-plan].[logInternalAction]
 													WHERE	[name] = 'foreign-key-made-disable'
 															AND [server_name] = @sqlServerName
-OPEN crsStatsMaintenancePlanInternals
-FETCH NEXT FROM crsStatsMaintenancePlanInternals INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+OPEN crslogInternalAction
+FETCH NEXT FROM crslogInternalAction INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
 WHILE @@FETCH_STATUS=0
 	begin
 		EXEC [dbo].[usp_mpAlterTableForeignKeys]	@SQLServerName		= @sqlServerName,
@@ -7512,10 +7518,10 @@ WHILE @@FETCH_STATUS=0
 													@flgOptions			= @flgOptions,
 													@executionLevel		= @nestExecutionLevel,
 													@debugMode			= @debugMode
-		FETCH NEXT FROM crsStatsMaintenancePlanInternals INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+		FETCH NEXT FROM crslogInternalAction INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
 	end
-CLOSE crsStatsMaintenancePlanInternals
-DEALLOCATE crsStatsMaintenancePlanInternals
+CLOSE crslogInternalAction
+DEALLOCATE crslogInternalAction
 
 
 -----------------------------------------------------------------------------------------
@@ -7527,6 +7533,7 @@ WHERE	[name]='Default lock timeout (ms)'
 		AND [module] = 'common'
 
 GO
+
 
 
 RAISERROR('Create procedure: [dbo].[usp_mpAlterTableIndexes]', 10, 1) WITH NOWAIT
@@ -8011,7 +8018,7 @@ BEGIN TRY
 												DECLARE crsNonClusteredIndexes	CURSOR LOCAL FAST_FORWARD FOR
 																				SELECT DISTINCT di.[index_name], di.[is_primary_xml]
 																				FROM @DependentIndexes di
-																				LEFT JOIN [maintenance-plan].[statsMaintenancePlanInternals] smpi ON	smpi.[name]=N'index-made-disable'
+																				LEFT JOIN [maintenance-plan].[logInternalAction] smpi ON	smpi.[name]=N'index-made-disable'
 																																					AND smpi.[server_name]=@SQLServerName
 																																					AND smpi.[database_name]=@DBName
 																																					AND smpi.[schema_name]=@crtTableSchema
@@ -8228,6 +8235,7 @@ END CATCH
 
 RETURN @errorCode
 GO
+
 
 
 RAISERROR('Create procedure: [dbo].[usp_monAlarmCustomFreeDiskSpace]', 10, 1) WITH NOWAIT
