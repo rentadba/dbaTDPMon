@@ -10,6 +10,8 @@
 -- Change date		 : 
 -- Description		 : 
 -------------------------------------------------------------------------------
+RAISERROR('Create job: Database Backup - Full and Diff', 10, 1) WITH NOWAIT
+GO
 USE [msdb]
 GO
 

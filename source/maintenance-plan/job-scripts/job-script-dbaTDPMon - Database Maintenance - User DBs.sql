@@ -10,6 +10,8 @@
 -- Change date		 : 08.01.2015
 -- Description		 : unify code for 2k and 2k+ maintenance
 -------------------------------------------------------------------------------
+RAISERROR('Create job: Database Maintenance - User DBs', 10, 1) WITH NOWAIT
+GO
 USE [msdb]
 GO
 

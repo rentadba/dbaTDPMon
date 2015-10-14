@@ -12,14 +12,16 @@ if  !%3==! goto error
 set server=%1
 set dbname=%2
 set module=%3
-set data_files_path=%4
-set log_files_path=%5
+set project=%4
+set data_files_path=%5
+set log_files_path=%6
 set userid=%6
-set password=%7
+set password=%8
 
-if !%4==! set data_files_path=""
-if !%5==! set log_files_path=""
-if !%6==! goto trusted_connection
+if !%4==! set project="DEFAULT"
+if !%5==! set data_files_path=""
+if !%6==! set log_files_path=""
+if !%7==! goto trusted_connection
 
 set autentif=-U%userid% -P%password%
 
@@ -76,10 +78,10 @@ if %module%=="all" set runscript=true
 if %module%=="health-check" set runscript=true
 if %module%=="maintenance-plan-2k" set run2k5mode=false
 	
-sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.appConfigurations.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.appConfigurations.sql" -d %dbname% -v projectCode=%project% -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.catalogProjects.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.catalogProjects.sql" -d %dbname% -v projectCode=%project% -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.catalogMachineNames.sql" -d %dbname%  -b -r 1
@@ -403,7 +405,7 @@ echo *--------------------------------------------------------------------------
 echo Health Check: Creating SQL Server Agent Jobs
 echo *-----------------------------------------------------------------------------*
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\job-scripts\job-script-dbaTDPMon - Discovery & Health Check.sql" -d %dbname% -v dbName=%dbname% -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\job-scripts\job-script-dbaTDPMon - Discovery & Health Check.sql" -d %dbname% -v dbName=%dbname% projectCode=%project% -b -r 1
 if errorlevel 1 goto install_err
 
 if %module%=="all" goto mon
@@ -429,7 +431,7 @@ echo *--------------------------------------------------------------------------
 echo Monitoring: Creating SQL Server Agent Jobs
 echo *-----------------------------------------------------------------------------*
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - Disk Space.sql" -d %dbname% -v dbName=%dbname% -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - Disk Space.sql" -d %dbname% -v dbName=%dbname% projectCode=%project% -b -r 1
 if errorlevel 1 goto install_err
 
 if %module%=="all" goto done
@@ -456,18 +458,18 @@ echo *--------------------------------------------------------------------------
 echo Install dbaTDPMon (Troubleshoot Database Performance / Monitoring)
 echo *-----------------------------------------------------------------------------*
 echo USAGE : SQL Server Authentication
-echo install.bat "server_name" "db_name" "module" "data_files_path" "log_files_path" "login_id" "login_password"
+echo install.bat "server_name" "db_name" "module" "project_code" "data_files_path" "log_files_path" "login_id" "login_password"
 echo .
 echo USAGE : Windows Authentication
-echo install.bat "server_name" "db_name" "module" "data_files_path" "log_files_path"
+echo install.bat "server_name" "db_name" "module" "project_code" "data_files_path" "log_files_path"
 echo .
 echo "module: {all | health-check | maintenance-plan | maintenance-plan-2k | monitoring}"
 echo .
 echo Example Call : SQL Server Authentication
-echo install.bat . "dbaTDPMon" "all" "D:\SQLData\Data\" "D:\SQLData\Log\" "testuser" "testpassword"
+echo install.bat . "dbaTDPMon" "all" "TEST" "D:\SQLData\Data\" "D:\SQLData\Log\" "testuser" "testpassword"
 echo .
 echo Example Call : Windows Authentication
-echo install.bat "LAB-SERVER" "dbaTDPMon" "all" "D:\SQLData\Data\" "D:\SQLData\Log\" 
+echo install.bat "LAB-SERVER" "dbaTDPMon" "all" "LAB"
 
 echo *-----------------------------------------------------------------------------*
 :end

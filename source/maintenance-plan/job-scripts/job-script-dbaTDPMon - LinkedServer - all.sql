@@ -15,6 +15,8 @@ GO
 EXEC dbo.usp_addLinkedSQLServer'$(linkedServerName)'
 GO
 
+RAISERROR('Create job: Database Backup - Full and Diff', 10, 1) WITH NOWAIT
+GO
 USE [msdb]
 GO
 
@@ -345,6 +347,8 @@ GO
 -- Change date		 : 
 -- Description		 : 
 -------------------------------------------------------------------------------
+RAISERROR('Create job: Database Backup - Log', 10, 1) WITH NOWAIT
+GO
 USE [msdb]
 GO
 
@@ -567,6 +571,8 @@ GO
 -- Change date		 : 08.01.2015
 -- Description		 : unify code for 2k and 2k+ maintenance
 -------------------------------------------------------------------------------
+RAISERROR('Create job: Database Maintenance - System DBs', 10, 1) WITH NOWAIT
+GO
 USE [msdb]
 GO
 
@@ -1314,6 +1320,8 @@ GO
 -- Change date		 : 08.01.2015
 -- Description		 : unify code for 2k and 2k+ maintenance
 -------------------------------------------------------------------------------
+RAISERROR('Create job: Database Maintenance - User DBs', 10, 1) WITH NOWAIT
+GO
 USE [msdb]
 GO
 

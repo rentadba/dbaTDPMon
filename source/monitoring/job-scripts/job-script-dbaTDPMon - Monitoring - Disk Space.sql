@@ -9,6 +9,8 @@
 -- Change date		 : 
 -- Description		 : 
 -------------------------------------------------------------------------------
+RAISERROR('Create job: Monitoring - Disk Space', 10, 1) WITH NOWAIT
+GO
 USE [msdb]
 GO
 
@@ -29,7 +31,7 @@ IF @logFileLocation IS NULL SET @logFileLocation = N'C:\'
 ---------------------------------------------------------------------------------------------------
 /* setting the job name & job log location */
 ---------------------------------------------------------------------------------------------------
-SET @projectCode  = NULL	/* add local project code here */
+SET @projectCode  = N'$(projectCode)'	/* add local project code here */
 IF @projectCode IS NULL	SET @projectCode = 'DEFAULT'
 
 SET @databaseName = N'$(dbName)'

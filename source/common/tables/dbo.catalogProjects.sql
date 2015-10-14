@@ -42,5 +42,5 @@ GO
 SET NOCOUNT ON
 GO
 INSERT	INTO [dbo].[catalogProjects]([id], [code], [name], [description], [active])
-		SELECT 0, 'DEFAULT', 'Default Project', '', 1
+		SELECT 0, '$(projectCode)', '', '', 1
 GO
