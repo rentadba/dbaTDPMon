@@ -247,7 +247,7 @@ echo *--------------------------------------------------------------------------
 if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\schema\create-schema-maintenance-plan.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\dbo.statsMaintenancePlanInternals.sql" -d %dbname%  -b -r 1
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.statsMaintenancePlanInternals.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 
@@ -337,34 +337,34 @@ echo *--------------------------------------------------------------------------
 if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\health-check\schema\create-schema-health-check.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsDatabaseDetails.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsDatabaseDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsSQLServerAgentJobsHistory.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsSQLServerAgentJobsHistory.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsDiskSpaceInfo.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsDiskSpaceInfo.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsSQLServerErrorlogDetails.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsSQLServerErrorlogDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsOSEventLogs.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsOSEventLogs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsDatabaseDetails.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsDatabaseDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsSQLServerAgentJobsHistory.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsSQLServerAgentJobsHistory.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsDiskSpaceInfo.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsDiskSpaceInfo.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsSQLServerErrorlogDetails.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsSQLServerErrorlogDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsOSEventLogs.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsOSEventLogs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 

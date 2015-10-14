@@ -7685,4 +7685,3 @@ FROM [msdb].[dbo].[sysjobs] sj
 INNER JOIN [msdb].[dbo].[sysjobsteps] sjs ON sjs.[job_id]=sj.[job_id]
 WHERE sj.[name] LIKE '%Monitoring - Disk Space'
 GO
-
