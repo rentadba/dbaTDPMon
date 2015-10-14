@@ -1,3 +1,8 @@
+SET QUOTED_IDENTIFIER ON 
+GO
+SET ANSI_NULLS ON 
+GO
+
 RAISERROR('Create procedure: [dbo].[usp_hcCollectOSEventLogs]', 10, 1) WITH NOWAIT
 GO
 IF  EXISTS (
