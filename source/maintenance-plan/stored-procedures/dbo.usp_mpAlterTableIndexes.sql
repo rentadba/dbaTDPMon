@@ -480,12 +480,12 @@ BEGIN TRY
 												DECLARE crsNonClusteredIndexes	CURSOR LOCAL FAST_FORWARD FOR
 																				SELECT DISTINCT di.[index_name], di.[is_primary_xml]
 																				FROM @DependentIndexes di
-																				LEFT JOIN [dbo].[statsMaintenancePlanInternals] smpi ON	smpi.[name]=N'index-made-disable'
-																																		AND smpi.[server_name]=@SQLServerName
-																																		AND smpi.[database_name]=@DBName
-																																		AND smpi.[schema_name]=@crtTableSchema
-																																		AND smpi.[object_name]=@crtTableName
-																																		AND smpi.[child_object_name]=di.[index_name]
+																				LEFT JOIN [maintenance-plan].[statsMaintenancePlanInternals] smpi ON	smpi.[name]=N'index-made-disable'
+																																					AND smpi.[server_name]=@SQLServerName
+																																					AND smpi.[database_name]=@DBName
+																																					AND smpi.[schema_name]=@crtTableSchema
+																																					AND smpi.[object_name]=@crtTableName
+																																					AND smpi.[child_object_name]=di.[index_name]
 																				WHERE	(
 																							/* index was disabled (option selected) and marked as disabled */
 																							(@flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline = N'ONLINE = ON')) AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0) 

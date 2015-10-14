@@ -1,10 +1,10 @@
-RAISERROR('Create view : [dbo].[vw_statsSQLServerErrorlogDetails]', 10, 1) WITH NOWAIT
+RAISERROR('Create view : [health-check].[vw_statsSQLServerErrorlogDetails]', 10, 1) WITH NOWAIT
 GO
-IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[dbo].[vw_statsSQLServerErrorlogDetails]'))
-DROP VIEW [dbo].[vw_statsSQLServerErrorlogDetails]
+IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[health-check].[vw_statsSQLServerErrorlogDetails]'))
+DROP VIEW [health-check].[vw_statsSQLServerErrorlogDetails]
 GO
 
-CREATE VIEW [dbo].[vw_statsSQLServerErrorlogDetails]
+CREATE VIEW [health-check].[vw_statsSQLServerErrorlogDetails]
 /* WITH ENCRYPTION */
 AS
 
@@ -25,5 +25,5 @@ SELECT 	  sseld.[id]
 		, sseld.[text]
 		, sseld.[event_date_utc]
 FROM [dbo].[catalogInstanceNames]	cin	
-INNER JOIN [dbo].[statsSQLServerErrorlogDetails] sseld ON cin.[id] = sseld.[instance_id] AND cin.[project_id] = sseld.[project_id]
+INNER JOIN [health-check].[statsSQLServerErrorlogDetails] sseld ON cin.[id] = sseld.[instance_id] AND cin.[project_id] = sseld.[project_id]
 GO

@@ -90,7 +90,7 @@ IF @projectID IS NULL
 RAISERROR('--Step 1: Delete existing information....', 10, 1) WITH NOWAIT
 
 DELETE ssajh
-FROM [dbo].[statsSQLServerAgentJobsHistory]		ssajh
+FROM [health-check].[statsSQLServerAgentJobsHistory]		ssajh
 INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = ssajh.[instance_id] AND cin.[project_id] = ssajh.[project_id]
 WHERE cin.[project_id] = @projectID
 		AND cin.[name] LIKE @sqlServerNameFilter
@@ -162,7 +162,7 @@ WHILE @@FETCH_STATUS=0
 															@extentedStepDetails	= @collectStepDetails,		
 															@debugMode				= @debugMode
 
-					INSERT	INTO [dbo].[statsSQLServerAgentJobsHistory]([instance_id], [project_id], [event_date_utc], [job_name], [message], [last_execution_status], [last_execution_date], [last_execution_time], [running_time_sec])
+					INSERT	INTO [health-check].[statsSQLServerAgentJobsHistory]([instance_id], [project_id], [event_date_utc], [job_name], [message], [last_execution_status], [last_execution_date], [last_execution_time], [running_time_sec])
 							SELECT	  @instanceID, @projectID, GETUTCDATE(), @jobName, @strMessage
 									, @lastExecutionStatus, @lastExecutionDate, @lastExecutionTime
 									, @runningTimeSec

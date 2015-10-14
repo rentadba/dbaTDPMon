@@ -346,10 +346,8 @@ BEGIN TRY
 
 						INSERT	INTO #xpCMDShellOutput([output])
 								EXEC (@queryToRun)
-
-						SELECT * FROM #xpCMDShellOutput
 									
-						UPDATE #xpCMDShellOutput SET [output]=LTRIM(RTRIM([output]))
+						UPDATE #xpCMDShellOutput SET [output]=REPLACE(REPLACE(REPLACE(LTRIM(RTRIM([output])), ' ', ''), CHAR(10), ''), CHAR(13), '')
 			
 						DELETE FROM #xpCMDShellOutput WHERE LEN([output])<=3 OR [output] IS NULL
 						DELETE FROM #xpCMDShellOutput WHERE [output] LIKE '%not recognized as an internal or external command%'
@@ -359,9 +357,7 @@ BEGIN TRY
 						SELECT TOP 1 @domainName = LOWER([output])
 						FROM #xpCMDShellOutput
 
-						SELECT REPLACE(@domainName, ' ', '')
-						SELECT 'AA'
-						UPDATE #catalogMachineNames SET [domain] = LTRIM(RTRIM(@domainName))
+						UPDATE #catalogMachineNames SET [domain] = @domainName
 					end
 
 				IF @SQLMajorVersion>8 AND (@optionXPHasChanged=1 OR @optionAdvancedHasChanged=1)
@@ -556,4 +552,3 @@ DECLARE
 END CATCH
 
 RETURN @returnValue
-GO

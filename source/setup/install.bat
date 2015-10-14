@@ -244,6 +244,9 @@ echo *--------------------------------------------------------------------------
 echo Maintenance Plan: Creating Table / Views and Indexes...
 echo *-----------------------------------------------------------------------------*
 
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\schema\create-schema-maintenance-plan.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\dbo.statsMaintenancePlanInternals.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -331,13 +334,13 @@ echo *--------------------------------------------------------------------------
 echo Health Check: Creating Table / Views and Indexes...
 echo *-----------------------------------------------------------------------------*
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsHealthCheckDatabaseDetails.sql" -d %dbname%  -b -r 1
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\health-check\schema\create-schema-health-check.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsDatabaseDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsSQLServerAgentJobsHistory.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsHealthCheckDiskSpaceInfo.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsDiskSpaceInfo.sql" -d %dbname%  -b -r 1
@@ -349,13 +352,10 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\dbo.statsOSEventLogs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsHealthCheckDatabaseDetails.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsDatabaseDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsSQLServerAgentJobsHistory.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsHealthCheckDiskSpaceInfo.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\dbo.vw_statsDiskSpaceInfo.sql" -d %dbname%  -b -r 1
@@ -417,9 +417,14 @@ echo *--------------------------------------------------------------------------
 echo Monitoring: Creating Table / Views and Indexes...
 echo *-----------------------------------------------------------------------------*
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\dbo.monitoringAlertThresholds.sql" -d %dbname%  -b -r 1
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\schema\create-schema-monitoring.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.alertThresholds.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.alertSkipRules.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
 
 echo Monitoring: Creating Functions / Stored Procedures
 

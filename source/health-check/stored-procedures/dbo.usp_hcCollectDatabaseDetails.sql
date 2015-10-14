@@ -75,8 +75,8 @@ CREATE TABLE #dbccLastKnownGood
 )
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
-IF object_id('#statsHealthCheckDatabaseDetails') IS NOT NULL DROP TABLE #statsHealthCheckDatabaseDetails
-CREATE TABLE #statsHealthCheckDatabaseDetails
+IF object_id('#statsDatabaseDetails') IS NOT NULL DROP TABLE #statsDatabaseDetails
+CREATE TABLE #statsDatabaseDetails
 (
 	[database_id]				[int]			NOT NULL,
 	[query_type]				[tinyint]		NOT NULL,
@@ -120,7 +120,7 @@ IF @projectID IS NULL
 RAISERROR('--Step 1: Delete existing information....', 10, 1) WITH NOWAIT
 
 DELETE shcdd
-FROM [dbo].[statsHealthCheckDatabaseDetails]	shcdd
+FROM [health-check].[statsDatabaseDetails]		shcdd
 INNER JOIN [dbo].[catalogDatabaseNames]			cdb ON cdb.[id] = shcdd.[catalog_database_id] AND cdb.[instance_id] = shcdd.[instance_id]
 INNER JOIN [dbo].[catalogInstanceNames]			cin ON cin.[id] = cdb.[instance_id] AND cin.[project_id] = cdb.[project_id]
 WHERE cin.[project_id] = @projectID
@@ -151,7 +151,7 @@ WHILE @@FETCH_STATUS=0
 		SET @strMessage='--	Analyzing server: ' + @sqlServerName
 		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
 
-		TRUNCATE TABLE #statsHealthCheckDatabaseDetails
+		TRUNCATE TABLE #statsDatabaseDetails
 
 		BEGIN TRY
 			SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(@sqlServerVersion, ''), 2), '.', '') 
@@ -298,7 +298,7 @@ WHILE @@FETCH_STATUS=0
 					end
 
 				/* compute database statistics */
-				INSERT	INTO #statsHealthCheckDatabaseDetails([query_type], [database_id], [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], [physical_drives], [last_dbcc checkdb_time], [is_growth_limited])
+				INSERT	INTO #statsDatabaseDetails([query_type], [database_id], [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], [physical_drives], [last_dbcc checkdb_time], [is_growth_limited])
 						SELECT    1, @databaseID
 								, CAST([data_size_kb] / 1024. AS [numeric](20,3)) AS [data_size_mb]
 								, CAST(CASE WHEN [data_size_kb] <>0 THEN [data_space_used_kb] * 100. / [data_size_kb] ELSE 0 END AS [numeric](6,2)) AS [data_used_percent]
@@ -376,7 +376,7 @@ WHILE @@FETCH_STATUS=0
 		IF @debugMode = 1 PRINT @queryToRun
 		
 		BEGIN TRY
-			INSERT	INTO #statsHealthCheckDatabaseDetails([query_type], [database_id], [last_backup_time], [is_auto_close], [is_auto_shrink], [recovery_model], [page_verify_option], [compatibility_level])
+			INSERT	INTO #statsDatabaseDetails([query_type], [database_id], [last_backup_time], [is_auto_close], [is_auto_shrink], [recovery_model], [page_verify_option], [compatibility_level])
 					EXEC (@queryToRun)
 		END TRY
 		BEGIN CATCH
@@ -392,7 +392,7 @@ WHILE @@FETCH_STATUS=0
 		END CATCH
 
 		/* save results to stats table */
-		INSERT	INTO [dbo].[statsHealthCheckDatabaseDetails]([catalog_database_id], [instance_id], 
+		INSERT	INTO [health-check].[statsDatabaseDetails]([catalog_database_id], [instance_id], 
 				 											 [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], 
 															 [is_auto_close], [is_auto_shrink], [physical_drives], 
 															 [last_backup_time], [last_dbcc checkdb_time],  [recovery_model], [page_verify_option], [compatibility_level], [is_growth_limited], [event_date_utc])
@@ -424,7 +424,7 @@ WHILE @@FETCH_STATUS=0
 										, [physical_drives]
 										, [last_dbcc checkdb_time]
 										, [is_growth_limited]
-								FROM #statsHealthCheckDatabaseDetails
+								FROM #statsDatabaseDetails
 								WHERE [query_type]=1
 							) qt1
 						FULL OUTER JOIN
@@ -436,7 +436,7 @@ WHILE @@FETCH_STATUS=0
 										, [recovery_model]
 										, [page_verify_option]
 										, [compatibility_level]
-								FROM #statsHealthCheckDatabaseDetails
+								FROM #statsDatabaseDetails
 								WHERE [query_type]=2
 							) qt2 ON qt1.[database_id] = qt2.[database_id]
 					)qt

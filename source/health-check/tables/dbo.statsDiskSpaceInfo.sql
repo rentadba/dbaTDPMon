@@ -2,19 +2,19 @@
 -- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
 -- ============================================================================
 -- Author			 : Dan Andrei STEFAN
--- Create date		 : 35.12.2014
+-- Create date		 : 15.12.2014
 -- Module			 : Database Analysis & Performance Monitoring
 -- ============================================================================
 
 -----------------------------------------------------------------------------------------------------
 --Health Check: disk space information
 -----------------------------------------------------------------------------------------------------
-RAISERROR('Create table: [dbo].[statsDiskSpaceInfo]', 10, 1) WITH NOWAIT
+RAISERROR('Create table: [health-check].[statsDiskSpaceInfo]', 10, 1) WITH NOWAIT
 GO
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[statsDiskSpaceInfo]') AND type in (N'U'))
-DROP TABLE [dbo].[statsDiskSpaceInfo]
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[health-check].[statsDiskSpaceInfo]') AND type in (N'U'))
+DROP TABLE [health-check].[statsDiskSpaceInfo]
 GO
-CREATE TABLE [dbo].[statsDiskSpaceInfo]
+CREATE TABLE [health-check].[statsDiskSpaceInfo]
 (
 	[id]					[int]	 IDENTITY (1, 1)	NOT NULL,
 	[instance_id]			[smallint]		NOT NULL,
@@ -52,7 +52,7 @@ CREATE TABLE [dbo].[statsDiskSpaceInfo]
 )ON [FG_Statistics_Data]
 GO
 
-CREATE INDEX [IX_statsDiskSpaceInfo_InstanceID] ON [dbo].[statsDiskSpaceInfo]([instance_id], [project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsDiskSpaceInfo_InstanceID] ON [health-check].[statsDiskSpaceInfo]([instance_id], [project_id]) ON [FG_Statistics_Index]
 GO
-CREATE INDEX [IX_statsDiskSpaceInfo_ProjecteID] ON [dbo].[statsDiskSpaceInfo]([project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsDiskSpaceInfo_ProjecteID] ON [health-check].[statsDiskSpaceInfo]([project_id]) ON [FG_Statistics_Index]
 GO

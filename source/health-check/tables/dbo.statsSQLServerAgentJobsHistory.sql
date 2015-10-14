@@ -9,12 +9,12 @@
 -----------------------------------------------------------------------------------------------------
 --log for SQL Server Agent job statuses
 -----------------------------------------------------------------------------------------------------
-RAISERROR('Create table: [dbo].[statsSQLServerAgentJobsHistory]', 10, 1) WITH NOWAIT
+RAISERROR('Create table: [health-check].[statsSQLServerAgentJobsHistory]', 10, 1) WITH NOWAIT
 GO
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[statsSQLServerAgentJobsHistory]') AND type in (N'U'))
-DROP TABLE [dbo].[statsSQLServerAgentJobsHistory]
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[health-check].[statsSQLServerAgentJobsHistory]') AND type in (N'U'))
+DROP TABLE [health-check].[statsSQLServerAgentJobsHistory]
 GO
-CREATE TABLE [dbo].[statsSQLServerAgentJobsHistory]
+CREATE TABLE [health-check].[statsSQLServerAgentJobsHistory]
 (
 	[id]					[int]	 IDENTITY (1, 1)	NOT NULL,
 	[instance_id]			[smallint]		NOT NULL,
@@ -52,7 +52,7 @@ CREATE TABLE [dbo].[statsSQLServerAgentJobsHistory]
 )ON [FG_Statistics_Data]
 GO
 
-CREATE INDEX [IX_statsSQLServerAgentJobsHistory_InstanceID] ON [dbo].[statsSQLServerAgentJobsHistory]([instance_id], [project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsSQLServerAgentJobsHistory_InstanceID] ON [health-check].[statsSQLServerAgentJobsHistory]([instance_id], [project_id]) ON [FG_Statistics_Index]
 GO
-CREATE INDEX [IX_statsSQLServerAgentJobsHistory_ProjecteID] ON [dbo].[statsSQLServerAgentJobsHistory]([project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsSQLServerAgentJobsHistory_ProjecteID] ON [health-check].[statsSQLServerAgentJobsHistory]([project_id]) ON [FG_Statistics_Index]
 GO

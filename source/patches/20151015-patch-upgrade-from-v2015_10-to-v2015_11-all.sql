@@ -1,3 +1,2425 @@
+USE [dbaTDPMon]
+GO
+
+IF EXISTS (SELECT * FROM sys.tables WHERE [name]='reportHTMLSkipRules')
+	begin
+		IF EXISTS(SELECT * FROM [dbo].[reportHTMLSkipRules] WHERE [module] = 'monitoring' AND [rule_name] = 'alarm-custom: low disk space')
+			DELETE FROM [dbo].[reportHTMLSkipRules] WHERE [module] = 'monitoring' AND [rule_name] = 'alarm-custom: low disk space'
+	end
+GO
+
+IF NOT EXISTS(SELECT * FROM sys.schemas WHERE [name] = 'health-check' AND [principal_id] IN (SELECT [principal_id] FROM sys.database_principals WHERE [name] = 'dbo'))
+	begin
+		RAISERROR('Create schema: [health-check]', 10, 1) WITH NOWAIT
+		EXEC ('CREATE SCHEMA [health-check] AUTHORIZATION [dbo]')
+	end
+GO
+
+IF NOT EXISTS(SELECT * FROM sys.schemas WHERE [name] = 'maintenance-plan' AND [principal_id] IN (SELECT [principal_id] FROM sys.database_principals WHERE [name] = 'dbo'))
+	begin
+		RAISERROR('Create schema: [maintenance-plan]', 10, 1) WITH NOWAIT
+		EXEC ('CREATE SCHEMA [maintenance-plan] AUTHORIZATION [dbo]')
+	end
+GO
+
+IF NOT EXISTS(SELECT * FROM sys.schemas WHERE [name] = 'monitoring' AND [principal_id] IN (SELECT [principal_id] FROM sys.database_principals WHERE [name] = 'dbo'))
+	begin
+		RAISERROR('Create schema: [monitoring]', 10, 1) WITH NOWAIT
+		EXEC ('CREATE SCHEMA [monitoring] AUTHORIZATION [dbo]')
+	end
+GO
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[statsHealthCheckDatabaseDetails]') AND type in (N'U'))
+	begin
+		RAISERROR('Drop table: [dbo].[statsHealthCheckDatabaseDetails]', 10, 1) WITH NOWAIT
+		DROP TABLE [dbo].[statsHealthCheckDatabaseDetails]
+	end
+GO
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[statsDiskSpaceInfo]') AND type in (N'U'))
+	begin
+		ALTER SCHEMA [health-check] TRANSFER [dbo].[statsDiskSpaceInfo]
+	end
+GO
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[statsOSEventLogs]') AND type in (N'U'))
+	begin
+		ALTER SCHEMA [health-check] TRANSFER [dbo].[statsOSEventLogs]
+	end
+GO
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[statsSQLServerAgentJobsHistory]') AND type in (N'U'))
+	begin
+		ALTER SCHEMA [health-check] TRANSFER [dbo].[statsSQLServerAgentJobsHistory]
+	end
+GO
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[statsSQLServerErrorlogDetails]') AND type in (N'U'))
+	begin
+		ALTER SCHEMA [health-check] TRANSFER [dbo].[statsSQLServerErrorlogDetails]
+	end
+GO
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[statsDatabaseDetails]') AND type in (N'U'))
+	begin
+		ALTER SCHEMA [health-check] TRANSFER [dbo].[statsDatabaseDetails]
+	end
+GO
+
+IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[health-check].[vw_statsHealthCheckDatabaseDetails]'))
+	begin
+		RAISERROR('Drop view : [health-check].[vw_statsHealthCheckDatabaseDetails]', 10, 1) WITH NOWAIT
+		DROP VIEW [health-check].[vw_statsHealthCheckDatabaseDetails]
+	end
+GO
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[vw_statsDiskSpaceInfo]') AND type in (N'U'))
+	begin
+		RAISERROR('Drop view : [health-check].[vw_statsDiskSpaceInfo]', 10, 1) WITH NOWAIT
+		DROP VIEW [dbo].[vw_statsDiskSpaceInfo]
+	end
+GO
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[vw_statsOSEventLogs]') AND type in (N'U'))
+	begin
+		RAISERROR('Drop view : [health-check].[vw_statsOSEventLogs]', 10, 1) WITH NOWAIT
+		DROP VIEW [dbo].[vw_statsOSEventLogs]
+	end
+GO
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[vw_statsSQLServerAgentJobsHistory]') AND type in (N'U'))
+	begin
+		RAISERROR('Drop view : [health-check].[vw_statsSQLServerAgentJobsHistory]', 10, 1) WITH NOWAIT
+		DROP VIEW [dbo].[vw_statsSQLServerAgentJobsHistory]
+	end
+GO
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[vw_statsSQLServerErrorlogDetails]') AND type in (N'U'))
+	begin
+		RAISERROR('Drop view : [health-check].[vw_statsSQLServerErrorlogDetails]', 10, 1) WITH NOWAIT
+		DROP VIEW [dbo].[vw_statsSQLServerErrorlogDetails]
+	end
+GO
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[vw_statsDatabaseDetails]') AND type in (N'U'))
+	begin
+		RAISERROR('Drop view : [health-check].[vw_statsDatabaseDetails]', 10, 1) WITH NOWAIT
+		DROP VIEW [dbo].[vw_statsDatabaseDetails]
+	end
+GO
+
+RAISERROR('Create view : [health-check].[vw_statsDiskSpaceInfo]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[health-check].[vw_statsDiskSpaceInfo]'))
+DROP VIEW [health-check].[vw_statsDiskSpaceInfo]
+GO
+
+CREATE VIEW [health-check].[vw_statsDiskSpaceInfo]
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 05.12.2014
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+SELECT 	  cin.[project_id]		AS [project_id]
+		, cin.[id]				AS [instance_id]
+		, cin.[name]			AS [instance_name]
+		, dsi.[event_date_utc]
+		, dsi.[logical_drive]
+		, dsi.[volume_mount_point]
+		, dsi.[total_size_mb]
+		, dsi.[available_space_mb]
+		, dsi.[percent_available]
+		, dsi.[block_size]
+FROM [health-check].[statsDiskSpaceInfo]	dsi
+INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = dsi.[instance_id] AND cin.[project_id] = dsi.[project_id]
+GO
+
+RAISERROR('Create view : [health-check].[vw_statsSQLServerErrorlogDetails]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[health-check].[vw_statsSQLServerErrorlogDetails]'))
+DROP VIEW [health-check].[vw_statsSQLServerErrorlogDetails]
+GO
+
+CREATE VIEW [health-check].[vw_statsSQLServerErrorlogDetails]
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 05.12.2014
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+SELECT 	  sseld.[id]
+		, cin.[project_id]		AS [project_id]
+		, cin.[id]				AS [instance_id]
+		, cin.[name]			AS [instance_name]
+		, sseld.[log_date]
+		, sseld.[process_info]
+		, sseld.[text]
+		, sseld.[event_date_utc]
+FROM [dbo].[catalogInstanceNames]	cin	
+INNER JOIN [health-check].[statsSQLServerErrorlogDetails] sseld ON cin.[id] = sseld.[instance_id] AND cin.[project_id] = sseld.[project_id]
+GO
+
+RAISERROR('Create view : [health-check].[vw_statsSQLServerAgentJobsHistory]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[health-check].[vw_statsSQLServerAgentJobsHistory]'))
+DROP VIEW [health-check].[vw_statsSQLServerAgentJobsHistory]
+GO
+
+CREATE VIEW [health-check].[vw_statsSQLServerAgentJobsHistory]
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 05.12.2014
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+SELECT 	  cin.[project_id]		AS [project_id]
+		, cin.[id]				AS [instance_id]
+		, cin.[name]			AS [instance_name]
+		, ssajh.[event_date_utc]
+		, ssajh.[job_name]
+		, ssajh.[last_execution_status]
+		, ssajh.[last_execution_date]
+		, ssajh.[last_execution_time]
+		, ssajh.[running_time_sec]
+		, ssajh.[message]
+FROM [health-check].[statsSQLServerAgentJobsHistory]	ssajh
+INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = ssajh.[instance_id] AND cin.[project_id] = ssajh.[project_id]
+GO
+
+RAISERROR('Create view : [health-check].[vw_statsOSEventLogs]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[health-check].[vw_statsOSEventLogs]'))
+DROP VIEW [health-check].[vw_statsOSEventLogs]
+GO
+
+CREATE VIEW [health-check].[vw_statsOSEventLogs]
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 04.09.2015
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+SELECT 	  cin.[project_id]		AS [project_id]
+		, cin.[id]				AS [instance_id]
+		, cin.[name]			AS [instance_name]
+		, cmn.[id]				AS [machine_id]
+		, soel.[event_date_utc]
+		, soel.[log_type_id]
+		, CASE soel.[log_type_id] WHEN 1 THEN 'Application'
+								  WHEN 2 THEN 'System'
+								  WHEN 3 THEN 'Setup'
+		  END AS [log_type_desc]
+		, soel.[event_id]
+		, soel.[level_id]
+		, CASE soel.[level_id]	WHEN 1 THEN 'Critical'
+								WHEN 2 THEN 'Error'
+								WHEN 3 THEN 'Warning'
+								WHEN 4 THEN 'Information'
+		  END AS [level_desc]
+		, soel.[record_id]
+		, soel.[category_id]
+		, soel.[category_name]
+		, soel.[source]
+		, soel.[process_id]
+		, soel.[thread_id]
+		, soel.[machine_name]
+		, soel.[user_id]
+		, soel.[time_created]
+		, soel.[message]
+FROM [health-check].[statsOSEventLogs]	soel
+INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = soel.[instance_id] AND cin.[project_id] = soel.[project_id]
+INNER JOIN [dbo].[catalogMachineNames]  cmn ON cmn.[id] = soel.[machine_id] AND cmn.[project_id] = soel.[project_id]
+GO
+
+RAISERROR('Create view : [health-check].[vw_statsDatabaseDetails]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[health-check].[vw_statsDatabaseDetails]'))
+DROP VIEW [health-check].[vw_statsDatabaseDetails]
+GO
+
+CREATE VIEW [health-check].[vw_statsDatabaseDetails]
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 05.12.2014
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+SELECT 	  cin.[project_id]		AS [project_id]
+		, cin.[id]				AS [instance_id]
+		, cin.[name]			AS [instance_name]
+		, shcdd.[catalog_database_id]
+		, cdn.[database_id]
+		, cdn.[name]			AS [database_name]
+		, cdn.[active]
+		, cdn.[state]
+		, cdn.[state_desc] 
+		, shcdd.[data_size_mb] + shcdd.[log_size_mb] AS [size_mb]
+		, shcdd.[data_size_mb]
+		, shcdd.[data_space_used_percent]
+		, shcdd.[log_size_mb]
+		, shcdd.[log_space_used_percent]
+		, shcdd.[is_auto_close]
+		, shcdd.[is_auto_shrink]
+		, shcdd.[physical_drives]
+		, shcdd.[last_backup_time]
+		, shcdd.[last_dbcc checkdb_time]
+		, CASE shcdd.[recovery_model] WHEN 1 THEN 'FULL' WHEN 2 THEN 'BULK_LOGGED' WHEN 3 THEN 'SIMPLE' ELSE NULL END AS [recovery_model_desc]
+		, CASE shcdd.[page_verify_option] WHEN 0 THEN 'NONE' WHEN 1 THEN 'TORN_PAGE_DETECTION' WHEN 2 THEN 'CHECKSUM' ELSE NULL END AS [page_verify_option_desc]
+		, shcdd.[compatibility_level]
+		, shcdd.[is_growth_limited]
+		, shcdd.[event_date_utc]
+FROM [dbo].[catalogInstanceNames]	cin	
+INNER JOIN [dbo].[catalogDatabaseNames] cdn ON cin.[id] = cdn.[instance_id] AND cin.[project_id] = cdn.[project_id]
+INNER JOIN [health-check].[statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[id] AND shcdd.[instance_id] = cdn.[instance_id]
+GO
+
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[statsMaintenancePlanInternals]') AND type in (N'U'))
+	begin
+		ALTER SCHEMA [maintenance-plan] TRANSFER [dbo].[statsMaintenancePlanInternals]
+	end
+GO
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[monitoringAlertThresholds]') AND type in (N'U'))
+	begin
+		RAISERROR('Drop table: [dbo].[monitoringAlertThresholds]', 10, 1) WITH NOWAIT
+		DROP TABLE [dbo].[monitoringAlertThresholds]
+	end
+GO
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 13.10.2015
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+-----------------------------------------------------------------------------------------------------
+--
+-----------------------------------------------------------------------------------------------------
+RAISERROR('Create table: [monitoring].[alertThresholds]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[monitoring].[alertThresholds]') AND type in (N'U'))
+DROP TABLE [monitoring].[alertThresholds]
+GO
+CREATE TABLE [monitoring].[alertThresholds]
+(
+	[id]										[int] IDENTITY (1, 1)NOT NULL,
+	[category]									[varchar](32)		NOT NULL,
+	[alert_name]								[sysname]			NULL,
+	[operator]									[varchar](8)		NULL,
+	[warning_limit]								[numeric](18,3)		NOT NULL,
+	[critical_limit]								[numeric](18,3)	NOT NULL,
+	[is_warning_limit_enabled]					[bit]				NOT NULL CONSTRAINT [DF_alertThresholds_IsWarningLimitEnabled] DEFAULT (1),
+	[is_critical_limit_enabled]					[bit]				NOT NULL CONSTRAINT [DF_alertThresholds_IsCriticalLimitEnabled] DEFAULT (1),
+	CONSTRAINT [PK_alertThresholds] PRIMARY KEY  CLUSTERED 
+	(
+		[id]
+	)  ON [PRIMARY],
+	CONSTRAINT [UK_alertThresholds_AlertName] UNIQUE
+		(
+			[category]
+		  , [alert_name]
+		) 
+) ON [PRIMARY]
+GO
+
+SET NOCOUNT ON
+-----------------------------------------------------------------------------------------------------
+RAISERROR('		...insert default data', 10, 1) WITH NOWAIT
+GO
+INSERT	INTO [monitoring].[alertThresholds] ([category], [alert_name], [operator], [warning_limit], [critical_limit])
+		SELECT 'disk-space', 'Logical Disk: Free Disk Space (%)', '<',     8.0,    5.0 UNION ALL
+		SELECT 'disk-space', 'Logical Disk: Free Disk Space (MB)', '<', 3000.0, 2048.0
+GO
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 30.09.2015
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+-----------------------------------------------------------------------------------------------------
+--HTML reports rules / checks and instances/machines to be skipped
+-----------------------------------------------------------------------------------------------------
+RAISERROR('Create table: [monitoring].[alertSkipRules]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[monitoring].[alertSkipRules]') AND type in (N'U'))
+DROP TABLE [monitoring].[alertSkipRules]
+GO
+
+CREATE TABLE [monitoring].[alertSkipRules] 
+(
+	[id]					[smallint] IDENTITY (1, 1)	NOT NULL,
+	[category]				[varchar](32)	NOT NULL,
+	[alert_name]			[sysname]		NULL,
+	[skip_value]			[sysname]		NULL,
+	[skip_value2]			[sysname]		NULL,
+	[active]				[bit]			NOT NULL CONSTRAINT [DF_alertSkipRules_Active] DEFAULT (1),
+	CONSTRAINT [PK_reportHTMLSkipRules] PRIMARY KEY  CLUSTERED 
+	(
+		[id]
+	) ON [PRIMARY],
+	CONSTRAINT [UK_reportHTMLSkipRules_Name] UNIQUE  NONCLUSTERED 
+	(
+		[category],
+		[alert_name],
+		[skip_value],
+		[skip_value2]
+	) ON [PRIMARY]
+)  ON [PRIMARY]
+GO
+
+-----------------------------------------------------------------------------------------------------
+RAISERROR('		...insert default data', 10, 1) WITH NOWAIT
+GO
+SET NOCOUNT ON
+GO
+INSERT	INTO [monitoring].[alertSkipRules] ([category], [alert_name], [skip_value], [active])
+		SELECT 'disk-space', 'Logical Disk: Free Disk Space (%)', NULL, 0 UNION ALL
+		SELECT 'disk-space', 'Logical Disk: Free Disk Space (MB)', NULL, 0
+GO
+
+RAISERROR('Create procedure: [dbo].[usp_removeFromCatalog]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sys.objects 
+	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_removeFromCatalog]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_removeFromCatalog]
+GO
+
+CREATE PROCEDURE [dbo].[usp_removeFromCatalog]
+		@projectCode		[varchar](32),
+		@sqlServerName		[sysname],
+		@debugMode			[bit] = 0
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 20.02.2015
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+SET NOCOUNT ON
+
+DECLARE   @returnValue			[smallint]
+		, @errMessage			[nvarchar](4000)
+
+DECLARE   @projectID			[smallint]
+		, @instanceID			[smallint]
+		, @machineID			[smallint]
+		
+-- { sql_statement | statement_block }
+BEGIN TRY
+	SET @returnValue=1
+
+	-----------------------------------------------------------------------------------------------------
+	SELECT @projectID = [id]
+	FROM [dbo].[catalogProjects]
+	WHERE [code] = @projectCode 
+
+	IF @projectID IS NULL
+		begin
+			SET @errMessage=N'The value specifief for Project Code is not valid.'
+			RAISERROR(@errMessage, 16, 1) WITH NOWAIT
+		end
+
+	SELECT   @instanceID = [id]
+		   , @machineID = [machine_id]
+	FROM [dbo].[catalogInstanceNames]
+	WHERE [project_id] = @projectID
+		AND [name] = @sqlServerName
+
+	IF @instanceID IS NULL
+		begin
+			SET @errMessage=N'The value specifief for SQL Server Instance Name is not valid.'
+			RAISERROR(@errMessage, 16, 1) WITH NOWAIT
+		end
+
+	BEGIN TRANSACTION
+		-----------------------------------------------------------------------------------------------------
+		DELETE jeq
+		FROM dbo.jobExecutionQueue jeq
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = jeq.[project_id] AND cin.[id] = jeq.[instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[id] = @instanceID
+
+		-----------------------------------------------------------------------------------------------------
+		DELETE jeq
+		FROM dbo.jobExecutionQueue jeq
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = jeq.[project_id] AND cin.[id] = jeq.[for_instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[id] = @instanceID
+	
+		-----------------------------------------------------------------------------------------------------
+		DELETE lem
+		FROM dbo.logEventMessages lem
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = lem.[project_id] AND cin.[id] = lem.[instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[id] = @instanceID
+
+		-----------------------------------------------------------------------------------------------------
+		DELETE lsam
+		FROM dbo.logServerAnalysisMessages lsam
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = lsam.[project_id] AND cin.[id] = lsam.[instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[id] = @instanceID
+
+		-----------------------------------------------------------------------------------------------------
+		DELETE sosel
+		FROM dbo.statsOSEventLogs sosel
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = sosel.[project_id] AND cin.[id] = sosel.[instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[id] = @instanceID
+
+		-----------------------------------------------------------------------------------------------------
+		DELETE sseld
+		FROM dbo.statsSQLServerErrorlogDetails sseld
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = sseld.[project_id] AND cin.[id] = sseld.[instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[id] = @instanceID
+
+		-----------------------------------------------------------------------------------------------------
+		DELETE ssajh
+		FROM dbo.statsSQLServerAgentJobsHistory ssajh
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = ssajh.[project_id] AND cin.[id] = ssajh.[instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[id] = @instanceID
+
+		-----------------------------------------------------------------------------------------------------
+		DELETE shcdsi
+		FROM dbo.statsDiskSpaceInfo shcdsi
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = shcdsi.[project_id] AND cin.[id] = shcdsi.[instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[id] = @instanceID
+
+		-----------------------------------------------------------------------------------------------------
+		DELETE shcdd
+		FROM dbo.statsDatabaseDetails shcdd
+		INNER JOIN dbo.catalogDatabaseNames cdb ON cdb.[instance_id] = shcdd.[instance_id] AND cdb.[id] = shcdd.[catalog_database_id]
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[id] = cdb.[instance_id] AND cin.[project_id] = cdb.[project_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[id] = @instanceID
+
+				
+		-----------------------------------------------------------------------------------------------------
+		DELETE FROM  dbo.catalogDatabaseNames 
+		WHERE [project_id] = @projectID
+				AND [instance_id] = @instanceID
+
+		-----------------------------------------------------------------------------------------------------
+		DELETE FROM  dbo.catalogInstanceNames
+		WHERE [project_id] = @projectID
+				AND [id] = @instanceID
+
+		-----------------------------------------------------------------------------------------------------
+		IF NOT EXISTS(	SELECT * FROM dbo.catalogInstanceNames
+						WHERE [project_id] = @projectID
+							AND [machine_id] = @machineID
+					)
+			DELETE FROM  dbo.catalogMachineNames
+			WHERE [project_id] = @projectID
+					AND [id] = @machineID
+
+	COMMIT
+END TRY
+
+BEGIN CATCH
+DECLARE 
+        @ErrorMessage    NVARCHAR(4000),
+        @ErrorNumber     INT,
+        @ErrorSeverity   INT,
+        @ErrorState      INT,
+        @ErrorLine       INT,
+        @ErrorProcedure  NVARCHAR(200);
+    -- Assign variables to error-handling functions that 
+    -- capture information for RAISERROR.
+    SELECT 
+        @ErrorNumber = ERROR_NUMBER(),
+        @ErrorSeverity = ERROR_SEVERITY(),
+        @ErrorState = CASE WHEN ERROR_STATE() BETWEEN 1 AND 127 THEN ERROR_STATE() ELSE 1 END ,
+        @ErrorLine = ERROR_LINE(),
+        @ErrorProcedure = ISNULL(ERROR_PROCEDURE(), '-');
+	-- Building the message string that will contain original
+    -- error information.
+    SELECT @ErrorMessage = 
+        N'Error %d, Level %d, State %d, Procedure %s, Line %d, ' + 
+            'Message: '+ ERROR_MESSAGE();
+    -- Raise an error: msg_str parameter of RAISERROR will contain
+    -- the original error information.
+    
+    
+    RAISERROR 
+        (
+        @ErrorMessage, 
+        @ErrorSeverity, 
+        @ErrorState,               
+        @ErrorNumber,    -- parameter: original error number.
+        @ErrorSeverity,  -- parameter: original error severity.
+        @ErrorState,     -- parameter: original error state.
+        @ErrorProcedure, -- parameter: original error procedure name.
+        @ErrorLine       -- parameter: original error line number.
+        );
+
+        -- Test XACT_STATE:
+        -- If 1, the transaction is committable.
+        -- If -1, the transaction is uncommittable and should 
+        --     be rolled back.
+        -- XACT_STATE = 0 means that there is no transaction and
+        --     a COMMIT or ROLLBACK would generate an error.
+
+    -- Test if the transaction is uncommittable.
+       IF @@TRANCOUNT >0 ROLLBACK TRANSACTION 
+END CATCH
+
+RETURN @returnValue
+GO
+
+
+SET QUOTED_IDENTIFIER ON 
+GO
+SET ANSI_NULLS ON 
+GO
+
+RAISERROR('Create procedure: [dbo].[usp_hcCollectSQLServerAgentJobsStatus]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sys.objects 
+	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_hcCollectSQLServerAgentJobsStatus]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_hcCollectSQLServerAgentJobsStatus]
+GO
+
+CREATE PROCEDURE [dbo].[usp_hcCollectSQLServerAgentJobsStatus]
+		@projectCode			[varchar](32)=NULL,
+		@sqlServerNameFilter	[sysname]='%',
+		@jobNameFilter			[sysname]='%',
+		@debugMode				[bit]=0
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 19.10.2010
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+SET NOCOUNT ON
+
+------------------------------------------------------------------------------------------------------------------------------------------
+DECLARE @sqlServerName			[sysname],
+		@jobName				[sysname],
+		@queryToRun				[nvarchar](4000),
+		@currentRunning			[int],
+		@lastExecutionStatus	[int],
+		@lastExecutionDate		[varchar](10),
+		@lastExecutionTime		[varchar](10),
+		@runningTimeSec			[bigint],
+		@projectID				[smallint],
+		@instanceID				[smallint],
+		@collectStepDetails		[bit],
+		@strMessage				[nvarchar](max)
+
+
+-----------------------------------------------------------------------------------------------------
+--appConfigurations - check if step details should be collected
+-----------------------------------------------------------------------------------------------------
+SELECT	@collectStepDetails = CASE WHEN LOWER([value])='true' THEN 1 ELSE 0 END
+FROM	[dbo].[appConfigurations]
+WHERE	[name]='Collect SQL Agent jobs step details'
+		AND [module] = 'health-check'
+
+SET @collectStepDetails = ISNULL(@collectStepDetails, 0)
+
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF object_id('#msdbSysJobs') IS NOT NULL DROP TABLE #msdbSysJobs
+
+CREATE TABLE #msdbSysJobs
+(
+	[name]		[sysname]			NULL
+)
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--get default project code
+IF @projectCode IS NULL
+	SELECT	@projectCode = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Default project code'
+			AND [module] = 'common'
+
+SELECT @projectID = [id]
+FROM [dbo].[catalogProjects]
+WHERE [code] = @projectCode 
+
+IF @projectID IS NULL
+	begin
+		SET @strMessage=N'The value specifief for Project Code is not valid.'
+		RAISERROR(@strMessage, 16, 1) WITH NOWAIT
+	end
+
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--A. get servers jobs status informations
+-------------------------------------------------------------------------------------------------------------------------
+RAISERROR('--Step 1: Delete existing information....', 10, 1) WITH NOWAIT
+
+DELETE ssajh
+FROM [health-check].[statsSQLServerAgentJobsHistory]		ssajh
+INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = ssajh.[instance_id] AND cin.[project_id] = ssajh.[project_id]
+WHERE cin.[project_id] = @projectID
+		AND cin.[name] LIKE @sqlServerNameFilter
+
+DELETE lsam
+FROM [dbo].[logServerAnalysisMessages]	lsam
+INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = lsam.[instance_id] AND cin.[project_id] = lsam.[project_id]
+WHERE cin.[project_id] = @projectID
+		AND cin.[name] LIKE @sqlServerNameFilter
+		AND lsam.[descriptor]='dbo.usp_hcCollectSQLServerAgentJobsStatus'
+
+
+-------------------------------------------------------------------------------------------------------------------------
+RAISERROR('--Step 2: Get Jobs Status Information....', 10, 1) WITH NOWAIT
+
+		
+DECLARE crsActiveInstances CURSOR LOCAL FOR 	SELECT	cin.[instance_id], cin.[instance_name]
+												FROM	[dbo].[vw_catalogInstanceNames] cin
+												WHERE 	cin.[project_id] = @projectID
+														AND cin.[instance_active]=1
+														AND cin.[instance_name] LIKE @sqlServerNameFilter
+OPEN crsActiveInstances
+FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName
+WHILE @@FETCH_STATUS=0
+	begin
+		SET @strMessage='--	Analyzing server: ' + @sqlServerName
+		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+		
+		TRUNCATE TABLE #msdbSysJobs
+		BEGIN TRY
+			SET @queryToRun='SELECT [name] FROM msdb.dbo.sysjobs WHERE [name] LIKE ''' + @jobNameFilter + ''' ORDER BY [name]'
+			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+			IF @debugMode = 1 PRINT @queryToRun		
+
+			INSERT INTO #msdbSysJobs EXEC (@queryToRun)
+		END TRY
+		BEGIN CATCH
+			INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+					SELECT  @instanceID
+							, @projectID
+							, GETUTCDATE()
+							, 'dbo.usp_hcCollectSQLServerAgentJobsStatus'
+							, ERROR_MESSAGE()		
+		END CATCH				
+
+
+		DECLARE crsJobs CURSOR FOR	SELECT REPLACE([name] , '''', '''''')
+									FROM #msdbSysJobs
+		OPEN crsJobs
+		FETCH NEXT FROM crsJobs INTO @jobName
+		WHILE @@FETCH_STATUS=0
+			begin
+				SET @strMessage				= NULL
+				SET @currentRunning			= NULL
+				SET @lastExecutionStatus	= NULL
+				SET @lastExecutionDate		= NULL
+				SET @lastExecutionTime 		= NULL
+
+				BEGIN TRY
+					EXEC dbo.usp_sqlAgentJobCheckStatus		@sqlServerName			= @sqlServerName,
+															@jobName				= @jobName,
+															@strMessage				= @strMessage OUT,
+															@currentRunning			= @currentRunning OUT,
+															@lastExecutionStatus	= @lastExecutionStatus OUT,
+															@lastExecutionDate		= @lastExecutionDate OUT,
+															@lastExecutionTime 		= @lastExecutionTime OUT,
+															@runningTimeSec			= @runningTimeSec OUT,
+															@selectResult			= 0,
+															@extentedStepDetails	= @collectStepDetails,		
+															@debugMode				= @debugMode
+
+					INSERT	INTO [health-check].[statsSQLServerAgentJobsHistory]([instance_id], [project_id], [event_date_utc], [job_name], [message], [last_execution_status], [last_execution_date], [last_execution_time], [running_time_sec])
+							SELECT	  @instanceID, @projectID, GETUTCDATE(), @jobName, @strMessage
+									, @lastExecutionStatus, @lastExecutionDate, @lastExecutionTime
+									, @runningTimeSec
+				END TRY
+				BEGIN CATCH
+					INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+							SELECT  @instanceID
+								  , @projectID
+								  , GETUTCDATE()
+								  , 'dbo.usp_hcCollectSQLServerAgentJobsStatus'
+								  , ERROR_MESSAGE()
+				END CATCH
+				FETCH NEXT FROM crsJobs INTO @jobName
+			end
+		CLOSE crsJobs
+		DEALLOCATE crsJobs
+		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName
+	end
+CLOSE crsActiveInstances
+DEALLOCATE crsActiveInstances
+GO
+
+
+RAISERROR('Create procedure: [dbo].[usp_hcCollectOSEventLogs]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sys.objects 
+	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_hcCollectOSEventLogs]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_hcCollectOSEventLogs]
+GO
+
+CREATE PROCEDURE [dbo].[usp_hcCollectOSEventLogs]
+		@projectCode			[varchar](32)=NULL,
+		@sqlServerNameFilter	[sysname]='%',
+		@logNameFilter			[sysname]='%',
+		@enableXPCMDSHELL		[bit]=1,
+		@debugMode				[bit]=0
+
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 20.11.2014
+-- Module			 : Database Analysis & Performance Monitoring
+-- Description		 : read OS event logs: Application, System, Setup
+-- ============================================================================
+SET NOCOUNT ON
+
+DECLARE   @eventDescriptor				[varchar](256)
+		, @logEntryType					[varchar](64)
+		, @psLogTypeName				[sysname]
+		, @psLogTypeID					[tinyint]
+		, @queryToRun					[nvarchar](max)
+		, @eventLog						[varchar](max)
+		, @eventLogXML					[XML]
+		, @projectID					[smallint]
+		, @instanceID					[smallint]
+		, @strMessage					[nvarchar](4000)
+		, @machineID					[smallint]
+		, @machineName					[nvarchar](512)
+		, @instanceName					[sysname]
+		, @psFileLocation				[nvarchar](260)
+		, @psFileName					[nvarchar](260)
+		, @configEventsInLastHours		[smallint]
+		, @configEventsTimeOutSeconds	[int]
+		, @startTime					[datetime]
+		, @endTime						[datetime]
+		, @getInformationEvent			[bit]=0
+		, @getWarningsEvent				[bit]=0
+		
+
+DECLARE @optionXPIsAvailable		[bit],
+		@optionXPValue				[int],
+		@optionXPHasChanged			[bit],
+		@optionAdvancedIsAvailable	[bit],
+		@optionAdvancedValue		[int],
+		@optionAdvancedHasChanged	[bit]
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF object_id('tempdb..#psOutput') IS NOT NULL DROP TABLE #psOutput
+CREATE TABLE #psOutput
+	(
+		  [id]	[int] identity(1,1) primary key
+		, [xml] [varchar](max)
+	)
+
+------------------------------------------------------------------------------------------------------------------------------------------
+SELECT @psFileLocation = REVERSE(SUBSTRING(REVERSE([value]), CHARINDEX('\', REVERSE([value])), LEN(REVERSE([value]))))
+FROM (
+		SELECT CAST(SERVERPROPERTY('ErrorLogFileName') AS [nvarchar](1024)) AS [value]
+	)er
+	
+IF @psFileLocation IS NULL SET @psFileLocation =N'C:\'
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--get default project code
+IF @projectCode IS NULL
+	SELECT	@projectCode = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Default project code'
+			AND [module] = 'common'
+
+SELECT @projectID = [id]
+FROM [dbo].[catalogProjects]
+WHERE [code] = @projectCode 
+
+IF @projectID IS NULL
+	begin
+		SET @strMessage=N'ERROR: The value specifief for Project Code is not valid.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+	end
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--get event messages time delta
+BEGIN TRY
+	SELECT	@configEventsInLastHours = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = N'Collect OS Events from last hours'
+			AND [module] = 'health-check'
+END TRY
+BEGIN CATCH
+	SET @configEventsInLastHours = 24
+END CATCH
+
+SET @configEventsInLastHours = ISNULL(@configEventsInLastHours, 24)
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--option to fetch also information OS events
+BEGIN TRY
+	SELECT	@getInformationEvent = CASE WHEN LOWER([value])='true' THEN 1 ELSE 0 END
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Collect Information OS Events'
+			AND [module] = 'health-check'
+END TRY
+BEGIN CATCH
+	SET @getInformationEvent = 0
+END CATCH
+
+SET @getInformationEvent = ISNULL(@getInformationEvent, 0)
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--option to fetch also warnings OS events
+BEGIN TRY
+	SELECT	@getWarningsEvent = CASE WHEN LOWER([value])='true' THEN 1 ELSE 0 END
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Collect Warning OS Events'
+			AND [module] = 'health-check'
+END TRY
+BEGIN CATCH
+	SET @getWarningsEvent = 0
+END CATCH
+
+SET @getWarningsEvent = ISNULL(@getWarningsEvent, 0)
+
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--option for timeout when fetching OS events
+BEGIN TRY
+	SELECT	@configEventsTimeOutSeconds = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Collect OS Events timeout (seconds)'
+			AND [module] = 'health-check'
+END TRY
+BEGIN CATCH
+	SET @configEventsTimeOutSeconds = 600
+END CATCH
+
+SET @configEventsTimeOutSeconds = ISNULL(@configEventsTimeOutSeconds, 600)
+
+
+
+-------------------------------------------------------------------------------------------------------------------------
+IF @enableXPCMDSHELL=1
+	begin
+		SELECT  @optionXPIsAvailable		= 0,
+				@optionXPValue				= 0,
+				@optionXPHasChanged			= 0,
+				@optionAdvancedIsAvailable	= 0,
+				@optionAdvancedValue		= 0,
+				@optionAdvancedHasChanged	= 0
+
+		/* enable xp_cmdshell configuration option */
+		EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+															@configOptionName	= 'xp_cmdshell',
+															@configOptionValue	= 1,
+															@optionIsAvailable	= @optionXPIsAvailable OUT,
+															@optionCurrentValue	= @optionXPValue OUT,
+															@optionHasChanged	= @optionXPHasChanged OUT,
+															@executionLevel		= 3,
+															@debugMode			= @debugMode
+
+		IF @optionXPIsAvailable = 0
+			begin
+				/* enable show advanced options configuration option */
+				EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+																	@configOptionName	= 'show advanced options',
+																	@configOptionValue	= 1,
+																	@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
+																	@optionCurrentValue	= @optionAdvancedValue OUT,
+																	@optionHasChanged	= @optionAdvancedHasChanged OUT,
+																	@executionLevel		= 3,
+																	@debugMode			= @debugMode
+
+				IF @optionAdvancedIsAvailable = 1 AND (@optionAdvancedValue=1 OR @optionAdvancedHasChanged=1)
+					EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+																		@configOptionName	= 'xp_cmdshell',
+																		@configOptionValue	= 1,
+																		@optionIsAvailable	= @optionXPIsAvailable OUT,
+																		@optionCurrentValue	= @optionXPValue OUT,
+																		@optionHasChanged	= @optionXPHasChanged OUT,
+																		@executionLevel		= 3,
+																		@debugMode			= @debugMode
+
+			end
+
+		IF @optionXPIsAvailable=0 OR @optionXPValue=0
+			begin
+				set @strMessage='xp_cmdshell component is turned off. Cannot continue'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+				RETURN 1
+			end		
+	end
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--A. get servers OS events details
+-------------------------------------------------------------------------------------------------------------------------
+SET @strMessage=N'Step 1: Delete existing information....'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+DELETE soel
+FROM [health-check].[statsOSEventLogs]			soel
+INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = soel.[instance_id] AND cin.[project_id] = soel.[project_id]
+WHERE cin.[project_id] = @projectID
+		AND cin.[name] LIKE @sqlServerNameFilter
+
+DELETE lsam
+FROM [dbo].[logServerAnalysisMessages]	lsam
+INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = lsam.[instance_id] AND cin.[project_id] = lsam.[project_id]
+WHERE cin.[project_id] = @projectID
+		AND cin.[name] LIKE @sqlServerNameFilter
+		AND lsam.[descriptor]='dbo.usp_hcCollectOSEventLogs'
+
+
+-------------------------------------------------------------------------------------------------------------------------
+SET @strMessage=N'Step 2: Generate PowerShell script ...'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+SET @logEntryType='1,2' /*Critical, Error*/
+IF @getWarningsEvent=1
+	SET @logEntryType=@logEntryType + ',3'
+IF @getInformationEvent=1
+	SET @logEntryType=@logEntryType + ',4'
+
+SET @eventDescriptor = 'dbo.usp_hcCollectOSEventLogs-Powershell'
+
+DECLARE crsMachineList CURSOR READ_ONLY FAST_FORWARD FOR SELECT cin.[id] AS [instance_id], cin.[name] AS [instance_name], cmn.[id] AS [machine_id], cmn.[name] AS [machine_name]
+														FROM	[dbo].[catalogInstanceNames] cin
+														INNER JOIN [dbo].[catalogMachineNames] cmn ON cmn.[project_id]=cin.[project_id] AND cmn.[id]=cin.[machine_id]
+														WHERE 	cin.[project_id] = @projectID
+																AND cin.[name] LIKE @sqlServerNameFilter
+																AND (   cin.[active] = 1
+																		OR 
+																		(
+																			cin.[active] = 0
+																			AND cin.[is_clustered] = 1
+																			AND EXISTS (
+																						SELECT 1
+																						FROM	[dbo].[catalogInstanceNames] cin2
+																						INNER JOIN [dbo].[catalogMachineNames] cmn2 ON cmn2.[project_id]=cin2.[project_id] AND cmn2.[id]=cin2.[machine_id]
+																						WHERE cin2.[project_id] = @projectID
+																								AND cin2.[active] = 1	
+																								AND cin2.[name] = cin.[name]
+																								AND cmn2.[id] <> cmn.[id]
+																					)
+																		)
+																	)
+														ORDER BY cin.[name], cmn.[name]
+OPEN crsMachineList
+FETCH NEXT FROM crsMachineList INTO @instanceID, @instanceName, @machineID, @machineName
+WHILE @@FETCH_STATUS=0
+	begin
+		SET @strMessage='Analyzing server: ' + @machineName
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
+
+
+		-------------------------------------------------------------------------------------------------------------------------
+		DECLARE crsLogName CURSOR READ_ONLY FOR SELECT [log_type_name], [log_type_id]
+												FROM (
+														SELECT 'Application' AS [log_type_name], 1 AS [log_type_id] UNION ALL
+														SELECT 'System'		 AS [log_type_name], 2 AS [log_type_id] UNION ALL
+														SELECT 'Setup'		 AS [log_type_name], 3 AS [log_type_id] 
+													)l
+												WHERE [log_type_name] LIKE @logNameFilter
+
+		OPEN crsLogName
+		FETCH NEXT FROM crsLogName INTO @psLogTypeName, @psLogTypeID
+		WHILE @@FETCH_STATUS=0
+			begin
+				SET @strMessage=N'Analyze type: ' + @psLogTypeName
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 3, @stopExecution=0
+
+				SET @strMessage=N'generate powershell script'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
+
+				DELETE lsam
+				FROM [dbo].[logServerAnalysisMessages]	lsam
+				INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = lsam.[instance_id] AND cin.[project_id] = lsam.[project_id]
+				WHERE cin.[project_id] = @projectID
+						AND cin.[id]= @instanceID
+						AND lsam.[descriptor]=@eventDescriptor
+						
+				SET @queryToRun='SELECT CONVERT([varchar](20), GETDATE(), 120) AS [current_date]'
+				SET @queryToRun = dbo.ufn_formatSQLQueryForLinkedServer(@instanceName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
+
+				TRUNCATE TABLE #psOutput
+				BEGIN TRY
+					INSERT	INTO #psOutput([xml])
+							EXEC (@queryToRun)
+
+					SELECT TOP 1 @endTime = CONVERT([datetime], [xml], 120)
+					FROM #psOutput
+				END TRY
+				BEGIN CATCH
+					SET @endTime = GETDATE()
+				END CATCH
+
+				SET @endTime = ISNULL(@endTime, GETDATE())
+				SET @startTime = DATEADD(hh, -@configEventsInLastHours, @endTime)
+
+				-------------------------------------------------------------------------------------------------------------------------
+				SET @queryToRun = N'
+						#-- ============================================================================
+						#-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+						#-- ============================================================================
+						#-- Author			 : Dan Andrei STEFAN
+						#-- Create date		 : 20.11.2014
+						#-- Module			 : Database Analysis & Performance Monitoring
+						#-- Description		 : read OS event logs: Application, System, Setup
+						#-- ============================================================================
+
+						$timeoutSeconds = ' + CAST(@configEventsTimeOutSeconds AS [nvarchar]) + N'
+						$code = {
+									$ErrorActionPreference = "SilentlyContinue"
+
+									#setup OS event filters
+									$machineName = ''' + @machineName + N'''
+									$eventName = ''' + @psLogTypeName + '''
+									$startTime = ''' + CONVERT([varchar](20), @startTime, 120) + N'''
+									$endTime = ''' + CONVERT([varchar](20), @endTime, 120) + N'''
+									$level = ' + @logEntryType + N'
+
+									#get OS events
+									$Error.Clear()
+									Get-WinEvent -Computername $machineName -FilterHashTable @{logname=$eventName; Level=$level; StartTime=$startTime; EndTime=$endTime}|Select-Object Id, Level, RecordId, Task, TaskDisplayName, ProviderName, LogName, ProcessId, ThreadId, MachineName, UserId, TimeCreated, LevelDisplayName, Message|ConvertTo-XML -As string|Out-String -Width 32768
+
+									if ($Error) 
+									{
+										$Error[0].ToString()
+									}
+								}
+						$j = Start-Job -ScriptBlock $code
+						if (Wait-Job $j -Timeout $timeoutSeconds) { Receive-Job $j }
+						Remove-Job -force $j'
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
+
+				INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+						SELECT  @instanceID
+								, @projectID
+								, GETUTCDATE()
+								, @eventDescriptor
+								, @queryToRun
+
+
+			
+				-------------------------------------------------------------------------------------------------------------------------
+				IF NOT (@optionXPIsAvailable=0 OR @optionXPValue=0)
+					begin
+						-- save powershell script
+						SET @psFileName = 'GetOSSystemEvents_' + REPLACE(@machineName, '\', '_') + '_' + @psLogTypeName + '.ps1'
+						SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [message] FROM [' + DB_NAME() + '].[dbo].[logServerAnalysisMessages] WHERE [descriptor]=''''' + @eventDescriptor + ''''' AND [instance_id]=' + CAST(@instanceID AS [varchar]) + ' AND [project_id]=' + CAST(@projectID AS [varchar]) + '" queryout "' + @psFileLocation + @psFileName + '" -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'', no_output'
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
+
+						EXEC (@queryToRun) 
+					end
+
+				-------------------------------------------------------------------------------------------------------------------------
+				--executing script to get the OS events
+				IF NOT (@optionXPIsAvailable=0 OR @optionXPValue=0)
+					begin
+						SET @strMessage=N'running powershell script - get OS events...'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
+
+						SET @queryToRun='master.dbo.xp_cmdshell N''@PowerShell -File "' + @psFileLocation + @psFileName + '"'''
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
+
+						TRUNCATE TABLE #psOutput
+						BEGIN TRY
+							INSERT	INTO #psOutput([xml])
+									EXEC (@queryToRun)
+						END TRY
+						BEGIN CATCH
+							SET @strMessage = ERROR_MESSAGE()
+							PRINT @strMessage
+			
+							INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+									SELECT  @instanceID
+											, @projectID
+											, GETUTCDATE()
+											, 'dbo.usp_hcCollectOSEventLogs'
+											, @strMessage
+						END CATCH
+
+						BEGIN TRY
+							SET @queryToRun=N'master.dbo.xp_cmdshell ''del "' + @psFileLocation + @psFileName + '"'', no_output'
+							IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
+							EXEC (@queryToRun) 
+						END TRY
+						BEGIN CATCH
+							SET @strMessage = ERROR_MESSAGE()
+							PRINT @strMessage
+			
+							INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+									SELECT  @instanceID
+											, @projectID
+											, GETUTCDATE()
+											, 'dbo.usp_hcCollectOSEventLogs'
+											, @strMessage
+						END CATCH
+					end
+
+				-------------------------------------------------------------------------------------------------------------------------
+				--executing script to get the OS events
+				SET @strMessage=N'analyzing data...'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
+
+				IF @debugMode=1 
+					SELECT * FROM #psOutput 
+
+				IF	EXISTS (SELECT * FROM #psOutput WHERE [xml] LIKE '%Objects%')
+					AND NOT EXISTS(SELECT * FROM #psOutput WHERE [xml] LIKE '%No events were found that match the specified selection criteria%')
+					AND NOT EXISTS(SELECT * FROM #psOutput WHERE [xml] LIKE '%There are no more endpoints available from the endpoint mapper%')
+					AND NOT EXISTS(SELECT * FROM #psOutput WHERE [xml] LIKE '%The RPC server is unavailable%')
+					begin
+						SET @eventLog=''
+						SELECT @eventLog = ((
+												SELECT [xml]
+												FROM #psOutput
+												ORDER BY [id]
+												FOR XML PATH(''), TYPE
+											).value('.', 'nvarchar(max)'))
+						/*
+						SELECT @eventLog=@eventLog + [xml] 
+						FROM #psOutput 
+						WHERE [xml] IS NOT NULL 
+						ORDER BY [id] 
+				  		*/
+						SET @eventLogXML = @eventLog
+
+						IF @debugMode=1 
+							SELECT    @instanceID, @projectID, @machineID, GETUTCDATE(), @psLogTypeID
+									, [Id] AS [EventID], [Level], [RecordId], [Task] AS [Category], [TaskDisplayName] AS [CategoryName]
+									, [ProviderName] AS [Source]
+									, [ProcessId], [ThreadId], [MachineName], [UserId], [TimeCreated], [Message]
+							FROM (
+									SELECT [value], [attribute], [unique_object] AS [idX]
+									FROM (
+											SELECT	[property].value('(./text())[1]', 'Varchar(1024)') AS [value],
+													[property].value('@Name', 'Varchar(1024)') AS [attribute],
+													DENSE_RANK() OVER (ORDER BY [object]) AS unique_object
+											FROM @eventLogXML.nodes('Objects/Object') AS b ([object])
+											CROSS APPLY b.object.nodes('./Property') AS c (property)
+										)X
+									WHERE [attribute] IN ('Id', 'Level', 'RecordId', 'Task', 'TaskDisplayName', 'ProviderName', 'LogName', 'ProcessId', 'ThreadId', 'MachineName', 'UserId', 'TimeCreated', 'LevelDisplayName', 'Message')
+								)P
+							PIVOT
+								(
+									MAX([value])
+									FOR [attribute] IN ([Id], [Level], [RecordId], [Task], [TaskDisplayName], [ProviderName], [LogName], [ProcessId], [ThreadId], [MachineName], [UserId], [TimeCreated], [LevelDisplayName], [Message])
+								)pvt
+
+						/* save results to stats table */
+						INSERT	INTO [health-check].[statsOSEventLogs](   [instance_id], [project_id], [machine_id], [event_date_utc], [log_type_id]
+																		, [event_id], [level_id], [record_id], [category_id], [category_name]
+																		, [source], [process_id], [thread_id], [machine_name], [user_id], [time_created], [message])
+								SELECT    @instanceID, @projectID, @machineID, GETUTCDATE(), @psLogTypeID
+										, [Id] AS [EventID], [Level], [RecordId], [Task] AS [Category], [TaskDisplayName] AS [CategoryName]
+										, [ProviderName] AS [Source]
+										, [ProcessId], [ThreadId], [MachineName], [UserId], [TimeCreated], [Message]
+								FROM (
+										SELECT [value], [attribute], [unique_object] AS [idX]
+										FROM (
+												SELECT	[property].value('(./text())[1]', 'Varchar(1024)') AS [value],
+														[property].value('@Name', 'Varchar(1024)') AS [attribute],
+														DENSE_RANK() OVER (ORDER BY [object]) AS unique_object
+												FROM @eventLogXML.nodes('Objects/Object') AS b ([object])
+												CROSS APPLY b.object.nodes('./Property') AS c (property)
+											)X
+										WHERE [attribute] IN ('Id', 'Level', 'RecordId', 'Task', 'TaskDisplayName', 'ProviderName', 'LogName', 'ProcessId', 'ThreadId', 'MachineName', 'UserId', 'TimeCreated', 'LevelDisplayName', 'Message')
+									)P
+								PIVOT
+									(
+										MAX([value])
+										FOR [attribute] IN ([Id], [Level], [RecordId], [Task], [TaskDisplayName], [ProviderName], [LogName], [ProcessId], [ThreadId], [MachineName], [UserId], [TimeCreated], [LevelDisplayName], [Message])
+									)pvt
+
+					end
+				ELSE
+					begin
+						IF (SELECT COUNT(*) FROM #psOutput WHERE [xml] IS NOT NULL)=0
+							INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+									SELECT  @instanceID
+											, @projectID
+											, GETUTCDATE()
+											, 'dbo.usp_hcCollectOSEventLogs'
+											, 'Timeout occured while running powershell script. (LogName = ' + @psLogTypeName + ')'
+
+						IF EXISTS(SELECT * FROM #psOutput WHERE [xml] LIKE '%There are no more endpoints available from the endpoint mapper%')
+							INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+									SELECT  @instanceID
+											, @projectID
+											, GETUTCDATE()
+											, 'dbo.usp_hcCollectOSEventLogs'
+											, 'There are no more endpoints available from the endpoint mapper.'
+
+						IF EXISTS(SELECT * FROM #psOutput WHERE [xml] LIKE '%The RPC server is unavailable%')
+							INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+									SELECT  @instanceID
+											, @projectID
+											, GETUTCDATE()
+											, 'dbo.usp_hcCollectOSEventLogs'
+											, 'The RPC server is unavailable.'
+					end
+					
+				FETCH NEXT FROM crsLogName INTO @psLogTypeName, @psLogTypeID
+			end
+		CLOSE crsLogName
+		DEALLOCATE crsLogName
+
+		FETCH NEXT FROM crsMachineList INTO @instanceID, @instanceName, @machineID, @machineName
+	end
+CLOSE crsMachineList
+DEALLOCATE crsMachineList
+
+DELETE lsam
+FROM [dbo].[logServerAnalysisMessages]	lsam
+INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = lsam.[instance_id] AND cin.[project_id] = lsam.[project_id]
+WHERE cin.[project_id] = @projectID
+		AND cin.[name] LIKE @sqlServerNameFilter
+		AND lsam.[descriptor]=@eventDescriptor
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+/* disable xp_cmdshell configuration option */
+IF @optionXPHasChanged = 1
+	EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+														@configOptionName	= 'xp_cmdshell',
+														@configOptionValue	= 0,
+														@optionIsAvailable	= @optionXPIsAvailable OUT,
+														@optionCurrentValue	= @optionXPValue OUT,
+														@optionHasChanged	= @optionXPHasChanged OUT,
+														@executionLevel		= 3,
+														@debugMode			= @debugMode
+
+/* disable show advanced options configuration option */
+IF @optionAdvancedHasChanged = 1
+		EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+															@configOptionName	= 'show advanced options',
+															@configOptionValue	= 0,
+															@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
+															@optionCurrentValue	= @optionAdvancedValue OUT,
+															@optionHasChanged	= @optionAdvancedHasChanged OUT,
+															@executionLevel		= 3,
+															@debugMode			= @debugMode
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+GO
+
+
+SET QUOTED_IDENTIFIER ON 
+GO
+SET ANSI_NULLS ON 
+GO
+
+RAISERROR('Create procedure: [dbo].[usp_hcCollectErrorlogMessages]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sys.objects 
+	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_hcCollectErrorlogMessages]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_hcCollectErrorlogMessages]
+GO
+
+CREATE PROCEDURE [dbo].[usp_hcCollectErrorlogMessages]
+		@projectCode			[varchar](32)=NULL,
+		@sqlServerNameFilter	[sysname]='%',
+		@debugMode				[bit]=0
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 29.04.2015
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+SET NOCOUNT ON
+
+------------------------------------------------------------------------------------------------------------------------------------------
+DECLARE @projectID				[smallint],
+		@sqlServerName			[sysname],
+		@instanceID				[smallint],
+		@queryToRun				[nvarchar](4000),
+		@strMessage				[nvarchar](max),
+		@errorCode				[int],
+		@lineID					[int]
+
+DECLARE @SQLMajorVersion		[int],
+		@sqlServerVersion		[sysname],
+		@configErrorlogFileNo	[int]
+
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF object_id('tempdb..#xpReadErrorLog') IS NOT NULL 
+DROP TABLE #xpReadErrorLog
+
+CREATE TABLE #xpReadErrorLog
+(
+	[id]					[int] IDENTITY (1, 1)NOT NULL PRIMARY KEY CLUSTERED ,
+	[log_date]				[datetime]		NULL,
+	[process_info]			[sysname]		NULL,
+	[text]					[varchar](max)	NULL,
+	[continuation_row]		[bit]			NULL,
+)
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--get default project code
+IF @projectCode IS NULL
+	SELECT	@projectCode = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Default project code'
+			AND [module] = 'common'
+
+SELECT @projectID = [id]
+FROM [dbo].[catalogProjects]
+WHERE [code] = @projectCode 
+
+IF @projectID IS NULL
+	begin
+		SET @strMessage=N'The value specified for Project Code is not valid.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=1
+	end
+
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--check the option for number of errorlog files to be analyzed
+BEGIN TRY
+	SELECT	@configErrorlogFileNo = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = N'Collect SQL Errorlog last files'
+			AND [module] = 'health-check'
+END TRY
+BEGIN CATCH
+	SET @configErrorlogFileNo = 1
+END CATCH
+
+SET @configErrorlogFileNo = ISNULL(@configErrorlogFileNo, 1)
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--
+-------------------------------------------------------------------------------------------------------------------------
+SET @strMessage= 'Step 1: Delete existing information...'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
+
+DELETE eld
+FROM [health-check].[statsSQLServerErrorlogDetails]	eld
+INNER JOIN [dbo].[catalogInstanceNames]		cin ON cin.[id] = eld.[instance_id] AND cin.[project_id] = eld.[project_id]
+WHERE cin.[project_id] = @projectID
+		AND cin.[name] LIKE @sqlServerNameFilter
+
+DELETE lsam
+FROM [dbo].[logServerAnalysisMessages]	lsam
+INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = lsam.[instance_id] AND cin.[project_id] = lsam.[project_id]
+WHERE cin.[project_id] = @projectID
+		AND cin.[name] LIKE @sqlServerNameFilter
+		AND lsam.[descriptor]='dbo.usp_hcCollectErrorlogMessages'
+
+-------------------------------------------------------------------------------------------------------------------------
+SET @strMessage= 'Step 2: Get Errorlog messages...'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
+		
+DECLARE crsActiveInstances CURSOR LOCAL FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
+												FROM	[dbo].[vw_catalogInstanceNames] cin
+												WHERE 	cin.[project_id] = @projectID
+														AND cin.[instance_active]=1
+														AND cin.[instance_name] LIKE @sqlServerNameFilter
+												ORDER BY cin.[instance_name]
+OPEN crsActiveInstances
+FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
+WHILE @@FETCH_STATUS=0
+	begin
+		SET @strMessage= 'Analyzing server: ' + @sqlServerName
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+		BEGIN TRY
+			SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(@sqlServerVersion, ''), 2), '.', '') 
+		END TRY
+		BEGIN CATCH
+			SET @SQLMajorVersion = 8
+		END CATCH
+
+		TRUNCATE TABLE #xpReadErrorLog
+
+		/* get errorlog messages */
+		WHILE @configErrorlogFileNo > 0
+			begin
+				IF @sqlServerName <> @@SERVERNAME
+					begin
+						IF @SQLMajorVersion < 11
+							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@configErrorlogFileNo-1) AS [nvarchar]) + ''')x'
+						ELSE
+							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@configErrorlogFileNo-1) AS [nvarchar]) + ' WITH RESULT SETS(([log_date] [datetime] NULL, [process_info] [sysname] NULL, [text] [varchar](max) NULL))'')x'
+					end
+				ELSE
+					SET @queryToRun = N'xp_readerrorlog ' + CAST((@configErrorlogFileNo-1) AS [nvarchar])
+				IF @debugMode=1	PRINT @queryToRun
+
+				BEGIN TRY
+					IF @SQLMajorVersion > 8 
+						INSERT	INTO #xpReadErrorLog([log_date], [process_info], [text])
+								EXEC (@queryToRun)
+					ELSE
+						INSERT	INTO #xpReadErrorLog([text], [continuation_row])
+								EXEC (@queryToRun)
+				END TRY
+				BEGIN CATCH
+					SET @strMessage = ERROR_MESSAGE()
+					PRINT @strMessage
+
+					INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+							SELECT  @instanceID
+									, @projectID
+									, GETUTCDATE()
+									, 'dbo.usp_hcCollectErrorlogMessages'
+									, @strMessage
+				END CATCH
+
+				SET @configErrorlogFileNo = @configErrorlogFileNo - 1
+			end
+
+		/* re-parse messages for 2k version */
+		IF @SQLMajorVersion = 8 
+			begin
+				SET @strMessage= 'rebuild messages for ContinuationRows'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
+
+				DECLARE crsErrorlogContinuation CURSOR FAST_FORWARD FOR SELECT [id], [text]
+																		FROM #xpReadErrorLog
+																		WHERE [continuation_row]=1
+				OPEN crsErrorlogContinuation
+				FETCH NEXT FROM crsErrorlogContinuation INTO @lineID, @strMessage
+				WHILE @@FETCH_STATUS=0
+					begin
+						UPDATE #xpReadErrorLog
+							SET [text] = [text] + @strMessage
+						WHERE [id] = @lineID-1
+
+						FETCH NEXT FROM crsErrorlogContinuation INTO @lineID, @strMessage
+					end
+				CLOSE crsErrorlogContinuation
+				DEALLOCATE crsErrorlogContinuation
+				
+				DELETE 
+				FROM #xpReadErrorLog
+				WHERE [continuation_row]=1
+
+				SET @strMessage= 'split messages / SQL Server 2000'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
+
+				UPDATE eld
+					SET   eld.[log_date] = X.[log_date]
+						, eld.[process_info] = X.[process_info]
+						, eld.[text] = X.[text]
+				FROM #xpReadErrorLog eld
+				INNER JOIN 
+					(
+						SELECT    [id]
+								, SUBSTRING([text], 1, 22) AS [log_date]
+								, LTRIM(RTRIM(SUBSTRING([text], 24, CHARINDEX(' ', [text], 24) -23))) AS [process_info]
+								, LTRIM(RTRIM(SUBSTRING([text], CHARINDEX(' ', [text], 24), LEN([text])))) AS [text]
+						FROM #xpReadErrorLog
+						WHERE LEFT([text], 4) = CAST(YEAR(GETDATE()) AS [varchar])
+							OR LEFT([text], 4) =CAST(YEAR(GETDATE())-1 AS [varchar])
+					)X ON X.[id] = eld.[id]
+			end
+
+		/* save results to stats table */
+		INSERT	INTO [health-check].[statsSQLServerErrorlogDetails]([instance_id], [project_id], [event_date_utc], [log_date], [process_info], [text])
+				SELECT @instanceID, @projectID, GETUTCDATE(), [log_date], [process_info], [text]
+				FROM #xpReadErrorLog
+				WHERE [log_date] IS NOT NULL
+				ORDER BY [log_date], [id]
+
+		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
+	end
+CLOSE crsActiveInstances
+DEALLOCATE crsActiveInstances
+GO
+
+
+RAISERROR('Create procedure: [dbo].[usp_hcCollectDiskSpaceUsage]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sys.objects 
+	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_hcCollectDiskSpaceUsage]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_hcCollectDiskSpaceUsage]
+GO
+
+CREATE PROCEDURE [dbo].[usp_hcCollectDiskSpaceUsage]
+		@projectCode			[varchar](32)=NULL,
+		@sqlServerNameFilter	[sysname]='%',
+		@enableXPCMDSHELL		[bit]=0,
+		@debugMode				[bit]=0
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 28.01.2015
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+SET NOCOUNT ON
+
+------------------------------------------------------------------------------------------------------------------------------------------
+DECLARE @projectID				[smallint],
+		@sqlServerName			[sysname],
+		@instanceID				[smallint],
+		@queryToRun				[nvarchar](4000),
+		@strMessage				[nvarchar](4000),
+		@SQLMajorVersion		[int],
+		@sqlServerVersion		[sysname],
+		@runxpFixedDrives		[bit],
+		@runwmicLogicalDisk		[bit],
+		@errorCode				[int]
+
+DECLARE @optionXPIsAvailable		[bit],
+		@optionXPValue				[int],
+		@optionXPHasChanged			[bit],
+		@optionAdvancedIsAvailable	[bit],
+		@optionAdvancedValue		[int],
+		@optionAdvancedHasChanged	[bit]
+
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF object_id('tempdb..#xpCMDShellOutput') IS NOT NULL 
+DROP TABLE #xpCMDShellOutput
+
+CREATE TABLE #xpCMDShellOutput
+(
+	[id]		[int] IDENTITY(1,1),
+	[output]	[nvarchar](max)			NULL
+)
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF object_id('#xp_cmdshell') IS NOT NULL DROP TABLE #xp_cmdshell
+
+CREATE TABLE #xp_cmdshell
+(
+	[output]		[nvarchar](max)		NULL,
+	[instance_name]	[sysname]			NULL,
+	[machine_name]	[sysname]			NULL
+)
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF object_id('#diskSpaceInfo') IS NOT NULL DROP TABLE #diskSpaceInfo
+CREATE TABLE #diskSpaceInfo
+(
+	[logical_drive]			[char](1)			NULL,
+	[volume_mount_point]	[nvarchar](512)		NULL,
+	[total_size_mb]			[numeric](18,3)		NULL,
+	[available_space_mb]	[numeric](18,3)		NULL,
+	[block_size]			[int]				NULL,
+	[percent_available]		[numeric](6,2)		NULL
+)
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--get default project code
+IF @projectCode IS NULL
+	SELECT	@projectCode = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Default project code'
+			AND [module] = 'common'
+
+SELECT @projectID = [id]
+FROM [dbo].[catalogProjects]
+WHERE [code] = @projectCode 
+
+IF @projectID IS NULL
+	begin
+		SET @strMessage=N'The value specifief for Project Code is not valid.'
+		RAISERROR(@strMessage, 16, 1) WITH NOWAIT
+	end
+
+
+------------------------------------------------------------------------------------------------------------------------------------------
+IF @enableXPCMDSHELL=1
+	begin
+		SELECT  @optionXPIsAvailable		= 0,
+				@optionXPValue				= 0,
+				@optionXPHasChanged			= 0,
+				@optionAdvancedIsAvailable	= 0,
+				@optionAdvancedValue		= 0,
+				@optionAdvancedHasChanged	= 0
+
+		/* enable xp_cmdshell configuration option */
+		EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+															@configOptionName	= 'xp_cmdshell',
+															@configOptionValue	= 1,
+															@optionIsAvailable	= @optionXPIsAvailable OUT,
+															@optionCurrentValue	= @optionXPValue OUT,
+															@optionHasChanged	= @optionXPHasChanged OUT,
+															@executionLevel		= 0,
+															@debugMode			= @debugMode
+
+		IF @optionXPIsAvailable = 0
+			begin
+				/* enable show advanced options configuration option */
+				EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+																	@configOptionName	= 'show advanced options',
+																	@configOptionValue	= 1,
+																	@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
+																	@optionCurrentValue	= @optionAdvancedValue OUT,
+																	@optionHasChanged	= @optionAdvancedHasChanged OUT,
+																	@executionLevel		= 0,
+																	@debugMode			= @debugMode
+
+				IF @optionAdvancedIsAvailable = 1 AND (@optionAdvancedValue=1 OR @optionAdvancedHasChanged=1)
+					EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+																		@configOptionName	= 'xp_cmdshell',
+																		@configOptionValue	= 1,
+																		@optionIsAvailable	= @optionXPIsAvailable OUT,
+																		@optionCurrentValue	= @optionXPValue OUT,
+																		@optionHasChanged	= @optionXPHasChanged OUT,
+																		@executionLevel		= 0,
+																		@debugMode			= @debugMode
+
+			end
+
+		IF @optionXPIsAvailable=0 OR @optionXPValue=0
+			begin
+				set @queryToRun='xp_cmdshell component is turned off. Cannot continue'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+				RETURN 1
+			end		
+	end
+
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--
+-------------------------------------------------------------------------------------------------------------------------
+RAISERROR('--Step 1: Delete existing information....', 10, 1) WITH NOWAIT
+
+DELETE dsi
+FROM [health-check].[statsDiskSpaceInfo]		dsi
+INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = dsi.[instance_id] AND cin.[project_id] = dsi.[project_id]
+WHERE cin.[project_id] = @projectID
+		AND cin.[name] LIKE @sqlServerNameFilter
+
+DELETE lsam
+FROM [dbo].[logServerAnalysisMessages]	lsam
+INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = lsam.[instance_id] AND cin.[project_id] = lsam.[project_id]
+WHERE cin.[project_id] = @projectID
+		AND cin.[name] LIKE @sqlServerNameFilter
+		AND lsam.[descriptor]='dbo.usp_hcCollectDiskSpaceUsage'
+
+-------------------------------------------------------------------------------------------------------------------------
+RAISERROR('--Step 2: Get Instance Details Information....', 10, 1) WITH NOWAIT
+		
+DECLARE crsActiveInstances CURSOR LOCAL FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
+												FROM	[dbo].[vw_catalogInstanceNames] cin
+												WHERE 	cin.[project_id] = @projectID
+														AND cin.[instance_active]=1
+														AND cin.[instance_name] LIKE @sqlServerNameFilter
+												ORDER BY cin.[instance_name]
+OPEN crsActiveInstances
+FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
+WHILE @@FETCH_STATUS=0
+	begin
+		SET @strMessage='--	Analyzing server: ' + @sqlServerName
+		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+
+		TRUNCATE TABLE #diskSpaceInfo
+		TRUNCATE TABLE #xp_cmdshell
+		TRUNCATE TABLE #xpCMDShellOutput
+
+		BEGIN TRY
+			SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(@sqlServerVersion, ''), 2), '.', '') 
+		END TRY
+		BEGIN CATCH
+			SET @SQLMajorVersion = 8
+		END CATCH
+
+		/* get volume space / free disk space details */
+		SET @runwmicLogicalDisk=1
+		SET @runxpFixedDrives=1
+		IF @SQLMajorVersion >= 10
+			begin				
+				SET @queryToRun = N''
+				SET @queryToRun = @queryToRun + N'SELECT DISTINCT
+													  UPPER(SUBSTRING([physical_name], 1, 1)) [logical_drive]
+													, CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point]
+													, [total_bytes] / 1024 / 1024 AS [total_size_mb]
+													, [available_bytes] / 1024 / 1024 AS [available_space_mb]
+													, CAST(ISNULL(ROUND([available_bytes] / CAST(NULLIF([total_bytes], 0) AS [numeric](20,3)) * 100, 2), 0) AS [numeric](10,2)) AS [percent_available]
+												FROM sys.master_files AS f
+												CROSS APPLY sys.dm_os_volume_stats(f.[database_id], f.[file_id])'
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	PRINT @queryToRun
+
+				TRUNCATE TABLE #diskSpaceInfo
+				BEGIN TRY
+						INSERT	INTO #diskSpaceInfo([logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [percent_available])
+							EXEC (@queryToRun)
+						SET @runwmicLogicalDisk=0
+						SET @runxpFixedDrives=0
+				END TRY
+				BEGIN CATCH
+					IF @debugMode=1 PRINT 'An error occured. It will be ignored: ' + ERROR_MESSAGE()					
+				END CATCH
+			end
+
+		IF @runwmicLogicalDisk=1
+			begin
+				/* try to run wmic */
+				IF @enableXPCMDSHELL=1 AND @optionXPIsAvailable=1
+					begin
+						BEGIN TRY
+								SET @queryToRun = N''
+								--SET @queryToRun = @queryToRun + N'DECLARE @cmdQuery [varchar](102); SET @cmdQuery=''wmic logicaldisk get Caption, FreeSpace, Size''; EXEC xp_cmdshell @cmdQuery;'
+								SET @queryToRun = @queryToRun + N'DECLARE @cmdQuery [varchar](102); SET @cmdQuery=''wmic volume get Name, Capacity, FreeSpace, BlockSize, DriveType''; EXEC xp_cmdshell @cmdQuery;'
+			
+								IF @sqlServerName<>@@SERVERNAME
+									SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+								IF @debugMode = 1 PRINT @queryToRun
+
+								INSERT	INTO #xpCMDShellOutput([output])
+										EXEC (@queryToRun)
+
+								DELETE FROM #xpCMDShellOutput WHERE LEN([output])<=3 OR [output] LIKE '%\\?\Volume%' OR [output] IS NULL
+
+								INSERT	INTO #diskSpaceInfo([logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [block_size])
+										SELECT	  LEFT([name], 1) AS [drive]
+												, LTRIM(RTRIM([name])) AS [name]
+												, CAST(REPLACE([capacity], ' ', '') AS [bigint]) / (1024 * 1024.) AS [total_size_mb]
+												, CAST(REPLACE([free_space], ' ', '') AS [bigint]) / (1024 * 1024.) AS [available_space_mb]
+												, [block_size]
+										FROM (
+												SELECT SUBSTRING([output], [block_size_start_pos], [capacity_start_pos] - [block_size_start_pos] - 1)	 AS [block_size],
+														SUBSTRING([output], [capacity_start_pos], [drive_type_start_pos] - [capacity_start_pos] - 1)	 AS [capacity],
+														SUBSTRING([output], [drive_type_start_pos], [free_space_start_pos] - [drive_type_start_pos] - 1) AS [drive_type],
+														SUBSTRING([output], [free_space_start_pos], [name_start_pos] - [free_space_start_pos] - 1)		 AS [free_space],
+														SUBSTRING([output], [name_start_pos], LEN([output]) - [name_start_pos] - 1)						 AS [name]
+												FROM #xpCMDShellOutput X
+												INNER JOIN (
+															SELECT  CHARINDEX('BlockSize', [output]) AS [block_size_start_pos],
+																	CHARINDEX('Capacity', [output])	 AS [capacity_start_pos],
+																	CHARINDEX('DriveType', [output]) AS [drive_type_start_pos],
+																	CHARINDEX('FreeSpace', [output]) AS [free_space_start_pos],
+																	CHARINDEX('Name', [output])		 AS [name_start_pos]
+															FROM	#xpCMDShellOutput 
+															WHERE [id]=1
+															) P ON 1=1
+												WHERE X.[id]>1
+											)A
+										WHERE [drive_type]=3
+
+								DELETE FROM #diskSpaceInfo WHERE [total_size_mb]=0
+
+								UPDATE #diskSpaceInfo
+										SET [percent_available] =  CAST(ISNULL(ROUND([available_space_mb] / CAST(NULLIF([total_size_mb], 0) AS [numeric](20,3)) * 100, 2), 0) AS [numeric](10,2)) 
+
+								SET @runxpFixedDrives=0
+						END TRY
+						BEGIN CATCH
+							IF @debugMode=1 PRINT 'An error occured. It will be ignored: ' + ERROR_MESSAGE()					
+						END CATCH
+					end
+			end
+
+		IF @runxpFixedDrives=1
+			begin
+				IF @sqlServerName <> @@SERVERNAME
+					begin
+						SET @queryToRun = N''
+						IF @SQLMajorVersion < 11
+							SET @queryToRun = @queryToRun + N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_fixeddrives'')x'
+						ELSE
+							SET @queryToRun = @queryToRun + N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_fixeddrives WITH RESULT SETS(([drive] [sysname], [MB free] [bigint]))'')x'
+
+						IF @debugMode=1	PRINT @queryToRun
+
+						TRUNCATE TABLE #diskSpaceInfo
+						BEGIN TRY
+								INSERT	INTO #diskSpaceInfo([logical_drive], [available_space_mb])
+									EXEC (@queryToRun)
+						END TRY
+						BEGIN CATCH
+							SET @strMessage = ERROR_MESSAGE()
+							PRINT @strMessage
+							INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+									SELECT  @instanceID
+											, @projectID
+											, GETUTCDATE()
+											, 'dbo.usp_hcCollectDiskSpaceUsage'
+											, @strMessage
+						END CATCH
+
+					end
+				ELSE
+					begin							
+						BEGIN TRY
+							INSERT	INTO #diskSpaceInfo([logical_drive], [available_space_mb])
+									EXEC xp_fixeddrives
+						END TRY
+						BEGIN CATCH
+							SET @strMessage = ERROR_MESSAGE()
+							PRINT @strMessage
+
+							INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+									SELECT  @instanceID
+											, @projectID
+											, GETUTCDATE()
+											, 'dbo.usp_hcCollectDiskSpaceUsage'
+											, @strMessage
+						END CATCH
+					end
+
+			end
+				
+		/* save results to stats table */
+		INSERT	INTO [health-check].[statsDiskSpaceInfo]([instance_id], [project_id], [event_date_utc], [logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [percent_available], [block_size])
+				SELECT    @instanceID, @projectID, GETUTCDATE()
+						, [logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [percent_available], [block_size]
+				FROM #diskSpaceInfo
+							
+		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
+	end
+CLOSE crsActiveInstances
+DEALLOCATE crsActiveInstances
+
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+/* disable xp_cmdshell configuration option */
+IF @optionXPHasChanged = 1
+	EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+														@configOptionName	= 'xp_cmdshell',
+														@configOptionValue	= 0,
+														@optionIsAvailable	= @optionXPIsAvailable OUT,
+														@optionCurrentValue	= @optionXPValue OUT,
+														@optionHasChanged	= @optionXPHasChanged OUT,
+														@executionLevel		= 0,
+														@debugMode			= @debugMode
+
+/* disable show advanced options configuration option */
+IF @optionAdvancedHasChanged = 1
+		EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
+															@configOptionName	= 'show advanced options',
+															@configOptionValue	= 0,
+															@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
+															@optionCurrentValue	= @optionAdvancedValue OUT,
+															@optionHasChanged	= @optionAdvancedHasChanged OUT,
+															@executionLevel		= 0,
+															@debugMode			= @debugMode
+
+
+GO
+
+
+SET QUOTED_IDENTIFIER ON 
+GO
+SET ANSI_NULLS ON 
+GO
+
+RAISERROR('Create procedure: [dbo].[usp_hcCollectDatabaseDetails]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sys.objects 
+	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_hcCollectDatabaseDetails]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_hcCollectDatabaseDetails]
+GO
+
+CREATE PROCEDURE [dbo].[usp_hcCollectDatabaseDetails]
+		@projectCode			[varchar](32)=NULL,
+		@sqlServerNameFilter	[sysname]='%',
+		@databaseNameFilter		[sysname]='%',
+		@debugMode				[bit]=0
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 30.12.2014
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+SET NOCOUNT ON
+
+------------------------------------------------------------------------------------------------------------------------------------------
+DECLARE @projectID				[smallint],
+		@sqlServerName			[sysname],
+		@instanceID				[smallint],
+		@catalogDatabaseID		[smallint],
+		@databaseID				[int],
+		@databaseName			[sysname],
+		@queryToRun				[nvarchar](4000),
+		@strMessage				[nvarchar](4000)
+
+DECLARE @SQLMajorVersion		[int],
+		@sqlServerVersion		[sysname],
+		@dbccLastKnownGood		[datetime]
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF object_id('#databaseSpaceInfo') IS NOT NULL DROP TABLE #databaseSpaceInfo
+CREATE TABLE #databaseSpaceInfo
+(
+	[drive]					[varchar](2)		NULL,
+	[is_log_file]			[bit]				NULL,
+	[size_kb]				[int]				NULL,
+	[space_used_kb]			[int]				NULL,
+	[is_growth_limited]		[bit]				NULL
+)
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF object_id('#dbccDBINFO') IS NOT NULL DROP TABLE #dbccDBINFO
+CREATE TABLE #dbccDBINFO
+	(
+		[id]				[int] IDENTITY(1,1),
+		[ParentObject]		[varchar](255),
+		[Object]			[varchar](255),
+		[Field]				[varchar](255),
+		[Value]				[varchar](255)
+	)
+	
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF object_id('#dbccLastKnownGood') IS NOT NULL DROP TABLE #dbccLastKnownGood
+CREATE TABLE #dbccLastKnownGood
+(
+	[Value]					[sysname]			NULL
+)
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF object_id('#statsDatabaseDetails') IS NOT NULL DROP TABLE #statsDatabaseDetails
+CREATE TABLE #statsDatabaseDetails
+(
+	[database_id]				[int]			NOT NULL,
+	[query_type]				[tinyint]		NOT NULL,
+	[data_size_mb]				[numeric](20,3)	NULL,
+	[data_space_used_percent]	[numeric](6,2)	NULL,
+	[log_size_mb]				[numeric](20,3)	NULL,
+	[log_space_used_percent]	[numeric](6,2)	NULL,
+	[is_auto_close]				[bit]			NULL,
+	[is_auto_shrink]			[bit]			NULL,
+	[physical_drives]			[sysname]		NULL,
+	[last_backup_time]			[datetime]		NULL,
+	[last_dbcc checkdb_time]	[datetime]		NULL,
+	[recovery_model]			[tinyint]		NULL,
+	[page_verify_option]		[tinyint]		NULL,
+	[compatibility_level]		[tinyint]		NULL,
+	[is_growth_limited]			[bit]			NULL
+)
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--get default project code
+IF @projectCode IS NULL
+	SELECT	@projectCode = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Default project code'
+			AND [module] = 'common'
+
+SELECT @projectID = [id]
+FROM [dbo].[catalogProjects]
+WHERE [code] = @projectCode 
+
+IF @projectID IS NULL
+	begin
+		SET @strMessage=N'The value specifief for Project Code is not valid.'
+		RAISERROR(@strMessage, 16, 1) WITH NOWAIT
+	end
+
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--A. get databases informations
+-------------------------------------------------------------------------------------------------------------------------
+RAISERROR('--Step 1: Delete existing information....', 10, 1) WITH NOWAIT
+
+DELETE shcdd
+FROM [health-check].[statsDatabaseDetails]		shcdd
+INNER JOIN [dbo].[catalogDatabaseNames]			cdb ON cdb.[id] = shcdd.[catalog_database_id] AND cdb.[instance_id] = shcdd.[instance_id]
+INNER JOIN [dbo].[catalogInstanceNames]			cin ON cin.[id] = cdb.[instance_id] AND cin.[project_id] = cdb.[project_id]
+WHERE cin.[project_id] = @projectID
+		AND cin.[name] LIKE @sqlServerNameFilter
+		AND cdb.[name] LIKE @databaseNameFilter
+
+DELETE lsam
+FROM [dbo].[logServerAnalysisMessages]	lsam
+INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = lsam.[instance_id] AND cin.[project_id] = lsam.[project_id]
+WHERE cin.[project_id] = @projectID
+		AND cin.[name] LIKE @sqlServerNameFilter
+		AND lsam.[descriptor]='dbo.usp_hcCollectDatabaseDetails'
+
+
+-------------------------------------------------------------------------------------------------------------------------
+RAISERROR('--Step 2: Get Database Details Information....', 10, 1) WITH NOWAIT
+		
+DECLARE crsActiveInstances CURSOR LOCAL FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
+												FROM	[dbo].[vw_catalogInstanceNames] cin
+												WHERE 	cin.[project_id] = @projectID
+														AND cin.[instance_active]=1
+														AND cin.[instance_name] LIKE @sqlServerNameFilter
+												ORDER BY cin.[instance_name]
+OPEN crsActiveInstances
+FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
+WHILE @@FETCH_STATUS=0
+	begin
+		SET @strMessage='--	Analyzing server: ' + @sqlServerName
+		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+
+		TRUNCATE TABLE #statsDatabaseDetails
+
+		BEGIN TRY
+			SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(@sqlServerVersion, ''), 2), '.', '') 
+		END TRY
+		BEGIN CATCH
+			SET @SQLMajorVersion = 8
+		END CATCH
+
+		DECLARE crsActiveDatabases CURSOR LOCAL FOR 	SELECT	cdn.[catalog_database_id], cdn.[database_id], cdn.[database_name]
+														FROM	[dbo].[vw_catalogDatabaseNames] cdn
+														WHERE 	cdn.[project_id] = @projectID
+																AND cdn.[instance_id] = @instanceID
+																AND cdn.[active]=1
+																AND cdn.[database_name] LIKE @databaseNameFilter
+																AND CHARINDEX(cdn.[state_desc], 'ONLINE, READ ONLY')<>0
+														ORDER BY cdn.[database_name]
+		OPEN crsActiveDatabases	
+		FETCH NEXT FROM crsActiveDatabases INTO @catalogDatabaseID, @databaseID, @databaseName
+		WHILE @@FETCH_STATUS=0
+			begin
+				SET @strMessage='--		database: ' + @databaseName
+				RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+
+				/* get space allocated / used details */
+				IF @sqlServerName <> @@SERVERNAME
+					SET @queryToRun = N'SELECT *
+										FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC(''''USE [' + @databaseName + N']; 
+												SELECT    [drive]
+														, CAST([is_logfile]		AS [bit]) AS [is_logfile]
+														, SUM([size_kb])		AS [size_mb]
+														, SUM([space_used_kb])	AS [space_used_mb]
+														, MAX(CAST([is_growth_limited] AS [tinyint])) AS [is_growth_limited]
+												FROM (		
+														SELECT    [name], [size] * 8 as [size_kb]
+																, CAST(FILEPROPERTY([name], ''''''''SpaceUsed'''''''') AS [int]) * 8	AS [space_used_kb]
+																, CAST(FILEPROPERTY([name], ''''''''IsLogFile'''''''') AS [bit])		AS [is_logfile]
+																, REPLACE(LEFT([' + CASE WHEN @SQLMajorVersion <=8 THEN N'filename' ELSE N'physical_name' END + N'], 2), '''''''':'''''''', '''''''''''''''') AS [drive]
+																, ' + CASE	WHEN @SQLMajorVersion <= 8 
+																			THEN N'CASE WHEN ([maxsize]=-1 AND [groupid]<>0) OR ([maxsize]=-1 AND [groupid]=0) OR ([maxsize]=268435456 AND [groupid]=0) THEN 0 ELSE 1 END ' 
+																			ELSE N'CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END '
+																	 END + N' AS [is_growth_limited]
+														FROM [' + @databaseName + N'].' + CASE WHEN @SQLMajorVersion <=8 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + N'
+													)sf
+												GROUP BY [drive], [is_logfile]
+										'''')'')x'
+				ELSE
+					SET @queryToRun = N'USE [' + @databaseName + N']; 
+										SELECT    [drive]
+												, CAST([is_logfile]		AS [bit]) AS [is_logfile]
+												, SUM([size_kb])		AS [size_mb]
+												, SUM([space_used_kb])	AS [space_used_mb]
+												, MAX(CAST([is_growth_limited] AS [tinyint])) AS [is_growth_limited]
+										FROM (		
+												SELECT    [name], [size] * 8 as [size_kb]
+														, CAST(FILEPROPERTY([name], ''SpaceUsed'') AS [int]) * 8	AS [space_used_kb]
+														, CAST(FILEPROPERTY([name], ''IsLogFile'') AS [bit])		AS [is_logfile]
+														, REPLACE(LEFT([' + CASE WHEN @SQLMajorVersion <=8 THEN N'filename' ELSE N'physical_name' END + N'], 2), '':'', '''') AS [drive]	
+														, ' + CASE	WHEN @SQLMajorVersion <= 8 
+																	THEN N'CASE WHEN ([maxsize]=-1 AND [groupid]<>0) OR ([maxsize]=-1 AND [groupid]=0) OR ([maxsize]=268435456 AND [groupid]=0) THEN 0 ELSE 1 END ' 
+																	ELSE N'CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END '
+																END + N' AS [is_growth_limited]
+												FROM [' + @databaseName + N'].' + CASE WHEN @SQLMajorVersion <=8 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + N'
+											)sf
+										GROUP BY [drive], [is_logfile]'			
+				IF @debugMode = 1 PRINT @queryToRun
+				
+				TRUNCATE TABLE #databaseSpaceInfo
+				BEGIN TRY
+						INSERT	INTO #databaseSpaceInfo([drive], [is_log_file], [size_kb], [space_used_kb], [is_growth_limited])
+							EXEC (@queryToRun)
+				END TRY
+				BEGIN CATCH
+					SET @strMessage = ERROR_MESSAGE()
+					PRINT @strMessage
+					INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+							SELECT  @instanceID
+								  , @projectID
+								  , GETUTCDATE()
+								  , 'dbo.usp_hcCollectDatabaseDetails'
+								  , '[' + @databaseName + ']:' + @strMessage
+				END CATCH
+
+				/* get last date for dbcc checkdb, only for 2k5+ */
+				IF @SQLMajorVersion > 8 
+					begin
+						IF @sqlServerName <> @@SERVERNAME
+							begin
+								IF @SQLMajorVersion < 11
+									SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
+														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @databaseName + N']) WITH TABLERESULTS'''')'')x
+														WHERE [Field]=''dbi_dbccLastKnownGood'''
+								ELSE
+									SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
+														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @databaseName + N']) WITH TABLERESULTS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
+														WHERE [Field]=''dbi_dbccLastKnownGood'''
+							end
+						ELSE
+							begin							
+								BEGIN TRY
+									INSERT INTO #dbccDBINFO
+											EXEC ('DBCC DBINFO (''' + @databaseName + N''') WITH TABLERESULTS')
+								END TRY
+								BEGIN CATCH
+									SET @strMessage = ERROR_MESSAGE()
+									PRINT @strMessage
+
+									INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+											SELECT  @instanceID
+												  , @projectID
+												  , GETUTCDATE()
+												  , 'dbo.usp_hcCollectDatabaseDetails'
+												  , '[' + @databaseName + ']:' + @strMessage
+								END CATCH
+
+								SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_dbccLastKnownGood'''											
+							end
+
+						IF @debugMode = 1 PRINT @queryToRun
+				
+						TRUNCATE TABLE #dbccLastKnownGood
+						BEGIN TRY
+							INSERT	INTO #dbccLastKnownGood([Value])
+									EXEC (@queryToRun)
+						END TRY
+						BEGIN CATCH
+							SET @strMessage = ERROR_MESSAGE()
+							PRINT @strMessage
+
+							INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+									SELECT  @instanceID
+										  , @projectID
+										  , GETUTCDATE()
+										  , 'dbo.usp_hcCollectDatabaseDetails'
+										  , '[' + @databaseName + ']:' + @strMessage
+						END CATCH
+
+						BEGIN TRY
+							SELECT @dbccLastKnownGood = CASE WHEN [Value] = '1900-01-01 00:00:00.000' THEN NULL ELSE [Value] END 
+							FROM #dbccLastKnownGood
+						END TRY
+						BEGIN CATCH
+							SET @dbccLastKnownGood=NULL
+						END CATCH
+					end
+
+				/* compute database statistics */
+				INSERT	INTO #statsDatabaseDetails([query_type], [database_id], [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], [physical_drives], [last_dbcc checkdb_time], [is_growth_limited])
+						SELECT    1, @databaseID
+								, CAST([data_size_kb] / 1024. AS [numeric](20,3)) AS [data_size_mb]
+								, CAST(CASE WHEN [data_size_kb] <>0 THEN [data_space_used_kb] * 100. / [data_size_kb] ELSE 0 END AS [numeric](6,2)) AS [data_used_percent]
+								, CAST([log_size_kb] / 1024. AS [numeric](20,3)) AS [log_size_mb]
+								, CAST(CASE WHEN [log_size_kb] <>0 THEN [log_space_used_kb] * 100. / [log_size_kb] ELSE 0 END AS [numeric](6,2)) AS [log_used_percent]
+								, [drives]
+								, @dbccLastKnownGood
+								, [is_growth_limited]
+						FROM (
+								SELECT    SUM(CASE WHEN [is_log_file] = 0 THEN dsi.[size_kb] ELSE 0 END)		AS [data_size_kb]
+										, SUM(CASE WHEN [is_log_file] = 0 THEN dsi.[space_used_kb] ELSE 0 END) 	AS [data_space_used_kb]
+										, SUM(CASE WHEN [is_log_file] = 1 THEN dsi.[size_kb] ELSE 0 END) 		AS [log_size_kb]
+										, SUM(CASE WHEN [is_log_file] = 1 THEN dsi.[space_used_kb] ELSE 0 END) 	AS [log_space_used_kb]
+										, MAX(x.[drives]) [drives]
+										, MAX(CAST([is_growth_limited] AS [tinyint])) [is_growth_limited]
+								FROM #databaseSpaceInfo dsi
+								CROSS APPLY(
+											SELECT STUFF(
+															(	SELECT ', ' + [drive]
+																FROM (	
+																		SELECT DISTINCT UPPER([drive]) [drive]
+																		FROM #databaseSpaceInfo
+																	) AS x
+																ORDER BY [drive]
+																FOR XML PATH('')
+															),1,1,''
+														) AS [drives]
+											)x
+							)db
+				FETCH NEXT FROM crsActiveDatabases INTO @catalogDatabaseID, @databaseID, @databaseName
+			end
+		CLOSE crsActiveDatabases
+		DEALLOCATE crsActiveDatabases
+
+		/* get last date for backup and other database flags / options */
+		SET @queryToRun = N'SELECT	  2 AS [query_type]
+									, bkp.[database_id]
+									, CASE WHEN bkp.[last_backup_time] = CONVERT([datetime], ''1900-01-01'', 120) THEN NULL ELSE bkp.[last_backup_time] END AS [last_backup_time]
+									, CAST(DATABASEPROPERTY(bkp.[database_name], ''IsAutoClose'')  AS [bit])	AS [is_auto_close]
+									, CAST(DATABASEPROPERTY(bkp.[database_name], ''IsAutoShrink'')  AS [bit])	AS [is_auto_shrink]
+									, bkp.[recovery_model]
+									, bkp.[page_verify_option]
+									, bkp.[compatibility_level]
+							FROM 	
+								(' + 
+							CASE	WHEN @SQLMajorVersion <= 8 
+									THEN N'	SELECT	  sdb.[dbid]	AS [database_id]
+													, sdb.[name]	AS [database_name]
+													, CASE CAST(DATABASEPROPERTYEX(sdb.[name], ''Recovery'') AS [sysname]) 
+															WHEN ''FULL'' THEN 1 
+															WHEN ''BULK_LOGGED'' THEN 2
+															WHEN ''SIMPLE'' THEN 3
+															ELSE NULL
+													  END AS [recovery_model]
+													, CASE WHEN sdb.[status] & 16 = 16 THEN 1 ELSE 0 END AS [page_verify_option]
+													, sdb.[cmptlevel] AS [compatibility_level]
+													, MAX(bs.[backup_finish_date]) AS [last_backup_time]
+											FROM dbo.sysdatabases sdb
+											LEFT OUTER JOIN msdb.dbo.backupset bs ON bs.[database_name] = sdb.[name] AND bs.type IN (''D'', ''I'')
+											WHERE sdb.[name] LIKE ''' + @databaseNameFilter + N'''
+											GROUP BY sdb.[name], sdb.[dbid], sdb.[status], sdb.[cmptlevel]'
+									ELSE N'SELECT	  sdb.[name]	AS [database_name]
+													, sdb.[database_id]
+													, sdb.[recovery_model]
+													, sdb.[page_verify_option]
+													, sdb.[compatibility_level]
+													, MAX(bs.[backup_finish_date]) AS [last_backup_time]
+											FROM sys.databases sdb
+											LEFT OUTER JOIN msdb.dbo.backupset bs ON bs.[database_name] = sdb.[name] AND bs.type IN (''D'', ''I'')
+											WHERE sdb.[name] LIKE ''' + @databaseNameFilter + N'''
+											GROUP BY sdb.[name], sdb.[database_id], sdb.[recovery_model], sdb.[page_verify_option], sdb.[compatibility_level]'
+							END + N'
+								)bkp'
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode = 1 PRINT @queryToRun
+		
+		BEGIN TRY
+			INSERT	INTO #statsDatabaseDetails([query_type], [database_id], [last_backup_time], [is_auto_close], [is_auto_shrink], [recovery_model], [page_verify_option], [compatibility_level])
+					EXEC (@queryToRun)
+		END TRY
+		BEGIN CATCH
+			SET @strMessage = ERROR_MESSAGE()
+			PRINT @strMessage
+
+			INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+					SELECT  @instanceID
+							, @projectID
+							, GETUTCDATE()
+							, 'dbo.usp_hcCollectDatabaseDetails'
+							, @strMessage
+		END CATCH
+
+		/* save results to stats table */
+		INSERT	INTO [health-check].[statsDatabaseDetails]([catalog_database_id], [instance_id], 
+				 											 [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], 
+															 [is_auto_close], [is_auto_shrink], [physical_drives], 
+															 [last_backup_time], [last_dbcc checkdb_time],  [recovery_model], [page_verify_option], [compatibility_level], [is_growth_limited], [event_date_utc])
+				SELECT cdn.[id], @instanceID, 
+				 		qt.[data_size_mb], qt.[data_space_used_percent], qt.[log_size_mb], qt.[log_space_used_percent], 
+						qt.[is_auto_close], qt.[is_auto_shrink], qt.[physical_drives], 
+						qt.[last_backup_time], qt.[last_dbcc checkdb_time],  qt.[recovery_model], qt.[page_verify_option], qt.[compatibility_level], qt.[is_growth_limited], GETUTCDATE()
+				FROM (
+						SELECT    ISNULL(qt1.[database_id], qt2.[database_id]) [database_id]
+								, qt2.[recovery_model]
+								, qt2.[page_verify_option]
+								, qt2.[compatibility_level]
+								, qt1.[data_size_mb]
+								, qt1.[data_space_used_percent]
+								, qt1.[log_size_mb]
+								, qt1.[log_space_used_percent]
+								, qt1.[physical_drives]
+								, qt2.[is_auto_close]
+								, qt2.[is_auto_shrink]
+								, qt2.[last_backup_time]
+								, qt1.[last_dbcc checkdb_time]
+								, qt1.[is_growth_limited]
+						FROM (
+								SELECT    [database_id]
+										, [data_size_mb]
+										, [data_space_used_percent]
+										, [log_size_mb]
+										, [log_space_used_percent]
+										, [physical_drives]
+										, [last_dbcc checkdb_time]
+										, [is_growth_limited]
+								FROM #statsDatabaseDetails
+								WHERE [query_type]=1
+							) qt1
+						FULL OUTER JOIN
+							(
+								SELECT    [database_id]
+										, [is_auto_close]
+										, [is_auto_shrink]
+										, [last_backup_time]
+										, [recovery_model]
+										, [page_verify_option]
+										, [compatibility_level]
+								FROM #statsDatabaseDetails
+								WHERE [query_type]=2
+							) qt2 ON qt1.[database_id] = qt2.[database_id]
+					)qt
+				INNER JOIN [dbo].[catalogDatabaseNames] cdn ON	cdn.[database_id] = qt.[database_id] 
+															AND cdn.[instance_id] = @instanceID 
+															AND cdn.[project_id] = @projectID
+	
+		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
+	end
+CLOSE crsActiveInstances
+DEALLOCATE crsActiveInstances
+GO
+
+
 RAISERROR('Create procedure: [dbo].[usp_reportHTMLBuildHealthCheck]', 10, 1) WITH NOWAIT
 GO
 IF  EXISTS (
@@ -3224,7 +5646,7 @@ BEGIN TRY
 															, SUM(1) OVER() AS [row_count]
 													FROM [dbo].[vw_catalogInstanceNames] cin
 													INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-													LEFT  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+													LEFT  JOIN [health-check].[vw_statsHDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
 													WHERE	cin.[instance_active]=1
 															AND cdn.[active]=1
 															AND cin.[project_id] = @projectID	
@@ -3961,3 +6383,1122 @@ END CATCH
 
 RETURN @ReturnValue
 GO
+
+
+RAISERROR('Create procedure: [dbo].[usp_mpMarkInternalAction]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sys.objects 
+	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_mpMarkInternalAction]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_mpMarkInternalAction]
+GO
+
+CREATE PROCEDURE [dbo].[usp_mpMarkInternalAction]
+		@actionName				[sysname],
+		@flgOperation			[tinyint] = 1, /*	1 - insert action 
+													2 - delete action
+												*/
+		@server_name			[sysname] = NULL,
+		@database_name			[sysname] = NULL,
+		@schema_name			[sysname] = NULL,
+		@object_name			[sysname] = NULL,
+		@child_object_name		[sysname] = NULL
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 06.02.2015
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+SET NOCOUNT ON
+
+--insert action
+IF @flgOperation = 1
+	begin
+		INSERT	INTO [maintenance-plan].[statsMaintenancePlanInternals]([name], [server_name], [database_name], [schema_name], [object_name], [child_object_name])
+				SELECT @actionName, @server_name, @database_name, @schema_name, @object_name, @child_object_name
+	end
+
+--delete action
+IF @flgOperation = 2
+	begin
+		IF @database_name <> '%'
+			DELETE	FROM [maintenance-plan].[statsMaintenancePlanInternals]
+			WHERE	[name] = @actionName
+					AND [server_name] = @server_name
+					AND ([database_name] = @database_name OR ([database_name] IS NULL AND @database_name IS NULL))
+					AND ([schema_name] = @schema_name OR ([schema_name] IS NULL AND @schema_name IS NULL))
+					AND ([object_name] = @object_name OR ([object_name] IS NULL AND @object_name IS NULL))
+					AND ([child_object_name] = @child_object_name OR ([child_object_name] IS NULL AND @child_object_name IS NULL))
+		ELSE
+			DELETE	FROM [maintenance-plan].[statsMaintenancePlanInternals]
+			WHERE	[name] = @actionName
+					AND [server_name] = @server_name
+
+	end
+GO
+
+
+RAISERROR('Create procedure: [dbo].[usp_mpCheckAndRevertInternalActions]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sysobjects 
+	     WHERE [id] = OBJECT_ID(N'[dbo].[usp_mpCheckAndRevertInternalActions]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_mpCheckAndRevertInternalActions]
+GO
+
+-----------------------------------------------------------------------------------------
+CREATE PROCEDURE [dbo].[usp_mpCheckAndRevertInternalActions]
+		@sqlServerName			[sysname],
+		@flgOptions				[int]	= 12941,
+		@executionLevel			[tinyint]	=     0,
+		@debugMode				[bit]		=     0
+/* WITH ENCRYPTION */
+AS
+
+DECLARE   @crtDatabaseName			[sysname]
+		, @crtSchemaName			[sysname]
+		, @crtObjectName			[sysname]
+		, @crtChildObjectName		[sysname]
+		, @queryToRun				[nvarchar](1024)
+		, @nestExecutionLevel		[tinyint]
+		, @affectedDependentObjects	[nvarchar](max)
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 19.02.2015
+-- Module			 : Database Maintenance Plan 
+-- Description		 : Optimization and Maintenance Checks
+-- ============================================================================
+-----------------------------------------------------------------------------------------
+-- Input Parameters:
+--		@flgOptions		 1  - Compact large objects (LOB) (default)
+--						 2  - Rebuild index by create with drop existing on (default)
+--						 4  - Rebuild all non-clustered indexes when rebuild clustered indexes (default)
+--						 8  - Disable non-clustered index before rebuild (save space) (default)
+--						16  - Disable all foreign key constraints that reffered current table before rebuilding clustered indexes
+--						32  - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
+--					    64  - When enabling foreign key constraints, do no check values. Default behaviour is to enabled foreign key constraint with check option
+--					  4096  - rebuild/reorganize indexes using ONLINE=ON, if applicable (default)
+--		@debugMode		 1 - print dynamic SQL statements / 0 - no statements will be displayed
+-----------------------------------------------------------------------------------------
+-- Return : 
+-- 1 : Succes  -1 : Fail 
+-----------------------------------------------------------------------------------------
+/*
+	--usage sample
+	EXEC [dbo].[usp_mpCheckAndRevertInternalActions]	@flgOptions				= DEFAULT,
+														@debugMode				= DEFAULT
+*/
+
+SET NOCOUNT ON
+
+---------------------------------------------------------------------------------------------
+--get configuration values
+---------------------------------------------------------------------------------------------
+DECLARE @queryLockTimeOut [int]
+SELECT	@queryLockTimeOut=[value] 
+FROM	[dbo].[appConfigurations] 
+WHERE	[name]='Default lock timeout (ms)'
+		AND [module] = 'common'
+
+--reset configuration value
+UPDATE [dbo].[appConfigurations]
+	SET [value]='-1'
+WHERE	[name]='Default lock timeout (ms)'
+		AND [module] = 'common'
+
+-----------------------------------------------------------------------------------------
+SET @queryToRun=N'Rebuilding previously disabled indexes...'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+SET @nestExecutionLevel = @executionLevel + 1
+DECLARE crsStatsMaintenancePlanInternals CURSOR FOR SELECT	[database_name], [schema_name], [object_name], [child_object_name]
+													FROM	[maintenance-plan].[statsMaintenancePlanInternals]
+													WHERE	[name] = 'index-made-disable'
+															AND [server_name] = @sqlServerName
+OPEN crsStatsMaintenancePlanInternals
+FETCH NEXT FROM crsStatsMaintenancePlanInternals INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+WHILE @@FETCH_STATUS=0
+	begin
+		EXEC [dbo].[usp_mpAlterTableIndexes]		@SQLServerName				= @sqlServerName,
+													@DBName						= @crtDatabaseName,
+													@TableSchema				= @crtSchemaName,
+													@TableName					= @crtObjectName,
+													@IndexName					= @crtChildObjectName,
+													@IndexID					= NULL,
+													@PartitionNumber			= DEFAULT,
+													@flgAction					= 1,
+													@flgOptions					= @flgOptions,
+													@MaxDOP						= 1,
+													@executionLevel				= @nestExecutionLevel,
+													@affectedDependentObjects	= @affectedDependentObjects OUT,
+													@debugMode					= @debugMode
+
+		FETCH NEXT FROM crsStatsMaintenancePlanInternals INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+	end
+CLOSE crsStatsMaintenancePlanInternals
+DEALLOCATE crsStatsMaintenancePlanInternals
+
+
+-----------------------------------------------------------------------------------------
+SET @queryToRun=N'Rebuilding previously disabled foreign key constraints...'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+DECLARE crsStatsMaintenancePlanInternals CURSOR FOR SELECT	[database_name], [schema_name], [object_name], [child_object_name]
+													FROM	[maintenance-plan].[statsMaintenancePlanInternals]
+													WHERE	[name] = 'foreign-key-made-disable'
+															AND [server_name] = @sqlServerName
+OPEN crsStatsMaintenancePlanInternals
+FETCH NEXT FROM crsStatsMaintenancePlanInternals INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+WHILE @@FETCH_STATUS=0
+	begin
+		EXEC [dbo].[usp_mpAlterTableForeignKeys]	@SQLServerName		= @sqlServerName,
+													@DBName				= @crtDatabaseName,
+													@TableSchema		= @crtSchemaName,
+													@TableName			= @crtObjectName,
+													@ConstraintName		= @crtChildObjectName,
+													@flgAction			= 1,
+													@flgOptions			= @flgOptions,
+													@executionLevel		= @nestExecutionLevel,
+													@debugMode			= @debugMode
+		FETCH NEXT FROM crsStatsMaintenancePlanInternals INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+	end
+CLOSE crsStatsMaintenancePlanInternals
+DEALLOCATE crsStatsMaintenancePlanInternals
+
+
+-----------------------------------------------------------------------------------------
+--restore original configuration value
+-----------------------------------------------------------------------------------------
+UPDATE [dbo].[appConfigurations]
+	SET [value]=@queryLockTimeOut
+WHERE	[name]='Default lock timeout (ms)'
+		AND [module] = 'common'
+
+GO
+
+
+RAISERROR('Create procedure: [dbo].[usp_mpAlterTableIndexes]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sys.objects 
+	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_mpAlterTableIndexes]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_mpAlterTableIndexes]
+GO
+
+-----------------------------------------------------------------------------------------
+CREATE PROCEDURE [dbo].[usp_mpAlterTableIndexes]
+		@SQLServerName				[sysname],
+		@DBName						[sysname],
+		@TableSchema				[sysname] = '%',
+		@TableName					[sysname] = '%',
+		@IndexName					[sysname] = '%',
+		@IndexID					[int],
+		@PartitionNumber			[int] = 1,
+		@flgAction					[tinyint] = 1,
+		@flgOptions					[int] = 6145, --4096 + 2048 + 1	/* 6177 for space optimized index rebuild */
+		@MaxDOP						[smallint] = 1,
+		@FillFactor					[tinyint] = 0,
+		@executionLevel				[tinyint] = 0,
+		@affectedDependentObjects	[nvarchar](max) OUTPUT,
+		@DebugMode					[bit] = 0
+/* WITH ENCRYPTION */
+AS
+
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 08.01.2010
+-- Module			 : Database Maintenance Scripts
+-- ============================================================================
+
+-----------------------------------------------------------------------------------------
+-- Input Parameters:
+--		@SQLServerName	- name of SQL Server instance to analyze
+--		@DBName			- database to be analyzed
+--		@TableSchema	- schema that current table belongs to
+--		@TableName		- specify table name to be analyzed.
+--		@IndexName		- name of the index to be analyzed
+--		@IndexID		- id of the index to be analyzed. to may specify either index name or id. 
+--						  if you specify both, index name will be taken into consideration
+--		@PartitionNumber- index partition number. default value = 1 (index with no partitions)
+--		@flgAction:		 1	- Rebuild index (default)
+--						 2  - Reorganize indexes
+--						 4	- Disable index
+--		@flgOptions		 1  - Compact large objects (LOB) when reorganize  (default)
+--						 2  - 
+--						 4  - Rebuild all dependent indexes when rebuild primary indexes
+--						 8  - Disable non-clustered index before rebuild (save space) (won't apply when 4096 is applicable)
+--						16  - Disable foreign key constraints that reffer current table before rebuilding with disable clustered/unique indexes
+--						64  - When enabling foreign key constraints, do no check values. Default behaviour is to enabled foreign key constraint with check option
+--					  2048  - send email when a error occurs (default)
+--					  4096  - rebuild/reorganize indexes using ONLINE=ON, if applicable (default)
+--		@DebugMode:		 1 - print dynamic SQL statements 
+--						 0 - no statements will be displayed (default)
+-----------------------------------------------------------------------------------------
+
+DECLARE		@queryToRun   				[nvarchar](max),
+			@strMessage				[nvarchar](4000),
+			@sqlIndexCreate			[nvarchar](max),
+			@sqlScriptOnline		[nvarchar](512),
+			@objectName				[nvarchar](512),
+			@childObjectName		[sysname],
+			@crtTableSchema 		[sysname],
+			@crtTableName 			[sysname],
+			@crtIndexID				[int],
+			@crtIndexName			[sysname],			
+			@crtIndexType			[tinyint],
+			@crtIndexAllowPageLocks	[bit],
+			@crtIndexIsDisabled		[bit],
+			@crtIndexIsPrimaryXML	[bit],
+			@crtIndexHasDependentFK	[bit],
+			@crtTableIsReplicated	[bit],
+			@flgInheritOptions		[int],
+			@tmpIndexName			[sysname],
+			@tmpIndexIsPrimaryXML	[bit],
+			@nestedExecutionLevel	[tinyint]
+
+DECLARE   @flgRaiseErrorAndStop [bit]
+		, @errorCode			[int]
+
+DECLARE @DependentIndexes TABLE	(
+									[index_name]		[sysname]	NULL
+								  , [is_primary_xml]	[bit]		DEFAULT(0)
+								)
+
+SET NOCOUNT ON
+
+DECLARE @tmpTableToAlterIndexes TABLE
+			(
+				[index_id]			[int]		NULL
+			  , [index_name]		[sysname]	NULL
+			  , [index_type]		[tinyint]	NULL
+			  , [allow_page_locks]	[bit]		NULL
+			  , [is_disabled]		[bit]		NULL
+			  , [is_primary_xml]	[bit]		NULL
+			  , [has_dependent_fk]	[bit]		NULL
+			  , [is_replicated]		[bit]		NULL
+			)
+
+
+-- { sql_statement | statement_block }
+BEGIN TRY
+		SET @errorCode	 = 0
+
+		---------------------------------------------------------------------------------------------
+		--get configuration values
+		---------------------------------------------------------------------------------------------
+		DECLARE @queryLockTimeOut [int]
+		SELECT	@queryLockTimeOut=[value] 
+		FROM	[dbo].[appConfigurations] 
+		WHERE	[name] = 'Default lock timeout (ms)'
+				AND [module] = 'common'
+
+		---------------------------------------------------------------------------------------------		
+		--get tables list	
+		IF object_id('tempdb..#tmpTableList') IS NOT NULL DROP TABLE #tmpTableList
+		CREATE TABLE #tmpTableList 
+				(
+					[table_schema] [sysname],
+					[table_name] [sysname]
+				)
+
+		SET @queryToRun = N'SELECT TABLE_SCHEMA, TABLE_NAME 
+						FROM [' + @DBName + '].INFORMATION_SCHEMA.TABLES 
+						WHERE	TABLE_TYPE = ''BASE TABLE'' 
+								AND TABLE_NAME LIKE ''' + @TableName + ''' 
+								AND TABLE_SCHEMA LIKE ''' + @TableSchema + ''''
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		INSERT	INTO #tmpTableList ([table_schema], [table_name])
+				EXEC (@queryToRun)
+
+		---------------------------------------------------------------------------------------------
+		IF EXISTS(SELECT 1 FROM #tmpTableList)
+			begin
+				DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT [table_schema], [table_name]
+																	FROM #tmpTableList
+																	ORDER BY [table_schema], [table_name]
+				OPEN crsTableList
+				FETCH NEXT FROM crsTableList INTO @crtTableSchema, @crtTableName
+				WHILE @@FETCH_STATUS=0
+					begin
+						SET @strMessage=N'Alter indexes ON [' + @crtTableSchema + '].[' + @crtTableName + '] : ' + 
+											CASE @flgAction WHEN 1 THEN 'REBUILD'
+															WHEN 2 THEN 'REORGANIZE'
+															WHEN 4 THEN 'DISABLE'
+															ELSE 'N/A'
+											END
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+						--if current action is to disable/reorganize indexes, will get only enabled indexes
+						--if current action is to rebuild, will get both enabled/disabled indexes
+						SET @queryToRun = N''
+						SET @queryToRun = @queryToRun + N'SELECT  si.[index_id]
+														, si.[name]
+														, si.[type]
+														, si.[allow_page_locks]
+														, si.[is_disabled]
+														, CASE WHEN xi.[type]=3 AND xi.[using_xml_index_id] IS NULL THEN 1 ELSE 0 END AS [is_primary_xml]
+														, CASE WHEN SUM(CASE WHEN fk.[name] IS NOT NULL THEN 1 ELSE 0 END) > 0 THEN 1 ELSE 0 END AS [has_dependent_fk]
+														, ISNULL(st.[is_replicated], 0) | ISNULL(st.[is_merge_published], 0) | ISNULL(st.[is_published], 0) AS [is_replicated]
+													FROM [' + @DBName + '].[sys].[indexes]				si
+													INNER JOIN [' + @DBName + '].[sys].[objects]		so  ON so.[object_id] = si.[object_id]
+													INNER JOIN [' + @DBName + '].[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
+													LEFT  JOIN [' + @DBName + '].[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id] AND si.[type]=3
+													LEFT  JOIN [' + @DBName + '].[sys].[foreign_keys]	fk  ON fk.[referenced_object_id] = so.[object_id] AND fk.[key_index_id] = si.[index_id]
+													LEFT  JOIN [' + @DBName + '].[sys].[tables]			st  ON st.[object_id] = so.[object_id]
+													WHERE	so.[name] = ''' + @crtTableName + '''
+															AND sch.[name] = ''' + @crtTableSchema + '''
+															AND so.[is_ms_shipped] = 0' + 
+															CASE	WHEN @IndexName IS NOT NULL 
+																	THEN ' AND si.[name] LIKE ''' + @IndexName + ''''
+																	ELSE CASE WHEN @IndexID  IS NOT NULL 
+																			  THEN ' AND si.[index_id] = ' + CAST(@IndexID AS [nvarchar])
+																			  ELSE ''
+																		 END
+															END + '
+															AND si.[is_disabled] IN ( ' + CASE WHEN @flgAction IN (2, 4) THEN '0' ELSE '0,1' END + ')
+													GROUP BY si.[index_id]
+															, si.[name]
+															, si.[type]
+															, si.[allow_page_locks]
+															, si.[is_disabled]
+															, CASE WHEN xi.[type]=3 AND xi.[using_xml_index_id] IS NULL THEN 1 ELSE 0 END
+															, ISNULL(st.[is_replicated], 0) | ISNULL(st.[is_merge_published], 0) | ISNULL(st.[is_published], 0)'
+
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+						IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+						DELETE FROM @tmpTableToAlterIndexes
+						INSERT	INTO @tmpTableToAlterIndexes([index_id], [index_name], [index_type], [allow_page_locks], [is_disabled], [is_primary_xml], [has_dependent_fk], [is_replicated])
+								EXEC (@queryToRun)
+
+						FETCH NEXT FROM crsTableList INTO @crtTableSchema, @crtTableName
+					end
+				CLOSE crsTableList
+				DEALLOCATE crsTableList
+
+
+
+				DECLARE crsTableToAlterIndexes CURSOR	LOCAL FAST_FORWARD FOR	SELECT DISTINCT [index_id], [index_name], [index_type], [allow_page_locks], [is_disabled], [is_primary_xml], [has_dependent_fk], [is_replicated]
+																				FROM @tmpTableToAlterIndexes
+																				ORDER BY [index_id], [index_name]						
+				OPEN crsTableToAlterIndexes
+				FETCH NEXT FROM crsTableToAlterIndexes INTO @crtIndexID, @crtIndexName, @crtIndexType, @crtIndexAllowPageLocks, @crtIndexIsDisabled, @crtIndexIsPrimaryXML, @crtIndexHasDependentFK, @crtTableIsReplicated
+				WHILE @@FETCH_STATUS=0
+					begin
+						SET @strMessage= '[' + @crtIndexName + ']'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+						SET @sqlScriptOnline=N''
+						---------------------------------------------------------------------------------------------
+						-- 1  - Rebuild indexes
+						---------------------------------------------------------------------------------------------
+						IF @flgAction = 1
+							begin
+								-- check for online operation mode	
+								IF @flgOptions & 4096 = 4096
+									begin
+										SET @nestedExecutionLevel = @executionLevel + 3
+										EXEC [dbo].[usp_mpCheckIndexOnlineOperation]	@sqlServerName		= @SQLServerName,
+																						@dbName				= @DBName,
+																						@tableSchema		= @crtTableSchema,
+																						@tableName			= @crtTableName,
+																						@indexName			= @crtIndexName,
+																						@indexID			= @crtIndexID,
+																						@partitionNumber	= @PartitionNumber,
+																						@sqlScriptOnline	= @sqlScriptOnline OUT,
+																						@flgOptions			= @flgOptions,
+																						@executionLevel		= @nestedExecutionLevel,
+																						@debugMode			= @DebugMode
+									end
+
+								---------------------------------------------------------------------------------------------
+								--primary / unique index options
+								-- 16  - Disable foreign key constraints that reffer current table before rebuilding clustered/unique indexes
+								IF @flgOptions & 16 = 16 AND @crtIndexHasDependentFK=1 
+									AND @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline = N'ONLINE = ON')) 
+									AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0
+									begin
+										SET @nestedExecutionLevel = @executionLevel + 2
+										EXEC [dbo].[usp_mpAlterTableForeignKeys]	  @SQLServerName	= @SQLServerName
+																					, @DBName			= @DBName
+																					, @TableSchema		= @crtTableSchema
+																					, @TableName		= @crtTableName
+																					, @ConstraintName	= '%'
+																					, @flgAction		= 0		-- Disable Constraints
+																					, @flgOptions		= 1		-- Use tables that have foreign key constraints that reffers current table (default)
+																					, @executionLevel	= @nestedExecutionLevel
+																					, @DebugMode		= @DebugMode
+									end
+
+								---------------------------------------------------------------------------------------------
+								--clustered/primary key index options
+								IF @crtIndexType = 1
+									begin
+										--4  - Rebuild all dependent indexes when rebuild primary indexes
+										IF @flgOptions & 4 = 4
+											begin
+												--get all enabled non-clustered/xml/spatial indexes for current table
+												SET @queryToRun = N''
+												SET @queryToRun = @queryToRun + N'SELECT  si.[name]
+																				, CASE WHEN xi.[type]=3 AND xi.[using_xml_index_id] IS NULL THEN 1 ELSE 0 END AS [is_primary_xml]
+																			FROM [' + @DBName + '].[sys].[indexes]				si
+																			INNER JOIN [' + @DBName + '].[sys].[objects]		so ON  si.[object_id] = so.[object_id]
+																			INNER JOIN [' + @DBName + '].[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
+																			LEFT  JOIN [' + @DBName + '].[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id] AND si.[type]=3
+																			WHERE	so.[name] = ''' + @crtTableName + '''
+																					AND sch.[name] = ''' + @crtTableSchema + ''' 
+																					AND si.[type] in (2,3,4)
+																					AND si.[is_disabled] = 0'
+												SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+												IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+												INSERT INTO @DependentIndexes ([index_name], [is_primary_xml])
+													EXEC (@queryToRun)
+											end
+
+										--8  - Disable non-clustered index before rebuild (save space)
+										--won't disable the index when performing online rebuild
+										IF @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline = N'ONLINE = ON')) AND @crtTableIsReplicated=0
+											begin
+												DECLARE crsNonClusteredIndexes	CURSOR LOCAL FAST_FORWARD FOR
+																				SELECT [index_name]
+																				FROM @DependentIndexes
+																				ORDER BY [is_primary_xml]
+												OPEN crsNonClusteredIndexes
+												FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName
+												WHILE @@FETCH_STATUS=0
+													begin
+														SET @nestedExecutionLevel = @executionLevel + 2
+														EXEC [dbo].[usp_mpAlterTableIndexes]	  @SQLServerName	= @SQLServerName
+																								, @DBName			= @DBName
+																								, @TableSchema		= @crtTableSchema
+																								, @TableName		= @crtTableName
+																								, @IndexName		= @tmpIndexName
+																								, @IndexID			= NULL
+																								, @PartitionNumber	= DEFAULT
+																								, @flgAction		= 4				--disable
+																								, @flgOptions		= @flgOptions
+																								, @executionLevel	= @nestedExecutionLevel
+																								, @affectedDependentObjects = @affectedDependentObjects OUT
+																								, @DebugMode		= @DebugMode										
+
+														FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName
+													end
+												CLOSE crsNonClusteredIndexes
+												DEALLOCATE crsNonClusteredIndexes
+											end
+									end
+								ELSE
+									---------------------------------------------------------------------------------------------
+									--xml primary key index options
+									IF @crtIndexType = 3 AND @crtIndexIsPrimaryXML=1
+										begin
+											--4  - Rebuild all dependent indexes when rebuild primary indexes
+											IF @flgOptions & 4 = 4
+												begin
+													--get all enabled secondary xml indexes for current table
+													SET @queryToRun = N''
+													SET @queryToRun = @queryToRun + N'SELECT  si.[name]
+																				FROM [' + @DBName + '].[sys].[indexes]				si
+																				INNER JOIN [' + @DBName + '].[sys].[objects]		so ON  si.[object_id] = so.[object_id]
+																				INNER JOIN [' + @DBName + '].[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
+																				INNER JOIN [' + @DBName + '].[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id]
+																				WHERE	so.[name] = ''' + @crtTableName + '''
+																						AND sch.[name] = ''' + @crtTableSchema + ''' 
+																						AND si.[type] = 3
+																						AND xi.[using_xml_index_id] = ''' + CAST(@crtIndexID AS [sysname]) + '''
+																						AND si.[is_disabled] = 0'
+													SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+													IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+													INSERT INTO @DependentIndexes ([index_name])
+														EXEC (@queryToRun)
+												end
+
+											--8  - Disable non-clustered index before rebuild (save space)
+											--won't disable the index when performing online rebuild
+											IF @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline = N'ONLINE = ON')) AND @crtTableIsReplicated=0
+												begin
+													DECLARE crsNonClusteredIndexes	CURSOR LOCAL FAST_FORWARD FOR
+																					SELECT [index_name]
+																					FROM @DependentIndexes
+													OPEN crsNonClusteredIndexes
+													FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName
+													WHILE @@FETCH_STATUS=0
+														begin
+															SET @nestedExecutionLevel = @executionLevel + 2
+															EXEC [dbo].[usp_mpAlterTableIndexes]	  @SQLServerName	= @SQLServerName
+																									, @DBName			= @DBName
+																									, @TableSchema		= @crtTableSchema
+																									, @TableName		= @crtTableName
+																									, @IndexName		= @tmpIndexName
+																									, @IndexID			= NULL
+																									, @PartitionNumber	= DEFAULT
+																									, @flgAction		= 4				--disable
+																									, @flgOptions		= @flgOptions
+																									, @executionLevel	= @nestedExecutionLevel
+																									, @affectedDependentObjects = @affectedDependentObjects OUT
+																									, @DebugMode		= @DebugMode										
+
+															FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName
+														end
+													CLOSE crsNonClusteredIndexes
+													DEALLOCATE crsNonClusteredIndexes
+												end
+										end
+									ELSE
+										--8  - Disable non-clustered index before rebuild (save space)
+										--won't disable the index when performing online rebuild										
+										IF @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline = N'ONLINE = ON')) AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0
+											begin
+												SET @nestedExecutionLevel = @executionLevel + 2
+												EXEC [dbo].[usp_mpAlterTableIndexes]	  @SQLServerName	= @SQLServerName
+																						, @DBName			= @DBName
+																						, @TableSchema		= @crtTableSchema
+																						, @TableName		= @crtTableName
+																						, @IndexName		= @crtIndexName
+																						, @IndexID			= NULL
+																						, @PartitionNumber	= @PartitionNumber
+																						, @flgAction		= 4				--disable
+																						, @flgOptions		= @flgOptions
+																						, @executionLevel	= @nestedExecutionLevel
+																						, @affectedDependentObjects = @affectedDependentObjects OUT
+																						, @DebugMode		= @DebugMode										
+										end
+
+								---------------------------------------------------------------------------------------------
+								/* FIX: Data corruption occurs in clustered index when you run online index rebuild in SQL Server 2012 or SQL Server 2014 https://support.microsoft.com/en-us/kb/2969896 */
+								IF (@sqlScriptOnline = N'ONLINE = ON')
+									begin
+										--get destination server running version/edition
+										DECLARE		@serverEdition					[sysname],
+													@serverVersionStr				[sysname],
+													@serverVersionNum				[numeric](9,6)
+
+										SET @nestedExecutionLevel = @executionLevel + 1
+										EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @SQLServerName,
+																				@serverEdition			= @serverEdition OUT,
+																				@serverVersionStr		= @serverVersionStr OUT,
+																				@serverVersionNum		= @serverVersionNum OUT,
+																				@executionLevel			= @nestedExecutionLevel,
+																				@debugMode				= @DebugMode
+										
+										IF     (@serverVersionNum >= 11.02100 AND @serverVersionNum < 11.03449) /* SQL Server 2012 RTM till SQL Server 2012 SP1 CU 11*/
+											OR (@serverVersionNum >= 11.05058 AND @serverVersionNum < 11.05532) /* SQL Server 2012 SP2 till SQL Server 2012 SP2 CU 1*/
+											OR (@serverVersionNum >= 12.02000 AND @serverVersionNum < 12.02370) /* SQL Server 2014 RTM CU 2*/
+											begin
+												SET @MaxDOP=1
+											end
+									end
+
+								---------------------------------------------------------------------------------------------
+								--generate rebuild index script
+								SET @queryToRun = N''
+
+								SET @queryToRun = @queryToRun + N'SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
+								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX [' + @crtIndexName + '] ON [' + @crtTableSchema + '].[' + @crtTableName + '] REBUILD'
+					
+								--rebuild options
+								SET @queryToRun = @queryToRun + N' WITH (SORT_IN_TEMPDB = ON' + CASE WHEN ISNULL(@MaxDOP, 0) <> 0 THEN N', MAXDOP = ' + CAST(@MaxDOP AS [nvarchar]) ELSE N'' END + 
+																						CASE WHEN ISNULL(@sqlScriptOnline, N'')<>N'' THEN N', ' + @sqlScriptOnline ELSE N'' END + 
+																						CASE WHEN ISNULL(@FillFactor, 0) <> 0 THEN N', FILLFACTOR = ' + CAST(@FillFactor AS [nvarchar]) ELSE N'' END +
+																N')'
+
+								IF @PartitionNumber>1
+									SET @queryToRun = @queryToRun + N' PARTITION ' + CAST(@PartitionNumber AS [nvarchar])
+
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+								IF @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline = N'ONLINE = ON'))
+									begin
+										SET @strMessage=N'performing index rebuild'
+										SET @nestedExecutionLevel = @executionLevel + 2
+										EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
+									end
+
+								SET @objectName = '[' + @crtTableSchema + '].[' + @crtTableName + ']'
+								SET @childObjectName = QUOTENAME(@crtIndexName)
+								SET @nestedExecutionLevel = @executionLevel + 1
+
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																				@dbName			= @DBName,
+																				@objectName		= @objectName,
+																				@childObjectName= @childObjectName,
+																				@module			= 'dbo.usp_mpAlterTableIndexes',
+																				@eventName		= 'database maintenance - rebuilding index',
+																				@queryToRun  	= @queryToRun,
+																				@flgOptions		= @flgOptions,
+																				@executionLevel	= @nestedExecutionLevel,
+																				@debugMode		= @DebugMode
+								
+								IF @errorCode=0
+									EXEC [dbo].[usp_mpMarkInternalAction]	@actionName			= N'index-made-disable',
+																			@flgOperation		= 2,
+																			@server_name		= @SQLServerName,
+																			@database_name		= @DBName,
+																			@schema_name		= @crtTableSchema,
+																			@object_name		= @crtTableName,
+																			@child_object_name	= @crtIndexName
+
+								---------------------------------------------------------------------------------------------
+								--rebuild dependent indexes
+								--clustered / xml primary key index options
+								IF (@crtIndexType = 1) OR (@crtIndexType = 3 AND @crtIndexIsPrimaryXML=1)
+									begin
+										--4  - Rebuild all dependent indexes when rebuild primary indexes
+										--will rebuild only indexes disabled by this tool
+										IF (@flgOptions & 4 = 4)
+											begin											
+												DECLARE crsNonClusteredIndexes	CURSOR LOCAL FAST_FORWARD FOR
+																				SELECT DISTINCT di.[index_name], di.[is_primary_xml]
+																				FROM @DependentIndexes di
+																				LEFT JOIN [maintenance-plan].[statsMaintenancePlanInternals] smpi ON	smpi.[name]=N'index-made-disable'
+																																					AND smpi.[server_name]=@SQLServerName
+																																					AND smpi.[database_name]=@DBName
+																																					AND smpi.[schema_name]=@crtTableSchema
+																																					AND smpi.[object_name]=@crtTableName
+																																					AND smpi.[child_object_name]=di.[index_name]
+																				WHERE	(
+																							/* index was disabled (option selected) and marked as disabled */
+																							(@flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline = N'ONLINE = ON')) AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0) 
+																							AND smpi.[name]=N'index-made-disable'
+																						)
+																						OR
+																						(
+																							/* index was not disabled (option selected) */
+																							NOT (@flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline = N'ONLINE = ON')) AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0) 
+																							AND smpi.[name] IS NULL
+																						)
+																				ORDER BY di.[is_primary_xml] DESC
+												OPEN crsNonClusteredIndexes
+												FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName, @tmpIndexIsPrimaryXML
+												WHILE @@FETCH_STATUS=0
+													begin
+														SET @nestedExecutionLevel = @executionLevel + 2
+														EXEC [dbo].[usp_mpAlterTableIndexes]	  @SQLServerName	= @SQLServerName
+																								, @DBName			= @DBName
+																								, @TableSchema		= @crtTableSchema
+																								, @TableName		= @crtTableName
+																								, @IndexName		= @tmpIndexName
+																								, @IndexID			= NULL
+																								, @PartitionNumber	= DEFAULT
+																								, @flgAction		= 1		--rebuild
+																								, @flgOptions		= @flgOptions
+																								, @executionLevel	= @nestedExecutionLevel
+																								, @affectedDependentObjects = @affectedDependentObjects OUT
+																								, @DebugMode		= @DebugMode										
+
+														FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName, @tmpIndexIsPrimaryXML
+													end
+												CLOSE crsNonClusteredIndexes
+												DEALLOCATE crsNonClusteredIndexes
+											end
+									end		
+
+								---------------------------------------------------------------------------------------------
+								-- must enable previous disabled constraints
+								-- 16  - Disable foreign key constraints that reffer current table before rebuilding clustered/unique indexes
+								IF @flgOptions & 16 = 16 AND @crtIndexHasDependentFK=1 
+									AND @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) 
+									AND (@sqlScriptOnline = N'ONLINE = ON')) AND @crtTableIsReplicated=0
+									begin
+										SET @flgInheritOptions = 1								-- Use tables that have foreign key constraints that reffers current table (default)
+
+										--64  - When enabling foreign key constraints, do no check values. Default behaviour is to enabled foreign key constraint with check option
+										IF @flgOptions & 64 = 64
+											SET @flgInheritOptions = @flgInheritOptions + 4		-- Enable constraints with NOCHECK. Default is to enable constraints using CHECK option
+
+										SET @nestedExecutionLevel = @executionLevel + 2
+										EXEC [dbo].[usp_mpAlterTableForeignKeys]	  @SQLServerName	= @SQLServerName
+																					, @DBName			= @DBName
+																					, @TableSchema		= @crtTableSchema
+																					, @TableName		= @crtTableName
+																					, @ConstraintName	= '%'
+																					, @flgAction		= 1		-- Enable Constraints
+																					, @flgOptions		= @flgInheritOptions
+																					, @executionLevel	= @nestedExecutionLevel
+																					, @DebugMode		= @DebugMode
+									end
+							end
+
+						---------------------------------------------------------------------------------------------
+						-- 2  - Reorganize indexes
+						---------------------------------------------------------------------------------------------
+						-- avoid messages like:	The index [...] on table [..] cannot be reorganized because page level locking is disabled.		
+						IF @flgAction = 2
+							IF @crtIndexAllowPageLocks=1
+								begin
+									SET @queryToRun = N''
+									SET @queryToRun = @queryToRun + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
+									SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX [' + @crtIndexName + '] ON [' + @crtTableSchema + '].[' + @crtTableName + '] REORGANIZE'
+				
+									--  1  - Compact large objects (LOB) (default)
+									IF @flgOptions & 1 = 1
+										SET @queryToRun = @queryToRun + N' WITH (LOB_COMPACTION = ON) '
+									ELSE
+										SET @queryToRun = @queryToRun + N' WITH (LOB_COMPACTION = OFF) '
+				
+									IF @PartitionNumber>1
+										SET @queryToRun = @queryToRun + N' PARTITION ' + CAST(@PartitionNumber AS [nvarchar])
+									IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+
+									SET @objectName = '[' + @crtTableSchema + '].[' + @crtTableName + ']'
+									SET @childObjectName = QUOTENAME(@crtIndexName)
+									SET @nestedExecutionLevel = @executionLevel + 1
+
+									EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																					@dbName			= @DBName,
+																					@objectName		= @objectName,
+																					@childObjectName= @childObjectName,
+																					@module			= 'dbo.usp_mpAlterTableIndexes',
+																					@eventName		= 'database maintenance - reorganize index',
+																					@queryToRun  	= @queryToRun,
+																					@flgOptions		= @flgOptions,
+																					@executionLevel	= @nestedExecutionLevel,
+																					@debugMode		= @DebugMode
+								end
+							ELSE
+								begin
+									SET @strMessage=N'--	index cannot be REORGANIZE because ALLOW_PAGE_LOCKS is set to OFF. Skipping...'
+									EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
+								end
+
+						---------------------------------------------------------------------------------------------
+						-- 4  - Disable indexes 
+						---------------------------------------------------------------------------------------------
+						IF @flgAction = 4
+							begin
+								SET @queryToRun = N''
+								SET @queryToRun = @queryToRun + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
+								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX [' + @crtIndexName + '] ON [' + @crtTableSchema + '].[' + @crtTableName + '] DISABLE'
+				
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+								SET @objectName = '[' + @crtTableSchema + '].[' + @crtTableName + ']'
+								SET @childObjectName = QUOTENAME(@crtIndexName)
+								SET @nestedExecutionLevel = @executionLevel + 1
+
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																				@dbName			= @DBName,
+																				@objectName		= @objectName,
+																				@childObjectName= @childObjectName,
+																				@module			= 'dbo.usp_mpAlterTableIndexes',
+																				@eventName		= 'database maintenance - disable index',
+																				@queryToRun  	= @queryToRun,
+																				@flgOptions		= @flgOptions,
+																				@executionLevel	= @nestedExecutionLevel,
+																				@debugMode		= @DebugMode
+
+								/* 4 disable index -> insert action 1 */
+								IF @errorCode=0
+									EXEC [dbo].[usp_mpMarkInternalAction]	@actionName		= N'index-made-disable',
+																			@flgOperation	= 1,
+																			@server_name		= @SQLServerName,
+																			@database_name		= @DBName,
+																			@schema_name		= @crtTableSchema,
+																			@object_name		= @crtTableName,
+																			@child_object_name	= @crtIndexName
+							end
+
+						FETCH NEXT FROM crsTableToAlterIndexes INTO @crtIndexID, @crtIndexName, @crtIndexType, @crtIndexAllowPageLocks, @crtIndexIsDisabled, @crtIndexIsPrimaryXML, @crtIndexHasDependentFK, @crtTableIsReplicated
+					end
+				CLOSE crsTableToAlterIndexes
+				DEALLOCATE crsTableToAlterIndexes
+			end
+
+		SET @affectedDependentObjects=N''
+		SELECT @affectedDependentObjects = @affectedDependentObjects + N'[' + [index_name] + N'];'
+		FROM @DependentIndexes
+END TRY
+
+BEGIN CATCH
+DECLARE 
+        @ErrorMessage    NVARCHAR(4000),
+        @ErrorNumber     INT,
+        @ErrorSeverity   INT,
+        @ErrorState      INT,
+        @ErrorLine       INT,
+        @ErrorProcedure  NVARCHAR(200);
+    -- Assign variables to error-handling functions that 
+    -- capture information for RAISERROR.
+		SET @errorCode = -1
+
+    SELECT 
+        @ErrorNumber = ERROR_NUMBER(),
+        @ErrorSeverity = ERROR_SEVERITY(),
+        @ErrorState = CASE WHEN ERROR_STATE() BETWEEN 1 AND 127 THEN ERROR_STATE() ELSE 1 END ,
+        @ErrorLine = ERROR_LINE(),
+        @ErrorProcedure = ISNULL(ERROR_PROCEDURE(), '-');
+	-- Building the message string that will contain original
+    -- error information.
+    SELECT @ErrorMessage = 
+        N'Error %d, Level %d, State %d, Procedure %s, Line %d, ' + 
+            'Message: '+ ERROR_MESSAGE();
+    -- Raise an error: msg_str parameter of RAISERROR will contain
+    -- the original error information.
+    RAISERROR 
+        (
+        @ErrorMessage, 
+        @ErrorSeverity, 
+        @ErrorState,               
+        @ErrorNumber,    -- parameter: original error number.
+        @ErrorSeverity,  -- parameter: original error severity.
+        @ErrorState,     -- parameter: original error state.
+        @ErrorProcedure, -- parameter: original error procedure name.
+        @ErrorLine       -- parameter: original error line number.
+        );
+
+        -- Test XACT_STATE:
+        -- If 1, the transaction is committable.
+        -- If -1, the transaction is uncommittable and should 
+        --     be rolled back.
+        -- XACT_STATE = 0 means that there is no transaction and
+        --     a COMMIT or ROLLBACK would generate an error.
+
+    -- Test if the transaction is uncommittable.
+    IF (XACT_STATE()) = -1
+    BEGIN
+        PRINT
+            N'The transaction is in an uncommittable state.' +
+            'Rolling back transaction.'
+        ROLLBACK TRANSACTION 
+   END;
+
+END CATCH
+
+RETURN @errorCode
+GO
+
+
+RAISERROR('Create procedure: [dbo].[usp_monAlarmCustomFreeDiskSpace]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sys.objects 
+	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_monAlarmCustomFreeDiskSpace]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_monAlarmCustomFreeDiskSpace]
+GO
+
+CREATE PROCEDURE [dbo].[usp_monAlarmCustomFreeDiskSpace]
+		@projectCode		[varchar](32)=NULL,
+		@sqlServerName		[sysname]='%'
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 13.10.2015
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+-- Change Date	: 
+-- Description	: 
+-----------------------------------------------------------------------------------------
+
+SET NOCOUNT ON 
+
+DECLARE	  @projectID						[int]
+		, @warningFreeDiskMinPercent		[numeric](6,2)
+		, @warningFreeDiskMinSpaceMB		[numeric](18,3)
+		, @criticalFreeDiskMinPercent		[numeric](6,2)
+		, @criticalFreeDiskMinSpaceMB		[numeric](18,3)
+		, @ErrMessage						[nvarchar](256)
+		
+-----------------------------------------------------------------------------------------------------
+--get default project code
+IF @projectCode IS NULL
+	SELECT	@projectCode = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Default project code'
+			AND [module] = 'common'
+
+SELECT    @projectID = [id]
+FROM [dbo].[catalogProjects]
+WHERE [code] = @projectCode 
+
+IF @projectID IS NULL
+	begin
+		SET @ErrMessage=N'The value specifief for Project Code is not valid.'
+		RAISERROR(@ErrMessage, 16, 1) WITH NOWAIT
+	end
+
+-----------------------------------------------------------------------------------------------------
+SELECT	@warningFreeDiskMinPercent = [warning_limit]
+FROM	[monitoring].[alertThresholds]
+WHERE	[alert_name] = 'Logical Disk: Free Disk Space (%)'
+		AND [category] = 'disk-space'
+		AND [is_warning_limit_enabled]=1
+
+SELECT	@criticalFreeDiskMinPercent = [critical_limit]
+FROM	[monitoring].[alertThresholds]
+WHERE	[alert_name] = 'Logical Disk: Free Disk Space (%)'
+		AND [category] = 'disk-space'
+		AND [is_critical_limit_enabled]=1
+
+SELECT	@warningFreeDiskMinSpaceMB = [warning_limit]
+FROM	[monitoring].[alertThresholds]
+WHERE	[alert_name] = 'Logical Disk: Free Disk Space (MB)'
+		AND [category] = 'disk-space'
+		AND [is_warning_limit_enabled]=1
+
+SELECT	@criticalFreeDiskMinSpaceMB = [critical_limit]
+FROM	[monitoring].[alertThresholds]
+WHERE	[alert_name] = 'Logical Disk: Free Disk Space (MB)'
+		AND [category] = 'disk-space'
+		AND [is_critical_limit_enabled]=1
+
+-----------------------------------------------------------------------------------------------------
+
+DECLARE   @instanceName		[sysname]
+		, @objectName		[nvarchar](512)
+		, @eventName		[sysname]
+		, @severity			[sysname]
+		, @eventMessage		[nvarchar](max)
+
+
+DECLARE crsDiskSpaceAlarms CURSOR FOR	SELECT  DISTINCT
+												  cin.[instance_name]
+												, ISNULL(dsi.[volume_mount_point], dsi.[logical_drive]) AS [object_name]
+												, 'warning'			AS [severity]
+												, 'low disk space'	AS [event_name]
+												, '<alert><detail>' + 
+													'<severity>warning</severity>' + 
+													'<machine_name>' + cin.[machine_name] + '</machine_name>' + 
+													'<counter_name>low disk space</counter_name><target_name>' + ISNULL(dsi.[volume_mount_point], dsi.[logical_drive]) + '</target_name>' + 
+													'<measure_unit>MB</measure_unit>' + 
+													'<current_value>' + CAST(dsi.[available_space_mb] AS [varchar]) +'</current_value>' + 
+													'<current_percentage>' + CAST(dsi.[percent_available] AS [varchar]) + '</current_percentage>' + 
+													'<refference_value>' + CAST(dsi.[total_size_mb] AS [varchar]) + '</refference_value>' + 
+													'<threshold_value>' + CAST(@warningFreeDiskMinSpaceMB AS [varchar]) + '</threshold_value>' + 
+													'<threshold_percentage>' + CAST(@warningFreeDiskMinPercent AS [varchar]) + '</threshold_percentage>' + 
+													'<event_date_utc>' + CONVERT([varchar](20), dsi.[event_date_utc], 120) + '</event_date_utc>' + 
+													'</detail></alert>' AS [event_message]
+										FROM [dbo].[vw_catalogInstanceNames]  cin
+										INNER JOIN [health-check].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
+										LEFT  JOIN 
+													(
+														SELECT DISTINCT [project_id], [instance_id], [physical_drives] 
+														FROM [health-check].[vw_statsDatabaseDetails]
+													)   cdd ON cdd.[project_id] = cin.[project_id] AND cdd.[instance_id] = cin.[instance_id]
+										LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'disk-space'
+																						AND asr.[alert_name] IN ('Logical Disk: Free Disk Space (%)', 'Logical Disk: Free Disk Space (MB)')
+																						AND asr.[active] = 1
+																						AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])
+																						AND (   asr.[skip_value2] IS NULL 
+																							 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ISNULL(dsi.[volume_mount_point], dsi.[logical_drive]))
+																							)
+										WHERE cin.[instance_active]=1
+												AND cin.[project_id] = @projectID
+												AND cin.[instance_name] LIKE @sqlServerName
+												AND (    (	  dsi.[percent_available] IS NOT NULL 
+															AND dsi.[percent_available] <= @warningFreeDiskMinPercent
+															AND dsi.[percent_available] > @criticalFreeDiskMinPercent
+															)
+														OR 
+														(	   dsi.[percent_available] IS NULL 
+															AND dsi.[available_space_mb] IS NOT NULL 
+															AND dsi.[available_space_mb] <= @warningFreeDiskMinSpaceMB
+															AND dsi.[percent_available] > @criticalFreeDiskMinSpaceMB
+														)
+													)
+												AND (dsi.[logical_drive] IN ('C') OR CHARINDEX(dsi.[logical_drive], cdd.[physical_drives])>0)
+												AND asr.[id] IS NULL
+												AND (@warningFreeDiskMinSpaceMB IS NOT NULL AND @warningFreeDiskMinPercent IS NOT NULL)
+
+										UNION ALL
+
+										SELECT  DISTINCT
+												  cin.[instance_name]
+												, ISNULL(dsi.[volume_mount_point], dsi.[logical_drive]) AS [object_name]
+												, 'critical'			AS [severity]
+												, 'low disk space'	AS [event_name]
+												, '<alert><detail>' + 
+													'<severity>critical</severity>' + 
+													'<machine_name>' + cin.[machine_name] + '</machine_name>' + 
+													'<counter_name>low disk space</counter_name><target_name>' + ISNULL(dsi.[volume_mount_point], dsi.[logical_drive]) + '</target_name>' + 
+													'<measure_unit>MB</measure_unit>' + 
+													'<current_value>' + CAST(dsi.[available_space_mb] AS [varchar]) +'</current_value>' + 
+													'<current_percentage>' + CAST(dsi.[percent_available] AS [varchar]) + '</current_percentage>' + 
+													'<refference_value>' + CAST(dsi.[total_size_mb] AS [varchar]) + '</refference_value>' + 
+													'<threshold_value>' + CAST(@criticalFreeDiskMinSpaceMB AS [varchar]) + '</threshold_value>' + 
+													'<threshold_percentage>' + CAST(@criticalFreeDiskMinPercent AS [varchar]) + '</threshold_percentage>' + 
+													'<event_date_utc>' + CONVERT([varchar](20), dsi.[event_date_utc], 120) + '</event_date_utc>' + 
+													'</detail></alert>' AS [event_message]
+										FROM [dbo].[vw_catalogInstanceNames]  cin
+										INNER JOIN [health-check].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
+										LEFT  JOIN 
+													(
+														SELECT DISTINCT [project_id], [instance_id], [physical_drives] 
+														FROM [health-check].[vw_statsDatabaseDetails]
+													)   cdd ON cdd.[project_id] = cin.[project_id] AND cdd.[instance_id] = cin.[instance_id]
+										LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'disk-space'
+																						AND asr.[alert_name] IN ('Logical Disk: Free Disk Space (%)', 'Logical Disk: Free Disk Space (MB)')
+																						AND asr.[active] = 1
+																						AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])
+																						AND (   asr.[skip_value2] IS NULL 
+																							 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ISNULL(dsi.[volume_mount_point], dsi.[logical_drive]))
+																							)
+										WHERE cin.[instance_active]=1
+												AND cin.[project_id] = @projectID
+												AND cin.[instance_name] LIKE @sqlServerName
+												AND (    (	  dsi.[percent_available] IS NOT NULL 
+															AND dsi.[percent_available] < @criticalFreeDiskMinPercent
+															)
+														OR 
+														(	   dsi.[percent_available] IS NULL 
+															AND dsi.[available_space_mb] IS NOT NULL 
+															AND dsi.[available_space_mb] < @criticalFreeDiskMinSpaceMB
+														)
+													)
+												AND (dsi.[logical_drive] IN ('C') OR CHARINDEX(dsi.[logical_drive], cdd.[physical_drives])>0)
+												AND asr.[id] IS NULL
+												AND (@criticalFreeDiskMinSpaceMB IS NOT NULL AND @criticalFreeDiskMinPercent IS NOT NULL)
+										
+										ORDER BY [instance_name], [object_name]
+OPEN crsDiskSpaceAlarms
+FETCH NEXT FROM crsDiskSpaceAlarms INTO @instanceName, @objectName, @severity, @eventName, @eventMessage
+WHILE @@FETCH_STATUS=0
+	begin
+		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= @projectCode,
+														@sqlServerName			= @instanceName,
+														@dbName					= @severity,
+														@objectName				= @objectName,
+														@childObjectName		= NULL,
+														@module					= 'health-check',
+														@eventName				= @eventName,
+														@parameters				= NULL,	
+														@eventMessage			= @eventMessage,
+														@dbMailProfileName		= NULL,
+														@recipientsList			= NULL,
+														@eventType				= 6,	/* 6 - alert-custom */
+														@additionalOption		= 0
+
+		FETCH NEXT FROM crsDiskSpaceAlarms INTO @instanceName, @objectName, @severity, @eventName, @eventMessage
+	end
+CLOSE crsDiskSpaceAlarms
+DEALLOCATE crsDiskSpaceAlarms
+GO
+
+

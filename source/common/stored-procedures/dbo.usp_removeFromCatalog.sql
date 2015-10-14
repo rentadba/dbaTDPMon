@@ -118,7 +118,7 @@ BEGIN TRY
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE shcdd
-		FROM dbo.statsHealthCheckDatabaseDetails shcdd
+		FROM dbo.statsDatabaseDetails shcdd
 		INNER JOIN dbo.catalogDatabaseNames cdb ON cdb.[instance_id] = shcdd.[instance_id] AND cdb.[id] = shcdd.[catalog_database_id]
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[id] = cdb.[instance_id] AND cin.[project_id] = cdb.[project_id]
 		WHERE cin.[project_id] = @projectID

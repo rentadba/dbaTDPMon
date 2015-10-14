@@ -11,12 +11,12 @@
 -----------------------------------------------------------------------------------------------------
 --
 -----------------------------------------------------------------------------------------------------
-RAISERROR('Create table: [dbo].[statsMaintenancePlanInternals]', 10, 1) WITH NOWAIT
+RAISERROR('Create table: [maintenance-plan].[statsMaintenancePlanInternals]', 10, 1) WITH NOWAIT
 GO
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[statsMaintenancePlanInternals]') AND type in (N'U'))
-DROP TABLE [dbo].[statsMaintenancePlanInternals]
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[maintenance-plan].[statsMaintenancePlanInternals]') AND type in (N'U'))
+DROP TABLE [maintenance-plan].[statsMaintenancePlanInternals]
 GO
-CREATE TABLE [dbo].[statsMaintenancePlanInternals]
+CREATE TABLE [maintenance-plan].[statsMaintenancePlanInternals]
 (
 	[id]				[bigint] IDENTITY (1, 1)NOT NULL,
 	[event_date_utc]	[datetime]				NOT NULL CONSTRAINT [DF_statsMaintenancePlanInternals_EventDateUTC] DEFAULT (GETUTCDATE()),
@@ -34,14 +34,14 @@ CREATE TABLE [dbo].[statsMaintenancePlanInternals]
 ) ON [FG_Statistics_Data]
 GO
 
-CREATE INDEX [IX_statsMaintenancePlanInternals_SessionID_Name] ON [dbo].[statsMaintenancePlanInternals]
+CREATE INDEX [IX_statsMaintenancePlanInternals_SessionID_Name] ON [maintenance-plan].[statsMaintenancePlanInternals]
 		([session_id], [name]) 
 	INCLUDE 
 		([server_name], [database_name]) 
 	ON [FG_Statistics_Index]
 GO
 
-CREATE INDEX [IX_statsMaintenancePlanInternals_Name] ON [dbo].[statsMaintenancePlanInternals]
+CREATE INDEX [IX_statsMaintenancePlanInternals_Name] ON [maintenance-plan].[statsMaintenancePlanInternals]
 		([name], [server_name], [database_name])
 	ON [FG_Statistics_Index]
 GO

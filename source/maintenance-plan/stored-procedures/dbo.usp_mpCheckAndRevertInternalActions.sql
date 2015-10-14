@@ -77,7 +77,7 @@ EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrin
 
 SET @nestExecutionLevel = @executionLevel + 1
 DECLARE crsStatsMaintenancePlanInternals CURSOR FOR SELECT	[database_name], [schema_name], [object_name], [child_object_name]
-													FROM	[dbo].[statsMaintenancePlanInternals]
+													FROM	[maintenance-plan].[statsMaintenancePlanInternals]
 													WHERE	[name] = 'index-made-disable'
 															AND [server_name] = @sqlServerName
 OPEN crsStatsMaintenancePlanInternals
@@ -109,7 +109,7 @@ SET @queryToRun=N'Rebuilding previously disabled foreign key constraints...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 DECLARE crsStatsMaintenancePlanInternals CURSOR FOR SELECT	[database_name], [schema_name], [object_name], [child_object_name]
-													FROM	[dbo].[statsMaintenancePlanInternals]
+													FROM	[maintenance-plan].[statsMaintenancePlanInternals]
 													WHERE	[name] = 'foreign-key-made-disable'
 															AND [server_name] = @sqlServerName
 OPEN crsStatsMaintenancePlanInternals

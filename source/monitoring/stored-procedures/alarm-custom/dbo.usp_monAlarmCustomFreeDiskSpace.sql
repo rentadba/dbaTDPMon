@@ -54,25 +54,25 @@ IF @projectID IS NULL
 
 -----------------------------------------------------------------------------------------------------
 SELECT	@warningFreeDiskMinPercent = [warning_limit]
-FROM	[dbo].[monitoringAlertThresholds]
+FROM	[monitoring].[alertThresholds]
 WHERE	[alert_name] = 'Logical Disk: Free Disk Space (%)'
 		AND [category] = 'disk-space'
 		AND [is_warning_limit_enabled]=1
 
 SELECT	@criticalFreeDiskMinPercent = [critical_limit]
-FROM	[dbo].[monitoringAlertThresholds]
+FROM	[monitoring].[alertThresholds]
 WHERE	[alert_name] = 'Logical Disk: Free Disk Space (%)'
 		AND [category] = 'disk-space'
 		AND [is_critical_limit_enabled]=1
 
 SELECT	@warningFreeDiskMinSpaceMB = [warning_limit]
-FROM	[dbo].[monitoringAlertThresholds]
+FROM	[monitoring].[alertThresholds]
 WHERE	[alert_name] = 'Logical Disk: Free Disk Space (MB)'
 		AND [category] = 'disk-space'
 		AND [is_warning_limit_enabled]=1
 
 SELECT	@criticalFreeDiskMinSpaceMB = [critical_limit]
-FROM	[dbo].[monitoringAlertThresholds]
+FROM	[monitoring].[alertThresholds]
 WHERE	[alert_name] = 'Logical Disk: Free Disk Space (MB)'
 		AND [category] = 'disk-space'
 		AND [is_critical_limit_enabled]=1
@@ -104,18 +104,18 @@ DECLARE crsDiskSpaceAlarms CURSOR FOR	SELECT  DISTINCT
 													'<event_date_utc>' + CONVERT([varchar](20), dsi.[event_date_utc], 120) + '</event_date_utc>' + 
 													'</detail></alert>' AS [event_message]
 										FROM [dbo].[vw_catalogInstanceNames]  cin
-										INNER JOIN [dbo].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
+										INNER JOIN [health-check].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
 										LEFT  JOIN 
 													(
 														SELECT DISTINCT [project_id], [instance_id], [physical_drives] 
-														FROM [dbo].[vw_statsHealthCheckDatabaseDetails]
+														FROM [health-check].[vw_statsDatabaseDetails]
 													)   cdd ON cdd.[project_id] = cin.[project_id] AND cdd.[instance_id] = cin.[instance_id]
-										LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'monitoring'
-																						AND rsr.[rule_id] = 1
-																						AND rsr.[active] = 1
-																						AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																						AND (   rsr.[skip_value2] IS NULL 
-																							 OR (rsr.[skip_value2] IS NOT NULL AND rsr.[skip_value2] = ISNULL(dsi.[volume_mount_point], dsi.[logical_drive]))
+										LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'disk-space'
+																						AND asr.[alert_name] IN ('Logical Disk: Free Disk Space (%)', 'Logical Disk: Free Disk Space (MB)')
+																						AND asr.[active] = 1
+																						AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])
+																						AND (   asr.[skip_value2] IS NULL 
+																							 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ISNULL(dsi.[volume_mount_point], dsi.[logical_drive]))
 																							)
 										WHERE cin.[instance_active]=1
 												AND cin.[project_id] = @projectID
@@ -132,7 +132,7 @@ DECLARE crsDiskSpaceAlarms CURSOR FOR	SELECT  DISTINCT
 														)
 													)
 												AND (dsi.[logical_drive] IN ('C') OR CHARINDEX(dsi.[logical_drive], cdd.[physical_drives])>0)
-												AND rsr.[id] IS NULL
+												AND asr.[id] IS NULL
 												AND (@warningFreeDiskMinSpaceMB IS NOT NULL AND @warningFreeDiskMinPercent IS NOT NULL)
 
 										UNION ALL
@@ -155,18 +155,18 @@ DECLARE crsDiskSpaceAlarms CURSOR FOR	SELECT  DISTINCT
 													'<event_date_utc>' + CONVERT([varchar](20), dsi.[event_date_utc], 120) + '</event_date_utc>' + 
 													'</detail></alert>' AS [event_message]
 										FROM [dbo].[vw_catalogInstanceNames]  cin
-										INNER JOIN [dbo].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
+										INNER JOIN [health-check].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
 										LEFT  JOIN 
 													(
 														SELECT DISTINCT [project_id], [instance_id], [physical_drives] 
-														FROM [dbo].[vw_statsHealthCheckDatabaseDetails]
+														FROM [health-check].[vw_statsDatabaseDetails]
 													)   cdd ON cdd.[project_id] = cin.[project_id] AND cdd.[instance_id] = cin.[instance_id]
-										LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'monitoring'
-																						AND rsr.[rule_id] = 1
-																						AND rsr.[active] = 1
-																						AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																						AND (   rsr.[skip_value2] IS NULL 
-																							 OR (rsr.[skip_value2] IS NOT NULL AND rsr.[skip_value2] = ISNULL(dsi.[volume_mount_point], dsi.[logical_drive]))
+										LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'disk-space'
+																						AND asr.[alert_name] IN ('Logical Disk: Free Disk Space (%)', 'Logical Disk: Free Disk Space (MB)')
+																						AND asr.[active] = 1
+																						AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])
+																						AND (   asr.[skip_value2] IS NULL 
+																							 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ISNULL(dsi.[volume_mount_point], dsi.[logical_drive]))
 																							)
 										WHERE cin.[instance_active]=1
 												AND cin.[project_id] = @projectID
@@ -181,7 +181,7 @@ DECLARE crsDiskSpaceAlarms CURSOR FOR	SELECT  DISTINCT
 														)
 													)
 												AND (dsi.[logical_drive] IN ('C') OR CHARINDEX(dsi.[logical_drive], cdd.[physical_drives])>0)
-												AND rsr.[id] IS NULL
+												AND asr.[id] IS NULL
 												AND (@criticalFreeDiskMinSpaceMB IS NOT NULL AND @criticalFreeDiskMinPercent IS NOT NULL)
 										
 										ORDER BY [instance_name], [object_name]

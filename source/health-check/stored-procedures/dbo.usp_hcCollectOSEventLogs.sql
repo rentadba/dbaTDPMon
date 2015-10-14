@@ -210,7 +210,7 @@ SET @strMessage=N'Step 1: Delete existing information....'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 DELETE soel
-FROM [dbo].[statsOSEventLogs]			soel
+FROM [health-check].[statsOSEventLogs]			soel
 INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = soel.[instance_id] AND cin.[project_id] = soel.[project_id]
 WHERE cin.[project_id] = @projectID
 		AND cin.[name] LIKE @sqlServerNameFilter
@@ -464,9 +464,9 @@ WHILE @@FETCH_STATUS=0
 								)pvt
 
 						/* save results to stats table */
-						INSERT	INTO [dbo].[statsOSEventLogs](  [instance_id], [project_id], [machine_id], [event_date_utc], [log_type_id]
-															  , [event_id], [level_id], [record_id], [category_id], [category_name]
-															  , [source], [process_id], [thread_id], [machine_name], [user_id], [time_created], [message])
+						INSERT	INTO [health-check].[statsOSEventLogs](   [instance_id], [project_id], [machine_id], [event_date_utc], [log_type_id]
+																		, [event_id], [level_id], [record_id], [category_id], [category_name]
+																		, [source], [process_id], [thread_id], [machine_name], [user_id], [time_created], [message])
 								SELECT    @instanceID, @projectID, @machineID, GETUTCDATE(), @psLogTypeID
 										, [Id] AS [EventID], [Level], [RecordId], [Task] AS [Category], [TaskDisplayName] AS [CategoryName]
 										, [ProviderName] AS [Source]

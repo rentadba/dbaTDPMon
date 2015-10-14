@@ -34,7 +34,7 @@ SET NOCOUNT ON
 --insert action
 IF @flgOperation = 1
 	begin
-		INSERT	INTO [dbo].[statsMaintenancePlanInternals]([name], [server_name], [database_name], [schema_name], [object_name], [child_object_name])
+		INSERT	INTO [maintenance-plan].[statsMaintenancePlanInternals]([name], [server_name], [database_name], [schema_name], [object_name], [child_object_name])
 				SELECT @actionName, @server_name, @database_name, @schema_name, @object_name, @child_object_name
 	end
 
@@ -42,7 +42,7 @@ IF @flgOperation = 1
 IF @flgOperation = 2
 	begin
 		IF @database_name <> '%'
-			DELETE	FROM [dbo].[statsMaintenancePlanInternals]
+			DELETE	FROM [maintenance-plan].[statsMaintenancePlanInternals]
 			WHERE	[name] = @actionName
 					AND [server_name] = @server_name
 					AND ([database_name] = @database_name OR ([database_name] IS NULL AND @database_name IS NULL))
@@ -50,7 +50,7 @@ IF @flgOperation = 2
 					AND ([object_name] = @object_name OR ([object_name] IS NULL AND @object_name IS NULL))
 					AND ([child_object_name] = @child_object_name OR ([child_object_name] IS NULL AND @child_object_name IS NULL))
 		ELSE
-			DELETE	FROM [dbo].[statsMaintenancePlanInternals]
+			DELETE	FROM [maintenance-plan].[statsMaintenancePlanInternals]
 			WHERE	[name] = @actionName
 					AND [server_name] = @server_name
 

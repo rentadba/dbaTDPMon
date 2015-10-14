@@ -554,8 +554,8 @@ BEGIN TRY
 
 						INSERT	INTO #xpCMDShellOutput([output])
 								EXEC (@queryToRun)
-			
-						UPDATE #xpCMDShellOutput SET [output]=LTRIM(RTRIM([output]))
+									
+						UPDATE #xpCMDShellOutput SET [output]=REPLACE(REPLACE(REPLACE(LTRIM(RTRIM([output])), ' ', ''), CHAR(10), ''), CHAR(13), '')
 			
 						DELETE FROM #xpCMDShellOutput WHERE LEN([output])<=3 OR [output] IS NULL
 						DELETE FROM #xpCMDShellOutput WHERE [output] LIKE '%not recognized as an internal or external command%'
@@ -760,7 +760,7 @@ DECLARE
 END CATCH
 
 RETURN @returnValue
-GO
+
 
 
 RAISERROR('Create procedure: [dbo].[usp_refreshProjectCatalogsAndDiscovery]', 10, 1) WITH NOWAIT
@@ -4554,7 +4554,7 @@ BEGIN TRY
 																		(
 																			SELECT    [project_id], [instance_id]
 																					, SUM(ISNULL([size_mb], 0)) [size_mb]
-																			FROM [dbo].[vw_statsHealthCheckDatabaseDetails]
+																			FROM [health-check].[vw_statsDatabaseDetails]
 																			WHERE [project_id] = @projectID
 																			GROUP BY [project_id], [instance_id]
 																		) shcdd ON shcdd.[instance_id] = cin.[instance_id] AND shcdd.[project_id] = cin.[project_id]
@@ -4576,22 +4576,22 @@ BEGIN TRY
 							AND [instance_name] = @instanceName
 
 					SELECT	@hasSQLagentJob = COUNT(*)
-					FROM	[dbo].[vw_statsSQLServerAgentJobsHistory]
+					FROM	[health-check].[vw_statsSQLServerAgentJobsHistory]
 					WHERE	[project_id]=@projectID
 							AND [instance_name] = @instanceName
 
 					SELECT	@hasDiskSpaceInfo = COUNT(*)
-					FROM	[dbo].[vw_statsHealthCheckDiskSpaceInfo]
+					FROM	[health-check].[vw_statsDiskSpaceInfo]
 					WHERE	[project_id]=@projectID
 							AND [instance_name] = @instanceName
 					
 					SELECT	@hasErrorlogMessages = COUNT(*)
-					FROM	[dbo].[vw_statsSQLServerErrorlogDetails]
+					FROM	[health-check].[vw_statsSQLServerErrorlogDetails]
 					WHERE	[project_id]=@projectID
 							AND [instance_name] = @instanceName
 
 					SELECT	@hasOSEventMessages = COUNT(*)
-					FROM	[dbo].[vw_statsOSEventLogs] 
+					FROM	[health-check].[vw_statsOSEventLogs] 
 					WHERE	[project_id]=@projectID
 							AND [instance_name] = @machineName
 																				  
@@ -4933,9 +4933,9 @@ BEGIN TRY
 					, @lastExecDate		[varchar](10)
 					, @lastExecTime		[varchar](8)
 			
-			SET @dateTimeLowerLimit = DATEADD(hh, -@configFailuresInLastHours, GETUTCDATE())
+			SET @dateTimeLowerLimit = DATEADD(hh, -@configFailuresInLastHours, GETDATE())
 			DECLARE crsSQLServerAgentJobsStatusIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT	ssajh.[instance_name], ssajh.[job_name], ssajh.[last_execution_status], ssajh.[last_execution_date], ssajh.[last_execution_time], ssajh.[message]
-																							FROM	[dbo].[vw_statsSQLServerAgentJobsHistory] ssajh
+																							FROM	[health-check].[vw_statsSQLServerAgentJobsHistory] ssajh
 																							LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																			AND rsr.[rule_id] = 16
 																																			AND rsr.[active] = 1
@@ -5021,12 +5021,12 @@ BEGIN TRY
 
 			DECLARE   @runningTime		[varchar](32)
 			
-			SET @dateTimeLowerLimit = DATEADD(hh, -@configFailuresInLastHours, GETUTCDATE())
+			SET @dateTimeLowerLimit = DATEADD(hh, -@configFailuresInLastHours, GETDATE())
 			DECLARE crsLongRunningSQLAgentJobsIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT	  ssajh.[instance_name], ssajh.[job_name]
 																								, ssajh.[last_execution_date] AS [start_date], ssajh.[last_execution_time] AS [start_time]
 																								, [dbo].[ufn_reportHTMLFormatTimeValue](CAST(ssajh.[running_time_sec]*1000 AS [bigint])) AS [running_time]
 																								, ssajh.[message]
-																						FROM [dbo].[vw_statsSQLServerAgentJobsHistory] ssajh
+																						FROM [health-check].[vw_statsSQLServerAgentJobsHistory] ssajh
 																						LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																		AND rsr.[rule_id] = 33554432
 																																		AND rsr.[active] = 1
@@ -5224,11 +5224,11 @@ BEGIN TRY
 																								, dsi.[logical_drive], dsi.[volume_mount_point]
 																								, dsi.[total_size_mb], dsi.[available_space_mb], dsi.[percent_available]
 																						FROM [dbo].[vw_catalogInstanceNames]  cin
-																						INNER JOIN [dbo].[vw_statsHealthCheckDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
+																						INNER JOIN [health-check].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
 																						LEFT  JOIN 
 																									(
 																										SELECT DISTINCT [project_id], [instance_id], [physical_drives] 
-																										FROM [dbo].[vw_statsHealthCheckDatabaseDetails]
+																										FROM [health-check].[vw_statsDatabaseDetails]
 																									)   cdd ON cdd.[project_id] = cin.[project_id] AND cdd.[instance_id] = cin.[instance_id]
 																						LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																		AND rsr.[rule_id] = 262144
@@ -5314,7 +5314,7 @@ BEGIN TRY
 																						, shcdd.[size_mb]
 																				FROM [dbo].[vw_catalogInstanceNames]  cin
 																				INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																				LEFT  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																				LEFT  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
 																				LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																AND rsr.[rule_id] = 128
 																																AND rsr.[active] = 1
@@ -5392,7 +5392,7 @@ BEGIN TRY
 																						, shcdd.[is_auto_shrink]
 																				FROM [dbo].[vw_catalogInstanceNames]  cin
 																				INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																				INNER JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																				INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
 																				LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																AND rsr.[rule_id] = 512
 																																AND rsr.[active] = 1
@@ -5469,7 +5469,7 @@ BEGIN TRY
 																							, shcdd.[log_space_used_percent]
 																					FROM [dbo].[vw_catalogInstanceNames]  cin
 																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																					INNER  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																					INNER  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
 																					LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																	AND rsr.[rule_id] = 1024
 																																	AND rsr.[active] = 1
@@ -5551,7 +5551,7 @@ BEGIN TRY
 																							, ((100.0 - shcdd.[data_space_used_percent]) * shcdd.[data_size_mb]) / 100 AS [reclaimable_space_mb]
 																					FROM [dbo].[vw_catalogInstanceNames]  cin
 																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																					INNER  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																					INNER  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
 																					LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																	AND rsr.[rule_id] = 2048
 																																	AND rsr.[active] = 1
@@ -5639,7 +5639,7 @@ BEGIN TRY
 																							, ((100.0 - shcdd.[log_space_used_percent]) * shcdd.[log_size_mb]) / 100 AS [available_space_mb]
 																					FROM [dbo].[vw_catalogInstanceNames]  cin
 																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																					INNER  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																					INNER  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
 																					LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																	AND rsr.[rule_id] = 32768
 																																	AND rsr.[active] = 1
@@ -5730,7 +5730,7 @@ BEGIN TRY
 																										, (shcdd.[log_size_mb] / shcdd.[data_size_mb] * 100.) AS [log_vs_data]
 																								FROM [dbo].[vw_catalogInstanceNames]  cin
 																								INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																								INNER  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																								INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
 																								LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																				AND rsr.[rule_id] = 4096
 																																				AND rsr.[active] = 1
@@ -5814,7 +5814,7 @@ BEGIN TRY
 																						, shcdd.[log_size_mb], shcdd.[log_space_used_percent] 
 																				FROM [dbo].[vw_catalogInstanceNames] cin
 																				INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																				LEFT  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																				LEFT  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
 																				LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																AND rsr.[rule_id] = 4194304
 																																AND rsr.[active] = 1
@@ -5895,7 +5895,7 @@ BEGIN TRY
 																							, shcdd.[compatibility_level]
 																					FROM [dbo].[vw_catalogInstanceNames]  cin
 																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																					INNER JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																					INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
 																					LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																	AND rsr.[rule_id] = 8388608
 																																	AND rsr.[active] = 1
@@ -6138,7 +6138,7 @@ BEGIN TRY
 																							, DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) AS [backup_age_days]
 																					FROM [dbo].[vw_catalogInstanceNames]  cin
 																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																					INNER  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																					INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
 																					LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																	AND rsr.[rule_id] = 8192
 																																	AND rsr.[active] = 1
@@ -6232,7 +6232,7 @@ BEGIN TRY
 																									END AS [dbcc_checkdb_age_days]
 																						FROM [dbo].[vw_catalogInstanceNames]  cin
 																						INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																						INNER  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																						INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
 																						LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																		AND rsr.[rule_id] = 16384
 																																		AND rsr.[active] = 1
@@ -6390,7 +6390,7 @@ BEGIN TRY
 			IF OBJECT_ID('tempdb..#filteredStatsSQLServerErrorlogDetail') IS NOT NULL
 				DROP TABLE #filteredStatsSQLServerErrorlogDetail
 
-			SET @dateTimeLowerLimit = DATEADD(hh, -@configErrorlogMessageLastHours, GETUTCDATE())
+			SET @dateTimeLowerLimit = DATEADD(hh, -@configErrorlogMessageLastHours, GETDATE())
 
 			SELECT DISTINCT 
 					cin.[instance_name], 
@@ -6398,7 +6398,7 @@ BEGIN TRY
 					eld.[process_info], eld.[text]
 			INTO #filteredStatsSQLServerErrorlogDetail
 			FROM [dbo].[vw_catalogInstanceNames]  cin
-			INNER JOIN [dbo].[vw_statsSQLServerErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
+			INNER JOIN [health-check].[vw_statsSQLServerErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
 			LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 															AND rsr.[rule_id] = 1048576
 															AND rsr.[active] = 1
@@ -6564,7 +6564,7 @@ BEGIN TRY
 															, SUM(1) OVER() AS [row_count]
 													FROM [dbo].[vw_catalogInstanceNames] cin
 													INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-													LEFT  JOIN [dbo].[vw_statsHealthCheckDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+													LEFT  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
 													WHERE	cin.[instance_active]=1
 															AND cdn.[active]=1
 															AND cin.[project_id] = @projectID	
@@ -6625,7 +6625,7 @@ BEGIN TRY
 			SET @idx=1		
 			
 			DECLARE crsSQLServerAgentJobsInstanceName CURSOR READ_ONLY LOCAL FOR	SELECT	ssajh.[instance_name], COUNT(*) AS [job_count]
-																					FROM	[dbo].[vw_statsSQLServerAgentJobsHistory] ssajh
+																					FROM	[health-check].[vw_statsSQLServerAgentJobsHistory] ssajh
 																					LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																	AND rsr.[rule_id] = 32
 																																	AND rsr.[active] = 1
@@ -6666,7 +6666,7 @@ BEGIN TRY
 													SELECT	[job_name], [last_execution_status], [last_execution_date], [last_execution_time], [message]
 															, ROW_NUMBER() OVER(ORDER BY [job_name]) [row_no]
 															, SUM(1) OVER() AS [row_count]
-													FROM	[dbo].[vw_statsSQLServerAgentJobsHistory]
+													FROM	[health-check].[vw_statsSQLServerAgentJobsHistory]
 													WHERE	[project_id]=@projectID
 															AND [instance_name] = @instanceName
 												)X
@@ -6728,7 +6728,7 @@ BEGIN TRY
 																								, cin.[is_clustered], cin.[cluster_node_machine_name]
 																								, COUNT(*) AS [volume_count]
 																						FROM [dbo].[vw_catalogInstanceNames]  cin
-																						INNER JOIN [dbo].[vw_statsHealthCheckDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
+																						INNER JOIN [health-check].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
 																						LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																		AND rsr.[rule_id] = 65536
 																																		AND rsr.[active] = 1
@@ -6769,7 +6769,7 @@ BEGIN TRY
 																, ROW_NUMBER() OVER(ORDER BY dsi.[logical_drive], dsi.[volume_mount_point]) [row_no]
 																, SUM(1) OVER() AS [row_count]
 													FROM [dbo].[vw_catalogInstanceNames] cin
-													INNER JOIN [dbo].[vw_statsHealthCheckDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
+													INNER JOIN [health-check].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
 													WHERE	cin.[instance_active]=1
 															AND cin.[project_id] = @projectID	
 															/*AND cin.[instance_name] =  @instanceName*/
@@ -6825,13 +6825,13 @@ BEGIN TRY
 											<TH WIDTH= "60px" class="details-bold" nowrap>Process Info</TH>
 											<TH WIDTH="710px" class="details-bold">Message</TH>'
 
-			SET @dateTimeLowerLimit = DATEADD(hh, -@configErrorlogMessageLastHours, GETUTCDATE())
+			SET @dateTimeLowerLimit = DATEADD(hh, -@configErrorlogMessageLastHours, GETDATE())
 			
 			DECLARE crsErrorlogMessagesInstanceName CURSOR READ_ONLY LOCAL FOR	SELECT DISTINCT
 																						  cin.[instance_name]
 																						, COUNT(*) AS [messages_count]
 																				FROM [dbo].[vw_catalogInstanceNames]  cin
-																				INNER JOIN [dbo].[vw_statsSQLServerErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
+																				INNER JOIN [health-check].[vw_statsSQLServerErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
 																				LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																AND rsr.[rule_id] = 2097152
 																																AND rsr.[active] = 1
@@ -6865,7 +6865,7 @@ BEGIN TRY
 													SELECT	eld.[log_date], eld.[id], eld.[process_info], eld.[text]
 															, ROW_NUMBER() OVER(ORDER BY eld.[log_date], eld.[id]) [row_no]
 															, SUM(1) OVER() AS [row_count]
-													FROM	[dbo].[vw_statsSQLServerErrorlogDetails] eld
+													FROM	[health-check].[vw_statsSQLServerErrorlogDetails] eld
 													WHERE	eld.[project_id]=@projectID
 															AND eld.[instance_name] = @instanceName
 															AND eld.[log_date] >= @dateTimeLowerLimit
@@ -6997,14 +6997,14 @@ BEGIN TRY
 											<TH WIDTH="480px" class="details-bold">Message</TH>'
 			SET @idx=1		
 
-			SET @dateTimeLowerLimit = DATEADD(hh, -@configOSEventMessageLastHours, GETUTCDATE())
+			SET @dateTimeLowerLimit = DATEADD(hh, -@configOSEventMessageLastHours, GETDATE())
 			SET @issuesDetectedCount = 0 
 			
 			DECLARE crsOSEventMessagesInstanceName CURSOR READ_ONLY LOCAL FOR	SELECT DISTINCT
 																						  oel.[machine_name]
 																						, COUNT(*) AS [messages_count]
 																				FROM [dbo].[vw_catalogInstanceNames]	cin
-																				INNER JOIN [dbo].[vw_statsOSEventLogs]	oel	ON oel.[project_id] = cin.[project_id] AND oel.[instance_id] = cin.[instance_id]
+																				INNER JOIN [health-check].[vw_statsOSEventLogs]	oel	ON oel.[project_id] = cin.[project_id] AND oel.[instance_id] = cin.[instance_id]
 																				LEFT JOIN [dbo].[reportHTMLSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																AND rsr.[rule_id] = 134217728
 																																AND rsr.[active] = 1
@@ -7045,7 +7045,7 @@ BEGIN TRY
 															oel.[event_id], oel.[record_id], oel.[source], oel.[message]
 															, ROW_NUMBER() OVER(ORDER BY oel.[time_created], oel.[record_id]) [row_no]
 															, SUM(1) OVER() AS [row_count]
-													FROM [dbo].[vw_statsOSEventLogs]	oel
+													FROM [health-check].[vw_statsOSEventLogs]	oel
 													WHERE	oel.[project_id]=@projectID
 															AND oel.[machine_name] = @machineName
 												)X
@@ -7301,6 +7301,7 @@ END CATCH
 
 RETURN @ReturnValue
 GO
+
 
 
 RAISERROR('Create procedure: [dbo].[usp_mpAlterTableForeignKeys]', 10, 1) WITH NOWAIT

@@ -1,10 +1,10 @@
-RAISERROR('Create view : [dbo].[vw_statsOSEventLogs]', 10, 1) WITH NOWAIT
+RAISERROR('Create view : [health-check].[vw_statsOSEventLogs]', 10, 1) WITH NOWAIT
 GO
-IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[dbo].[vw_statsOSEventLogs]'))
-DROP VIEW [dbo].[vw_statsOSEventLogs]
+IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[health-check].[vw_statsOSEventLogs]'))
+DROP VIEW [health-check].[vw_statsOSEventLogs]
 GO
 
-CREATE VIEW [dbo].[vw_statsOSEventLogs]
+CREATE VIEW [health-check].[vw_statsOSEventLogs]
 /* WITH ENCRYPTION */
 AS
 
@@ -43,7 +43,7 @@ SELECT 	  cin.[project_id]		AS [project_id]
 		, soel.[user_id]
 		, soel.[time_created]
 		, soel.[message]
-FROM [dbo].[statsOSEventLogs]	soel
+FROM [health-check].[statsOSEventLogs]	soel
 INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = soel.[instance_id] AND cin.[project_id] = soel.[project_id]
 INNER JOIN [dbo].[catalogMachineNames]  cmn ON cmn.[id] = soel.[machine_id] AND cmn.[project_id] = soel.[project_id]
 GO

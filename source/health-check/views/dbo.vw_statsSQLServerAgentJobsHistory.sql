@@ -1,10 +1,10 @@
-RAISERROR('Create view : [dbo].[vw_statsSQLServerAgentJobsHistory]', 10, 1) WITH NOWAIT
+RAISERROR('Create view : [health-check].[vw_statsSQLServerAgentJobsHistory]', 10, 1) WITH NOWAIT
 GO
-IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[dbo].[vw_statsSQLServerAgentJobsHistory]'))
-DROP VIEW [dbo].[vw_statsSQLServerAgentJobsHistory]
+IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[health-check].[vw_statsSQLServerAgentJobsHistory]'))
+DROP VIEW [health-check].[vw_statsSQLServerAgentJobsHistory]
 GO
 
-CREATE VIEW [dbo].[vw_statsSQLServerAgentJobsHistory]
+CREATE VIEW [health-check].[vw_statsSQLServerAgentJobsHistory]
 /* WITH ENCRYPTION */
 AS
 
@@ -26,6 +26,6 @@ SELECT 	  cin.[project_id]		AS [project_id]
 		, ssajh.[last_execution_time]
 		, ssajh.[running_time_sec]
 		, ssajh.[message]
-FROM [dbo].[statsSQLServerAgentJobsHistory]	ssajh
+FROM [health-check].[statsSQLServerAgentJobsHistory]	ssajh
 INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = ssajh.[instance_id] AND cin.[project_id] = ssajh.[project_id]
 GO
