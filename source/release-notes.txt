@@ -323,7 +323,11 @@
 	- fix small bugs on maintenance-plan (check database state when performing backup)
 	- add monitoring module and first custom alert - free disk/volume space on project infrastructure
 
-/* 15.10.2015 */
+/* 14.10.2015 */
 	- change install.bat, add project code as parameter and use it to configure default project
-	- create schema for each individual module and move tables and views; important object renaming patches
+	- create schema for each individual module and move tables and views
+
+/* 15.10.2015 */
+	- important object renaming patches
 	- fix overlapping internal jobs between Health-Check and DiskSpace Monitoring & Alerting
+	- improve performance for internal parallelism mechanisms

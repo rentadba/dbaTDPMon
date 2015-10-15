@@ -38,6 +38,7 @@ DECLARE   @projectID				[smallint]
 		, @jobQueueID				[int]
 
 		, @configParallelJobs		[smallint]
+		, @configMaxNumberOfRetries	[smallint]
 		, @runningJobs				[smallint]
 		, @executedJobs				[smallint]
 		, @jobQueueCount			[smallint]
@@ -81,6 +82,21 @@ BEGIN CATCH
 END CATCH
 
 SET @configParallelJobs = ISNULL(@configParallelJobs, 1)
+
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--get the number of retries in case of a failure
+BEGIN TRY
+	SELECT	@configMaxNumberOfRetries = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = N'Maximum number of retries at failed job'
+			AND [module] = 'health-check'
+END TRY
+BEGIN CATCH
+	SET @configMaxNumberOfRetries = 3
+END CATCH
+
+SET @configMaxNumberOfRetries = ISNULL(@configMaxNumberOfRetries, 3)
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
@@ -144,6 +160,7 @@ WHILE @@FETCH_STATUS=0
 										@jobStepName 	= @jobStepName,
 										@jobStepCommand	= @jobCommand,
 										@jobLogFileName	= @logFileLocation,
+										@jobStepRetries = @configMaxNumberOfRetries,
 										@debugMode		= @debugMode
 
 		---------------------------------------------------------------------------------------------------
@@ -187,4 +204,17 @@ EXEC dbo.usp_jobQueueGetStatus	@projectCode			= @projectCode,
 								@minJobToRunBeforeExit	= 0,
 								@executionLevel			= 1,
 								@debugMode				= @debugMode
+
+IF EXISTS(	SELECT *
+			FROM [dbo].[vw_jobExecutionQueue]
+			WHERE  [project_id] = @projectID 
+					AND [module] LIKE @moduleFilter
+					AND [descriptor] LIKE @descriptorFilter
+					AND [status]=0 /* failed */
+			)
+		EXEC [dbo].[usp_logPrintMessage]	@customMessage		= 'Execution failed. Check log for internal job failures (dbo.vw_jobExecutionQueue).',
+											@raiseErrorAsPrint	= 1,
+											@messagRootLevel	= 0,
+											@messageTreelevel	= 1,
+											@stopExecution		= 1
 GO

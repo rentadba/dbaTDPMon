@@ -44,6 +44,7 @@ SELECT    jeq.[id]
 							WHEN '4' THEN 'In progress'
 							ELSE 'Unknown'
 			END AS [status_desc]
+		, jeq.[log_message]
 		, jeq.[event_date_utc]
 FROM [dbo].[jobExecutionQueue]		jeq
 INNER JOIN [dbo].[catalogInstanceNames]	 cin	ON cin.[id] = jeq.[instance_id] AND cin.[project_id] = jeq.[project_id]

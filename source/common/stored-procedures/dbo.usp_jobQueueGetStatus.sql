@@ -124,10 +124,20 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 															@debugMode				= @debugMode
 						IF @currentRunning = 0 AND @lastExecutionStatus<>5 /* Unknown */
 							begin
+								
+								IF @lastExecutionStatus = 0 /* failed */
+									SET @strMessage = CASE	WHEN CHARINDEX('--Job execution return this message: ', @strMessage) > 0
+															THEN SUBSTRING(@strMessage, CHARINDEX('--Job execution return this message: ', @strMessage) + 37, LEN(@strMessage))
+															ELSE @strMessage
+													  END
+								ELSE
+									SET @strMessage=NULL
+
 								UPDATE [dbo].[jobExecutionQueue]
 									SET [status] = @lastExecutionStatus,
 										[execution_date] = CONVERT([datetime], @lastExecutionDate + ' ' + @lastExecutionTime, 120),
-										[running_time_sec] = @runningTimeSec
+										[running_time_sec] = @runningTimeSec,
+										[log_message] = @strMessage
 								WHERE [id] = @jobQueueID
 
 								/* removing job */
