@@ -286,6 +286,8 @@ IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[catalogHardco
 				SELECT [module], [object_name], [filter_pattern], [active]
 				FROM [dbo].[catalogHardcodedFilters]
 
+		UPDATE [report].[hardcodedFilters] SET [object_name]=REPLACE([object_name], 'dbo.', '')
+
 		RAISERROR('Drop table: [dbo].[catalogHardcodedFilters]', 10, 1) WITH NOWAIT
 		DROP TABLE [dbo].[catalogHardcodedFilters]
 	end
@@ -7983,9 +7985,30 @@ WHERE sj.[name] LIKE '%Discovery & Health Check'
 		AND sjs.[command] LIKE '%logServerAnalysisMessages%'
 GO
 
+UPDATE sjs SET sjs.[command] = REPLACE(sjs.[command], '@moduleFilter			= ''%''', '@moduleFilter			= ''health-check''')
+FROM [msdb].[dbo].[sysjobs] sj
+INNER JOIN [msdb].[dbo].[sysjobsteps] sjs ON sjs.[job_id]=sj.[job_id]
+WHERE sj.[name] LIKE '%Discovery & Health Check'
+		AND sjs.[command] LIKE '%moduleFilter%'
+GO
+
 UPDATE sjs SET sjs.[command] = REPLACE(sjs.[command], 'usp_JobQueueExecute', 'usp_jobQueueExecute')
 FROM [msdb].[dbo].[sysjobs] sj
 INNER JOIN [msdb].[dbo].[sysjobsteps] sjs ON sjs.[job_id]=sj.[job_id]
 WHERE sj.[name] LIKE '%Monitoring - Disk Space'
 		AND sjs.[command] LIKE '%usp_JobQueueExecute%'
+GO
+
+UPDATE sjs SET sjs.[command] = REPLACE(sjs.[command], '@moduleFilter			= ''%''', '@moduleFilter			= ''health-check''')
+FROM [msdb].[dbo].[sysjobs] sj
+INNER JOIN [msdb].[dbo].[sysjobsteps] sjs ON sjs.[job_id]=sj.[job_id]
+WHERE sj.[name] LIKE '%Monitoring - Disk Space'
+		AND sjs.[command] LIKE '%moduleFilter%'
+GO
+
+UPDATE sjs SET sjs.[command] = REPLACE(sjs.[command], '@descriptorFilter		= ''%''', '@descriptorFilter		= ''dbo.usp_hcCollectDiskSpaceUsage''')
+FROM [msdb].[dbo].[sysjobs] sj
+INNER JOIN [msdb].[dbo].[sysjobsteps] sjs ON sjs.[job_id]=sj.[job_id]
+WHERE sj.[name] LIKE '%Monitoring - Disk Space'
+		AND sjs.[command] LIKE '%descriptorFilter%'
 GO

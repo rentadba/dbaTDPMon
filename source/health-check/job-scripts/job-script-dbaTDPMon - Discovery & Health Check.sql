@@ -128,7 +128,7 @@ http://dbaTDPMon.codeple.com',
 	
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'exec dbo.usp_jobQueueExecute	@projectCode			= ''' + @projectCode + N''',
-														@moduleFilter			= ''%'',
+														@moduleFilter			= ''health-check'',
 														@descriptorFilter		= ''%'',
 														@waitForDelay			= ''00:00:05'',
 														@debugMode				= 0'

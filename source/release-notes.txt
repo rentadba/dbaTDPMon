@@ -326,3 +326,4 @@
 /* 15.10.2015 */
 	- change install.bat, add project code as parameter and use it to configure default project
 	- create schema for each individual module and move tables and views; important object renaming patches
+	- fix overlapping internal jobs between Health-Check and DiskSpace Monitoring & Alerting

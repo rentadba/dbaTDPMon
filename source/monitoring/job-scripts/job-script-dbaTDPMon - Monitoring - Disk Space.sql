@@ -102,8 +102,8 @@ http://dbaTDPMon.codeplex.com',
 
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'EXEC [dbo].[usp_jobQueueExecute]	@projectCode			= ''' + @projectCode + ''',
-															@moduleFilter			= ''%'',
-															@descriptorFilter		= ''%'',
+															@moduleFilter			= ''health-check'',
+															@descriptorFilter		= ''dbo.usp_hcCollectDiskSpaceUsage'',
 															@waitForDelay			= ''00:00:05'',
 															@debugMode				= 0'
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
