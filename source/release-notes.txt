@@ -323,6 +323,6 @@
 	- fix small bugs on maintenance-plan (check database state when performing backup)
 	- add monitoring module and first custom alert - free disk/volume space on project infrastructure
 
-/* 14.10.2015 */
+/* 15.10.2015 */
 	- change install.bat, add project code as parameter and use it to configure default project
-	- create schema for each individual module and move tables and views
+	- create schema for each individual module and move tables and views; important object renaming patches

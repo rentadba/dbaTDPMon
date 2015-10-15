@@ -770,11 +770,11 @@ CREATE TABLE [monitoring].[alertSkipRules]
 	[skip_value]			[sysname]		NULL,
 	[skip_value2]			[sysname]		NULL,
 	[active]				[bit]			NOT NULL CONSTRAINT [DF_alertSkipRules_Active] DEFAULT (1),
-	CONSTRAINT [PK_reportHTMLSkipRules] PRIMARY KEY  CLUSTERED 
+	CONSTRAINT [PK_alertSkipRules] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
 	) ON [PRIMARY],
-	CONSTRAINT [UK_reportHTMLSkipRules_Name] UNIQUE  NONCLUSTERED 
+	CONSTRAINT [UK_alertSkipRules_Name] UNIQUE  NONCLUSTERED 
 	(
 		[category],
 		[alert_name],

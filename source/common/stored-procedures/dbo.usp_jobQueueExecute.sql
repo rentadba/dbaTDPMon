@@ -1,15 +1,15 @@
-RAISERROR('Create procedure: [dbo].[usp_JobQueueExecute]', 10, 1) WITH NOWAIT
+RAISERROR('Create procedure: [dbo].[usp_jobQueueExecute]', 10, 1) WITH NOWAIT
 GO
 SET QUOTED_IDENTIFIER ON 
 GO
 SET ANSI_NULLS ON 
 GO
 
-if exists (select * from dbo.sysobjects where id = object_id(N'[dbo].[usp_JobQueueExecute]') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-drop procedure [dbo].[usp_JobQueueExecute]
+if exists (select * from dbo.sysobjects where id = object_id(N'[dbo].[usp_jobQueueExecute]') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure [dbo].[usp_jobQueueExecute]
 GO
 
-CREATE PROCEDURE dbo.usp_JobQueueExecute
+CREATE PROCEDURE dbo.usp_jobQueueExecute
 		@projectCode			[varchar](32) = NULL,
 		@moduleFilter			[varchar](32) = '%',
 		@descriptorFilter		[varchar](256)= '%',
@@ -163,7 +163,7 @@ WHILE @@FETCH_STATUS=0
 		SET @runningJobs = @runningJobs + 1
 
 		SET @runningJobs = @executedJobs
-		EXEC @runningJobs = dbo.usp_JobQueueGetStatus	@projectCode			= @projectCode,
+		EXEC @runningJobs = dbo.usp_jobQueueGetStatus	@projectCode			= @projectCode,
 														@moduleFilter			= @moduleFilter,
 														@descriptorFilter		= @descriptorFilter,
 														@waitForDelay			= @waitForDelay,
@@ -180,7 +180,7 @@ WHILE @@FETCH_STATUS=0
 CLOSE crsJobQueue
 DEALLOCATE crsJobQueue
 
-EXEC dbo.usp_JobQueueGetStatus	@projectCode			= @projectCode,
+EXEC dbo.usp_jobQueueGetStatus	@projectCode			= @projectCode,
 								@moduleFilter			= @moduleFilter,
 								@descriptorFilter		= @descriptorFilter,
 								@waitForDelay			= @waitForDelay,

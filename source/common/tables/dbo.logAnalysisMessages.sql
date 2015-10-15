@@ -9,13 +9,13 @@
 -----------------------------------------------------------------------------------------------------
 --log for discovery messages
 -----------------------------------------------------------------------------------------------------
-RAISERROR('Create table: [dbo].[logServerAnalysisMessages]', 10, 1) WITH NOWAIT
+RAISERROR('Create table: [dbo].[logAnalysisMessages]', 10, 1) WITH NOWAIT
 GO
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[logServerAnalysisMessages]') AND type in (N'U'))
-DROP TABLE [dbo].[logServerAnalysisMessages]
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[logAnalysisMessages]') AND type in (N'U'))
+DROP TABLE [dbo].[logAnalysisMessages]
 GO
 
-CREATE TABLE [dbo].[logServerAnalysisMessages]
+CREATE TABLE [dbo].[logAnalysisMessages]
 (
 	[id]					[int]	 IDENTITY (1, 1)	NOT NULL,
 	[instance_id]			[smallint]		NOT NULL,
@@ -23,12 +23,12 @@ CREATE TABLE [dbo].[logServerAnalysisMessages]
 	[event_date_utc]		[datetime]		NOT NULL,
 	[descriptor]			[varchar](256)	NULL,
 	[message]				[varchar](max)	NULL,
-	CONSTRAINT [PK_logServerAnalysisMessages] PRIMARY KEY  CLUSTERED 
+	CONSTRAINT [PK_logAnalysisMessages] PRIMARY KEY  CLUSTERED 
 	(
 		[id],
 		[instance_id]
 	) ON [FG_Statistics_Data],
-	CONSTRAINT [FK_logServerAnalysisMessages_catalogProjects] FOREIGN KEY 
+	CONSTRAINT [FK_logAnalysisMessages_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
 	) 
@@ -36,7 +36,7 @@ CREATE TABLE [dbo].[logServerAnalysisMessages]
 	(
 		[id]
 	),
-	CONSTRAINT [FK_logServerAnalysisMessages_catalogInstanceNames] FOREIGN KEY 
+	CONSTRAINT [FK_logAnalysisMessages_catalogInstanceNames] FOREIGN KEY 
 	(
 		[instance_id],
 		[project_id]
@@ -49,8 +49,8 @@ CREATE TABLE [dbo].[logServerAnalysisMessages]
 ) ON [FG_Statistics_Data]
 GO
 
-CREATE INDEX [IX_logServerAnalysisMessages_InstanceID] ON [dbo].[logServerAnalysisMessages]([instance_id], [project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_logAnalysisMessages_InstanceID] ON [dbo].[logAnalysisMessages]([instance_id], [project_id]) ON [FG_Statistics_Index]
 GO
-CREATE INDEX [IX_logServerAnalysisMessages_ProjecteID] ON [dbo].[logServerAnalysisMessages]([project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_logAnalysisMessages_ProjecteID] ON [dbo].[logAnalysisMessages]([project_id]) ON [FG_Statistics_Index]
 GO
 

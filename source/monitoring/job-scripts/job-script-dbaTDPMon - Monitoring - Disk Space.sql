@@ -101,7 +101,7 @@ http://dbaTDPMon.codeplex.com',
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'EXEC [dbo].[usp_JobQueueExecute]	@projectCode			= ''' + @projectCode + ''',
+	SET @queryToRun = N'EXEC [dbo].[usp_jobQueueExecute]	@projectCode			= ''' + @projectCode + ''',
 															@moduleFilter			= ''%'',
 															@descriptorFilter		= ''%'',
 															@waitForDelay			= ''00:00:05'',

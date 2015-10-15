@@ -9,13 +9,13 @@
 -----------------------------------------------------------------------------------------------------
 --HTML reports rules / checks and instances/machines to be skipped
 -----------------------------------------------------------------------------------------------------
-RAISERROR('Create table: [dbo].[reportHTMLSkipRules]', 10, 1) WITH NOWAIT
+RAISERROR('Create table: [report].[htmlSkipRules]', 10, 1) WITH NOWAIT
 GO
-IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[reportHTMLSkipRules]') AND type in (N'U'))
-DROP TABLE [dbo].[reportHTMLSkipRules]
+IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[report].[htmlSkipRules]') AND type in (N'U'))
+DROP TABLE [report].[htmlSkipRules]
 GO
 
-CREATE TABLE [dbo].[reportHTMLSkipRules] 
+CREATE TABLE [report].[htmlSkipRules] 
 (
 	[id]					[smallint] IDENTITY (1, 1)	NOT NULL,
 	[module]				[varchar](32)	NOT NULL,
@@ -23,12 +23,12 @@ CREATE TABLE [dbo].[reportHTMLSkipRules]
 	[rule_name]				[sysname]		NOT NULL,
 	[skip_value]			[sysname]		NULL,
 	[skip_value2]			[sysname]		NULL,
-	[active]				[bit]			NOT NULL CONSTRAINT [DF_reportHTMLSkipRules_Active] DEFAULT (1),
-	CONSTRAINT [PK_reportHTMLSkipRules] PRIMARY KEY  CLUSTERED 
+	[active]				[bit]			NOT NULL CONSTRAINT [DF_htmlSkipRules_Active] DEFAULT (1),
+	CONSTRAINT [PK_htmlSkipRules] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
 	) ON [PRIMARY],
-	CONSTRAINT [UK_reportHTMLSkipRules_Name] UNIQUE  NONCLUSTERED 
+	CONSTRAINT [UK_htmlSkipRules_Name] UNIQUE  NONCLUSTERED 
 	(
 		[module],
 		[rule_id],
@@ -42,7 +42,7 @@ RAISERROR('		...insert default data', 10, 1) WITH NOWAIT
 GO
 SET NOCOUNT ON
 GO
-INSERT	INTO [dbo].[reportHTMLSkipRules] ([module], [rule_id], [rule_name], [skip_value], [active])
+INSERT	INTO [report].[htmlSkipRules] ([module], [rule_id], [rule_name], [skip_value], [active])
 		SELECT 'health-check',         1, 'Instances - Offline', NULL, 0 UNION ALL
 		SELECT 'health-check',         2, 'Instances - Online', NULL, 0 UNION ALL
 		SELECT 'health-check',         4, 'Databases Status - Issues Detected', NULL, 0 UNION ALL
@@ -70,7 +70,5 @@ INSERT	INTO [dbo].[reportHTMLSkipRules] ([module], [rule_id], [rule_name], [skip
 		SELECT 'health-check',  16777216, 'Frequently Fragmented Indexes (consider lowering the fill-factor)', NULL, 0 UNION ALL
 		SELECT 'health-check',  33554432, 'SQL Server Agent Jobs - Long Running SQL Agent Jobs', NULL, 0 UNION ALL
 		SELECT 'health-check',  67108864, 'OS Event messages - Permission errors', NULL, 0 UNION ALL
-		SELECT 'health-check', 134217728, 'OS Event messages - Complete Details', NULL, 0 UNION ALL
-
-		SELECT 'monitoring',		   1, 'alarm-custom: low disk space', NULL, 0
+		SELECT 'health-check', 134217728, 'OS Event messages - Complete Details', NULL, 0
 GO

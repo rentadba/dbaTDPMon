@@ -1,15 +1,15 @@
-RAISERROR('Create procedure: [dbo].[usp_JobQueueGetStatus]', 10, 1) WITH NOWAIT
+RAISERROR('Create procedure: [dbo].[usp_jobQueueGetStatus]', 10, 1) WITH NOWAIT
 GO
 SET QUOTED_IDENTIFIER ON 
 GO
 SET ANSI_NULLS ON 
 GO
 
-if exists (select * from dbo.sysobjects where id = object_id(N'[dbo].[usp_JobQueueGetStatus]') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-drop procedure [dbo].[usp_JobQueueGetStatus]
+if exists (select * from dbo.sysobjects where id = object_id(N'[dbo].[usp_jobQueueGetStatus]') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure [dbo].[usp_jobQueueGetStatus]
 GO
 
-CREATE PROCEDURE dbo.usp_JobQueueGetStatus
+CREATE PROCEDURE dbo.usp_jobQueueGetStatus
 		@projectCode			[varchar](32) = NULL,
 		@moduleFilter			[varchar](32) = '%',
 		@descriptorFilter		[varchar](256)= '%',

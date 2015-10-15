@@ -193,7 +193,7 @@ IF @runDiscovery=1
 																		@debugMode		= @debugMode
 
 
-				INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+				INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
 						SELECT  @instanceID
 							  , @projectID
 							  , GETUTCDATE()

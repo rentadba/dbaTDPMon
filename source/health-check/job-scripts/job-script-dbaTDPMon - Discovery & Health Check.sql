@@ -77,7 +77,7 @@ http://dbaTDPMon.codeple.com',
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'TRUNCATE TABLE [dbo].[logServerAnalysisMessages]
+	SET @queryToRun = N'TRUNCATE TABLE [dbo].[logAnalysisMessages]
 	EXEC [dbo].[usp_refreshProjectCatalogsAndDiscovery] @projectCode	 = ''' + @projectCode + N''',
 														@runDiscovery	 = 0,
 														@enableXPCMDSHELL= 1,
@@ -127,7 +127,7 @@ http://dbaTDPMon.codeple.com',
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 	
 	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'exec dbo.usp_JobQueueExecute	@projectCode			= ''' + @projectCode + N''',
+	SET @queryToRun = N'exec dbo.usp_jobQueueExecute	@projectCode			= ''' + @projectCode + N''',
 														@moduleFilter			= ''%'',
 														@descriptorFilter		= ''%'',
 														@waitForDelay			= ''00:00:05'',

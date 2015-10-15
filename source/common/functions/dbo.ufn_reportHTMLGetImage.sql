@@ -39,7 +39,7 @@ begin
 			FROM (
 					SELECT    *
 							, ROW_NUMBER() OVER(ORDER BY [id]) AS [row_no]
-					FROM [dbo].[catalogReportHTMLGraphics]
+					FROM [report].[htmlGraphics]
 					WHERE [name]=@imageType
 				)xbase64
 			WHERE [row_no] = 1

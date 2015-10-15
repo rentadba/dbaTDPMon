@@ -83,42 +83,42 @@ BEGIN TRY
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE lsam
-		FROM dbo.logServerAnalysisMessages lsam
+		FROM dbo.logAnalysisMessages lsam
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = lsam.[project_id] AND cin.[id] = lsam.[instance_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[id] = @instanceID
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE sosel
-		FROM dbo.statsOSEventLogs sosel
+		FROM [health-check].statsOSEventLogs sosel
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = sosel.[project_id] AND cin.[id] = sosel.[instance_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[id] = @instanceID
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE sseld
-		FROM dbo.statsSQLServerErrorlogDetails sseld
+		FROM [health-check].statsSQLServerErrorlogDetails sseld
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = sseld.[project_id] AND cin.[id] = sseld.[instance_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[id] = @instanceID
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE ssajh
-		FROM dbo.statsSQLServerAgentJobsHistory ssajh
+		FROM [health-check].statsSQLServerAgentJobsHistory ssajh
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = ssajh.[project_id] AND cin.[id] = ssajh.[instance_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[id] = @instanceID
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE shcdsi
-		FROM dbo.statsDiskSpaceInfo shcdsi
+		FROM [health-check].statsDiskSpaceInfo shcdsi
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = shcdsi.[project_id] AND cin.[id] = shcdsi.[instance_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[id] = @instanceID
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE shcdd
-		FROM dbo.statsDatabaseDetails shcdd
+		FROM [health-check].statsDatabaseDetails shcdd
 		INNER JOIN dbo.catalogDatabaseNames cdb ON cdb.[instance_id] = shcdd.[instance_id] AND cdb.[id] = shcdd.[catalog_database_id]
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[id] = cdb.[instance_id] AND cin.[project_id] = cdb.[project_id]
 		WHERE cin.[project_id] = @projectID

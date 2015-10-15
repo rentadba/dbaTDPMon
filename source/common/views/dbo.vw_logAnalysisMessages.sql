@@ -1,13 +1,13 @@
 -----------------------------------------------------------------------------------------------------
 --
 -----------------------------------------------------------------------------------------------------
-RAISERROR('Create view : [dbo].[vw_logServerAnalysisMessages]', 10, 1) WITH NOWAIT
+RAISERROR('Create view : [dbo].[vw_logAnalysisMessages]', 10, 1) WITH NOWAIT
 GO
-IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[dbo].[vw_logServerAnalysisMessages]'))
-DROP VIEW [dbo].[vw_logServerAnalysisMessages]
+IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[dbo].[vw_logAnalysisMessages]'))
+DROP VIEW [dbo].[vw_logAnalysisMessages]
 GO
 
-CREATE VIEW [dbo].[vw_logServerAnalysisMessages]
+CREATE VIEW [dbo].[vw_logAnalysisMessages]
 /* WITH ENCRYPTION */
 AS
 
@@ -25,7 +25,7 @@ SELECT 	  cin.[project_id]		AS [project_id]
 		, lsam.[event_date_utc]
 		, lsam.[descriptor]
 		, lsam.[message]
-FROM [dbo].[logServerAnalysisMessages]	lsam
+FROM [dbo].[logAnalysisMessages]	lsam
 INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = lsam.[instance_id] AND cin.[project_id] = lsam.[project_id]
 GO
 

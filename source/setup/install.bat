@@ -77,7 +77,11 @@ set run2k5mode=true
 if %module%=="all" set runscript=true
 if %module%=="health-check" set runscript=true
 if %module%=="maintenance-plan-2k" set run2k5mode=false
+if %module%=="monitoring" set runscript=true
 	
+if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\schema\create-schema-report.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.appConfigurations.sql" -d %dbname% -v projectCode=%project% -b -r 1
 if errorlevel 1 goto install_err
 
@@ -90,32 +94,31 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.catalogInstanceNames.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-
 if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.catalogDatabaseNames.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.logEventMessages.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.logServerAnalysisMessages.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.catalogReportHTMLGraphics.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.reportHTML.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.reportHTMLOptions.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.catalogHardcodedFilters.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.reportHTMLSkipRules.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
 if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.jobExecutionQueue.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.logAnalysisMessages.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\report.hardcodedFilters.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\report.htmlGraphics.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\report.htmlOptions.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\report.htmlSkipRules.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\report.htmlContent.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 
@@ -128,7 +131,7 @@ if errorlevel 1 goto install_err
 if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_logEventMessages.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_logServerAnalysisMessages.sql" -d %dbname%  -b -r 1
+if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_logAnalysisMessages.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionQueue.sql" -d %dbname%  -b -r 1
@@ -211,10 +214,10 @@ if errorlevel 1 goto install_err
 if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_sqlAgentJobStartAndWatch.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_JobQueueGetStatus.sql" -d %dbname%  -b -r 1
+if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_jobQueueGetStatus.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_JobQueueExecute.sql" -d %dbname%  -b -r 1
+if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_jobQueueExecute.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_refreshMachineCatalogs.sql" -d %dbname%  -b -r 1

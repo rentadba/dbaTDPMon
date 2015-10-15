@@ -9,12 +9,12 @@
 -----------------------------------------------------------------------------------------------------
 --
 -----------------------------------------------------------------------------------------------------
-RAISERROR('Create table: [dbo].[reportHTML]', 10, 1) WITH NOWAIT
+RAISERROR('Create table: [report].[htmlContent]', 10, 1) WITH NOWAIT
 GO
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[reportHTML]') AND type in (N'U'))
-DROP TABLE [dbo].[reportHTML]
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[report].[htmlContent]') AND type in (N'U'))
+DROP TABLE [report].[htmlContent]
 GO
-CREATE TABLE [dbo].[reportHTML]
+CREATE TABLE [report].[htmlContent]
 (
 	[id]										[int] IDENTITY (1, 1)NOT NULL,
 	[project_id]								[smallint]			NOT NULL,
@@ -29,13 +29,13 @@ CREATE TABLE [dbo].[reportHTML]
 	[build_at]									[datetime]			NOT NULL,
 	[build_duration]							[int]				NOT NULL,
 	[html_content] 								[nvarchar](max)		NULL,
-	[build_in_progress]							[bit]				NOT NULL CONSTRAINT [DF_reportHTML_BuildInProgress]  DEFAULT ((0)),
-	[report_uid]								[uniqueidentifier]	NOT NULL CONSTRAINT [DF_reportHTML_ReportUID]  DEFAULT ((NEWID())),
-	CONSTRAINT [PK_reportHTML] PRIMARY KEY  CLUSTERED 
+	[build_in_progress]							[bit]				NOT NULL CONSTRAINT [DF_htmlContent_BuildInProgress]  DEFAULT ((0)),
+	[report_uid]								[uniqueidentifier]	NOT NULL CONSTRAINT [DF_htmlContent_ReportUID]  DEFAULT ((NEWID())),
+	CONSTRAINT [PK_htmlContent] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
 	) ON [FG_Statistics_Data],
-	CONSTRAINT [FK_reportHTML_CatalogProjects] FOREIGN KEY 
+	CONSTRAINT [FK_htmlContent_CatalogProjects] FOREIGN KEY 
 	(
 		[project_id]
 	) 
@@ -43,7 +43,7 @@ CREATE TABLE [dbo].[reportHTML]
 	(
 		[id]
 	),
-	CONSTRAINT [FK_reportHTML_catalogInstanceNames] FOREIGN KEY 
+	CONSTRAINT [FK_htmlContent_catalogInstanceNames] FOREIGN KEY 
 	(
 		[instance_id],
 		[project_id]
@@ -58,7 +58,7 @@ CREATE TABLE [dbo].[reportHTML]
 GO
 
 
-CREATE INDEX [IX_reportHTML_ProjecteID] ON [dbo].[reportHTML]([project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_htmlContent_ProjecteID] ON [report].[htmlContent]([project_id]) ON [FG_Statistics_Index]
 GO
-CREATE INDEX [IX_reportHTML_InstanceID] ON [dbo].[reportHTML]([instance_id], [project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_htmlContent_InstanceID] ON [report].[htmlContent]([instance_id], [project_id]) ON [FG_Statistics_Index]
 GO

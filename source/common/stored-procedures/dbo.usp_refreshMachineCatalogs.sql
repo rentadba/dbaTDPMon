@@ -488,7 +488,7 @@ BEGIN TRY
 	INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[name] = srcIN.[name] AND cin.[machine_id] = cmn.[id]
 
 	IF @errMessage IS NOT NULL AND @errMessage<>''
-		INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+		INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
 				SELECT  @instanceID
 					  , @projectID
 					  , GETUTCDATE()

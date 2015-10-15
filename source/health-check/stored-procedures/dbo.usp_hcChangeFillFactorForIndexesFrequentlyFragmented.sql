@@ -49,7 +49,7 @@ DECLARE	@minimumIndexMaintenanceFrequencyDays	[tinyint] = 2,
 -----------------------------------------------------------------------------------------------------
 --reading report options
 SELECT	@minimumIndexMaintenanceFrequencyDays = [value]
-FROM	[dbo].[reportHTMLOptions]
+FROM	[report].[htmlOptions]
 WHERE	[name] = N'Minimum Index Maintenance Frequency (days)'
 		AND [module] = 'health-check'
 
@@ -57,7 +57,7 @@ SET @minimumIndexMaintenanceFrequencyDays = ISNULL(@minimumIndexMaintenanceFrequ
 
 -----------------------------------------------------------------------------------------------------
 SELECT	@analyzeOnlyMessagesFromTheLastHours = [value]
-FROM	[dbo].[reportHTMLOptions]
+FROM	[report].[htmlOptions]
 WHERE	[name] = N'Analyze Only Messages from the last hours'
 		AND [module] = 'health-check'
 
@@ -65,7 +65,7 @@ SET @analyzeOnlyMessagesFromTheLastHours = ISNULL(@analyzeOnlyMessagesFromTheLas
 	
 -----------------------------------------------------------------------------------------------------
 SELECT	@analyzeIndexMaintenanceOperation = [value]
-FROM	[dbo].[reportHTMLOptions]
+FROM	[report].[htmlOptions]
 WHERE	[name] = N'Analyze Index Maintenance Operation'
 		AND [module] = 'health-check'
 

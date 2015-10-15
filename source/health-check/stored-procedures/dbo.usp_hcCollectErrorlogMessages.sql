@@ -103,7 +103,7 @@ WHERE cin.[project_id] = @projectID
 		AND cin.[name] LIKE @sqlServerNameFilter
 
 DELETE lsam
-FROM [dbo].[logServerAnalysisMessages]	lsam
+FROM [dbo].[logAnalysisMessages]	lsam
 INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = lsam.[instance_id] AND cin.[project_id] = lsam.[project_id]
 WHERE cin.[project_id] = @projectID
 		AND cin.[name] LIKE @sqlServerNameFilter
@@ -161,7 +161,7 @@ WHILE @@FETCH_STATUS=0
 					SET @strMessage = ERROR_MESSAGE()
 					PRINT @strMessage
 
-					INSERT	INTO [dbo].[logServerAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
 							SELECT  @instanceID
 									, @projectID
 									, GETUTCDATE()

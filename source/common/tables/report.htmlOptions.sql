@@ -9,23 +9,23 @@
 -----------------------------------------------------------------------------------------------------
 --report HTML options
 -----------------------------------------------------------------------------------------------------
-RAISERROR('Create table: [dbo].[reportHTMLOptions]', 10, 1) WITH NOWAIT
+RAISERROR('Create table: [report].[htmlOptions]', 10, 1) WITH NOWAIT
 GO
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[reportHTMLOptions]') AND type in (N'U'))
-DROP TABLE [dbo].[reportHTMLOptions]
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[report].[htmlOptions]') AND type in (N'U'))
+DROP TABLE [report].[htmlOptions]
 GO
-CREATE TABLE [dbo].[reportHTMLOptions]
+CREATE TABLE [report].[htmlOptions]
 (
 	[id]					[int]	 IDENTITY (1, 1)	NOT NULL,
 	[module]				[varchar](32)			NOT NULL,
 	[name]					[nvarchar](256)	NOT NULL,
 	[value]					[sysname]		NULL,
 	[description]			[nvarchar](256) NULL,
-	CONSTRAINT [PK_reportHTMLOptions] PRIMARY KEY  CLUSTERED 
+	CONSTRAINT [PK_htmlOptions] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
 	) ON [PRIMARY],
-	CONSTRAINT [UK_reportHTMLOptions] UNIQUE 
+	CONSTRAINT [UK_htmlOptions] UNIQUE 
 	(
 		[name], 
 		[module]
@@ -38,7 +38,7 @@ RAISERROR('		...insert default data', 10, 1) WITH NOWAIT
 GO
 SET NOCOUNT ON
 GO
-INSERT	INTO [dbo].[reportHTMLOptions] ([module], [name], [value], [description])
+INSERT	INTO [report].[htmlOptions] ([module], [name], [value], [description])
 		  SELECT 'health-check' AS [module], N'Database online admitted state'					AS [name], 'ONLINE, READ ONLY'	AS [value], 'comma separated, default ONLINE, READ ONLY'								AS [description] UNION ALL
 		  SELECT 'health-check' AS [module], N'Database max size (mb) - master'					AS [name], '32'					AS [value], 'maximum allowed size for master database; default 32'						AS [description] UNION ALL
 		  SELECT 'health-check' AS [module], N'Database max size (mb) - msdb'					AS [name], '1024'				AS [value], 'maximum allowed size for msdb database; default 1024'						AS [description] UNION ALL
