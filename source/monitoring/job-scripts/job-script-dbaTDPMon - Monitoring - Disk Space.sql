@@ -115,7 +115,7 @@ http://dbaTDPMon.codeplex.com',
 												@on_fail_action=4, 
 												@on_fail_step_id=4, 
 												@retry_attempts=3, 
-												@retry_interval=1, 
+												@retry_interval=0, 
 												@os_run_priority=0, @subsystem=N'TSQL', 
 												@command=@queryToRun, 
 												@database_name=@databaseName, 
@@ -141,7 +141,7 @@ http://dbaTDPMon.codeplex.com',
 												@command=@queryToRun, 
 												@database_name=@databaseName, 
 												@output_file_name=@logFileLocation, 
-												@flags=0
+												@flags=2
 	
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 

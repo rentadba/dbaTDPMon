@@ -27,9 +27,10 @@ SET NOCOUNT ON
 -- Module			 : Database Analysis & Performance Monitoring
 -- ============================================================================
 
-DECLARE @eventMessageData	[varchar](8000),
-		@jobID				[uniqueidentifier],
-		@strMessage			[nvarchar](512)
+DECLARE @eventMessageData			[varchar](8000),
+		@jobID						[uniqueidentifier],
+		@strMessage					[nvarchar](512),
+		@lastCompletionInstanceID	[int]
 
 -----------------------------------------------------------------------------------------------------
 --get job id
@@ -38,16 +39,28 @@ FROM	[msdb].[dbo].[sysjobs]
 WHERE	[name]=@jobName 
 
 -----------------------------------------------------------------------------------------------------
-SET @eventMessageData = '<job-history><job-step>'
+--get last instance_id when job completed
+SELECT @lastCompletionInstanceID = MAX(h.[instance_id])
+FROM [msdb].[dbo].[sysjobs] j 
+RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
+WHERE	j.[job_id] = @jobID
+		AND h.[step_name] ='(Job outcome)'
+
+SET @lastCompletionInstanceID = ISNULL(@lastCompletionInstanceID, 0)
+
+-----------------------------------------------------------------------------------------------------
+SET @eventMessageData = '<job-history>'
 
 SELECT @eventMessageData = @eventMessageData + [job_step_detail]
 FROM (
-		SELECT	'<step_id>' + CAST([step_id] AS [varchar](32)) + '</step_id>' + 
+		SELECT	'<job-step>' + 
+				'<step_id>' + CAST([step_id] AS [varchar](32)) + '</step_id>' + 
 				'<step_name>' + [step_name] + '</step_name>' + 
 				'<run_status>' + [run_status] + '</run_status>' + 
 				'<run_date>' + [run_date] + '</run_date>' + 
 				'<run_time>' + [run_time] + '</run_time>' + 
-				'<duration>' + [duration] + '</duration>' AS [job_step_detail]
+				'<duration>' + [duration] + '</duration>' +
+				'</job-step>' AS [job_step_detail] 
 		FROM (
 				SELECT	  [step_id]
 						, [step_name]
@@ -72,17 +85,12 @@ FROM (
 						FROM [msdb].[dbo].[sysjobs] j 
 						RIGHT JOIN [msdb].[dbo].[sysjobhistory] h	 ON j.[job_id] = h.[job_id] 
 						WHERE j.[job_id] = @jobID
-							AND	h.[instance_id]>ISNULL((SELECT MAX(h.[instance_id])
-														FROM [msdb].[dbo].[sysjobs] j 
-														RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-														WHERE	j.[job_id] = @jobID
-																AND h.[step_name] ='(Job outcome)'
-														),0)	
+							AND	h.[instance_id] > @lastCompletionInstanceID
 					)A
 				)x										
 	)xmlData
 
-SET @eventMessageData = @eventMessageData + '</job-step></job-history>'
+SET @eventMessageData = @eventMessageData + '</job-history>'
 
 IF @sendLogAsAttachment=0
 	SET @logFileLocation = NULL
@@ -95,13 +103,8 @@ SELECT @failedSteps = COUNT(*)
 FROM [msdb].[dbo].[sysjobs] j 
 RIGHT JOIN [msdb].[dbo].[sysjobhistory] h	 ON j.[job_id] = h.[job_id] 
 WHERE j.[job_id] = @jobID
-	AND	h.[instance_id]>ISNULL( (SELECT MAX(h.[instance_id])
-								 FROM	[msdb].[dbo].[sysjobs] j 
-								 RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
-								 WHERE	j.[job_id] = @jobID
-										AND h.[step_name] ='(Job outcome)'
-								),0)
-	AND h.[run_status]=0 /* Failed */
+	AND	h.[instance_id] > @lastCompletionInstanceID
+	AND h.[run_status] = 0 /* Failed */
 
 EXEC [dbo].[usp_logEventMessageAndSendEmail] @projectCode		= NULL,
 											 @sqlServerName		= @@SERVERNAME,

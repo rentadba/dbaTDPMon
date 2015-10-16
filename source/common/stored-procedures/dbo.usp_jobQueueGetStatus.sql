@@ -43,6 +43,7 @@ DECLARE   @projectID				[smallint]
 		, @lastExecutionDate		[varchar](10)
 		, @lastExecutionTime 		[varchar](8)
 		, @runningTimeSec			[bigint]
+		, @queryToRun				[nvarchar](max)
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
@@ -171,14 +172,29 @@ IF @minJobToRunBeforeExit=0
 		SET @strMessage='Performing cleanup...'
 		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
 
+		SET @queryToRun = N''
+		SET @queryToRun = 'SELECT [name] FROM [msdb].[dbo].[sysjobs]'
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode = 1 PRINT @queryToRun
+
+		IF OBJECT_ID('tempdb..#existingSQLAgentJobs') IS NOT NULL DROP TABLE #existingSQLAgentJobs
+		CREATE TABLE #existingSQLAgentJobs
+			(
+				[job_name] [sysname]
+			)
+
+		INSERT	INTO #existingSQLAgentJobs([job_name])
+				EXEC (@queryToRun)
+
 		SET @runningJobs = 0
-		DECLARE crsRunningJobs CURSOR FOR	SELECT  [id], [instance_name], [job_name]
-											FROM [dbo].[vw_jobExecutionQueue]
-											WHERE  [project_id] = @projectID 
-													AND [module] LIKE @moduleFilter
-													AND [descriptor] LIKE @descriptorFilter
-													AND [status]<>-1
-											ORDER BY [id]
+		DECLARE crsRunningJobs CURSOR FOR	SELECT  jeq.[id], jeq.[instance_name], jeq.[job_name]
+											FROM [dbo].[vw_jobExecutionQueue] jeq
+											INNER JOIN #existingSQLAgentJobs esaj ON esaj.[job_name] = jeq.[job_name]
+											WHERE  jeq.[project_id] = @projectID 
+													AND jeq.[module] LIKE @moduleFilter
+													AND jeq.[descriptor] LIKE @descriptorFilter
+													AND jeq.[status]<>-1
+											ORDER BY jeq.[id]
 		OPEN crsRunningJobs
 		FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName
 		WHILE @@FETCH_STATUS=0

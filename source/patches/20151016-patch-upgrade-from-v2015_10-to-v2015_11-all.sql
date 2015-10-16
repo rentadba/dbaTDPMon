@@ -1,3 +1,138 @@
+USE [dbaTDPMon]
+GO
+
+IF NOT EXISTS(SELECT * FROM [dbo].[appConfigurations] WHERE [name] = 'Application Version' AND [module] = 'common')
+	INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
+		  SELECT 'common' AS [module], 'Application Version' AS [name], '2015.10.16' AS [value]
+GO
+
+RAISERROR('Create procedure: [dbo].[usp_sqlAgentJobEmailStatusReport]', 10, 1) WITH NOWAIT
+GO---
+IF  EXISTS (
+	    SELECT * 
+	      FROM sysobjects 
+	     WHERE id = OBJECT_ID(N'[dbo].[usp_sqlAgentJobEmailStatusReport]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_sqlAgentJobEmailStatusReport]
+GO
+
+CREATE PROCEDURE [dbo].[usp_sqlAgentJobEmailStatusReport]
+		@jobName				[nvarchar](256),
+		@logFileLocation		[nvarchar](512),
+		@module					[varchar](32),
+		@sendLogAsAttachment	[bit]=1,
+		@eventType				[smallint]=2
+/* WITH ENCRYPTION */
+AS
+
+SET NOCOUNT ON
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 17.03.2015
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+DECLARE @eventMessageData			[varchar](8000),
+		@jobID						[uniqueidentifier],
+		@strMessage					[nvarchar](512),
+		@lastCompletionInstanceID	[int]
+
+-----------------------------------------------------------------------------------------------------
+--get job id
+SELECT	@jobID = [job_id] 
+FROM	[msdb].[dbo].[sysjobs] 
+WHERE	[name]=@jobName 
+
+-----------------------------------------------------------------------------------------------------
+--get last instance_id when job completed
+SELECT @lastCompletionInstanceID = MAX(h.[instance_id])
+FROM [msdb].[dbo].[sysjobs] j 
+RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
+WHERE	j.[job_id] = @jobID
+		AND h.[step_name] ='(Job outcome)'
+
+SET @lastCompletionInstanceID = ISNULL(@lastCompletionInstanceID, 0)
+
+-----------------------------------------------------------------------------------------------------
+SET @eventMessageData = '<job-history>'
+
+SELECT @eventMessageData = @eventMessageData + [job_step_detail]
+FROM (
+		SELECT	'<job-step>' + 
+				'<step_id>' + CAST([step_id] AS [varchar](32)) + '</step_id>' + 
+				'<step_name>' + [step_name] + '</step_name>' + 
+				'<run_status>' + [run_status] + '</run_status>' + 
+				'<run_date>' + [run_date] + '</run_date>' + 
+				'<run_time>' + [run_time] + '</run_time>' + 
+				'<duration>' + [duration] + '</duration>' +
+				'</job-step>' AS [job_step_detail] 
+		FROM (
+				SELECT	  [step_id]
+						, [step_name]
+						, [run_status]
+						, SUBSTRING([run_date], 1, 4) + '-' + SUBSTRING([run_date], 5 ,2) + '-' + SUBSTRING([run_date], 7 ,2) AS [run_date]
+						, SUBSTRING([run_time], 1,2) + ':' + SUBSTRING([run_time], 3,2) + ':' + SUBSTRING([run_time], 5,2) AS [run_time]
+						, SUBSTRING([run_duration], 1,2) + 'h ' + SUBSTRING([run_duration], 3,2) + 'm ' + SUBSTRING([run_duration], 5,2) + 's' AS [duration]
+				FROM (		
+						SELECT	  h.[step_id]
+								, h.[step_name]
+								, CASE h.[run_status]	WHEN '0' THEN 'Failed'
+														WHEN '1' THEN 'Succeded'	
+														WHEN '2' THEN 'Retry'
+														WHEN '3' THEN 'Canceled'
+														WHEN '4' THEN 'In progress'
+														ELSE 'Unknown'
+									END [run_status]
+								, CAST(h.[run_date] AS varchar) AS [run_date]
+								, REPLICATE('0', 6-LEN(CAST(h.[run_time] AS varchar))) + CAST(h.[run_time] AS varchar) AS [run_time]
+								, REPLICATE('0', 6-LEN(CAST(h.[run_duration] AS varchar))) + CAST(h.[run_duration] AS varchar) AS [run_duration]
+								, h.[instance_id]
+						FROM [msdb].[dbo].[sysjobs] j 
+						RIGHT JOIN [msdb].[dbo].[sysjobhistory] h	 ON j.[job_id] = h.[job_id] 
+						WHERE j.[job_id] = @jobID
+							AND	h.[instance_id] > @lastCompletionInstanceID
+					)A
+				)x										
+	)xmlData
+
+SET @eventMessageData = @eventMessageData + '</job-history>'
+
+IF @sendLogAsAttachment=0
+	SET @logFileLocation = NULL
+
+
+--if one of the job steps failed, will fail the job
+DECLARE @failedSteps [int]
+
+SELECT @failedSteps = COUNT(*)
+FROM [msdb].[dbo].[sysjobs] j 
+RIGHT JOIN [msdb].[dbo].[sysjobhistory] h	 ON j.[job_id] = h.[job_id] 
+WHERE j.[job_id] = @jobID
+	AND	h.[instance_id] > @lastCompletionInstanceID
+	AND h.[run_status] = 0 /* Failed */
+
+EXEC [dbo].[usp_logEventMessageAndSendEmail] @projectCode		= NULL,
+											 @sqlServerName		= @@SERVERNAME,
+											 @objectName		= @jobName,
+											 @module			= @module,
+											 @eventName			= 'sql agent job status',
+											 @parameters		= @logFileLocation,
+											 @eventMessage		= @eventMessageData,
+											 @recipientsList	= NULL,
+											 @eventType			= @eventType,
+											 @additionalOption	= @failedSteps
+
+IF @failedSteps <> 0
+	begin
+		SET @strMessage = 'Job execution failed. See individual steps status.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=1
+	end
+
+GO
+
 RAISERROR('Create procedure: [dbo].[usp_logEventMessageAndSendEmail]', 10, 1) WITH NOWAIT
 GO---
 IF  EXISTS (
@@ -565,4 +700,268 @@ EXEC [dbo].[usp_logEventMessage]	@projectCode			= @projectCode,
 
 
 RETURN @ReturnValue
+GO
+
+RAISERROR('Create procedure: [dbo].[usp_jobQueueGetStatus]', 10, 1) WITH NOWAIT
+GO
+SET QUOTED_IDENTIFIER ON 
+GO
+SET ANSI_NULLS ON 
+GO
+
+if exists (select * from dbo.sysobjects where id = object_id(N'[dbo].[usp_jobQueueGetStatus]') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure [dbo].[usp_jobQueueGetStatus]
+GO
+
+CREATE PROCEDURE dbo.usp_jobQueueGetStatus
+		@projectCode			[varchar](32) = NULL,
+		@moduleFilter			[varchar](32) = '%',
+		@descriptorFilter		[varchar](256)= '%',
+		@waitForDelay			[varchar](8) = '00:00:30',
+		@minJobToRunBeforeExit	[smallint] = 0,
+		@executionLevel			[tinyint] = 0,
+		@debugMode				[bit]=0
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 2004-2014
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+SET NOCOUNT ON
+
+DECLARE   @projectID				[smallint]
+		, @jobName					[sysname]
+		, @sqlServerName			[sysname]
+		, @jobDBName				[sysname]
+		, @jobQueueID				[int]
+		, @runningJobs				[smallint]
+
+		, @strMessage				[varchar](8000)	
+		, @currentRunning			[int]
+		, @lastExecutionStatus		[int]
+		, @lastExecutionDate		[varchar](10)
+		, @lastExecutionTime 		[varchar](8)
+		, @runningTimeSec			[bigint]
+		, @queryToRun				[nvarchar](max)
+
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--get default project code
+IF @projectCode IS NULL
+	SELECT	@projectCode = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Default project code'
+			AND [module] = 'common'
+
+SELECT @projectID = [id]
+FROM [dbo].[catalogProjects]
+WHERE [code] = @projectCode 
+
+IF @projectID IS NULL
+	begin
+		SET @strMessage=N'ERROR: The value specifief for Project Code is not valid.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+	end
+	
+------------------------------------------------------------------------------------------------------------------------------------------
+SELECT @runningJobs = COUNT(*)
+FROM [dbo].[vw_jobExecutionQueue]
+WHERE  [project_id] = @projectID 
+		AND [module] LIKE @moduleFilter
+		AND [descriptor] LIKE @descriptorFilter
+		AND [status]=4
+
+WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) OR (@runningJobs > @minJobToRunBeforeExit AND @minJobToRunBeforeExit = 0)
+	begin
+		---------------------------------------------------------------------------------------------------
+		/* check running job status and make updates */
+		SET @runningJobs = 0
+
+		DECLARE crsRunningJobs CURSOR FOR	SELECT  [id], [instance_name], [job_name]
+											FROM [dbo].[vw_jobExecutionQueue]
+											WHERE  [project_id] = @projectID 
+													AND [module] LIKE @moduleFilter
+													AND [descriptor] LIKE @descriptorFilter
+													AND [status]=4
+											ORDER BY [id]
+		OPEN crsRunningJobs
+		FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName
+		WHILE @@FETCH_STATUS=0
+			begin
+				SET @strMessage			= NULL
+				SET @currentRunning		= NULL
+				SET @lastExecutionStatus= NULL
+				SET @lastExecutionDate	= NULL
+				SET @lastExecutionTime 	= NULL
+				SET @runningTimeSec		= NULL
+
+				EXEC dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
+													@jobName				= @jobName,
+													@strMessage				= @strMessage OUTPUT,
+													@currentRunning			= @currentRunning OUTPUT,
+													@lastExecutionStatus	= @lastExecutionStatus OUTPUT,
+													@lastExecutionDate		= @lastExecutionDate OUTPUT,
+													@lastExecutionTime 		= @lastExecutionTime OUTPUT,
+													@runningTimeSec			= @runningTimeSec OUTPUT,
+													@selectResult			= 0,
+													@extentedStepDetails	= 0,		
+													@debugMode				= @debugMode
+
+				IF @currentRunning = 0 AND @lastExecutionStatus<>5 /* Unknown */
+					begin
+						--double check
+						WAITFOR DELAY '00:00:01'						
+						EXEC dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
+															@jobName				= @jobName,
+															@strMessage				= @strMessage OUTPUT,
+															@currentRunning			= @currentRunning OUTPUT,
+															@lastExecutionStatus	= @lastExecutionStatus OUTPUT,
+															@lastExecutionDate		= @lastExecutionDate OUTPUT,
+															@lastExecutionTime 		= @lastExecutionTime OUTPUT,
+															@runningTimeSec			= @runningTimeSec OUTPUT,
+															@selectResult			= 0,
+															@extentedStepDetails	= 0,		
+															@debugMode				= @debugMode
+						IF @currentRunning = 0 AND @lastExecutionStatus<>5 /* Unknown */
+							begin
+								
+								IF @lastExecutionStatus = 0 /* failed */
+									SET @strMessage = CASE	WHEN CHARINDEX('--Job execution return this message: ', @strMessage) > 0
+															THEN SUBSTRING(@strMessage, CHARINDEX('--Job execution return this message: ', @strMessage) + 37, LEN(@strMessage))
+															ELSE @strMessage
+													  END
+								ELSE
+									SET @strMessage=NULL
+
+								UPDATE [dbo].[jobExecutionQueue]
+									SET [status] = @lastExecutionStatus,
+										[execution_date] = CONVERT([datetime], @lastExecutionDate + ' ' + @lastExecutionTime, 120),
+										[running_time_sec] = @runningTimeSec,
+										[log_message] = @strMessage
+								WHERE [id] = @jobQueueID
+
+								/* removing job */
+								EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
+																@jobName		= @jobName,
+																@operation		= 'Clean',
+																@dbName			= @jobDBName, 
+																@jobStepName 	= '',
+																@debugMode		= @debugMode
+							end
+						ELSE
+							SET @runningJobs = @runningJobs + 1
+					end
+				ELSE
+					SET @runningJobs = @runningJobs + 1
+
+				FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName
+			end
+		CLOSE crsRunningJobs
+		DEALLOCATE crsRunningJobs
+
+		SET @strMessage='Currently running jobs : ' + CAST(@runningJobs AS [varchar])
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+						
+		IF @runningJobs > @minJobToRunBeforeExit
+			WAITFOR DELAY @waitForDelay
+	end
+
+IF @minJobToRunBeforeExit=0
+	begin
+		SET @strMessage='Performing cleanup...'
+		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+
+		SET @queryToRun = N''
+		SET @queryToRun = 'SELECT [name] FROM [msdb].[dbo].[sysjobs]'
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode = 1 PRINT @queryToRun
+
+		IF OBJECT_ID('tempdb..#existingSQLAgentJobs') IS NOT NULL DROP TABLE #existingSQLAgentJobs
+		CREATE TABLE #existingSQLAgentJobs
+			(
+				[job_name] [sysname]
+			)
+
+		INSERT	INTO #existingSQLAgentJobs([job_name])
+				EXEC (@queryToRun)
+
+		SET @runningJobs = 0
+		DECLARE crsRunningJobs CURSOR FOR	SELECT  jeq.[id], jeq.[instance_name], jeq.[job_name]
+											FROM [dbo].[vw_jobExecutionQueue] jeq
+											INNER JOIN #existingSQLAgentJobs esaj ON esaj.[job_name] = jeq.[job_name]
+											WHERE  jeq.[project_id] = @projectID 
+													AND jeq.[module] LIKE @moduleFilter
+													AND jeq.[descriptor] LIKE @descriptorFilter
+													AND jeq.[status]<>-1
+											ORDER BY jeq.[id]
+		OPEN crsRunningJobs
+		FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName
+		WHILE @@FETCH_STATUS=0
+			begin
+				SET @strMessage			= NULL
+				SET @currentRunning		= NULL
+				SET @lastExecutionStatus= NULL
+				SET @lastExecutionDate	= NULL
+				SET @lastExecutionTime 	= NULL
+				SET @runningTimeSec		= NULL
+
+				EXEC dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
+													@jobName				= @jobName,
+													@strMessage				= @strMessage OUTPUT,
+													@currentRunning			= @currentRunning OUTPUT,
+													@lastExecutionStatus	= @lastExecutionStatus OUTPUT,
+													@lastExecutionDate		= @lastExecutionDate OUTPUT,
+													@lastExecutionTime 		= @lastExecutionTime OUTPUT,
+													@runningTimeSec			= @runningTimeSec OUTPUT,
+													@selectResult			= 0,
+													@extentedStepDetails	= 0,		
+													@debugMode				= @debugMode
+
+				IF @currentRunning = 0
+					begin
+						/* removing job */
+						EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
+														@jobName		= @jobName,
+														@operation		= 'Clean',
+														@dbName			= @jobDBName, 
+														@jobStepName 	= '',
+														@debugMode		= @debugMode
+					end
+				ELSE
+					SET @runningJobs = @runningJobs + 1
+
+				FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName
+			end
+		CLOSE crsRunningJobs
+		DEALLOCATE crsRunningJobs
+
+		SET @strMessage='Currently running jobs : ' + CAST(@runningJobs AS [varchar])
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+	end
+
+RETURN @runningJobs
+GO
+
+
+
+
+RAISERROR('Update jobs...', 10, 1) WITH NOWAIT
+
+UPDATE sjs SET sjs.[retry_interval] = 0
+FROM [msdb].[dbo].[sysjobs] sj
+INNER JOIN [msdb].[dbo].[sysjobsteps] sjs ON sjs.[job_id]=sj.[job_id]
+WHERE sj.[name] LIKE '%Monitoring - Disk Space'
+		AND sjs.[step_name] = 'Run Job Queue'
+GO
+
+UPDATE sjs SET sjs.[flags] = 2
+FROM [msdb].[dbo].[sysjobs] sj
+INNER JOIN [msdb].[dbo].[sysjobsteps] sjs ON sjs.[job_id]=sj.[job_id]
+WHERE sj.[name] LIKE '%Monitoring - Disk Space'
+		AND sjs.[step_name] = 'Raise Alarms'
 GO
