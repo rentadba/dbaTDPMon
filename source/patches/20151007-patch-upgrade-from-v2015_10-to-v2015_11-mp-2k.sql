@@ -2241,20 +2241,6 @@ begin
     CREATE INDEX [IX_backupmediafamily_media_set_id] ON [dbo].[backupmediafamily]([media_set_id])
 end
 
---  backupfilegroup
-IF NOT EXISTS(	SELECT *
-				FROM [msdb]..sysindexes si
-				INNER JOIN [msdb]..sysindexkeys sik ON si.[id] = sik.[id] AND si.[indid] = sik.[indid] 
-				INNER JOIN [msdb]..syscolumns sc ON sik.[id] = sc.[id] AND sik.[colid] = sc.[colid]
-				WHERE si.[id] = OBJECT_ID('dbo.backupfilegroup')
-						AND sc.[name] = 'backup_set_id'
-						and sik.[keyno] = 1
-				)
-	AND NOT EXISTS(SELECT * FROM [msdb]..sysindexes si WHERE [name]='IX_backupfilegroup_backup_set_id' AND [id]=OBJECT_ID('dbo.backupfilegroup'))
-begin
-    RAISERROR('--Creating index => [IX_backupfilegroup_backup_set_id] ON [dbo].[backupfilegroup]', 10, 1) WITH NOWAIT
-	CREATE INDEX [IX_backupfilegroup_backup_set_id] ON [dbo].[backupfilegroup]([backup_set_id])
-end
 
 --  restorehistory
 IF NOT EXISTS(	SELECT *
