@@ -1,3 +1,23 @@
+USE dbaTDPMon
+GO
+
+UPDATE [dbo].[appConfigurations] SET [value] = N'2015.10.19' WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+
+DECLARE @queryToRun [nvarchar](max)
+
+SET @queryToRun=N''
+SELECT @queryToRun = @queryToRun + N'DROP TABLE [' + SCHEMA_NAME([schema_id]) + N'].[' + [name] + N'];'
+FROM sys.objects
+WHERE lower([name]) LIKE 'appconfigurations%backup%' 
+
+IF LEN(ISNULL(@queryToRun,''))>0
+	begin
+		PRINT @queryToRun
+		EXEC (@queryToRun)
+	end
+GO
+
 RAISERROR('Create procedure: [dbo].[usp_logEventMessageAndSendEmail]', 10, 1) WITH NOWAIT
 GO---
 IF  EXISTS (
@@ -567,3 +587,4 @@ EXEC [dbo].[usp_logEventMessage]	@projectCode			= @projectCode,
 
 RETURN @ReturnValue
 GO
+
