@@ -57,7 +57,7 @@ BEGIN TRY
 	SELECT	@configParallelJobs = [value]
 	FROM	[dbo].[appConfigurations]
 	WHERE	[name] = N'Parallel Data Collecting Jobs'
-			AND [module] = 'health-check'
+			AND [module] = 'common'
 END TRY
 BEGIN CATCH
 	SET @configParallelJobs = 1

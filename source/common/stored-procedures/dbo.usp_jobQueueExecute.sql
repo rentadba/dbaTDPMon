@@ -39,6 +39,7 @@ DECLARE   @projectID				[smallint]
 
 		, @configParallelJobs		[smallint]
 		, @configMaxNumberOfRetries	[smallint]
+		, @configFailMasterJob		[bit]
 		, @runningJobs				[smallint]
 		, @executedJobs				[smallint]
 		, @jobQueueCount			[smallint]
@@ -75,7 +76,7 @@ BEGIN TRY
 	SELECT	@configParallelJobs = [value]
 	FROM	[dbo].[appConfigurations]
 	WHERE	[name] = N'Parallel Data Collecting Jobs'
-			AND [module] = 'health-check'
+			AND [module] = 'common'
 END TRY
 BEGIN CATCH
 	SET @configParallelJobs = 1
@@ -90,7 +91,7 @@ BEGIN TRY
 	SELECT	@configMaxNumberOfRetries = [value]
 	FROM	[dbo].[appConfigurations]
 	WHERE	[name] = N'Maximum number of retries at failed job'
-			AND [module] = 'health-check'
+			AND [module] = 'common'
 END TRY
 BEGIN CATCH
 	SET @configMaxNumberOfRetries = 3
@@ -98,6 +99,20 @@ END CATCH
 
 SET @configMaxNumberOfRetries = ISNULL(@configMaxNumberOfRetries, 3)
 
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--get the number of retries in case of a failure
+BEGIN TRY
+	SELECT	@configFailMasterJob = CASE WHEN lower([value])='true' THEN 1 ELSE 0 END
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = N'Fail master job if any queued job fails'
+			AND [module] = 'common'
+END TRY
+BEGIN CATCH
+	SET @configFailMasterJob = 0
+END CATCH
+
+SET @configFailMasterJob = ISNULL(@configFailMasterJob, 0)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 SELECT @jobQueueCount = COUNT(*)
@@ -205,7 +220,8 @@ EXEC dbo.usp_jobQueueGetStatus	@projectCode			= @projectCode,
 								@executionLevel			= 1,
 								@debugMode				= @debugMode
 
-IF EXISTS(	SELECT *
+IF @configFailMasterJob=1 
+	AND EXISTS(	SELECT *
 			FROM [dbo].[vw_jobExecutionQueue]
 			WHERE  [project_id] = @projectID 
 					AND [module] LIKE @moduleFilter

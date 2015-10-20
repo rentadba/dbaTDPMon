@@ -97,8 +97,8 @@ DECLARE crsDiskSpaceAlarms CURSOR FOR	SELECT  DISTINCT
 													'<counter_name>low disk space</counter_name><target_name>' + ISNULL(dsi.[volume_mount_point], dsi.[logical_drive]) + '</target_name>' + 
 													'<measure_unit>MB</measure_unit>' + 
 													'<current_value>' + CAST(dsi.[available_space_mb] AS [varchar]) +'</current_value>' + 
-													'<current_percentage>' + CAST(dsi.[percent_available] AS [varchar]) + '</current_percentage>' + 
-													'<refference_value>' + CAST(dsi.[total_size_mb] AS [varchar]) + '</refference_value>' + 
+													CASE WHEN dsi.[percent_available] IS NOT NULL THEN '<current_percentage>' + CAST(dsi.[percent_available] AS [varchar]) + '</current_percentage>' ELSE '' END + 
+													CASE WHEN dsi.[total_size_mb] IS NOT NULL	  THEN '<refference_value>' + CAST(dsi.[total_size_mb] AS [varchar]) + '</refference_value>' ELSE '' END + 
 													'<threshold_value>' + CAST(@warningFreeDiskMinSpaceMB AS [varchar]) + '</threshold_value>' + 
 													'<threshold_percentage>' + CAST(@warningFreeDiskMinPercent AS [varchar]) + '</threshold_percentage>' + 
 													'<event_date_utc>' + CONVERT([varchar](20), dsi.[event_date_utc], 120) + '</event_date_utc>' + 
@@ -148,8 +148,8 @@ DECLARE crsDiskSpaceAlarms CURSOR FOR	SELECT  DISTINCT
 													'<counter_name>low disk space</counter_name><target_name>' + ISNULL(dsi.[volume_mount_point], dsi.[logical_drive]) + '</target_name>' + 
 													'<measure_unit>MB</measure_unit>' + 
 													'<current_value>' + CAST(dsi.[available_space_mb] AS [varchar]) +'</current_value>' + 
-													'<current_percentage>' + CAST(dsi.[percent_available] AS [varchar]) + '</current_percentage>' + 
-													'<refference_value>' + CAST(dsi.[total_size_mb] AS [varchar]) + '</refference_value>' + 
+													CASE WHEN dsi.[percent_available] IS NOT NULL THEN '<current_percentage>' + CAST(dsi.[percent_available] AS [varchar]) + '</current_percentage>' ELSE '' END + 
+													CASE WHEN dsi.[total_size_mb] IS NOT NULL	  THEN '<refference_value>' + CAST(dsi.[total_size_mb] AS [varchar]) + '</refference_value>' ELSE '' END + 
 													'<threshold_value>' + CAST(@criticalFreeDiskMinSpaceMB AS [varchar]) + '</threshold_value>' + 
 													'<threshold_percentage>' + CAST(@criticalFreeDiskMinPercent AS [varchar]) + '</threshold_percentage>' + 
 													'<event_date_utc>' + CONVERT([varchar](20), dsi.[event_date_utc], 120) + '</event_date_utc>' + 

@@ -337,3 +337,6 @@
 
 /* 19.10.2015 */
 	- fix small bug on email alerting system / html report notification
+
+/* 20.10.2015 */
+	- fix small bug on email alerting system

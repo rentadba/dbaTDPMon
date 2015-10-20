@@ -65,8 +65,9 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 		  SELECT 'health-check'		AS [module], 'Collect Information OS Events'												AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'health-check'		AS [module], 'Collect OS Events timeout (seconds)'											AS [name], '600'		AS [value]		UNION ALL
 		  SELECT 'health-check'		AS [module], 'Collect OS Events from last hours'											AS [name], '24'			AS [value]		UNION ALL
-		  SELECT 'health-check'		AS [module], 'Parallel Data Collecting Jobs'												AS [name], '16'			AS [value]		UNION ALL
-		  SELECT 'health-check'		AS [module], 'Maximum number of retries at failed job'										AS [name], '3'			AS [value]
+		  SELECT 'common'			AS [module], 'Parallel Data Collecting Jobs'												AS [name], '16'			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Maximum number of retries at failed job'										AS [name], '3'			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Fail master job if any queued job fails'										AS [name], 'false'		AS [value]
 GO
 
 ---------------------------------------------------------------------------------------------
@@ -108,5 +109,5 @@ UPDATE [dbo].[appConfigurations]
 						THEN 32
 						ELSE 4 * (SELECT [cpu_count] FROM sys.dm_os_sys_info)
 				END
-WHERE [module] = 'health-check' AND [name] = 'Parallel Data Collecting Jobs'
+WHERE [module] = 'common' AND [name] = 'Parallel Data Collecting Jobs'
 GO
