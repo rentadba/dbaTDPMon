@@ -210,15 +210,15 @@ IF @eventType=6	AND @eventMessageXML IS NOT NULL
 		SET @HTMLBody =@HTMLBody + COALESCE(
 								CAST ( ( 
 										SELECT	
-												li = 'machine-name:' + [machine_name], '',
-												li = 'measure-unit:' + [measure_unit], '',
-												li = 'current-value:' + CAST([current_value] AS [varchar](32)), '',
-												li = 'current-percentage:' + CAST([current_percentage] AS [varchar](32)), '',
-												li = 'refference-value:' + CAST([refference_value] AS [varchar](32)), '',
-												li = 'refference-percentage:' + CAST([refference_percentage] AS [varchar](32)), '',
+												li = 'machine-name: ' + [machine_name], '',
+												li = 'measure-unit: ' + [measure_unit], '',
+												li = 'current-value: ' + CAST([current_value] AS [varchar](32)), '',
+												li = 'current-percentage: ' + CAST([current_percentage] AS [varchar](32)), '',
+												li = 'reference-value: ' + CAST([refference_value] AS [varchar](32)), '',
+												li = 'reference-percentage: ' + CAST([refference_percentage] AS [varchar](32)), '',
 												li = 'threshold-value: ' + CAST([threshold_value] AS [varchar](32)), '',
 												li = 'threshold-percentage: ' + CAST([threshold_percentage] AS [varchar](32)), '',
-												li = 'severity:' + [severity], '',
+												li = 'severity: ' + [severity], '',
 												li = 'event-date (utc): ' + CAST([event_date_utc] AS [varchar](32)), ''
 										FROM (
 												SELECT  *
