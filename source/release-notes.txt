@@ -333,10 +333,6 @@
 
 /* 16.10.2015 */
 	- improve performance for internal parallelism mechanisms
-	- fix small bugs on email alerting system / job failure notifications
 
-/* 19.10.2015 */
-	- fix small bug on email alerting system / html report notification
-
-/* 20.10.2015 */
-	- fix small bug on email alerting system
+/* 23.10.2015 */
+	- fix small bugs on email alerting system / html report notification
