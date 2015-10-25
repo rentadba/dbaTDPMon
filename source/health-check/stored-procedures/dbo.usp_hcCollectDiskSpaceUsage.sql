@@ -103,59 +103,6 @@ IF @projectID IS NULL
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-IF @enableXPCMDSHELL=1
-	begin
-		SELECT  @optionXPIsAvailable		= 0,
-				@optionXPValue				= 0,
-				@optionXPHasChanged			= 0,
-				@optionAdvancedIsAvailable	= 0,
-				@optionAdvancedValue		= 0,
-				@optionAdvancedHasChanged	= 0
-
-		/* enable xp_cmdshell configuration option */
-		EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
-															@configOptionName	= 'xp_cmdshell',
-															@configOptionValue	= 1,
-															@optionIsAvailable	= @optionXPIsAvailable OUT,
-															@optionCurrentValue	= @optionXPValue OUT,
-															@optionHasChanged	= @optionXPHasChanged OUT,
-															@executionLevel		= 0,
-															@debugMode			= @debugMode
-
-		IF @optionXPIsAvailable = 0
-			begin
-				/* enable show advanced options configuration option */
-				EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
-																	@configOptionName	= 'show advanced options',
-																	@configOptionValue	= 1,
-																	@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
-																	@optionCurrentValue	= @optionAdvancedValue OUT,
-																	@optionHasChanged	= @optionAdvancedHasChanged OUT,
-																	@executionLevel		= 0,
-																	@debugMode			= @debugMode
-
-				IF @optionAdvancedIsAvailable = 1 AND (@optionAdvancedValue=1 OR @optionAdvancedHasChanged=1)
-					EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
-																		@configOptionName	= 'xp_cmdshell',
-																		@configOptionValue	= 1,
-																		@optionIsAvailable	= @optionXPIsAvailable OUT,
-																		@optionCurrentValue	= @optionXPValue OUT,
-																		@optionHasChanged	= @optionXPHasChanged OUT,
-																		@executionLevel		= 0,
-																		@debugMode			= @debugMode
-
-			end
-
-		IF @optionXPIsAvailable=0 OR @optionXPValue=0
-			begin
-				set @queryToRun='xp_cmdshell component is turned off. Cannot continue'
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-				RETURN 1
-			end		
-	end
-
-
-------------------------------------------------------------------------------------------------------------------------------------------
 --
 -------------------------------------------------------------------------------------------------------------------------
 RAISERROR('--Step 1: Delete existing information....', 10, 1) WITH NOWAIT
@@ -231,6 +178,59 @@ WHILE @@FETCH_STATUS=0
 
 		IF @runwmicLogicalDisk=1
 			begin
+				------------------------------------------------------------------------------------------------------------------------------------------
+				IF @enableXPCMDSHELL=1
+					begin
+						SELECT  @optionXPIsAvailable		= 0,
+								@optionXPValue				= 0,
+								@optionXPHasChanged			= 0,
+								@optionAdvancedIsAvailable	= 0,
+								@optionAdvancedValue		= 0,
+								@optionAdvancedHasChanged	= 0
+
+						/* enable xp_cmdshell configuration option */
+						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
+																			@configOptionName	= 'xp_cmdshell',
+																			@configOptionValue	= 1,
+																			@optionIsAvailable	= @optionXPIsAvailable OUT,
+																			@optionCurrentValue	= @optionXPValue OUT,
+																			@optionHasChanged	= @optionXPHasChanged OUT,
+																			@executionLevel		= 0,
+																			@debugMode			= @debugMode
+
+						IF @optionXPIsAvailable = 0
+							begin
+								/* enable show advanced options configuration option */
+								EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
+																					@configOptionName	= 'show advanced options',
+																					@configOptionValue	= 1,
+																					@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
+																					@optionCurrentValue	= @optionAdvancedValue OUT,
+																					@optionHasChanged	= @optionAdvancedHasChanged OUT,
+																					@executionLevel		= 0,
+																					@debugMode			= @debugMode
+
+								IF @optionAdvancedIsAvailable = 1 AND (@optionAdvancedValue=1 OR @optionAdvancedHasChanged=1)
+									EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
+																						@configOptionName	= 'xp_cmdshell',
+																						@configOptionValue	= 1,
+																						@optionIsAvailable	= @optionXPIsAvailable OUT,
+																						@optionCurrentValue	= @optionXPValue OUT,
+																						@optionHasChanged	= @optionXPHasChanged OUT,
+																						@executionLevel		= 0,
+																						@debugMode			= @debugMode
+
+							end
+
+						IF @optionXPIsAvailable=0 OR @optionXPValue=0
+							begin
+								set @queryToRun='xp_cmdshell component is turned off. Cannot continue'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+								RETURN 1
+							end		
+					end
+
+				/*-------------------------------------------------------------------------------------------------------------------------------*/
 				/* try to run wmic */
 				IF @enableXPCMDSHELL=1 AND @optionXPIsAvailable=1
 					begin
@@ -285,6 +285,30 @@ WHILE @@FETCH_STATUS=0
 							IF @debugMode=1 PRINT 'An error occured. It will be ignored: ' + ERROR_MESSAGE()					
 						END CATCH
 					end
+
+				/*-------------------------------------------------------------------------------------------------------------------------------*/
+				/* disable xp_cmdshell configuration option */
+				IF @optionXPHasChanged = 1
+					EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
+																		@configOptionName	= 'xp_cmdshell',
+																		@configOptionValue	= 0,
+																		@optionIsAvailable	= @optionXPIsAvailable OUT,
+																		@optionCurrentValue	= @optionXPValue OUT,
+																		@optionHasChanged	= @optionXPHasChanged OUT,
+																		@executionLevel		= 0,
+																		@debugMode			= @debugMode
+
+				/* disable show advanced options configuration option */
+				IF @optionAdvancedHasChanged = 1
+						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @sqlServerName,
+																			@configOptionName	= 'show advanced options',
+																			@configOptionValue	= 0,
+																			@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
+																			@optionCurrentValue	= @optionAdvancedValue OUT,
+																			@optionHasChanged	= @optionAdvancedHasChanged OUT,
+																			@executionLevel		= 0,
+																			@debugMode			= @debugMode
+
 			end
 
 		IF @runxpFixedDrives=1
@@ -347,30 +371,5 @@ WHILE @@FETCH_STATUS=0
 	end
 CLOSE crsActiveInstances
 DEALLOCATE crsActiveInstances
-
-
-/*-------------------------------------------------------------------------------------------------------------------------------*/
-/* disable xp_cmdshell configuration option */
-IF @optionXPHasChanged = 1
-	EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
-														@configOptionName	= 'xp_cmdshell',
-														@configOptionValue	= 0,
-														@optionIsAvailable	= @optionXPIsAvailable OUT,
-														@optionCurrentValue	= @optionXPValue OUT,
-														@optionHasChanged	= @optionXPHasChanged OUT,
-														@executionLevel		= 0,
-														@debugMode			= @debugMode
-
-/* disable show advanced options configuration option */
-IF @optionAdvancedHasChanged = 1
-		EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
-															@configOptionName	= 'show advanced options',
-															@configOptionValue	= 0,
-															@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
-															@optionCurrentValue	= @optionAdvancedValue OUT,
-															@optionHasChanged	= @optionAdvancedHasChanged OUT,
-															@executionLevel		= 0,
-															@debugMode			= @debugMode
-
 
 GO
