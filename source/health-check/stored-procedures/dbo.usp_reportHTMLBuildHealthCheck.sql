@@ -1572,7 +1572,7 @@ BEGIN TRY
 							N'<A NAME="SQLServerAgentJobsStatusIssuesDetected" class="category-style">SQL Server Agent Jobs Status - Issues Detected (last ' + CAST(@configFailuresInLastHours AS [nvarchar]) + N'h)</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="6">job status not in (Succeded, In progress)</TD>
+								<TD class="small-size" COLLSPAN="6">job status in (Failed, Retry, Canceled)</TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -1601,7 +1601,7 @@ BEGIN TRY
 																																		AND rsr.[active] = 1
 																																		AND (rsr.[skip_value]=ssajh.[instance_name])
 																							WHERE	ssajh.[project_id]=@projectID
-																									AND ssajh.[last_execution_status] NOT IN (1, 4) /* 1 = Succeded; 4 = In progress */
+																									AND ssajh.[last_execution_status] IN (0, 2, 3) /* 0 = Failed; 2 = Retry; 3 = Canceled */
 																									AND CONVERT([datetime], ssajh.[last_execution_date] + ' ' + ssajh.[last_execution_time], 120) >= @dateTimeLowerLimit
 																									AND rsr.[id] IS NULL
 																							ORDER BY ssajh.[instance_name], ssajh.[job_name], ssajh.[last_execution_date], ssajh.[last_execution_time]
