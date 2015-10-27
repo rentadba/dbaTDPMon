@@ -535,6 +535,7 @@ ELSE
 				end
 	end
 
+SET @lastExecutionStatus = ISNULL(@lastExecutionStatus, 5) --Unknown
 IF @debugMode=1
 	print @strMessage
 SET @ReturnValue=ISNULL(@ReturnValue, 0)
