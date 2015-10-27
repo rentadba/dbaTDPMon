@@ -337,3 +337,6 @@
 /* 23.10.2015 */
 	- fix small bugs on email alerting system / html report notification
 	- fix small bugs on health check data collection
+
+/* 27.10.2015 */
+	- improve Disk Space monitoring job / add run overlap check with Health-Check job

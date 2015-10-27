@@ -32,7 +32,6 @@ IF @logFileLocation IS NULL SET @logFileLocation = N'C:\'
 /* setting the job name & job log location */
 ---------------------------------------------------------------------------------------------------
 SET @projectCode  = N'$(projectCode)'	/* add local project code here */
-IF @projectCode IS NULL	SET @projectCode = 'DEFAULT'
 
 SET @databaseName = N'$(dbName)'
 SET @job_name = @databaseName + N' - Monitoring - Disk Space'
@@ -76,7 +75,65 @@ http://dbaTDPMon.codeplex.com',
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'EXEC [dbo].[usp_hcJobQueueCreate]	@projectCode			= ''' + @projectCode + ''',
+	SET @queryToRun = N'DECLARE		@strMessage				[varchar](8000)='''',
+			@currentRunning			[int]=0,
+			@lastExecutionStatus	[int]=0,
+			@lastExecutionDate		[varchar](10)='''',
+			@lastExecutionTime 		[varchar](8)='''',
+			@runningTimeSec			[bigint]=0,
+			@jobName				[sysname]
+
+/* check execution overlapping with Health Check job */
+SELECT TOP 1 @jobName = sj.[name]
+FROM [msdb].dbo.sysjobs sj
+INNER JOIN [msdb].dbo.sysjobsteps sjs ON sj.[job_id] = sjs.[job_id] 
+WHERE sj.[name] LIKE ''%Discovery & Health Check''
+	AND sjs.[database_name] = DB_NAME()
+
+SET @lastExecutionStatus = 4
+WHILE @lastExecutionStatus = 4
+	begin
+		EXEC dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @@SERVERNAME,
+											@jobName				= @jobName,
+											@strMessage				= @strMessage OUTPUT,	
+											@currentRunning			= @currentRunning OUTPUT,			
+											@lastExecutionStatus	= @lastExecutionStatus OUTPUT,			
+											@lastExecutionDate		= @lastExecutionDate OUTPUT,		
+											@lastExecutionTime 		= @lastExecutionTime OUTPUT,	
+											@runningTimeSec			= @runningTimeSec OUTPUT,
+											@selectResult			= 0,
+											@extentedStepDetails	= 0,		
+											@debugMode				= 0
+		IF @lastExecutionStatus = 4
+			begin
+				SET @strMessage = ''Job "'' + @jobName + ''" is currently running. Waiting for its completion...''
+				RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+
+				WAITFOR DELAY ''00:00:30''
+			end
+	end
+'
+	
+	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
+												@step_name=N'Check Overlapping jobs', 
+												@step_id=1, 
+												@cmdexec_success_code=0, 
+												@on_success_action=3, 
+												@on_success_step_id=0, 
+												@on_fail_action=4, 
+												@on_fail_step_id=5, 
+												@retry_attempts=0, 
+												@retry_interval=0, 
+												@os_run_priority=0, @subsystem=N'TSQL', 
+												@command=@queryToRun, 
+												@database_name=@databaseName, 
+												@output_file_name=@logFileLocation, 
+												@flags=2
+	
+	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+	
+	---------------------------------------------------------------------------------------------------
+	SET @queryToRun = N'EXEC [dbo].[usp_hcJobQueueCreate]	@projectCode			= ' + CASE WHEN @projectCode IS NOT NULL THEN N'''' + @projectCode + '''' ELSE 'NULL' END + N',
 															@sqlServerNameFilter	= ''%'',
 															@collectorDescriptor	= ''dbo.usp_hcCollectDiskSpaceUsage'',
 															@enableXPCMDSHELL		= 1,
@@ -84,12 +141,12 @@ http://dbaTDPMon.codeplex.com',
 	
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Generate Data Collector Job Queue', 
-												@step_id=1, 
+												@step_id=2, 
 												@cmdexec_success_code=0, 
 												@on_success_action=3, 
 												@on_success_step_id=0, 
 												@on_fail_action=4, 
-												@on_fail_step_id=4, 
+												@on_fail_step_id=5, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
 												@os_run_priority=0, @subsystem=N'TSQL', 
@@ -101,19 +158,19 @@ http://dbaTDPMon.codeplex.com',
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'EXEC [dbo].[usp_jobQueueExecute]	@projectCode			= ''' + @projectCode + ''',
+	SET @queryToRun = N'EXEC [dbo].[usp_jobQueueExecute]	@projectCode			= ' + CASE WHEN @projectCode IS NOT NULL THEN N'''' + @projectCode + '''' ELSE 'NULL' END + N',
 															@moduleFilter			= ''health-check'',
 															@descriptorFilter		= ''dbo.usp_hcCollectDiskSpaceUsage'',
 															@waitForDelay			= ''00:00:05'',
 															@debugMode				= 0'
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Run Job Queue', 
-												@step_id=2, 
+												@step_id=3, 
 												@cmdexec_success_code=0, 
 												@on_success_action=3, 
 												@on_success_step_id=0, 
 												@on_fail_action=4, 
-												@on_fail_step_id=4, 
+												@on_fail_step_id=5, 
 												@retry_attempts=3, 
 												@retry_interval=0, 
 												@os_run_priority=0, @subsystem=N'TSQL', 
@@ -124,17 +181,17 @@ http://dbaTDPMon.codeplex.com',
 
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'EXEC [dbo].[usp_monAlarmCustomFreeDiskSpace] @projectCode	= ''' + @projectCode + ''',
+	SET @queryToRun = N'EXEC [dbo].[usp_monAlarmCustomFreeDiskSpace] @projectCode	= ' + CASE WHEN @projectCode IS NOT NULL THEN N'''' + @projectCode + '''' ELSE 'NULL' END + N',
 																	@sqlServerName	= ''%'''
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Raise Alarms', 
-												@step_id=3, 
+												@step_id=4, 
 												@cmdexec_success_code=0, 
 												@on_success_action=3, 
 												@on_success_step_id=0, 
 												@on_fail_action=4, 
-												@on_fail_step_id=4, 
+												@on_fail_step_id=5, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
 												@os_run_priority=0, @subsystem=N'TSQL', 
@@ -155,7 +212,7 @@ EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Send email', 
-												@step_id=4, 
+												@step_id=5, 
 												@cmdexec_success_code=0, 
 												@on_success_action=1, 
 												@on_success_step_id=0, 
