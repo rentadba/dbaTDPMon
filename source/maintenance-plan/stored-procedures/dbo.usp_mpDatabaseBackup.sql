@@ -347,7 +347,7 @@ IF @serverVersionNum >= 11
 							end
 					end
 
-				SET @agName = @clusterName + '$' + @agName
+				SET @agName = @clusterName + '_' + @agName
 			end
 	end
 
