@@ -150,7 +150,7 @@ IF @databaseStateDesc NOT IN ('ONLINE')
 begin
 	SET @queryToRun='Current database state (' + @databaseStateDesc + ') does not allow backup. It will be skipped.'
 	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-	RETURN
+	RETURN 0
 end
 
 
@@ -209,37 +209,148 @@ IF @flgOptions & 512 = 512
 			begin
 				SET @queryToRun='Database is part of log shipping. It will be skipped.'
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-				RETURN
+				RETURN 0
 			end
 	end
 
 --------------------------------------------------------------------------------------------------
---on alwayson availability groups, for secondary replicas, force copy-only backups
-IF @flgOptions & 1024 = 1024 AND @serverVersionNum >= 11
-	begin
-		SET @queryToRun = N'SELECT [replica_server_name]
-							FROM sys.dm_hadr_availability_replica_cluster_nodes
-							WHERE [replica_server_name] NOT IN (
-																SELECT [primary_replica] 
-																FROM sys.dm_hadr_availability_group_states
-																)
-									AND [replica_server_name]=@@SERVERNAME'
+DECLARE @clusterName				[sysname],		
+		@agName						[sysname],
+		@agInstanceRoleDesc			[sysname],
+		@agSynchronizationState		[sysname],
+		@agPreferredBackupReplica	[bit]
 
+/* AlwaysOn Availability Groups */
+IF @serverVersionNum >= 11
+	begin
+		/* get cluster name */
+		SET @queryToRun = N'SELECT [cluster_name] FROM sys.dm_hadr_cluster'
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+
+		SET @queryToRun = N'SELECT @clusterName = [cluster_name]
+							FROM (' + @queryToRun + N')inq'
+
+		SET @queryParameters = N'@clusterName [sysname] OUTPUT'
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		DELETE FROM #serverPropertyConfig
-		INSERT	INTO #serverPropertyConfig([value])
-				EXEC (@queryToRun)
+		EXEC sp_executesql @queryToRun, @queryParameters, @clusterName = @clusterName OUTPUT
 
-		IF (SELECT COUNT(*) FROM #serverPropertyConfig)>0
+
+		/* availability group configuration */
+		SET @queryToRun = N'
+					SELECT    ag.[name]
+							, ars.[role_desc]
+					FROM sys.availability_replicas ar
+					INNER JOIN sys.dm_hadr_availability_replica_states ars ON ars.[replica_id]=ar.[replica_id] AND ars.[group_id]=ar.[group_id]
+					INNER JOIN sys.availability_groups ag ON ag.[group_id]=ar.[group_id]
+					INNER JOIN sys.dm_hadr_availability_replica_cluster_nodes arcn ON arcn.[group_name]=ag.[name] AND arcn.[replica_server_name]=ar.[replica_server_name]
+					WHERE arcn.[replica_server_name] = ''' + @sqlServerName + N''''
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+
+		SET @queryToRun = N'SELECT    @agName = [name]
+									, @agInstanceRoleDesc = [role_desc]
+							FROM (' + @queryToRun + N')inq'
+		SET @queryParameters = N'@agName [sysname] OUTPUT, @agInstanceRoleDesc [sysname] OUTPUT'
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		EXEC sp_executesql @queryToRun, @queryParameters, @agName = @agName OUTPUT
+														, @agInstanceRoleDesc = @agInstanceRoleDesc OUTPUT
+	
+
+		IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 			begin
-				SET @queryToRun='Server is part of an Availability Group as a secondary replica. Allowing copy-only full backups.'
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+				/* availability group synchronization status */
+				SET @queryToRun = N'
+						SELECT    hdrs.[synchronization_state_desc]
+								, sys.fn_hadr_backup_is_preferred_replica(''' + @dbName + N''') AS [backup_is_preferred_replica]
+						FROM sys.dm_hadr_database_replica_states hdrs
+						INNER JOIN sys.availability_replicas ar ON ar.[replica_id]=hdrs.[replica_id]
+						INNER JOIN sys.availability_databases_cluster adc ON adc.[group_id]=hdrs.[group_id] AND adc.[group_database_id]=hdrs.[group_database_id]
+						INNER JOIN sys.dm_hadr_availability_replica_cluster_states rcs ON rcs.[replica_id]=ar.[replica_id] AND rcs.[group_id]=hdrs.[group_id]
+						INNER JOIN sys.databases sd ON sd.name = adc.database_name
+						WHERE	ar.[replica_server_name] = ''' + @sqlServerName + N'''
+								AND adc.[database_name] = ''' + @dbName + N''''
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+
+				SET @queryToRun = N'SELECT    @agSynchronizationState = [synchronization_state_desc]
+											, @agPreferredBackupReplica = [backup_is_preferred_replica]
+									FROM (' + @queryToRun + N')inq'
+
+				SET @queryParameters = N'@agSynchronizationState [sysname] OUTPUT, @agPreferredBackupReplica [bit] OUTPUT'
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+				EXEC sp_executesql @queryToRun, @queryParameters, @agSynchronizationState = @agSynchronizationState OUTPUT
+																, @agPreferredBackupReplica = @agPreferredBackupReplica OUTPUT
+
+				SET @agSynchronizationState = ISNULL(@agSynchronizationState, '')
+				SET @agInstanceRoleDesc = ISNULL(@agInstanceRoleDesc, '')
+
+				/* if instance is preferred replica */
+				IF @agPreferredBackupReplica = 0
+					begin
+						SET @queryToRun=N'Current instance [ ' + @sqlServerName + N'] is not a backup preferred replica for the database [' + @dbName + N']. Skipping.'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+						RETURN 0
+					end
+		
+				IF UPPER(@agInstanceRoleDesc) NOT IN ('PRIMARY', 'SECONDARY')
+					begin
+						SET @queryToRun=N'Current role state [ ' + @agInstanceRoleDesc + N'] does not permit the backup operation. Skipping.'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+						RETURN 0
+					end
+
+				/* allowed actions on a secondary replica */
+				IF UPPER(@agInstanceRoleDesc) = 'SECONDARY'
+					begin
+						/* copy-only full backups are allowed */
+						IF @flgActions & 1 = 1 AND @flgOptions & 4 = 0
+							begin
+								/* on alwayson availability groups, for secondary replicas, force copy-only backups */
+								IF @flgOptions & 1024 = 1024
+									begin
+										SET @queryToRun='Server is part of an Availability Group as a secondary replica. Forcing copy-only full backups.'
+										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 				
-				SET @flgOptions = @flgOptions + 4
+										SET @flgOptions = @flgOptions + 4
+									end
+								ELSE
+									begin
+										SET @queryToRun=N'Only copy-only full backups are allowed on a secondary replica. Skipping.'
+										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+										RETURN 0
+									end
+							end
+
+						/* Differential backups are not supported on secondary replicas. */
+						IF @flgActions & 2 = 2
+							begin
+								SET @queryToRun=N'Differential backups are not supported on secondary replicas. Skipping.'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+								RETURN 0
+							end
+				
+						/* BACKUP LOG supports only regular log backups (the COPY_ONLY option is not supported for log backups on secondary replicas).*/
+						IF @flgActions & 4 = 4 AND @flgOptions & 4 = 4
+							begin
+								SET @queryToRun=N'BACKUP LOG supports only regular log backups (the COPY_ONLY option is not supported for log backups on secondary replicas). Skipping.'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+								RETURN 0
+							end
+
+						/* To back up a secondary database, a secondary replica must be able to communicate with the primary replica and must be SYNCHRONIZED or SYNCHRONIZING. */
+						IF UPPER(@agSynchronizationState) NOT IN ('SYNCHRONIZED', 'SYNCHRONIZING')
+							begin
+								SET @queryToRun=N'Current secondary replica state [ ' + @agSynchronizationState + N'] does not permit the backup operation. Skipping.'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+								RETURN 0
+							end
+					end
+
+				SET @agName = @clusterName + '$' + @agName
 			end
 	end
+
 																				
 --------------------------------------------------------------------------------------------------
 --check recovery model for database. transaction log backup is allowed only for FULL
@@ -365,7 +476,12 @@ IF @dbName='master'
 IF @optionForceChangeBackupType=1
 	begin
 		SET @currentDate = GETDATE()
-		SET @backupFileName = dbo.[ufn_mpBackupBuildFileName](@sqlServerName, @dbName, 'full', @currentDate)
+		
+		IF @agName IS NULL
+			SET @backupFileName = dbo.[ufn_mpBackupBuildFileName](@sqlServerName, @dbName, 'full', @currentDate)
+		ELSE
+			SET @backupFileName = dbo.[ufn_mpBackupBuildFileName](@agName, @dbName, 'full', @currentDate)
+
 		SET @queryToRun	= N'BACKUP DATABASE ['+ @dbName + N'] TO DISK = ''' + @backupLocation + @backupFileName + N''' WITH STATS = 10, NAME = ''' + @backupFileName + N'''' + @backupOptions
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -387,7 +503,10 @@ SELECT @backupType = CASE WHEN @flgActions & 1 = 1 THEN N'full'
 					 END
 
 SET @currentDate = GETDATE()
-SET @backupFileName = dbo.[ufn_mpBackupBuildFileName](@sqlServerName, @dbName, @backupType, @currentDate)
+IF @agName IS NULL
+	SET @backupFileName = dbo.[ufn_mpBackupBuildFileName](@sqlServerName, @dbName, @backupType, @currentDate)
+ELSE
+	SET @backupFileName = dbo.[ufn_mpBackupBuildFileName](@agName, @dbName, @backupType, @currentDate)
 
 IF @flgActions & 1 = 1 
 	begin

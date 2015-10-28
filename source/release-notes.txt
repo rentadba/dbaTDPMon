@@ -340,3 +340,6 @@
 
 /* 27.10.2015 */
 	- improve Disk Space monitoring job / add run overlap check with Health-Check job
+
+/* 28.10.2015 */
+	- add AlwaysOn Availability Groups backup support; secondary replicas restrictions
