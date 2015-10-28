@@ -24,6 +24,8 @@ CREATE PROCEDURE [dbo].[usp_logEventMessage]
 													2 - job-history
 													3 - report-html
 													4 - action
+													5 - backup-job-history
+													6 - alert-custom
 												*/
 		@recipientsList			[nvarchar](1024) = NULL,
 		@isEmailSent			[bit]=0,
