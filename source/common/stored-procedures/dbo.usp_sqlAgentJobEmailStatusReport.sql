@@ -46,8 +46,8 @@ RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id]
 WHERE	j.[job_id] = @jobID
 		AND h.[step_name] ='(Job outcome)'
 
-SET @lastCompletionInstanceID = ISNULL(@lastCompletionInstanceID, 0)
 
+SET @lastCompletionInstanceID = ISNULL(@lastCompletionInstanceID, 0)
 -----------------------------------------------------------------------------------------------------
 SET @eventMessageData = '<job-history>'
 
@@ -60,6 +60,7 @@ FROM (
 				'<run_date>' + [run_date] + '</run_date>' + 
 				'<run_time>' + [run_time] + '</run_time>' + 
 				'<duration>' + [duration] + '</duration>' +
+				'<message>' + [message] + '</message>' +
 				'</job-step>' AS [job_step_detail] 
 		FROM (
 				SELECT	  [step_id]
@@ -68,8 +69,9 @@ FROM (
 						, SUBSTRING([run_date], 1, 4) + '-' + SUBSTRING([run_date], 5 ,2) + '-' + SUBSTRING([run_date], 7 ,2) AS [run_date]
 						, SUBSTRING([run_time], 1,2) + ':' + SUBSTRING([run_time], 3,2) + ':' + SUBSTRING([run_time], 5,2) AS [run_time]
 						, SUBSTRING([run_duration], 1,2) + 'h ' + SUBSTRING([run_duration], 3,2) + 'm ' + SUBSTRING([run_duration], 5,2) + 's' AS [duration]
+						, [message]
 				FROM (		
-						SELECT	  h.[step_id]
+						SELECT    h.[step_id]
 								, h.[step_name]
 								, CASE h.[run_status]	WHEN '0' THEN 'Failed'
 														WHEN '1' THEN 'Succeded'	
@@ -77,15 +79,42 @@ FROM (
 														WHEN '3' THEN 'Canceled'
 														WHEN '4' THEN 'In progress'
 														ELSE 'Unknown'
-									END [run_status]
+								  END [run_status]
 								, CAST(h.[run_date] AS varchar) AS [run_date]
-								, REPLICATE('0', 6-LEN(CAST(h.[run_time] AS varchar))) + CAST(h.[run_time] AS varchar) AS [run_time]
-								, REPLICATE('0', 6-LEN(CAST(h.[run_duration] AS varchar))) + CAST(h.[run_duration] AS varchar) AS [run_duration]
-								, h.[instance_id]
-						FROM [msdb].[dbo].[sysjobs] j 
-						RIGHT JOIN [msdb].[dbo].[sysjobhistory] h	 ON j.[job_id] = h.[job_id] 
-						WHERE j.[job_id] = @jobID
-							AND	h.[instance_id] > @lastCompletionInstanceID
+								, CAST(h.[run_time] AS varchar) AS [run_time]
+								, CAST(h.[run_duration] AS varchar) AS [run_duration]
+								, CASE WHEN [run_status] IN (0, 2) THEN LEFT(h.[message], 256) ELSE '' END AS [message]
+						FROM [msdb].[dbo].[sysjobhistory] h
+						WHERE	 h.[instance_id] < (
+													SELECT TOP 1 [instance_id] 
+													FROM (	
+															SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+															FROM [msdb].[dbo].[sysjobhistory] h
+															WHERE	h.[job_id]= @JobID
+																	AND h.[step_name] ='(Job outcome)'
+															ORDER BY h.[instance_id] DESC
+														)A
+													) 
+								AND	h.[instance_id] > ISNULL(
+													( SELECT [instance_id] 
+													FROM (	
+															SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+															FROM [msdb].[dbo].[sysjobhistory] h
+															WHERE	h.[job_id]= @JobID
+																	AND h.[step_name] ='(Job outcome)'
+															ORDER BY h.[instance_id] DESC
+														)A
+													WHERE [instance_id] NOT IN 
+														(
+														SELECT TOP 1 [instance_id] 
+														FROM (	SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+																FROM [msdb].[dbo].[sysjobhistory] h
+																WHERE	h.[job_id]= @JobID
+																		AND h.[step_name] ='(Job outcome)'
+																ORDER BY h.[instance_id] DESC
+															)A
+														)),0)
+								AND h.[job_id] = @JobID
 					)A
 				)x										
 	)xmlData
@@ -100,11 +129,38 @@ IF @sendLogAsAttachment=0
 DECLARE @failedSteps [int]
 
 SELECT @failedSteps = COUNT(*)
-FROM [msdb].[dbo].[sysjobs] j 
-RIGHT JOIN [msdb].[dbo].[sysjobhistory] h	 ON j.[job_id] = h.[job_id] 
-WHERE j.[job_id] = @jobID
-	AND	h.[instance_id] > @lastCompletionInstanceID
-	AND h.[run_status] = 0 /* Failed */
+FROM [msdb].[dbo].[sysjobhistory] h
+WHERE	 h.[instance_id] < (
+							SELECT TOP 1 [instance_id] 
+							FROM (	
+									SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+									FROM [msdb].[dbo].[sysjobhistory] h
+									WHERE	h.[job_id]= @JobID
+											AND h.[step_name] ='(Job outcome)'
+									ORDER BY h.[instance_id] DESC
+								)A
+							) 
+		AND	h.[instance_id] > ISNULL(
+							( SELECT [instance_id] 
+							FROM (	
+									SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+									FROM [msdb].[dbo].[sysjobhistory] h
+									WHERE	h.[job_id]= @JobID
+											AND h.[step_name] ='(Job outcome)'
+									ORDER BY h.[instance_id] DESC
+								)A
+							WHERE [instance_id] NOT IN 
+								(
+								SELECT TOP 1 [instance_id] 
+								FROM (	SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+										FROM [msdb].[dbo].[sysjobhistory] h
+										WHERE	h.[job_id]= @JobID
+												AND h.[step_name] ='(Job outcome)'
+										ORDER BY h.[instance_id] DESC
+									)A
+								)),0)
+		AND h.[job_id] = @JobID
+		AND h.[run_status] = 0 /* Failed */
 
 EXEC [dbo].[usp_logEventMessageAndSendEmail] @projectCode		= NULL,
 											 @sqlServerName		= @@SERVERNAME,
