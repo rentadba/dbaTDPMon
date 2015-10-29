@@ -67,6 +67,7 @@ DECLARE		@backupFileName					[nvarchar](1024),
 			@serverVersionNum				[numeric](9,6),
 			@errorCode						[int],
 			@currentDate					[datetime],
+			@databaseStatus					[int],
 			@databaseStateDesc				[sysname]
 
 DECLARE		@backupStartDate				[datetime],
@@ -133,23 +134,85 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName		= @sqlServerName,
 SET @nestedExecutionLevel = @executionLevel + 1
 
 --------------------------------------------------------------------------------------------------
+--treat exceptions
+IF @dbName='master'
+	begin
+		SET @optionForceChangeBackupType=0
+		SET @flgActions=1 /* only full backup is allowed for master database */
+	end
+
+--------------------------------------------------------------------------------------------------
+--selected backup type
+SELECT @backupType = CASE WHEN @flgActions & 1 = 1 THEN N'full'
+						  WHEN @flgActions & 2 = 2 THEN N'diff'
+						  WHEN @flgActions & 4 = 4 THEN N'log'
+					 END
+
+--------------------------------------------------------------------------------------------------
 --get database status
-SET @queryToRun = N'SELECT CONVERT([sysname], DATABASEPROPERTYEX(''' + @dbName + N''', ''Status'')) AS [state]' 
-SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+IF @serverVersionNum >= 9
+	begin
+		SET @queryToRun = N'SELECT CONVERT([sysname], DATABASEPROPERTYEX(''' + @dbName + N''', ''Status'')) AS [state]' 
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-DELETE FROM #serverPropertyConfig
-INSERT	INTO #serverPropertyConfig([value])
-		EXEC (@queryToRun)
+		DELETE FROM #serverPropertyConfig
+		INSERT	INTO #serverPropertyConfig([value])
+				EXEC (@queryToRun)
 
-SELECT @databaseStateDesc = [value]
-FROM #serverPropertyConfig
+		SELECT @databaseStateDesc = [value]
+		FROM #serverPropertyConfig
 
-SET @databaseStateDesc = ISNULL(@databaseStateDesc, 'NULL')
-IF @databaseStateDesc NOT IN ('ONLINE')
+		SET @databaseStateDesc = ISNULL(@databaseStateDesc, 'NULL')
+	end
+ELSE
+	begin
+		SET @queryToRun = N'SELECT [status] FROM master.dbo.sysdatabases WHERE [name]=''' + @dbName + N'''' 
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		DELETE FROM #serverPropertyConfig
+		INSERT	INTO #serverPropertyConfig([value])
+				EXEC (@queryToRun)
+
+		SELECT @databaseStatus = [value]
+		FROM #serverPropertyConfig
+
+		SET @databaseStateDesc =   CASE	WHEN @databaseStatus & 32 = 32			 THEN 'LOADING'
+										WHEN @databaseStatus & 64 = 64			 THEN 'PRE RECOVERY'
+										WHEN @databaseStatus & 128 = 128		 THEN 'RECOVERING'
+										WHEN @databaseStatus & 256 = 256		 THEN 'NOT RECOVERED'
+										WHEN @databaseStatus & 512 = 512		 THEN 'OFFLINE'
+										WHEN @databaseStatus & 2048 = 2048		 THEN 'DBO USE ONLY'
+										WHEN @databaseStatus & 4096 = 4096		 THEN 'SINGLE USER'
+										WHEN @databaseStatus & 32768 = 32768	 THEN 'EMERGENCY MODE'
+										WHEN @databaseStatus & 2097152 = 2097152 THEN 'STANDBY'
+										WHEN @databaseStatus & 4194584 = 4194584 THEN 'SUSPECT'
+										WHEN @databaseStatus = 0				 THEN 'UNKNOWN'
+										ELSE 'ONLINE'
+									END
+	end
+
+IF  @databaseStateDesc NOT IN ('ONLINE')
 begin
-	SET @queryToRun='Current database state (' + @databaseStateDesc + ') does not allow backup. It will be skipped.'
+	SET @queryToRun='Current database state (' + @databaseStateDesc + ') does not allow backup.'
 	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+	SET @eventData='<skipaction><detail>' + 
+						'<name>database backup</name>' + 
+						'<type>' + @backupType + '</type>' + 
+						'<affected_object>' + @dbName + '</affected_object>' + 
+						'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+						'<reason>' + @queryToRun + '</reason>' + 
+					'</detail></skipaction>'
+
+	EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+										@dbName			= @dbName,
+										@module			= 'dbo.usp_mpDatabaseBackup',
+										@eventName		= 'database backup',
+										@eventMessage	= @eventData,
+										@eventType		= 0 /* info */
+
 	RETURN 0
 end
 
@@ -207,8 +270,29 @@ IF @flgOptions & 512 = 512
 
 		IF (SELECT COUNT(*) FROM #serverPropertyConfig)>0
 			begin
-				SET @queryToRun='Database is part of log shipping. It will be skipped.'
+				SET @queryToRun='Log Shipping: '
+				IF @flgActions IN (1, 2)
+					SET @queryToRun = @queryToRun + 'Cannot perform a full or differential backup on a secondary database.'
+				IF @flgActions IN (4)
+					SET @queryToRun = @queryToRun + 'Cannot perform a transaction log backup since it may break the log shipping chain.'
+
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+				SET @eventData='<skipaction><detail>' + 
+									'<name>database backup</name>' + 
+									'<type>' + @backupType + '</type>' + 
+									'<affected_object>' + @dbName + '</affected_object>' + 
+									'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+									'<reason>' + @queryToRun + '</reason>' + 
+								'</detail></skipaction>'
+
+				EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+													@dbName			= @dbName,
+													@module			= 'dbo.usp_mpDatabaseBackup',
+													@eventName		= 'database backup',
+													@eventMessage	= @eventData,
+													@eventType		= 0 /* info */
+
 				RETURN 0
 			end
 	end
@@ -288,15 +372,47 @@ IF @serverVersionNum >= 11
 				/* if instance is preferred replica */
 				IF @agPreferredBackupReplica = 0
 					begin
-						SET @queryToRun=N'Current instance [ ' + @sqlServerName + N'] is not a backup preferred replica for the database [' + @dbName + N']. Skipping.'
+						SET @queryToRun=N'Availability Group: Current instance [ ' + @sqlServerName + N'] is not a backup preferred replica for the database [' + @dbName + N'].'
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+						SET @eventData='<skipaction><detail>' + 
+											'<name>database backup</name>' + 
+											'<type>' + @backupType + '</type>' + 
+											'<affected_object>' + @dbName + '</affected_object>' + 
+											'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+											'<reason>' + @queryToRun + '</reason>' + 
+										'</detail></skipaction>'
+
+						EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+															@dbName			= @dbName,
+															@module			= 'dbo.usp_mpDatabaseBackup',
+															@eventName		= 'database backup',
+															@eventMessage	= @eventData,
+															@eventType		= 0 /* info */
+
 						RETURN 0
 					end
 		
 				IF UPPER(@agInstanceRoleDesc) NOT IN ('PRIMARY', 'SECONDARY')
 					begin
-						SET @queryToRun=N'Current role state [ ' + @agInstanceRoleDesc + N'] does not permit the backup operation. Skipping.'
+						SET @queryToRun=N'Availability Group: Current role state [ ' + @agInstanceRoleDesc + N'] does not permit the backup operation.'
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+						SET @eventData='<skipaction><detail>' + 
+											'<name>database backup</name>' + 
+											'<type>' + @backupType + '</type>' + 
+											'<affected_object>' + @dbName + '</affected_object>' + 
+											'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+											'<reason>' + @queryToRun + '</reason>' + 
+										'</detail></skipaction>'
+
+						EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+															@dbName			= @dbName,
+															@module			= 'dbo.usp_mpDatabaseBackup',
+															@eventName		= 'database backup',
+															@eventMessage	= @eventData,
+															@eventType		= 0 /* info */
+
 						RETURN 0
 					end
 
@@ -316,8 +432,24 @@ IF @serverVersionNum >= 11
 									end
 								ELSE
 									begin
-										SET @queryToRun=N'Only copy-only full backups are allowed on a secondary replica. Skipping.'
+										SET @queryToRun=N'Availability Group: Only copy-only full backups are allowed on a secondary replica.'
 										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+										SET @eventData='<skipaction><detail>' + 
+															'<name>database backup</name>' + 
+															'<type>' + @backupType + '</type>' + 
+															'<affected_object>' + @dbName + '</affected_object>' + 
+															'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+															'<reason>' + @queryToRun + '</reason>' + 
+														'</detail></skipaction>'
+
+										EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+																			@dbName			= @dbName,
+																			@module			= 'dbo.usp_mpDatabaseBackup',
+																			@eventName		= 'database backup',
+																			@eventMessage	= @eventData,
+																			@eventType		= 0 /* info */
+
 										RETURN 0
 									end
 							end
@@ -325,24 +457,72 @@ IF @serverVersionNum >= 11
 						/* Differential backups are not supported on secondary replicas. */
 						IF @flgActions & 2 = 2
 							begin
-								SET @queryToRun=N'Differential backups are not supported on secondary replicas. Skipping.'
+								SET @queryToRun=N'Availability Group: Differential backups are not supported on secondary replicas.'
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+								SET @eventData='<skipaction><detail>' + 
+													'<name>database backup</name>' + 
+													'<type>' + @backupType + '</type>' + 
+													'<affected_object>' + @dbName + '</affected_object>' + 
+													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+													'<reason>' + @queryToRun + '</reason>' + 
+												'</detail></skipaction>'
+
+								EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+																	@dbName			= @dbName,
+																	@module			= 'dbo.usp_mpDatabaseBackup',
+																	@eventName		= 'database backup',
+																	@eventMessage	= @eventData,
+																	@eventType		= 0 /* info */
+
 								RETURN 0
 							end
 				
 						/* BACKUP LOG supports only regular log backups (the COPY_ONLY option is not supported for log backups on secondary replicas).*/
 						IF @flgActions & 4 = 4 AND @flgOptions & 4 = 4
 							begin
-								SET @queryToRun=N'BACKUP LOG supports only regular log backups (the COPY_ONLY option is not supported for log backups on secondary replicas). Skipping.'
+								SET @queryToRun=N'Availability Group: BACKUP LOG supports only regular log backups (the COPY_ONLY option is not supported for log backups on secondary replicas).'
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+								SET @eventData='<skipaction><detail>' + 
+													'<name>database backup</name>' + 
+													'<type>' + @backupType + '</type>' + 
+													'<affected_object>' + @dbName + '</affected_object>' + 
+													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+													'<reason>' + @queryToRun + '</reason>' + 
+												'</detail></skipaction>'
+
+								EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+																	@dbName			= @dbName,
+																	@module			= 'dbo.usp_mpDatabaseBackup',
+																	@eventName		= 'database backup',
+																	@eventMessage	= @eventData,
+																	@eventType		= 0 /* info */
+
 								RETURN 0
 							end
 
 						/* To back up a secondary database, a secondary replica must be able to communicate with the primary replica and must be SYNCHRONIZED or SYNCHRONIZING. */
 						IF UPPER(@agSynchronizationState) NOT IN ('SYNCHRONIZED', 'SYNCHRONIZING')
 							begin
-								SET @queryToRun=N'Current secondary replica state [ ' + @agSynchronizationState + N'] does not permit the backup operation. Skipping.'
+								SET @queryToRun=N'Availability Group: Current secondary replica state [ ' + @agSynchronizationState + N'] does not permit the backup operation.'
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+								SET @eventData='<skipaction><detail>' + 
+													'<name>database backup</name>' + 
+													'<type>' + @backupType + '</type>' + 
+													'<affected_object>' + @dbName + '</affected_object>' + 
+													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+													'<reason>' + @queryToRun + '</reason>' + 
+												'</detail></skipaction>'
+
+								EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+																	@dbName			= @dbName,
+																	@module			= 'dbo.usp_mpDatabaseBackup',
+																	@eventName		= 'database backup',
+																	@eventMessage	= @eventData,
+																	@eventType		= 0 /* info */
+
 								RETURN 0
 							end
 					end
@@ -356,7 +536,7 @@ IF @serverVersionNum >= 11
 --check recovery model for database. transaction log backup is allowed only for FULL
 --if force option is selected, for SIMPLE recovery model, backup type will be changed to diff
 --------------------------------------------------------------------------------------------------
-IF @flgActions & 4 =4
+IF @flgActions & 4 = 4
 	begin
 		SET @queryToRun = N''
 		SET @queryToRun = @queryToRun + 'SELECT CAST(DATABASEPROPERTYEX(''' + @dbName + N''', ''Recovery'') AS [sysname])'
@@ -369,8 +549,23 @@ IF @flgActions & 4 =4
 
 		IF (SELECT UPPER([value]) FROM #serverPropertyConfig) = 'SIMPLE'
 			begin
-				SET @queryToRun = 'WARNING: Database recovery model is SIMPLE. Transaction log backup cannot be performed.'
+				SET @queryToRun = 'Database recovery model is SIMPLE. Transaction log backup cannot be performed.'
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+				SET @eventData='<skipaction><detail>' + 
+									'<name>database backup</name>' + 
+									'<type>' + @backupType + '</type>' + 
+									'<affected_object>' + @dbName + '</affected_object>' + 
+									'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+									'<reason>' + @queryToRun + '</reason>' + 
+								'</detail></skipaction>'
+
+				EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+													@dbName			= @dbName,
+													@module			= 'dbo.usp_mpDatabaseBackup',
+													@eventName		= 'database backup',
+													@eventMessage	= @eventData,
+													@eventType		= 0 /* info */
 
 				RETURN 0
 			end
@@ -464,14 +659,6 @@ IF ISNULL(@retentionDays, 0) <> 0
 	SET @backupOptions = @backupOptions + N', RETAINDAYS=' + CAST(@retentionDays AS [nvarchar](32))
 
 --------------------------------------------------------------------------------------------------
---treat exceptions
-IF @dbName='master'
-	begin
-		SET @optionForceChangeBackupType=0
-		SET @flgActions=1 /* only full backup is allowed for master database */
-	end
-
---------------------------------------------------------------------------------------------------
 --run a full database backup, in order to perform an additional diff or log backup
 IF @optionForceChangeBackupType=1
 	begin
@@ -496,12 +683,6 @@ IF @optionForceChangeBackupType=1
 	end
 
 --------------------------------------------------------------------------------------------------
---run selected backup type
-SELECT @backupType = CASE WHEN @flgActions & 1 = 1 THEN N'full'
-						  WHEN @flgActions & 2 = 2 THEN N'diff'
-						  WHEN @flgActions & 4 = 4 THEN N'log'
-					 END
-
 SET @currentDate = GETDATE()
 IF @agName IS NULL
 	SET @backupFileName = dbo.[ufn_mpBackupBuildFileName](@sqlServerName, @dbName, @backupType, @currentDate)

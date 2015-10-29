@@ -343,3 +343,6 @@
 
 /* 28.10.2015 */
 	- add AlwaysOn Availability Groups backup support; secondary replicas restrictions
+
+/* 29.10.2015 */
+	- add skipaction event message with information on skipped database backups and reasons
