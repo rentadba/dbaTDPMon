@@ -158,6 +158,7 @@ IF @projectID IS NOT NULL AND @instanceID IS NOT NULL
 --processing the xml message
 -----------------------------------------------------------------------------------------------------
 SET @eventMessage = REPLACE(@eventMessage, '&', '&amp;')
+
 SET @eventMessageXML = CAST(@eventMessage AS [xml])
 SET @HTMLBody = N''
 
@@ -519,6 +520,12 @@ IF @eventType IN (5) AND @eventMessageXML IS NOT NULL
 			FROM @xmlBackupSet
 			WHERE [error_code]<>0
 	end
+
+
+SET @HTMLBody = REPLACE(@HTMLBody, N'&amp;', N'&')
+SET @HTMLBody = REPLACE(@HTMLBody, N'&amp;lt;', N'<')
+SET @HTMLBody = REPLACE(@HTMLBody, N'&amp;gt;', N'>')
+
 
 -----------------------------------------------------------------------------------------------------
 --get notification status
