@@ -13,7 +13,8 @@ CREATE PROCEDURE [dbo].[usp_sqlAgentJobEmailStatusReport]
 		@logFileLocation		[nvarchar](512),
 		@module					[varchar](32),
 		@sendLogAsAttachment	[bit]=1,
-		@eventType				[smallint]=2
+		@eventType				[smallint]=2,
+		@currentlyRunning		[bit] = 1
 /* WITH ENCRYPTION */
 AS
 
@@ -67,7 +68,7 @@ FROM (
 						, [step_name]
 						, [run_status]
 						, SUBSTRING([run_date], 1, 4) + '-' + SUBSTRING([run_date], 5 ,2) + '-' + SUBSTRING([run_date], 7 ,2) AS [run_date]
-						, SUBSTRING([run_time], 1,2) + ':' + SUBSTRING([run_time], 3,2) + ':' + SUBSTRING([run_time], 5,2) AS [run_time]
+						, SUBSTRING([run_time], 1, 2) + ':' + SUBSTRING([run_time], 3, 2) + ':' + SUBSTRING([run_time], 5, 2) AS [run_time]
 						, SUBSTRING([run_duration], 1,2) + 'h ' + SUBSTRING([run_duration], 3,2) + 'm ' + SUBSTRING([run_duration], 5,2) + 's' AS [duration]
 						, [message]
 				FROM (		
@@ -81,7 +82,7 @@ FROM (
 														ELSE 'Unknown'
 								  END [run_status]
 								, CAST(h.[run_date] AS varchar) AS [run_date]
-								, CAST(h.[run_time] AS varchar) AS [run_time]
+								, REPLICATE('0', 6 - LEN(CAST(h.[run_time] AS varchar))) + CAST(h.[run_time] AS varchar) AS [run_time]
 								, CAST(h.[run_duration] AS varchar) AS [run_duration]
 								, CASE WHEN [run_status] IN (0, 2) THEN LEFT(h.[message], 256) ELSE '' END AS [message]
 						FROM [msdb].[dbo].[sysjobhistory] h
@@ -90,7 +91,7 @@ FROM (
 													FROM (	
 															SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
 															FROM [msdb].[dbo].[sysjobhistory] h
-															WHERE	h.[job_id]= @JobID
+															WHERE	h.[job_id]= @jobID
 																	AND h.[step_name] ='(Job outcome)'
 															ORDER BY h.[instance_id] DESC
 														)A
@@ -100,7 +101,7 @@ FROM (
 													FROM (	
 															SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
 															FROM [msdb].[dbo].[sysjobhistory] h
-															WHERE	h.[job_id]= @JobID
+															WHERE	h.[job_id]= @jobID
 																	AND h.[step_name] ='(Job outcome)'
 															ORDER BY h.[instance_id] DESC
 														)A
@@ -109,12 +110,42 @@ FROM (
 														SELECT TOP 1 [instance_id] 
 														FROM (	SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
 																FROM [msdb].[dbo].[sysjobhistory] h
-																WHERE	h.[job_id]= @JobID
+																WHERE	h.[job_id]= @jobID
 																		AND h.[step_name] ='(Job outcome)'
 																ORDER BY h.[instance_id] DESC
 															)A
 														)),0)
-								AND h.[job_id] = @JobID
+								AND h.[job_id] = @jobID
+								AND @currentlyRunning = 0
+						
+						UNION ALL
+
+						SELECT    h.[step_id]
+								, h.[step_name]
+								, CASE h.[run_status]	WHEN '0' THEN 'Failed'
+														WHEN '1' THEN 'Succeded'	
+														WHEN '2' THEN 'Retry'
+														WHEN '3' THEN 'Canceled'
+														WHEN '4' THEN 'In progress'
+														ELSE 'Unknown'
+								  END [run_status]
+								, CAST(h.[run_date] AS varchar) AS [run_date]
+								, REPLICATE('0', 6 - LEN(CAST(h.[run_time] AS varchar))) + CAST(h.[run_time] AS varchar) AS [run_time]
+								, CAST(h.[run_duration] AS varchar) AS [run_duration]
+								, CASE WHEN [run_status] IN (0, 2) THEN LEFT(h.[message], 256) ELSE '' END AS [message]
+						FROM [msdb].[dbo].[sysjobhistory] h
+						WHERE	 h.[instance_id] > ISNULL((
+															SELECT TOP 1 [instance_id] 
+															FROM (	
+																	SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+																	FROM [msdb].[dbo].[sysjobhistory] h
+																	WHERE	h.[job_id] = @jobID
+																			AND h.[step_name] ='(Job outcome)'
+																	ORDER BY h.[instance_id] DESC
+																)A
+															), 0)
+								AND h.[job_id] = @jobID
+								AND @currentlyRunning = 1
 					)A
 				)x										
 	)xmlData
@@ -129,38 +160,60 @@ IF @sendLogAsAttachment=0
 DECLARE @failedSteps [int]
 
 SELECT @failedSteps = COUNT(*)
-FROM [msdb].[dbo].[sysjobhistory] h
-WHERE	 h.[instance_id] < (
-							SELECT TOP 1 [instance_id] 
-							FROM (	
-									SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-									FROM [msdb].[dbo].[sysjobhistory] h
-									WHERE	h.[job_id]= @JobID
-											AND h.[step_name] ='(Job outcome)'
-									ORDER BY h.[instance_id] DESC
-								)A
-							) 
-		AND	h.[instance_id] > ISNULL(
-							( SELECT [instance_id] 
-							FROM (	
-									SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-									FROM [msdb].[dbo].[sysjobhistory] h
-									WHERE	h.[job_id]= @JobID
-											AND h.[step_name] ='(Job outcome)'
-									ORDER BY h.[instance_id] DESC
-								)A
-							WHERE [instance_id] NOT IN 
-								(
-								SELECT TOP 1 [instance_id] 
-								FROM (	SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-										FROM [msdb].[dbo].[sysjobhistory] h
-										WHERE	h.[job_id]= @JobID
-												AND h.[step_name] ='(Job outcome)'
-										ORDER BY h.[instance_id] DESC
-									)A
-								)),0)
-		AND h.[job_id] = @JobID
-		AND h.[run_status] = 0 /* Failed */
+FROM (
+		SELECT h.[instance_id]
+		FROM [msdb].[dbo].[sysjobhistory] h
+		WHERE	 h.[instance_id] < (
+									SELECT TOP 1 [instance_id] 
+									FROM (	
+											SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+											FROM [msdb].[dbo].[sysjobhistory] h
+											WHERE	h.[job_id]= @jobID
+													AND h.[step_name] ='(Job outcome)'
+											ORDER BY h.[instance_id] DESC
+										)A
+									) 
+				AND	h.[instance_id] > ISNULL(
+									( SELECT [instance_id] 
+									FROM (	
+											SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+											FROM [msdb].[dbo].[sysjobhistory] h
+											WHERE	h.[job_id]= @jobID
+													AND h.[step_name] ='(Job outcome)'
+											ORDER BY h.[instance_id] DESC
+										)A
+									WHERE [instance_id] NOT IN 
+										(
+										SELECT TOP 1 [instance_id] 
+										FROM (	SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+												FROM [msdb].[dbo].[sysjobhistory] h
+												WHERE	h.[job_id]= @jobID
+														AND h.[step_name] ='(Job outcome)'
+												ORDER BY h.[instance_id] DESC
+											)A
+										)),0)
+				AND h.[job_id] = @jobID
+				AND h.[run_status] = 0 /* Failed */
+				AND @currentlyRunning = 0
+						
+		UNION ALL
+
+		SELECT    h.[instance_id]
+		FROM [msdb].[dbo].[sysjobhistory] h
+		WHERE	 h.[instance_id] > ISNULL((
+											SELECT TOP 1 [instance_id] 
+											FROM (	
+													SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+													FROM [msdb].[dbo].[sysjobhistory] h
+													WHERE	h.[job_id] = @jobID
+															AND h.[step_name] ='(Job outcome)'
+													ORDER BY h.[instance_id] DESC
+												)A
+											), 0)
+				AND h.[job_id] = @jobID
+				AND h.[run_status] = 0 /* Failed */
+				AND @currentlyRunning = 1
+	)X
 
 EXEC [dbo].[usp_logEventMessageAndSendEmail] @projectCode		= NULL,
 											 @sqlServerName		= @@SERVERNAME,

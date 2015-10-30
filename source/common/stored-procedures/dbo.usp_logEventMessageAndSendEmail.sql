@@ -259,14 +259,16 @@ IF @eventType IN (2, 5)	AND @eventMessageXML IS NOT NULL
 									<TH>Run Status</TH>
 									<TH>Run Date</TH>
 									<TH>Run Time</TH>
-									<TH>Run Duration</TH>' +
+									<TH>Run Duration</TH>
+									<TH>Message</TH>' +
 								CAST ( ( 
 										SELECT	TD = [step_id], '',
 												TD = [step_name], '',
 												TD = [run_status], '',
 												TD = [run_date], '',
 												TD = [run_time], '',
-												TD = [duration], ''
+												TD = [duration], '',
+												TD = [message], ''
 										FROM (
 												SELECT  *
 												FROM    OPENXML(@handle, '/job-history/job-step', 2)  
@@ -276,7 +278,8 @@ IF @eventType IN (2, 5)	AND @eventMessageXML IS NOT NULL
 																[run_status]	[nvarchar](32),
 																[run_date]		[nvarchar](32),
 																[run_time]		[nvarchar](32),
-																[duration]		[nvarchar](32)
+																[duration]		[nvarchar](32),
+																[message]		[nvarchar](max)
 															)  
 											)x
 										FOR XML PATH('TR'), TYPE 
@@ -388,7 +391,7 @@ IF @eventType IN (5) AND @eventMessageXML IS NOT NULL
 
 		DECLARE @xmlBackupSet TABLE
 			(
-					[database_name]	[sysname]
+				  [database_name]	[sysname]
 				, [type]			[nvarchar](32)
 				, [start_date]		[nvarchar](32)
 				, [duration]		[nvarchar](32)
@@ -397,6 +400,15 @@ IF @eventType IN (5) AND @eventMessageXML IS NOT NULL
 				, [verified]		[nvarchar](8)
 				, [file_name]		[nvarchar](512)
 				, [error_code]		[int]
+			)
+
+
+		DECLARE @xmlSkippedActions TABLE
+			(
+				  [database_name]	[sysname]
+				, [backup_type]		[nvarchar](32)
+				, [date]			[nvarchar](32)
+				, [reason]			[nvarchar](512)
 			)
 
 		INSERT	INTO @xmlBackupSet([database_name], [type], [start_date], [duration], [size], [size_bytes], [verified], [file_name], [error_code])
@@ -421,6 +433,27 @@ IF @eventType IN (5) AND @eventMessageXML IS NOT NULL
 							)x CROSS APPLY [message_xml].nodes ('//backupset/detail') R(ref)								
 					)bs
 				WHERE [start_date] BETWEEN @jobStartTime AND GETDATE()
+
+
+		INSERT	INTO @xmlSkippedActions ([database_name], [backup_type], [date], [reason])
+				SELECT [database_name], [backup_type], [date], [reason]
+				FROM (
+						SELECT	  ref.value ('affected_object[1]', 'sysname') as [database_name]
+								, ref.value ('type[1]', 'nvarchar(32)') as [backup_type]
+								, ref.value ('date[1]', 'nvarchar(32)') as [date]
+								, ref.value ('reason[1]', 'nvarchar(512)') as [reason]
+						FROM (
+								SELECT	CAST([message] AS [xml]) AS [message_xml]
+								FROM	[dbo].[logEventMessages]
+								WHERE	[message] LIKE '<skipaction>%'
+										AND ISNULL([project_id], 0) = ISNULL(@projectID, 0)
+										AND ISNULL([instance_id], 0) = ISNULL(@instanceID, 0)
+										AND [event_type]=0
+										AND [event_name] = 'database backup'
+							)x CROSS APPLY [message_xml].nodes ('//skipaction/detail') R(ref)	
+					) sa
+				WHERE [date] BETWEEN @jobStartTime AND GETDATE()
+
 
 		SET @HTMLBody =@HTMLBody + N'<br><br>'
 		SET @HTMLBody =@HTMLBody + COALESCE(
@@ -451,6 +484,31 @@ IF @eventType IN (5) AND @eventMessageXML IS NOT NULL
 										FOR XML PATH('TR'), TYPE 
 							) AS NVARCHAR(MAX) ) +
 							N'</TABLE>', '') ;
+
+		IF (SELECT COUNT(*) FROM @xmlSkippedActions)>0
+			begin
+				SET @HTMLBody =@HTMLBody + N'<br><br>'
+				SET @HTMLBody =@HTMLBody + COALESCE(
+									N'<TABLE BORDER="1">' +
+									N'<TR>' +
+										N'	<TH>Database Name</TH>
+											<TH>Backup Type</TH>
+											<TH>Date</TH>
+											<TH>Reasob</TH>' +
+										CAST ( ( 
+												SELECT	TD = [database_name], '',
+														TD = [backup_type], '',
+														TD = [date], '',
+														TD = [reason], ''
+												FROM (
+														SELECT	TOP (100) PERCENT *
+														FROM @xmlSkippedActions							
+														ORDER BY [database_name]
+													)x
+												FOR XML PATH('TR'), TYPE 
+									) AS NVARCHAR(MAX) ) +
+									N'</TABLE>', '') ;
+			end
 
 		--if any of the backups had failed, send notification
 		IF @additionalOption=0

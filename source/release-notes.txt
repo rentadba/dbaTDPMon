@@ -346,3 +346,6 @@
 
 /* 29.10.2015 */
 	- add skipaction event message with information on skipped database backups and reasons
+
+/* 30.10.2015 */
+	- enhance email notification message for failing jobs
