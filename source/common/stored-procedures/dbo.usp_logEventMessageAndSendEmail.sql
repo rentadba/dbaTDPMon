@@ -372,7 +372,10 @@ IF @eventType IN (5) AND @eventMessageXML IS NOT NULL
 			
 		SELECT    @jobStartTime = MIN([job_step_start_time])
 		FROM	(
-					SELECT CONVERT([datetime], ([run_date] + ' ' + [run_time]), 120) AS [job_step_start_time]
+					SELECT CASE WHEN [run_date] IS NOT NULL AND [run_time] IS NOT NULL
+								THEN CONVERT([datetime], ([run_date] + ' ' + [run_time]), 120) 
+								ELSE GETDATE()
+							END AS [job_step_start_time]
 					FROM (
 							SELECT  *
 							FROM    OPENXML(@handle, '/job-history/job-step', 2)  
@@ -416,7 +419,7 @@ IF @eventType IN (5) AND @eventMessageXML IS NOT NULL
 				FROM (
 						SELECT	  ref.value ('database_name[1]', 'sysname') as [database_name]
 								, ref.value ('type[1]', 'nvarchar(32)') as [type]
-								, ref.value ('start_date[1]', 'datetime') as [start_date]
+								, ref.value ('start_date[1]', '[datetime]') as [start_date]
 								, ref.value ('duration[1]', 'nvarchar(32)') as [duration]
 								, ref.value ('size[1]', 'nvarchar(32)') as [size]
 								, ref.value ('size_bytes[1]', 'bigint') as [size_bytes]
@@ -440,7 +443,7 @@ IF @eventType IN (5) AND @eventMessageXML IS NOT NULL
 				FROM (
 						SELECT	  ref.value ('affected_object[1]', 'sysname') as [database_name]
 								, ref.value ('type[1]', 'nvarchar(32)') as [backup_type]
-								, ref.value ('date[1]', 'nvarchar(32)') as [date]
+								, ref.value ('date[1]', '[datetime]') as [date]
 								, ref.value ('reason[1]', 'nvarchar(512)') as [reason]
 						FROM (
 								SELECT	CAST([message] AS [xml]) AS [message_xml]
@@ -494,7 +497,7 @@ IF @eventType IN (5) AND @eventMessageXML IS NOT NULL
 										N'	<TH>Database Name</TH>
 											<TH>Backup Type</TH>
 											<TH>Date</TH>
-											<TH>Reasob</TH>' +
+											<TH>Reason</TH>' +
 										CAST ( ( 
 												SELECT	TD = [database_name], '',
 														TD = [backup_type], '',
