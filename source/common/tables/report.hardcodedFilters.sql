@@ -95,5 +95,7 @@ INSERT	INTO [report].[hardcodedFilters] ([module], [object_name], [filter_patter
 		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%SQL Server blocked access to procedure ''sys.xp_cmdshell'' of component ''xp_cmdshell''%', 1 UNION ALL
 		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Error: 18456, Severity: 14, State: %', 1 UNION ALL
 		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Login failed for user %', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%SQL Trace%', 1 
+		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%SQL Trace%', 1  UNION ALL
+		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%UTC adjustment%', 1  UNION ALL
+		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Default collation:%', 1 
 GO
