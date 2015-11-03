@@ -9,7 +9,7 @@ DROP PROCEDURE [dbo].[usp_sqlAgentJobEmailStatusReport]
 GO
 
 CREATE PROCEDURE [dbo].[usp_sqlAgentJobEmailStatusReport]
-		@sqlServerName			[sysname],
+		@sqlServerName			[sysname] = @@SERVERNAME,
 		@jobName				[sysname],
 		@logFileLocation		[nvarchar](512),
 		@module					[varchar](32),
@@ -90,7 +90,7 @@ IF @currentlyRunning = 0
 					, [run_status]
 					, SUBSTRING([run_date], 1, 4) + ''-'' + SUBSTRING([run_date], 5 ,2) + ''-'' + SUBSTRING([run_date], 7 ,2) AS [run_date]
 					, SUBSTRING([run_time], 1, 2) + '':'' + SUBSTRING([run_time], 3, 2) + '':'' + SUBSTRING([run_time], 5, 2) AS [run_time]
-					, SUBSTRING([run_duration], 1,2) + ''h '' + SUBSTRING([run_duration], 3,2) + ''m '' + SUBSTRING([run_duration], 5,2) + ''s'' AS [duration]
+					, SUBSTRING([run_duration], 1, 2) + ''h '' + SUBSTRING([run_duration], 3, 2) + ''m '' + SUBSTRING([run_duration], 5, 2) + ''s'' AS [duration]
 					, [message]
 			FROM (		
 					SELECT    h.[step_id]
@@ -104,7 +104,7 @@ IF @currentlyRunning = 0
 								END [run_status]
 							, CAST(h.[run_date] AS varchar) AS [run_date]
 							, REPLICATE(''0'', 6 - LEN(CAST(h.[run_time] AS varchar))) + CAST(h.[run_time] AS varchar) AS [run_time]
-							, CAST(h.[run_duration] AS varchar) AS [run_duration]
+							, REPLICATE(''0'', 6 - LEN(CAST(h.[run_duration] AS varchar))) + CAST(h.[run_duration] AS varchar) AS [run_duration]
 							, CASE WHEN [run_status] IN (0, 2) THEN LEFT(h.[message], 256) ELSE '''' END AS [message]
 					FROM [msdb].[dbo].[sysjobhistory] h
 					WHERE	 h.[instance_id] < (
@@ -145,7 +145,7 @@ ELSE
 					, [run_status]
 					, SUBSTRING([run_date], 1, 4) + ''-'' + SUBSTRING([run_date], 5 ,2) + ''-'' + SUBSTRING([run_date], 7 ,2) AS [run_date]
 					, SUBSTRING([run_time], 1, 2) + '':'' + SUBSTRING([run_time], 3, 2) + '':'' + SUBSTRING([run_time], 5, 2) AS [run_time]
-					, SUBSTRING([run_duration], 1,2) + ''h '' + SUBSTRING([run_duration], 3,2) + ''m '' + SUBSTRING([run_duration], 5,2) + ''s'' AS [duration]
+					, SUBSTRING([run_duration], 1, 2) + ''h '' + SUBSTRING([run_duration], 3, 2) + ''m '' + SUBSTRING([run_duration], 5, 2) + ''s'' AS [duration]
 					, [message]
 			FROM (		
 					SELECT    h.[step_id]
@@ -159,7 +159,7 @@ ELSE
 								END [run_status]
 							, CAST(h.[run_date] AS varchar) AS [run_date]
 							, REPLICATE(''0'', 6 - LEN(CAST(h.[run_time] AS varchar))) + CAST(h.[run_time] AS varchar) AS [run_time]
-							, CAST(h.[run_duration] AS varchar) AS [run_duration]
+							, REPLICATE(''0'', 6 - LEN(CAST(h.[run_duration] AS varchar))) + CAST(h.[run_duration] AS varchar) AS [run_duration]
 							, CASE WHEN [run_status] IN (0, 2) THEN LEFT(h.[message], 256) ELSE '''' END AS [message]
 					FROM [msdb].[dbo].[sysjobhistory] h
 					WHERE	 h.[instance_id] > ISNULL((
