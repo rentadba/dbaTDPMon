@@ -1,6 +1,8 @@
 USE [dbaTDPMon]
 GO
 
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
 UPDATE [dbo].[appConfigurations] SET [value] = N'2015.11.03' WHERE [module] = 'common' AND [name] = 'Application Version'
 GO
 
@@ -2332,4 +2334,6 @@ IF @errorCode = 0 AND ISNULL(@retentionDays,0) <> 0
 	end
 
 RETURN @errorCode
+GO
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
 GO

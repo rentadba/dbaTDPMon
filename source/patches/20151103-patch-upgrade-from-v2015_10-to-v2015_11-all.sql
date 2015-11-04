@@ -1,6 +1,9 @@
 USE [dbaTDPMon]
 GO
 
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+
 UPDATE [dbo].[appConfigurations] SET [value] = N'2015.11.03' WHERE [module] = 'common' AND [name] = 'Application Version'
 GO
 
@@ -1532,6 +1535,7 @@ IF @failedSteps <> 0
 
 GO
 
+
 RAISERROR('Create procedure: [dbo].[usp_reportHTMLBuildHealthCheck]', 10, 1) WITH NOWAIT
 GO
 IF  EXISTS (
@@ -1542,6 +1546,8 @@ IF  EXISTS (
 DROP PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 GO
 
+SET QUOTED_IDENTIFIER ON
+GO
 CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 		@projectCode			[varchar](32)=NULL,
 		@flgActions				[int]			= 63,		/*	1 - Instance Availability 
@@ -5493,6 +5499,7 @@ END CATCH
 
 RETURN @ReturnValue
 GO
+
 
 
 RAISERROR('Create procedure: [dbo].[usp_mpDatabaseBackup]', 10, 1) WITH NOWAIT

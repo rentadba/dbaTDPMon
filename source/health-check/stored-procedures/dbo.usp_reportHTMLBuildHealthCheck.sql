@@ -8,6 +8,8 @@ IF  EXISTS (
 DROP PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 GO
 
+SET QUOTED_IDENTIFIER ON
+GO
 CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 		@projectCode			[varchar](32)=NULL,
 		@flgActions				[int]			= 63,		/*	1 - Instance Availability 
