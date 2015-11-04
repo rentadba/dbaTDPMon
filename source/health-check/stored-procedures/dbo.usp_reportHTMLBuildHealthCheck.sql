@@ -1691,7 +1691,9 @@ BEGIN TRY
 																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																	AND rsr.[rule_id] = 33554432
 																																	AND rsr.[active] = 1
-																																	AND (rsr.[skip_value]=ssajh.[instance_name])
+																																	AND (    rsr.[skip_value]=ssajh.[instance_name]
+																																		 AND ISNULL(rsr.[skip_value2], '') = ISNULL(ssajh.[job_name], '') 
+																																		)
 																						WHERE ssajh.[last_execution_status] = 4
 																								AND ssajh.[last_execution_date] IS NOT NULL
 																								AND ssajh.[last_execution_time] IS NOT NULL

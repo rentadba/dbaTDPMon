@@ -32,7 +32,8 @@ CREATE TABLE [report].[htmlSkipRules]
 	(
 		[module],
 		[rule_id],
-		[skip_value]
+		[skip_value],
+		[skip_value2]
 	) ON [PRIMARY]
 )  ON [PRIMARY]
 GO
