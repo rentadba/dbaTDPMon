@@ -115,7 +115,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM [$(linkedServerName)].master.dbo.sysdatabases
-									WHERE [name] IN (''master'', ''model'', ''msdb'')
+									WHERE [name] IN (''master'', ''model'', ''msdb'', ''distribution'')
 		OPEN crsDatabases
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
@@ -173,7 +173,7 @@ IF DATEPART(dw, GETUTCDATE())<>7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM [$(linkedServerName)].master.dbo.sysdatabases
-									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
+									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'', ''distribution'')
 		OPEN crsDatabases
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
@@ -233,7 +233,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM [$(linkedServerName)].master.dbo.sysdatabases
-									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
+									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'', ''distribution'')
 		OPEN crsDatabases
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
@@ -443,7 +443,7 @@ http://dbaTDPMon.codeplex.com',
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM [$(linkedServerName)].master.dbo.sysdatabases
-									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
+									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'', ''distribution'')
 		OPEN crsDatabases
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
@@ -1092,7 +1092,7 @@ IF DATEPART(dw, GETUTCDATE())= 2
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM [$(linkedServerName)].master.dbo.sysdatabases
-									WHERE [name] IN (''master'', ''model'', ''msdb'')
+									WHERE [name] IN (''master'', ''model'', ''msdb'', ''distribution'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
 													 WHEN [status] & 128 = 128 THEN ''RECOVERING''
@@ -1154,7 +1154,7 @@ IF DATEPART(dw, GETUTCDATE())=7 AND DATEPART(dd, GETUTCDATE())<=7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM [$(linkedServerName)].master.dbo.sysdatabases
-									WHERE [name] IN (''master'', ''model'', ''msdb'', ''tempdb'')
+									WHERE [name] IN (''master'', ''model'', ''msdb'', ''tempdb'', ''distribution'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
 													 WHEN [status] & 128 = 128 THEN ''RECOVERING''
@@ -1449,7 +1449,7 @@ http://dbaTDPMon.codeplex.com',
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM [$(linkedServerName)].master.dbo.sysdatabases
-									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
+									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'', ''distribution'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
 													 WHEN [status] & 128 = 128 THEN ''RECOVERING''
@@ -1511,7 +1511,7 @@ IF DATEPART(dw, GETUTCDATE())=1
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM [$(linkedServerName)].master.dbo.sysdatabases
-									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
+									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'', ''distribution'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
 													 WHEN [status] & 128 = 128 THEN ''RECOVERING''
@@ -1573,7 +1573,7 @@ IF DATEPART(dw, GETUTCDATE())=1
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM [$(linkedServerName)].master.dbo.sysdatabases
-									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
+									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'', ''distribution'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
 													 WHEN [status] & 128 = 128 THEN ''RECOVERING''
@@ -1635,7 +1635,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM [$(linkedServerName)].master.dbo.sysdatabases
-									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
+									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'', ''distribution'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
 													 WHEN [status] & 128 = 128 THEN ''RECOVERING''
@@ -1697,7 +1697,7 @@ IF DATEPART(dw, GETUTCDATE())=2
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM [$(linkedServerName)].master.dbo.sysdatabases
-									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
+									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'', ''distribution'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
 													 WHEN [status] & 128 = 128 THEN ''RECOVERING''
@@ -1759,7 +1759,7 @@ IF DATEPART(dw, GETUTCDATE())=2
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM [$(linkedServerName)].master.dbo.sysdatabases
-									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
+									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'', ''distribution'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
 													 WHEN [status] & 128 = 128 THEN ''RECOVERING''
@@ -1821,7 +1821,7 @@ IF DATEPART(dw, GETUTCDATE())=2
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM [$(linkedServerName)].master.dbo.sysdatabases
-									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')	
+									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'', ''distribution'')	
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
 													 WHEN [status] & 128 = 128 THEN ''RECOVERING''
@@ -1883,7 +1883,7 @@ IF DATEPART(dw, GETUTCDATE())=2
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM [$(linkedServerName)].master.dbo.sysdatabases
-									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
+									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'', ''distribution'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
 													 WHEN [status] & 128 = 128 THEN ''RECOVERING''
@@ -1948,7 +1948,7 @@ IF DATEPART(dw, GETUTCDATE())= 2
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM [$(linkedServerName)].master.dbo.sysdatabases
-									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
+									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'', ''distribution'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
 													 WHEN [status] & 128 = 128 THEN ''RECOVERING''
@@ -2009,7 +2009,7 @@ IF DATEPART(dw, GETUTCDATE())=7 AND DATEPART(dd, GETUTCDATE())<=7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM [$(linkedServerName)].master.dbo.sysdatabases
-									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
+									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'', ''distribution'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
 													 WHEN [status] & 128 = 128 THEN ''RECOVERING''

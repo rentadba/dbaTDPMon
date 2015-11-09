@@ -57,7 +57,7 @@ INSERT	INTO [report].[hardcodedFilters] ([module], [object_name], [filter_patter
 		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%This is an informational message%user action is required%', 1 UNION ALL
 		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Analysis of database%complete (approximately%more seconds)%', 1 UNION ALL
 		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Microsoft Corporation%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Microsoft SQL Server%', 1 UNION ALL
+		SELECT 'health-check', 'statsSQLServerErrorlogDetails', 'Microsoft SQL Server%', 1 UNION ALL
 		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%All rights reserved.%', 1 UNION ALL
 		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Server process ID is%', 1 UNION ALL
 		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%System Manufacturer:%', 1 UNION ALL

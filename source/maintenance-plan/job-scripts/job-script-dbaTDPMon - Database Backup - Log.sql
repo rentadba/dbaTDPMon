@@ -106,7 +106,7 @@ http://dbaTDPMon.codeple.com',
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases
-									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'')
+									WHERE [name] NOT IN (''master'', ''model'', ''msdb'', ''tempdb'', ''distribution'')
 		OPEN crsDatabases
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0

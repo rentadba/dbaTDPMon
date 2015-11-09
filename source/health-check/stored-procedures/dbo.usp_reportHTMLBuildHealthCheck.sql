@@ -2225,7 +2225,7 @@ BEGIN TRY
 																							AND shcdd.[size_mb]>=@configDBMinSizeForAnalysis
 																							AND shcdd.[data_space_used_percent] <= @configDataSpaceMinPercent 
 																							AND @configDataSpaceMinPercent<>0
-																							AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb')
+																							AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb', 'distribution')
 																							AND rsr.[id] IS NULL
 																					ORDER BY --[reclaimable_space_mb] DESC, 
 																							 cin.[instance_name], cin.[machine_name], shcdd.[data_space_used_percent] DESC, cdn.[database_name]
@@ -2313,7 +2313,7 @@ BEGIN TRY
 																							AND shcdd.[size_mb]>=@configDBMinSizeForAnalysis
 																							AND shcdd.[log_space_used_percent] >= @configLogSpaceMaxPercent 
 																							AND @configLogSpaceMaxPercent<>0
-																							AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb')
+																							AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb', 'distribution')
 																							AND rsr.[id] IS NULL
 																					ORDER BY --[available_space_mb] DESC, 
 																							 cin.[instance_name], cin.[machine_name], shcdd.[data_space_used_percent] DESC, cdn.[database_name]
@@ -2404,7 +2404,7 @@ BEGIN TRY
 																										AND shcdd.[data_size_mb] <> 0
 																										AND (shcdd.[log_size_mb] / shcdd.[data_size_mb] * 100.) > @configLogVsDataPercent
 																										AND shcdd.[size_mb]>=@configDBMinSizeForAnalysis
-																										AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb')
+																										AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb', 'distribution')
 																										AND rsr.[id] IS NULL
 																							)X
 																						WHERE [log_vs_data] >= @configLogVsDataPercent
@@ -2810,10 +2810,10 @@ BEGIN TRY
 																							AND cdn.[active]=1
 																							AND cin.[project_id] = @projectID	
 																							AND (
-																									(    cdn.[database_name] NOT IN ('master', 'model', 'msdb') 
+																									(    cdn.[database_name] NOT IN ('master', 'model', 'msdb', 'distribution') 
 																										AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @configUserDatabaseBACKUPAgeDays
 																									)
-																								    OR (    cdn.[database_name] IN ('master', 'model', 'msdb') 
+																								    OR (    cdn.[database_name] IN ('master', 'model', 'msdb', 'distribution') 
 																										AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @configSystemDatabaseBACKUPAgeDays
 																									)
 																									OR (
@@ -2904,10 +2904,10 @@ BEGIN TRY
 																								AND cdn.[active]=1
 																								AND cin.[project_id] = @projectID	
 																								AND (
-																										(    cdn.[database_name] NOT IN ('master', 'model', 'msdb') 
+																										(    cdn.[database_name] NOT IN ('master', 'model', 'msdb', 'distribution') 
 																											AND DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) > @configUserDBCCCHECKDBAgeDays
 																										)
-																										OR (    cdn.[database_name] IN ('master', 'model', 'msdb') 
+																										OR (    cdn.[database_name] IN ('master', 'model', 'msdb', 'distribution') 
 																											AND DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) > @configSystemDBCCCHECKDBAgeDays
 																										)
 																										OR (
