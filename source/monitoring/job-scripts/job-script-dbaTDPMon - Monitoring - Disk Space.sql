@@ -134,6 +134,7 @@ WHILE @lastExecutionStatus = 4
 	
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'EXEC [dbo].[usp_hcJobQueueCreate]	@projectCode			= ' + CASE WHEN @projectCode IS NOT NULL THEN N'''' + @projectCode + '''' ELSE 'NULL' END + N',
+															@module					= ''monitoring'',
 															@sqlServerNameFilter	= ''%'',
 															@collectorDescriptor	= ''dbo.usp_hcCollectDiskSpaceUsage'',
 															@enableXPCMDSHELL		= 1,
@@ -159,7 +160,7 @@ WHILE @lastExecutionStatus = 4
 
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'EXEC [dbo].[usp_jobQueueExecute]	@projectCode			= ' + CASE WHEN @projectCode IS NOT NULL THEN N'''' + @projectCode + '''' ELSE 'NULL' END + N',
-															@moduleFilter			= ''health-check'',
+															@moduleFilter			= ''monitoring'',
 															@descriptorFilter		= ''dbo.usp_hcCollectDiskSpaceUsage'',
 															@waitForDelay			= ''00:00:05'',
 															@debugMode				= 0'

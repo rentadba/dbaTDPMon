@@ -10,6 +10,7 @@ GO
 
 CREATE PROCEDURE [dbo].[usp_hcJobQueueCreate]
 		@projectCode			[varchar](32)=NULL,
+		@module					[varchar](32)='health-check',
 		@sqlServerNameFilter	[sysname]='%',
 		@collectorDescriptor	[varchar](256)='%',
 		@enableXPCMDSHELL		[bit]=1,
@@ -94,7 +95,7 @@ WHILE @@FETCH_STATUS=0
 		WHERE [project_id] = @projectID
 				AND [instance_id] = @instanceID
 				AND [descriptor] = @codeDescriptor
-				AND [module] = 'health-check'
+				AND [module] = @module
 
 		------------------------------------------------------------------------------------------------------------------------------------------
 		IF @codeDescriptor = 'dbo.usp_hcCollectDatabaseDetails'
@@ -102,7 +103,7 @@ WHILE @@FETCH_STATUS=0
 				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 													   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 													   , [job_command])
-						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], 'health-check' AS [module], @codeDescriptor AS [descriptor],
+						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 								X.[instance_id] AS [for_instance_id], 
 								DB_NAME() + ' - ' + 'usp_hcCollectDatabaseDetails' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END AS [job_name],
 								'Run Collect'	AS [job_step_name],
@@ -130,7 +131,7 @@ WHILE @@FETCH_STATUS=0
 				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 													   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 													   , [job_command])
-						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], 'health-check' AS [module], @codeDescriptor AS [descriptor],
+						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 								X.[instance_id] AS [for_instance_id], 
 								DB_NAME() + ' - ' + 'usp_hcCollectSQLServerAgentJobsStatus' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END AS [job_name],
 								'Run Collect'	AS [job_step_name],
@@ -158,7 +159,7 @@ WHILE @@FETCH_STATUS=0
 				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 													   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 													   , [job_command])
-						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], 'health-check' AS [module], @codeDescriptor AS [descriptor],
+						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 								X.[instance_id] AS [for_instance_id], 
 								DB_NAME() + ' - ' + 'usp_hcCollectDiskSpaceUsage' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END AS [job_name],
 								'Run Collect'	AS [job_step_name],
@@ -188,7 +189,7 @@ WHILE @@FETCH_STATUS=0
 				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 													   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 													   , [job_command])
-						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], 'health-check' AS [module], @codeDescriptor AS [descriptor],
+						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 								X.[instance_id] AS [for_instance_id], 
 								DB_NAME() + ' - ' + 'usp_hcCollectErrorlogMessages' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END AS [job_name],
 								'Run Collect'	AS [job_step_name],
@@ -216,7 +217,7 @@ WHILE @@FETCH_STATUS=0
 				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 													   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 													   , [job_command])
-						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], 'health-check' AS [module], @codeDescriptor AS [descriptor],
+						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 								X.[instance_id] AS [for_instance_id], 
 								DB_NAME() + ' - ' + 'usp_hcCollectEventMessages' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END AS [job_name],
 								'Run Collect'	AS [job_step_name],
@@ -245,7 +246,7 @@ WHILE @@FETCH_STATUS=0
 				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor], [filter]
 													   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 													   , [job_command])
-						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], 'health-check' AS [module], @codeDescriptor AS [descriptor], L.[log_type_name],
+						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], L.[log_type_name],
 								X.[instance_id] AS [for_instance_id], 
 								DB_NAME() + ' - ' + 'hcCollectOSEventLogs' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END  + ' (' + L.[log_type_name] + ')' AS [job_name],
 								'Run Collect'	AS [job_step_name],

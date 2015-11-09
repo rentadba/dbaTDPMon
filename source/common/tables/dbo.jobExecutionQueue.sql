@@ -38,6 +38,7 @@ CREATE TABLE [dbo].[jobExecutionQueue]
 	) ON [FG_Statistics_Data],
 	CONSTRAINT [UK_jobExecutionQueue] UNIQUE
 	(
+		[module],
 		[for_instance_id],
 		[project_id],
 		[instance_id],
