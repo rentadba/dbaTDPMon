@@ -110,7 +110,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases
-									WHERE [name] IN (''master'', ''model'', ''msdb'', ''distribution'', ''distribution'')
+									WHERE [name] IN (''master'', ''model'', ''msdb'', ''distribution'')
 		OPEN crsDatabases
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
