@@ -96,6 +96,29 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@executionLevel			= @nestedExecutionLevel,
 										@debugMode				= @debugMode
 
+--------------------------------------------------------------------------------------------------
+/* AlwaysOn Availability Groups */
+DECLARE @agName			[sysname],
+		@agStopLimit	[int] = 0,
+		@actionType		[sysname] = NULL
+
+IF @flgActions &  64 = 64	SET @actionType = 'update space usage'
+IF @flgActions & 128 = 128	SET @actionType = 'clean wasted space - table'
+
+IF @serverVersionNum >= 11 AND @flgActions IS NOT NULL
+	EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @SQLServerName,
+																		@dbName				= @DBName,
+																		@actionName			= 'database maintenance',
+																		@actionType			= @actionType,
+																		@flgActions			= @flgActions,
+																		@flgOptions			= @flgOptions OUTPUT,
+																		@agName				= @agName OUTPUT,
+																		@executionLevel		= @executionLevel,
+																		@debugMode			= @DebugMode
+
+IF @agStopLimit <> 0
+	RETURN 0
+	
 ---------------------------------------------------------------------------------------------
 DECLARE @compatibilityLevel [tinyint]
 IF object_id('tempdb..#databaseCompatibility') IS NOT NULL 
@@ -328,7 +351,7 @@ IF @flgActions & 1 = 1
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 														@dbName			= @dbName,
 														@module			= 'dbo.usp_mpDatabaseConsistencyCheck',
-														@eventName		= 'database maintenance - consistency check',
+														@eventName		= 'database consistency check',
 														@queryToRun  	= @queryToRun,
 														@flgOptions		= @flgOptions,
 														@executionLevel	= @nestedExecutionLevel,
@@ -372,7 +395,7 @@ IF @flgActions & 2 = 2
 																@dbName			= @dbName,
 																@objectName		= @objectName,
 																@module			= 'dbo.usp_mpDatabaseConsistencyCheck',
-																@eventName		= 'database maintenance - consistency check - tables/views',
+																@eventName		= 'database consistency check - tables/views',
 																@queryToRun  	= @queryToRun,
 																@flgOptions		= @flgOptions,
 																@executionLevel	= @nestedExecutionLevel,
@@ -402,7 +425,7 @@ IF @flgActions & 4 = 4
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 														@dbName			= @dbName,
 														@module			= 'dbo.usp_mpDatabaseConsistencyCheck',
-														@eventName		= 'database maintenance - consistency check - allocation structures',
+														@eventName		= 'database consistency check - allocation structures',
 														@queryToRun  	= @queryToRun,
 														@flgOptions		= @flgOptions,
 														@executionLevel	= @nestedExecutionLevel,
@@ -427,7 +450,7 @@ IF @flgActions & 8 = 8
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 														@dbName			= @dbName,
 														@module			= 'dbo.usp_mpDatabaseConsistencyCheck',
-														@eventName		= 'database maintenance - consistency check - catalogs',
+														@eventName		= 'database consistency check - catalogs',
 														@queryToRun  	= @queryToRun,
 														@flgOptions		= @flgOptions,
 														@executionLevel	= @nestedExecutionLevel,
@@ -464,7 +487,7 @@ IF @flgActions & 16 = 16
 																@dbName			= @dbName,
 																@objectName		= @objectName,
 																@module			= 'dbo.usp_mpDatabaseConsistencyCheck',
-																@eventName		= 'database maintenance - consistency check - table constraints',
+																@eventName		= 'database consistency check - table constraints',
 																@queryToRun  	= @queryToRun,
 																@flgOptions		= @flgOptions,
 																@executionLevel	= @nestedExecutionLevel,
@@ -571,7 +594,7 @@ IF @flgActions & 32 = 32
 																		@dbName			= @dbName,
 																		@objectName		= @objectName,
 																		@module			= 'dbo.usp_mpDatabaseConsistencyCheck',
-																		@eventName		= 'database maintenance - consistency check - table identity value',
+																		@eventName		= 'database consistency check - table identity value',
 																		@queryToRun  	= @queryToRun,
 																		@flgOptions		= @flgOptions,
 																		@executionLevel	= @nestedExecutionLevel,

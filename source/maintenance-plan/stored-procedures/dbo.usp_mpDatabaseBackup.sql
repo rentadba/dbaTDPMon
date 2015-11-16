@@ -302,15 +302,16 @@ IF @flgOptions & 512 = 512
 DECLARE @agName			[sysname],
 		@agStopLimit	[int] = 0
 
-EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @sqlServerName,
-																	@dbName				= @dbName,
-																	@actionName			= 'database backup',
-																	@actionType			= @backupType,
-																	@flgActions			= @flgActions,
-																	@flgOptions			= @flgOptions OUTPUT,
-																	@agName				= @agName OUTPUT,
-																	@executionLevel		= @executionLevel,
-																	@debugMode			= @debugMode
+IF @serverVersionNum >= 11
+	EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @sqlServerName,
+																		@dbName				= @dbName,
+																		@actionName			= 'database backup',
+																		@actionType			= @backupType,
+																		@flgActions			= @flgActions,
+																		@flgOptions			= @flgOptions OUTPUT,
+																		@agName				= @agName OUTPUT,
+																		@executionLevel		= @executionLevel,
+																		@debugMode			= @debugMode
 
 IF @agStopLimit <> 0
 	RETURN 0

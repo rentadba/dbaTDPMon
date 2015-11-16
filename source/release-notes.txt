@@ -356,5 +356,8 @@
 /* 03.11.2015 */
 	- version 2015.11 released
 
-/* 30.10.2015 */
+/* 09.11.2015 */
 	- fixed small bugs on monitoring mechanisms
+
+/* 16.10.2015 */
+	- enhance AlwaysOn Availability Groups support; secondary replicas restrictions

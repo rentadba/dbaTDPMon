@@ -179,6 +179,32 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @SQLServerName,
 										@debugMode				= @DebugMode
 ---------------------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------------------------------
+/* AlwaysOn Availability Groups */
+DECLARE @agName			[sysname],
+		@agStopLimit	[int] = 0,
+		@actionType		[sysname]
+
+IF @flgActions &  1 =  1	SET @actionType = 'reorganize index'
+IF @flgActions &  2 =  2	SET @actionType = 'rebuilding index'
+IF @flgActions &  4 =  4	SET @actionType = 'rebuilding index'
+IF @flgActions &  8 =  8	SET @actionType = 'update statistics'
+IF @flgActions & 16 = 16	SET @actionType = 'rebuilding heap'
+
+IF @serverVersionNum >= 11
+	EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @SQLServerName,
+																		@dbName				= @DBName,
+																		@actionName			= 'database maintenance',
+																		@actionType			= @actionType,
+																		@flgActions			= @flgActions,
+																		@flgOptions			= @flgOptions OUTPUT,
+																		@agName				= @agName OUTPUT,
+																		@executionLevel		= @executionLevel,
+																		@debugMode			= @DebugMode
+
+IF @agStopLimit <> 0
+	RETURN 0
+
 ---------------------------------------------------------------------------------------------
 DECLARE @compatibilityLevel [tinyint]
 IF object_id('tempdb..#databaseCompatibility') IS NOT NULL 

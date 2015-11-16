@@ -69,6 +69,43 @@ CREATE TABLE #databaseFiles(
 							)
 
 ---------------------------------------------------------------------------------------------
+--get destination server running version/edition
+DECLARE		@serverEdition					[sysname],
+			@serverVersionStr				[sysname],
+			@serverVersionNum				[numeric](9,6)
+
+SET @nestedExecutionLevel = @executionLevel + 1
+EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @SQLServerName,
+										@serverEdition			= @serverEdition OUT,
+										@serverVersionStr		= @serverVersionStr OUT,
+										@serverVersionNum		= @serverVersionNum OUT,
+										@executionLevel			= @nestedExecutionLevel,
+										@debugMode				= @DebugMode
+
+--------------------------------------------------------------------------------------------------
+/* AlwaysOn Availability Groups */
+DECLARE @agName			[sysname],
+		@agStopLimit	[int] = 0,
+		@actionType		[sysname] = NULL
+
+IF @flgActions & 1 = 1	SET @actionType = 'shrink log'
+IF @flgActions & 2 = 2	SET @actionType = 'shrink database'
+
+IF @serverVersionNum >= 11 AND @flgActions IS NOT NULL
+	EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @SQLServerName,
+																		@dbName				= @DBName,
+																		@actionName			= 'database shrink',
+																		@actionType			= @actionType,
+																		@flgActions			= @flgActions,
+																		@flgOptions			= @flgOptions OUTPUT,
+																		@agName				= @agName OUTPUT,
+																		@executionLevel		= @executionLevel,
+																		@debugMode			= @DebugMode
+
+IF @agStopLimit <> 0
+	RETURN 0
+
+---------------------------------------------------------------------------------------------
 SET @errorCode	 = 1
 ---------------------------------------------------------------------------------------------
 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
