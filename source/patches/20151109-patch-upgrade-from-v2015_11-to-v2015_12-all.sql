@@ -1435,12 +1435,17 @@ BEGIN TRY
 			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
-			SELECT    @idx = COUNT(*)
+			SELECT     @idx = COUNT(DISTINCT lsam.[message])
 			FROM [dbo].[vw_catalogInstanceNames]  cin
 			INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+			LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+														AND rsr.[rule_id] = 256
+														AND rsr.[active] = 1
+														AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 			WHERE	cin.[instance_active]=1
 					AND cin.[project_id] = @projectID
 					AND lsam.descriptor IN (N'dbo.usp_hcCollectDatabaseDetails')
+					AND rsr.[id] IS NULL
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasesStatusPermissionErrorsCount}', '(' + CAST((@idx) AS [nvarchar]) + ')')
 		end
