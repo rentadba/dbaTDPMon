@@ -361,3 +361,6 @@
 
 /* 16.10.2015 */
 	- enhance AlwaysOn Availability Groups support; secondary replicas restrictions
+
+/* 24.10.2015 */
+	- add custom alert & monitoring for Replication Subscription Status & Latency

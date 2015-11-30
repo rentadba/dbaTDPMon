@@ -42,5 +42,6 @@ RAISERROR('		...insert default data', 10, 1) WITH NOWAIT
 GO
 INSERT	INTO [monitoring].[alertThresholds] ([category], [alert_name], [operator], [warning_limit], [critical_limit])
 		SELECT 'disk-space', 'Logical Disk: Free Disk Space (%)', '<',     8.0,    5.0 UNION ALL
-		SELECT 'disk-space', 'Logical Disk: Free Disk Space (MB)', '<', 3000.0, 2048.0
+		SELECT 'disk-space', 'Logical Disk: Free Disk Space (MB)', '<', 3000.0, 2048.0  UNION ALL
+		SELECT 'replication', 'Replication Latency', '>', 15.0, 20.0
 GO

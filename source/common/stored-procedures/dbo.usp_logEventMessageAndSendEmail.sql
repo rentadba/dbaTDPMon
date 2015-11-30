@@ -211,6 +211,7 @@ IF @eventType=6	AND @eventMessageXML IS NOT NULL
 		SET @HTMLBody =@HTMLBody + COALESCE(
 								CAST ( ( 
 										SELECT	
+												li = 'target-name: ' + [target_name], '',
 												li = 'machine-name: ' + [machine_name], '',
 												li = 'measure-unit: ' + [measure_unit], '',
 												li = 'current-value: ' + CAST([current_value] AS [varchar](32)), '',
@@ -229,7 +230,7 @@ IF @eventType=6	AND @eventMessageXML IS NOT NULL
 																[instance_name]				[sysname],
 																[machine_name]				[sysname],
 																[counter_name]				[sysname],
-																[target_name]				[sysname],
+																[target_name]				[nvarchar](512),
 																[measure_unit]				[sysname],
 																[current_value]				[numeric](18,3),
 																[current_percentage]		[numeric](18,3),

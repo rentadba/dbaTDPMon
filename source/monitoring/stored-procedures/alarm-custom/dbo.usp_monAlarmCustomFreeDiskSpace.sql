@@ -182,8 +182,7 @@ DECLARE crsDiskSpaceAlarms CURSOR FOR	SELECT  DISTINCT
 													)
 												AND (dsi.[logical_drive] IN ('C') OR CHARINDEX(dsi.[logical_drive], cdd.[physical_drives])>0)
 												AND asr.[id] IS NULL
-												AND (@criticalFreeDiskMinSpaceMB IS NOT NULL AND @criticalFreeDiskMinPercent IS NOT NULL)
-										
+												AND (@criticalFreeDiskMinSpaceMB IS NOT NULL AND @criticalFreeDiskMinPercent IS NOT NULL)										
 										ORDER BY [instance_name], [object_name]
 OPEN crsDiskSpaceAlarms
 FETCH NEXT FROM crsDiskSpaceAlarms INTO @instanceName, @objectName, @severity, @eventName, @eventMessage
