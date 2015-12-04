@@ -182,8 +182,10 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @SQLServerName,
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
 DECLARE @agName			[sysname],
-		@agStopLimit	[int] = 0,
+		@agStopLimit	[int],
 		@actionType		[sysname]
+
+SET @agStopLimit = 0
 
 IF @flgActions &  1 =  1	SET @actionType = 'reorganize index'
 IF @flgActions &  2 =  2	SET @actionType = 'rebuilding index'
@@ -644,19 +646,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 												, (ABS(sp.[modification_counter]) * 100. / sp.[rows]) AS [percent_changes]
 										FROM [' + @DBName + '].sys.stats ss
 										INNER JOIN [' + @DBName + '].sys.objects ob	ON ob.[object_id] = ss.[object_id]
-										INNER JOIN [' + @DBName + '].sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]' +
-										CASE WHEN @flgOptions & 32768 = 32768 
-											THEN N'
-										INNER JOIN
-												(
-													 SELECT   [object_id]
-															, SUM([reserved_page_count]) as [reserved_page_count]
-													 FROM [' + @DBName + '].sys.dm_db_partition_stats
-													 GROUP BY [object_id]
-													 HAVING SUM([reserved_page_count]) >=' + CAST(@PageThreshold AS [nvarchar](32)) + N'
-												) ps ON ps.[object_id] = ob.[object_id]'
-											ELSE N''
-											END + N'
+										INNER JOIN [' + @DBName + '].sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]' + N'
 										CROSS APPLY [' + @DBName + '].sys.dm_db_stats_properties(ss.object_id, ss.stats_id) AS sp
 										WHERE	ob.[name] LIKE ''' + @TableName + '''
 												AND sc.[name] LIKE ''' + @TableSchema + '''
@@ -690,19 +680,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 										FROM [' + @DBName + '].sys.stats ss
 										INNER JOIN [' + @DBName + '].sys.objects ob	ON ob.[object_id] = ss.[object_id]
 										INNER JOIN [' + @DBName + '].sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]
-										INNER JOIN [' + @DBName + ']..sysindexes si ON si.[id] = ob.[object_id] AND si.[name] = ss.[name]' +
-										CASE WHEN @flgOptions & 32768 = 32768 
-											THEN N'
-										INNER JOIN
-												(
-													 SELECT   [object_id]
-															, SUM([reserved_page_count]) as [reserved_page_count]
-													 FROM [' + @DBName + '].sys.dm_db_partition_stats
-													 GROUP BY [object_id]
-													 HAVING SUM([reserved_page_count]) >=' + CAST(@PageThreshold AS [nvarchar](32)) + N'
-												) ps ON ps.[object_id] = ob.[object_id]'
-											ELSE N''
-											END + N'
+										INNER JOIN [' + @DBName + ']..sysindexes si ON si.[id] = ob.[object_id] AND si.[name] = ss.[name]' + N'
 										WHERE	ob.[name] LIKE ''' + @TableName + '''
 												AND sc.[name] LIKE ''' + @TableSchema + '''
 												AND ob.[type] <> ''S''

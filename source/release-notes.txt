@@ -359,8 +359,14 @@
 /* 09.11.2015 */
 	- fixed small bugs on monitoring mechanisms
 
-/* 16.10.2015 */
+/* 16.11.2015 */
 	- enhance AlwaysOn Availability Groups support; secondary replicas restrictions
 
-/* 24.10.2015 */
+/* 24.11.2015 */
 	- add custom alert & monitoring for Replication Subscription Status & Latency
+
+/*----------------------------------------------------------------------*/
+/* December 2015 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 04.12.2015 */
+	- fix small bugs on maintenance-plans
