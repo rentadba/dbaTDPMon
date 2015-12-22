@@ -99,8 +99,11 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
 DECLARE @agName			[sysname],
-		@agStopLimit	[int] = 0,
-		@actionType		[sysname] = NULL
+		@agStopLimit	[int],
+		@actionType		[sysname]
+
+SET @agStopLimit = 0
+SET @actionType = NULL
 
 IF @flgActions &  64 = 64	SET @actionType = 'update space usage'
 IF @flgActions & 128 = 128	SET @actionType = 'clean wasted space - table'

@@ -300,8 +300,9 @@ IF @flgOptions & 512 = 512
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
 DECLARE @agName			[sysname],
-		@agStopLimit	[int] = 0
+		@agStopLimit	[int]
 
+SET @agStopLimit = 0
 IF @serverVersionNum >= 11
 	EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @sqlServerName,
 																		@dbName				= @dbName,

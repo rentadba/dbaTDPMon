@@ -85,8 +85,11 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @SQLServerName,
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
 DECLARE @agName			[sysname],
-		@agStopLimit	[int] = 0,
-		@actionType		[sysname] = NULL
+		@agStopLimit	[int],
+		@actionType		[sysname]
+
+SET @agStopLimit = 0
+SET @actionType = NULL
 
 IF @flgActions & 1 = 1	SET @actionType = 'shrink log'
 IF @flgActions & 2 = 2	SET @actionType = 'shrink database'

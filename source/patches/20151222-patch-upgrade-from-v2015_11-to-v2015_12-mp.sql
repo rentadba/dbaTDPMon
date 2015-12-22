@@ -1060,8 +1060,11 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @SQLServerName,
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
 DECLARE @agName			[sysname],
-		@agStopLimit	[int] = 0,
-		@actionType		[sysname] = NULL
+		@agStopLimit	[int],
+		@actionType		[sysname]
+
+SET @agStopLimit = 0
+SET @actionType = NULL
 
 IF @flgActions & 1 = 1	SET @actionType = 'shrink log'
 IF @flgActions & 2 = 2	SET @actionType = 'shrink database'
@@ -1287,8 +1290,11 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
 DECLARE @agName			[sysname],
-		@agStopLimit	[int] = 0,
-		@actionType		[sysname] = NULL
+		@agStopLimit	[int],
+		@actionType		[sysname]
+
+SET @agStopLimit = 0
+SET @actionType = NULL
 
 IF @flgActions &  64 = 64	SET @actionType = 'update space usage'
 IF @flgActions & 128 = 128	SET @actionType = 'clean wasted space - table'
@@ -2215,7 +2221,9 @@ IF @flgOptions & 512 = 512
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
 DECLARE @agName			[sysname],
-		@agStopLimit	[int] = 0
+		@agStopLimit	[int]
+
+SET @agStopLimit = 0
 
 IF @serverVersionNum >= 11
 	EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @sqlServerName,
