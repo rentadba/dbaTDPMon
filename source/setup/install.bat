@@ -263,6 +263,9 @@ if errorlevel 1 goto install_err
 if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpCheckIndexOnlineOperation.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpCheckAvailabilityGroupLimitations.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpMarkInternalAction.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -447,8 +450,8 @@ echo *--------------------------------------------------------------------------
 sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - Disk Space.sql" -d %dbname% -v dbName=%dbname% projectCode=%project% -b -r 1
 if errorlevel 1 goto install_err
 
-rem sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - Replication.sql" -d %dbname% -v dbName=%dbname% projectCode=%project% -b -r 1
-rem if errorlevel 1 goto install_err
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - Replication.sql" -d %dbname% -v dbName=%dbname% projectCode=%project% -b -r 1
+if errorlevel 1 goto install_err
 
 
 if %module%=="all" goto done

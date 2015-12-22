@@ -106,15 +106,15 @@ IF @flgActions &  64 = 64	SET @actionType = 'update space usage'
 IF @flgActions & 128 = 128	SET @actionType = 'clean wasted space - table'
 
 IF @serverVersionNum >= 11 AND @flgActions IS NOT NULL
-	EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @SQLServerName,
-																		@dbName				= @DBName,
+	EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @sqlServerName,
+																		@dbName				= @dbName,
 																		@actionName			= 'database maintenance',
 																		@actionType			= @actionType,
 																		@flgActions			= @flgActions,
 																		@flgOptions			= @flgOptions OUTPUT,
 																		@agName				= @agName OUTPUT,
 																		@executionLevel		= @executionLevel,
-																		@debugMode			= @DebugMode
+																		@debugMode			= @debugMode
 
 IF @agStopLimit <> 0
 	RETURN 0
