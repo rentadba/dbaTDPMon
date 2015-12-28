@@ -3441,7 +3441,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'
 /* only once a week on Saturday */
-IF DATEPART(dw, GETUTCDATE())=7 AND EXISTS (SELECT * FROM sys.databases WHERE [name]=''distribution'')
+IF DATEPART(dw, GETUTCDATE())=7 AND EXISTS (SELECT * FROM master..sysdatabases WHERE [name]=''distribution'')
 	EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= @@SERVERNAME,
 												@dbName					= ''distribution'',
 												@tableSchema			= ''%'',
