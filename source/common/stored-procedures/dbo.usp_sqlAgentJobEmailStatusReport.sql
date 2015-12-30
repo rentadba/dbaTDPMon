@@ -30,7 +30,7 @@ SET NOCOUNT ON
 -- Module			 : Database Analysis & Performance Monitoring
 -- ============================================================================
 
-DECLARE @eventMessageData			[varchar](8000),
+DECLARE @eventMessageData			[varchar](max),
 		@jobID						[uniqueidentifier],
 		@strMessage					[nvarchar](512),
 		@lastCompletionInstanceID	[int],
@@ -181,41 +181,21 @@ IF @debugMode=1	PRINT @queryToRun
 INSERT	INTO #jobHistory([step_id], [step_name], [run_status], [run_date], [run_time], [duration], [message])
 		EXEC (@queryToRun)
 
-UPDATE #jobHistory	SET [message] = REPLACE([message], '&', '&amp;')
-UPDATE #jobHistory	SET [message] = REPLACE([message], '<', '&lt;')
-UPDATE #jobHistory	SET [message] = REPLACE([message], '>', '&gt;')
-UPDATE #jobHistory	SET [message] = REPLACE([message], '"', '&quot;')
-UPDATE #jobHistory	SET [message] = REPLACE([message], '&', '&amp;')
-UPDATE #jobHistory	SET [message] = REPLACE([message], '''', '&apos;')
-
-
 -----------------------------------------------------------------------------------------------------
-SET @eventMessageData = '<job-history>'
+SET @eventMessageData = ''
+SELECT @eventMessageData = @eventMessageData + 
+							'<job-step>' + 
+							'<step_id>' + CAST(ISNULL([step_id], 0) AS [varchar](32)) + '</step_id>' + 
+							'<step_name>' + REPLACE(ISNULL([step_name], ''), '&', '&amp;') + '</step_name>' + 
+							'<run_status>' + ISNULL([run_status], '') + '</run_status>' + 
+							'<run_date>' + ISNULL([run_date], '') + '</run_date>' + 
+							'<run_time>' + ISNULL([run_time], '') + '</run_time>' + 
+							'<duration>' + ISNULL([duration], '') + '</duration>' +
+							'<message>' + REPLACE(ISNULL([message], ''), '&', '&amp;') + '</message>' +
+							'</job-step>'
+FROM #jobHistory
 
-SELECT @eventMessageData = @eventMessageData + [job_step_detail]
-FROM (
-		SELECT	'<job-step>' + 
-				'<step_id>' + CAST([step_id] AS [varchar](32)) + '</step_id>' + 
-				'<step_name>' + [step_name] + '</step_name>' + 
-				'<run_status>' + [run_status] + '</run_status>' + 
-				'<run_date>' + [run_date] + '</run_date>' + 
-				'<run_time>' + [run_time] + '</run_time>' + 
-				'<duration>' + [duration] + '</duration>' +
-				'<message>' + [message] + '</message>' +
-				'</job-step>' AS [job_step_detail] 
-		FROM (
-				SELECT	  [step_id]
-						, [step_name]
-						, [run_status]
-						, [run_date]
-						, [run_time]
-						, [duration]
-						, [message]
-				FROM #jobHistory
-			)x										
-	)xmlData
-
-SET @eventMessageData = @eventMessageData + '</job-history>'
+SET @eventMessageData = '<job-history>' + @eventMessageData + '</job-history>'
 
 IF @sendLogAsAttachment=0
 	SET @logFileLocation = NULL
@@ -244,5 +224,4 @@ IF @failedSteps <> 0
 		SET @strMessage = 'Job execution failed. See individual steps status.'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=1
 	end
-
 GO

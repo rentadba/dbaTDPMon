@@ -370,3 +370,6 @@
 /*----------------------------------------------------------------------*/
 /* 04.12.2015 */
 	- fix small bugs on maintenance-plans
+
+/* 29.12.2015 */
+	- fix small bugs on maintenance-plans

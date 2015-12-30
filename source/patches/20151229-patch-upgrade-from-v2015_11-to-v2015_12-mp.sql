@@ -1,3 +1,246 @@
+USE [dbaTDPMon]
+GO
+
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+UPDATE [dbo].[appConfigurations] SET [value] = N'2015.12.29' WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+
+IF EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='logEventMessages' AND COLUMN_NAME='message' AND CHARACTER_MAXIMUM_LENGTH<>-1)
+	ALTER TABLE [dbo].[logEventMessages] ALTER COLUMN [message] [varchar](max)
+GO
+
+RAISERROR('Create procedure: [dbo].[usp_sqlExecuteAndLog]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sysobjects 
+	     WHERE id = OBJECT_ID(N'[dbo].[usp_sqlExecuteAndLog]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_sqlExecuteAndLog]
+GO
+
+-----------------------------------------------------------------------------------------
+CREATE PROCEDURE [dbo].[usp_sqlExecuteAndLog]
+		@sqlServerName			[sysname],
+		@dbName					[sysname] = NULL,
+		@objectName				[nvarchar](512) = NULL,
+		@childObjectName		[sysname] = NULL,
+		@module					[sysname] = NULL,
+		@eventName				[nvarchar](256) = NULL,
+		@queryToRun  			[nvarchar](4000) = NULL,
+		@flgOptions				[int]=32,
+		@executionLevel			[tinyint]= 0,
+		@debugMode				[bit]=0
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 23.03.2015
+-- Module			 : Database Maintenance Plan 
+--					 : SQL Server 2000/2005/2008/2008R2/2012+
+-- Description		 : run SQL command and log action
+-- ============================================================================
+
+DECLARE		@queryParameters				[nvarchar](512),
+			@tmpSQL		  					[nvarchar](2048),
+			@tmpServer						[varchar](256),
+			@ReturnValue					[int]
+
+DECLARE		@projectID						[smallint],
+			@instanceID						[smallint],
+			@errorCode						[int],
+			@durationSeconds				[bigint],
+			@eventData						[varchar](8000)
+			
+SET NOCOUNT ON
+
+
+---------------------------------------------------------------------------------------------
+--get default project id / instance id
+SELECT	@projectID = [id]
+FROM	[dbo].[catalogProjects]
+WHERE	[code] IN ( 
+					SELECT	[value]
+					FROM	[dbo].[appConfigurations]
+					WHERE	[name] = 'Default project code'
+							AND [module] = 'common'
+				  )
+
+SELECT  @instanceID = [id] 
+FROM	[dbo].[catalogInstanceNames]  
+WHERE	[name] = @sqlServerName
+		AND [project_id] = @projectID
+
+---------------------------------------------------------------------------------------------
+DECLARE @logEventActions	[nvarchar](32)
+
+SELECT	@logEventActions = LOWER([value])
+FROM	[dbo].[appConfigurations]
+WHERE	[name]='Log action events'
+		AND [module] = 'common'
+
+
+---------------------------------------------------------------------------------------------
+--get destination server running version/edition
+DECLARE		@serverEdition					[sysname],
+			@serverVersionStr				[sysname],
+			@serverVersionNum				[numeric](9,6),
+			@nestedExecutionLevel			[tinyint]
+
+SET @nestedExecutionLevel = @executionLevel + 1
+
+EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
+										@serverEdition			= @serverEdition OUT,
+										@serverVersionStr		= @serverVersionStr OUT,
+										@serverVersionNum		= @serverVersionNum OUT,
+										@executionLevel			= @nestedExecutionLevel,
+										@debugMode				= @debugMode
+
+--------------------------------------------------------------------------------------------------
+SET @tmpServer='[' + @sqlServerName + '].[' + ISNULL(@dbName, 'master') + '].[dbo].[sp_executesql]'
+
+IF @serverVersionNum >= 9
+	SET @tmpSQL = N'DECLARE @startTime [datetime]
+
+					BEGIN TRY
+						SET @startTime = GETDATE()
+						
+						EXEC @tmpServer @queryToRun
+
+						SET @errorCode = 0
+						SET @durationSeconds=DATEDIFF(ss, @startTime, GETDATE())
+					END TRY
+
+					BEGIN CATCH
+						DECLARE   @flgRaiseErrorAndStop [bit]
+								, @errorString			[nvarchar](max)
+								, @eventMessageData		[varchar](8000)
+
+						SET @errorString = ERROR_MESSAGE()
+						SET @errorCode = ERROR_NUMBER()
+						SET @durationSeconds=DATEDIFF(ss, @startTime, GETDATE())
+
+						IF LEFT(@errorString, 2)=''--'' 
+							SET @errorString = LTRIM(SUBSTRING(@errorString, 3, LEN(@errorString)))
+
+						SET @flgRaiseErrorAndStop = CASE WHEN @flgOptions & 32 = 32 THEN 1 ELSE 0 END
+						
+						SET @eventMessageData = ''<alert><detail>'' + 
+												''<error_code>'' + CAST(@errorCode AS [varchar](32)) + ''</error_code>'' + 
+												''<error_string>'' + @errorString + ''</error_string>'' + 
+												''<query_executed>'' + @queryToRun + ''</query_executed>'' + 
+												''<duration_seconds>'' + CAST(@durationSeconds AS [varchar](32)) + ''</duration_seconds>'' + 
+												''<event_date_utc>'' + CONVERT([varchar](20), GETUTCDATE(), 120) + ''</event_date_utc>'' + 
+												''</detail></alert>''
+
+						EXEC [dbo].[usp_logEventMessageAndSendEmail]	@sqlServerName			= @sqlServerName,
+																		@dbName					= @dbName,
+																		@objectName				= @objectName,
+																		@childObjectName		= @childObjectName,
+																		@module					= @module,
+																		@eventName				= @eventName,
+																		@eventMessage			= @eventMessageData,
+																		@eventType				= 1
+
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @errorString, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=@flgRaiseErrorAndStop
+					END CATCH'
+ELSE
+	SET @tmpSQL = N'DECLARE   @startTime			[datetime]
+					
+					SET @startTime = GETDATE()
+					
+					EXEC @tmpServer @queryToRun
+					
+					SET @errorCode=@@ERROR
+					SET @durationSeconds=DATEDIFF(ss, @startTime, GETDATE())
+
+					IF @errorCode<>0
+						begin
+							DECLARE   @flgRaiseErrorAndStop [bit]
+									, @errorString			[nvarchar](255)
+									, @eventData			[varchar](8000)
+
+							SELECT @errorString = [description]
+							FROM master.dbo.sysmessages 
+							WHERE [error] = @errorCode
+
+							SET @flgRaiseErrorAndStop = CASE WHEN @flgOptions & 32 = 32 THEN 1 ELSE 0 END
+							
+							SET @eventData = ''<alert><detail>'' + 
+												''<error_code>'' + CAST(@errorCode AS [varchar](32)) + ''</error_code>'' + 
+												''<error_string>'' + ISNULL(@errorString, '''') + ''</error_string>'' + 
+												''<query_executed>'' + @queryToRun + ''</query_executed>'' + 
+												''<duration_seconds>'' + CAST(@durationSeconds AS [varchar](32)) + ''</duration_seconds>'' + 
+											''</detail></alert>''
+
+							EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+																@dbName			= @dbName,
+																@objectName		= @objectName,
+																@childObjectName= @childObjectName,
+																@module			= @module,
+																@eventName		= @eventName,
+																@eventMessage	= @eventData,
+																@eventType		= 1
+
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @errorString, @stopExecution=0
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @stopExecution=@flgRaiseErrorAndStop
+						end'
+
+SET @queryParameters=N'@tmpServer [nvarchar](512), @queryToRun [nvarchar](2048), @flgOptions [int], @module [sysname], @eventName [nvarchar](512), @sqlServerName [sysname], @dbName [sysname], @objectName [nvarchar](512), @childObjectName [sysname], @errorCode [int] OUTPUT, @durationSeconds [bigint] OUTPUT'
+
+
+--------------------------------------------------------------------------------------------------
+--running action
+SET @errorCode=0
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpServer, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @tmpSQL, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+EXEC sp_executesql @tmpSQL, @queryParameters, @tmpServer		= @tmpServer
+											, @queryToRun		= @queryToRun
+											, @flgOptions		= @flgOptions
+											, @eventName		= @eventName
+											, @module			= @module
+											, @sqlServerName	= @sqlServerName
+											, @dbName			= @dbName
+											, @objectName		= @objectName
+											, @childObjectName	= @childObjectName
+											, @errorCode		= @errorCode OUT
+											, @durationSeconds	= @durationSeconds OUT
+
+--------------------------------------------------------------------------------------------------
+--logging action
+IF @logEventActions = 'true'
+	begin
+		SET @eventData = '<action><detail>' + 
+							CASE WHEN @dbName IS NOT NULL THEN '<database_name>' + @dbName + '</database_name>' ELSE N'' END + 
+							CASE WHEN @eventName IS NOT NULL THEN '<event_name>' + @eventName + '</event_name>' ELSE N'' END + 
+							CASE WHEN @objectName IS NOT NULL THEN '<object_name>' + @objectName + '</object_name>' ELSE N'' END + 
+							CASE WHEN @childObjectName IS NOT NULL THEN '<child_object_name>' + @childObjectName + '</child_object_name>' ELSE N'' END + 
+							'<query_executed>' + @queryToRun + '</query_executed>' + 
+							'<duration>' + REPLICATE('0', 2-LEN(CAST(@durationSeconds / 3600 AS [varchar]))) + CAST(@durationSeconds / 3600 AS [varchar]) + 'h'
+												+ ' ' + REPLICATE('0', 2-LEN(CAST((@durationSeconds / 60) % 60 AS [varchar]))) + CAST((@durationSeconds / 60) % 60 AS [varchar]) + 'm'
+												+ ' ' + REPLICATE('0', 2-LEN(CAST(@durationSeconds % 60 AS [varchar]))) + CAST(@durationSeconds % 60 AS [varchar]) + 's' + '</duration>' + 
+							'<error_code>' + CAST(@errorCode AS [varchar](32) )+ '</error_code>' + 
+							'</detail></action>'
+
+		EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+											@dbName			= @dbName,
+											@objectName		= @objectName,
+											@childObjectName= @childObjectName,
+											@module			= @module,
+											@eventName		= @eventName,
+											@eventMessage	= @eventData,
+											@eventType		= 4 /* action */
+	end
+
+RETURN @errorCode
+GO
+
 RAISERROR('Create procedure: [dbo].[usp_logEventMessageAndSendEmail]', 10, 1) WITH NOWAIT
 GO---
 IF  EXISTS (
@@ -638,4 +881,237 @@ EXEC [dbo].[usp_logEventMessage]	@projectCode			= @projectCode,
 
 
 RETURN @ReturnValue
+GO
+
+RAISERROR('Create procedure: [dbo].[usp_sqlAgentJobEmailStatusReport]', 10, 1) WITH NOWAIT
+GO---
+IF  EXISTS (
+	    SELECT * 
+	      FROM sysobjects 
+	     WHERE id = OBJECT_ID(N'[dbo].[usp_sqlAgentJobEmailStatusReport]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_sqlAgentJobEmailStatusReport]
+GO
+
+CREATE PROCEDURE [dbo].[usp_sqlAgentJobEmailStatusReport]
+		@sqlServerName			[sysname] = @@SERVERNAME,
+		@jobName				[sysname],
+		@logFileLocation		[nvarchar](512),
+		@module					[varchar](32),
+		@sendLogAsAttachment	[bit]=1,
+		@eventType				[smallint]=2,
+		@currentlyRunning		[bit] = 1,
+		@debugMode				[bit] = 0
+/* WITH ENCRYPTION */
+AS
+
+SET NOCOUNT ON
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 17.03.2015
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+DECLARE @eventMessageData			[varchar](max),
+		@jobID						[uniqueidentifier],
+		@strMessage					[nvarchar](512),
+		@lastCompletionInstanceID	[int],
+		@queryToRun					[nvarchar](max),
+		@queryParams				[nvarchar](1024)
+
+-----------------------------------------------------------------------------------------------------
+--get job id
+SET @queryToRun = N''
+SET @queryToRun = @queryToRun + N'SELECT [job_id] FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + @jobName + ''''
+SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+
+SET @queryToRun = N'SELECT @jobID = [job_id] FROM (' + @queryToRun + N')inq'
+SET @queryParams = '@jobID [uniqueidentifier] OUTPUT'
+
+IF @debugMode=1	PRINT @queryToRun
+EXEC sp_executesql @queryToRun, @queryParams, @jobID = @jobID OUTPUT
+
+-----------------------------------------------------------------------------------------------------
+--get last instance_id when job completed
+SET @queryToRun = N''
+SET @queryToRun = @queryToRun + N'SELECT MAX(h.[instance_id]) AS [instance_id]
+					FROM [msdb].[dbo].[sysjobs] j 
+					RIGHT JOIN [msdb].[dbo].[sysjobhistory] h ON j.[job_id] = h.[job_id] 
+					WHERE	j.[job_id] = ''' + CAST(@jobID AS [nvarchar](36)) + N'''
+							AND h.[step_name] =''(Job outcome)'''
+SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+
+SET @queryToRun = N'SELECT @lastCompletionInstanceID = [instance_id] FROM (' + @queryToRun + N')inq'
+SET @queryParams = '@lastCompletionInstanceID [int] OUTPUT'
+
+IF @debugMode=1	PRINT @queryToRun
+EXEC sp_executesql @queryToRun, @queryParams, @lastCompletionInstanceID = @lastCompletionInstanceID OUTPUT
+
+SET @lastCompletionInstanceID = ISNULL(@lastCompletionInstanceID, 0)
+-----------------------------------------------------------------------------------------------------
+
+IF OBJECT_ID('tempdb..#jobHistory') IS NOT NULL
+	DROP TABLE #jobHistory
+
+CREATE TABLE #jobHistory
+	(
+		  [step_id]			[int]
+		, [step_name]		[sysname]
+		, [run_status]		[nvarchar](32)
+		, [run_date]		[nvarchar](32)
+		, [run_time]		[nvarchar](32)
+		, [duration]		[nvarchar](32)
+		, [message]			[nvarchar](max)
+	)
+
+SET @queryToRun = N''
+IF @currentlyRunning = 0
+	SET @queryToRun = @queryToRun + N'
+			SELECT	[step_id]
+					, [step_name]
+					, [run_status]
+					, SUBSTRING([run_date], 1, 4) + ''-'' + SUBSTRING([run_date], 5 ,2) + ''-'' + SUBSTRING([run_date], 7 ,2) AS [run_date]
+					, SUBSTRING([run_time], 1, 2) + '':'' + SUBSTRING([run_time], 3, 2) + '':'' + SUBSTRING([run_time], 5, 2) AS [run_time]
+					, SUBSTRING([run_duration], 1, 2) + ''h '' + SUBSTRING([run_duration], 3, 2) + ''m '' + SUBSTRING([run_duration], 5, 2) + ''s'' AS [duration]
+					, [message]
+			FROM (		
+					SELECT    h.[step_id]
+							, h.[step_name]
+							, CASE h.[run_status]	WHEN ''0'' THEN ''Failed''
+													WHEN ''1'' THEN ''Succeded''	
+													WHEN ''2'' THEN ''Retry''
+													WHEN ''3'' THEN ''Canceled''
+													WHEN ''4'' THEN ''In progress''
+													ELSE ''Unknown''
+								END [run_status]
+							, CAST(h.[run_date] AS varchar) AS [run_date]
+							, REPLICATE(''0'', 6 - LEN(CAST(h.[run_time] AS varchar))) + CAST(h.[run_time] AS varchar) AS [run_time]
+							, REPLICATE(''0'', 6 - LEN(CAST(h.[run_duration] AS varchar))) + CAST(h.[run_duration] AS varchar) AS [run_duration]
+							, CASE WHEN [run_status] IN (0, 2) THEN LEFT(h.[message], 256) ELSE '''' END AS [message]
+					FROM [msdb].[dbo].[sysjobhistory] h
+					WHERE	 h.[instance_id] < (
+												SELECT TOP 1 [instance_id] 
+												FROM (	
+														SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+														FROM [msdb].[dbo].[sysjobhistory] h
+														WHERE	h.[job_id]= ''' + CAST(@jobID AS [nvarchar](36)) + N'''
+																AND h.[step_name] =''(Job outcome)''
+														ORDER BY h.[instance_id] DESC
+													)A
+												) 
+							AND	h.[instance_id] > ISNULL(
+												( SELECT [instance_id] 
+												FROM (	
+														SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+														FROM [msdb].[dbo].[sysjobhistory] h
+														WHERE	h.[job_id]= ''' + CAST(@jobID AS [nvarchar](36)) + N'''
+																AND h.[step_name] =''(Job outcome)''
+														ORDER BY h.[instance_id] DESC
+													)A
+												WHERE [instance_id] NOT IN 
+													(
+													SELECT TOP 1 [instance_id] 
+													FROM (	SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+															FROM [msdb].[dbo].[sysjobhistory] h
+															WHERE	h.[job_id]= ''' + CAST(@jobID AS [nvarchar](36)) + N'''
+																	AND h.[step_name] =''(Job outcome)''
+															ORDER BY h.[instance_id] DESC
+														)A
+													)),0)
+							AND h.[job_id] = ''' + CAST(@jobID AS [nvarchar](36)) + N'''
+				)A'
+ELSE
+	SET @queryToRun = @queryToRun + N'
+			SELECT	[step_id]
+					, [step_name]
+					, [run_status]
+					, SUBSTRING([run_date], 1, 4) + ''-'' + SUBSTRING([run_date], 5 ,2) + ''-'' + SUBSTRING([run_date], 7 ,2) AS [run_date]
+					, SUBSTRING([run_time], 1, 2) + '':'' + SUBSTRING([run_time], 3, 2) + '':'' + SUBSTRING([run_time], 5, 2) AS [run_time]
+					, SUBSTRING([run_duration], 1, 2) + ''h '' + SUBSTRING([run_duration], 3, 2) + ''m '' + SUBSTRING([run_duration], 5, 2) + ''s'' AS [duration]
+					, [message]
+			FROM (		
+					SELECT    h.[step_id]
+							, h.[step_name]
+							, CASE h.[run_status]	WHEN ''0'' THEN ''Failed''
+													WHEN ''1'' THEN ''Succeded''	
+													WHEN ''2'' THEN ''Retry''
+													WHEN ''3'' THEN ''Canceled''
+													WHEN ''4'' THEN ''In progress''
+													ELSE ''Unknown''
+								END [run_status]
+							, CAST(h.[run_date] AS varchar) AS [run_date]
+							, REPLICATE(''0'', 6 - LEN(CAST(h.[run_time] AS varchar))) + CAST(h.[run_time] AS varchar) AS [run_time]
+							, REPLICATE(''0'', 6 - LEN(CAST(h.[run_duration] AS varchar))) + CAST(h.[run_duration] AS varchar) AS [run_duration]
+							, CASE WHEN [run_status] IN (0, 2) THEN LEFT(h.[message], 256) ELSE '''' END AS [message]
+					FROM [msdb].[dbo].[sysjobhistory] h
+					WHERE	 h.[instance_id] > ISNULL((
+														SELECT TOP 1 [instance_id] 
+														FROM (	
+																SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
+																FROM [msdb].[dbo].[sysjobhistory] h
+																WHERE	h.[job_id] = ''' + CAST(@jobID AS [nvarchar](36)) + N'''
+																		AND h.[step_name] =''(Job outcome)''
+																ORDER BY h.[instance_id] DESC
+															)A
+														), 0)
+							AND h.[job_id] = ''' + CAST(@jobID AS [nvarchar](36)) + N'''
+				)A'
+
+SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+
+IF @debugMode=1	PRINT @queryToRun
+INSERT	INTO #jobHistory([step_id], [step_name], [run_status], [run_date], [run_time], [duration], [message])
+		EXEC (@queryToRun)
+
+-----------------------------------------------------------------------------------------------------
+SET @eventMessageData = ''
+SELECT @eventMessageData = @eventMessageData + 
+							'<job-step>' + 
+							'<step_id>' + CAST(ISNULL([step_id], 0) AS [varchar](32)) + '</step_id>' + 
+							'<step_name>' + REPLACE(ISNULL([step_name], ''), '&', '&amp;') + '</step_name>' + 
+							'<run_status>' + ISNULL([run_status], '') + '</run_status>' + 
+							'<run_date>' + ISNULL([run_date], '') + '</run_date>' + 
+							'<run_time>' + ISNULL([run_time], '') + '</run_time>' + 
+							'<duration>' + ISNULL([duration], '') + '</duration>' +
+							'<message>' + REPLACE(ISNULL([message], ''), '&', '&amp;') + '</message>' +
+							'</job-step>'
+FROM #jobHistory
+
+SET @eventMessageData = '<job-history>' + @eventMessageData + '</job-history>'
+
+IF @sendLogAsAttachment=0
+	SET @logFileLocation = NULL
+
+
+--if one of the job steps failed, will fail the job
+DECLARE @failedSteps [int]
+
+SELECT @failedSteps = COUNT(*)
+FROM #jobHistory
+WHERE [run_status] = 'Failed'
+
+EXEC [dbo].[usp_logEventMessageAndSendEmail] @projectCode		= NULL,
+											 @sqlServerName		= @sqlServerName,
+											 @objectName		= @jobName,
+											 @module			= @module,
+											 @eventName			= 'sql agent job status',
+											 @parameters		= @logFileLocation,
+											 @eventMessage		= @eventMessageData,
+											 @recipientsList	= NULL,
+											 @eventType			= @eventType,
+											 @additionalOption	= @failedSteps
+
+IF @failedSteps <> 0
+	begin
+		SET @strMessage = 'Job execution failed. See individual steps status.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=1
+	end
+GO
+
+USE [dbaTDPMon]
+GO
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
 GO

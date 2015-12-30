@@ -176,6 +176,7 @@ WHILE @@FETCH_STATUS=0
 								'<error_string>The subscription(s) have been marked inactive and must be reinitialized.</error_string>' + 
 								'<query_executed>' + @queryToRun + '</query_executed>' + 
 								'<duration_seconds>' + CAST(ISNULL(DATEDIFF(ss, @runStartTime, GETUTCDATE()), 0) AS [nvarchar]) + '</duration_seconds>' + 
+								'<event_date_utc>' + CONVERT([varchar](20), GETUTCDATE(), 120) + '</event_date_utc>' + 
 								'</detail></alert>'
 
 		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= @projectCode,

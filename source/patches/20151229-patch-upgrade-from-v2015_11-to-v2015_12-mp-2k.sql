@@ -1,3 +1,15 @@
+USE [dbaTDPMon]
+GO
+
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+UPDATE [dbo].[appConfigurations] SET [value] = N'2015.12.29' WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+
+IF EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='logEventMessages' AND COLUMN_NAME='message' AND CHARACTER_MAXIMUM_LENGTH<>4000)
+	ALTER TABLE [dbo].[logEventMessages] ALTER COLUMN [message] [varchar](4000)
+GO
+
 RAISERROR('Create procedure: [dbo].[usp_sqlExecuteAndLog]', 10, 1) WITH NOWAIT
 GO
 IF  EXISTS (
@@ -227,4 +239,9 @@ IF @logEventActions = 'true'
 	end
 
 RETURN @errorCode
+GO
+
+USE [dbaTDPMon]
+GO
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
 GO
