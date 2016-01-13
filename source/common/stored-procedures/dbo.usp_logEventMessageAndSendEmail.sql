@@ -208,6 +208,27 @@ IF @eventType=1	AND @eventMessageXML IS NOT NULL
 --alert details
 IF @eventType=6	AND @eventMessageXML IS NOT NULL
 	begin
+		SET @HTMLBody = @HTMLBody + REPLACE(REPLACE(REPLACE(REPLACE(CAST(@eventMessageXML AS [nvarchar](max)), '<alert><detail>', '<ul>'), '</detail></alert>', '</ul>'), '><', '><li><'), '<li></ul>','</ul>')
+
+		DECLARE @strPos		[int],
+				@strPos2	[int]
+
+		SET @strPos = CHARINDEX('</', @HTMLBody)
+		WHILE @strPos <> 0
+			BEGIN
+				SET @strPos2 = CHARINDEX('><', @HTMLBody, @strPos)
+				SET @HTMLBody = SUBSTRING(@HTMLBody, 1, @strPos+1) + SUBSTRING(@HTMLBody, @strPos2, LEN(@HTMLBody))
+	
+				SET @strPos = CHARINDEX('</', @HTMLBody, @strPos2)
+			END
+		SET @HTMLBody = REPLACE(@HTMLBody, '</>', '')
+		SET @HTMLBody = REPLACE(@HTMLBody, '><', '>')
+		SET @HTMLBody = REPLACE(@HTMLBody, '>', ': ')
+		SET @HTMLBody = REPLACE(@HTMLBody, '<li: ', '<li>')
+		SET @HTMLBody = REPLACE(@HTMLBody, '<ul: li: ', '<ul><li>')
+		SET @HTMLBody = REPLACE(@HTMLBody, '</ul: ', '</ul>')
+
+		/*
 		EXEC @PrepareXmlStatus= sp_xml_preparedocument @handle OUTPUT, @eventMessageXML  
 
 		SET @HTMLBody =@HTMLBody + COALESCE(
@@ -247,6 +268,7 @@ IF @eventType=6	AND @eventMessageXML IS NOT NULL
 							, '') ;
 		
 		EXEC sp_xml_removedocument @handle 
+		*/
 	end
 
 -----------------------------------------------------------------------------------------------------

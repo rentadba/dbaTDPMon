@@ -87,7 +87,7 @@ http://dbaTDPMon.codeplex.com',
 SELECT TOP 1 @jobName = sj.[name]
 FROM [msdb].dbo.sysjobs sj
 INNER JOIN [msdb].dbo.sysjobsteps sjs ON sj.[job_id] = sjs.[job_id] 
-WHERE sj.[name] LIKE ''%Discovery & Health Check''
+WHERE sj.[name] LIKE ''%Discovery & Health Check%''
 	AND sjs.[database_name] = DB_NAME()
 
 SET @lastExecutionStatus = 4

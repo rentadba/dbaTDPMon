@@ -373,3 +373,12 @@
 
 /* 29.12.2015 */
 	- fix small bugs on maintenance-plans
+
+/*----------------------------------------------------------------------*/
+/* January 2016 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 12.01.2016 */
+	- add monitoring job and alert for detecting long running transactions and long uncommitted transactions
+
+/* 13.01.2016 */
+	- add replication monitoring alert: The subscription is not active. Subscription must have active in order to post a tracer token.
