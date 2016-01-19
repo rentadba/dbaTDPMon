@@ -26,12 +26,14 @@ CREATE TABLE [monitoring].[statsTransactionsStatus]
 	[host_name]							[sysname],
 	[program_name]						[sysname],
 	[login_name]						[sysname],
-	[last_request_elapsed_time_seconds]	[bigint],
-	[transaction_elapsed_time_seconds]	[bigint],
+	[last_request_elapsed_time_sec]		[int],
+	[transaction_elapsed_time_sec]		[int],
 	[sessions_blocked]					[smallint],
 	[is_session_blocked]				[bit],
 	[sql_handle]						[varbinary](64),
 	[request_completed]					[bit],
+	[wait_duration_sec]					[int],
+	[wait_type]							[nvarchar](60)
 	CONSTRAINT [PK_statsTransactionsStatus] PRIMARY KEY  CLUSTERED 
 	(
 		[id],

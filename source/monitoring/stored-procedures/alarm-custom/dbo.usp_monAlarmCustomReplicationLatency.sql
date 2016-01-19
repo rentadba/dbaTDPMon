@@ -11,8 +11,7 @@ GO
 CREATE PROCEDURE [dbo].[usp_monAlarmCustomReplicationLatency]
 		  @projectCode			[varchar](32)=NULL
 		, @sqlServerNameFilter	[sysname]='%'
-		, @iterations			[int] = 1
-		, @iterationDelay		[varchar](10) = N'00:00:05'
+		, @operationDelay		[varchar](10) = N'00:00:05'
 		, @debugMode			[bit]=0
 /* WITH ENCRYPTION */
 AS
@@ -156,9 +155,18 @@ DECLARE   @publicationName		[sysname]
 		, @distributorServer	[sysname]
 		, @subscriptionArticles	[int]
 
-DECLARE crsInactiveSubscriptions CURSOR FAST_FORWARD READ_ONLY FOR	SELECT [publication_name], [publisher_server], [publisher_db], [subscriber_server], [subscriber_db], [subscription_articles], [distributor_server]
-																	FROM [monitoring].[statsReplicationLatency]
-																	WHERE [subscription_status] = 0 /* inactive subscriptions */
+DECLARE crsInactiveSubscriptions CURSOR FAST_FORWARD READ_ONLY FOR	SELECT    srl.[publication_name], srl.[publisher_server], srl.[publisher_db]
+																			, srl.[subscriber_server], srl.[subscriber_db], srl.[subscription_articles], srl.[distributor_server]
+																	FROM [monitoring].[statsReplicationLatency] srl
+																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication'
+																												AND asr.[alert_name] IN ('subscription marked inactive')
+																												AND asr.[active] = 1
+																												AND (asr.[skip_value] = ('[' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '](' + srl.[publication_name] + ')'))
+																												AND (    asr.[skip_value2] IS NULL 
+																													 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ('[' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + ']'))
+																													)
+																	WHERE	srl.[subscription_status] = 0 /* inactive subscriptions */
+																			AND asr.[id] IS NULL
 OPEN crsInactiveSubscriptions
 FETCH NEXT FROM crsInactiveSubscriptions INTO @publicationName, @publicationServer, @publisherDB, @subcriptionServer, @subscriptionDB, @subscriptionArticles, @distributorServer
 WHILE @@FETCH_STATUS=0
@@ -200,9 +208,18 @@ DEALLOCATE crsInactiveSubscriptions
 RAISERROR('--Check for subscribed but not active subscriptions....', 10, 1) WITH NOWAIT
 
 
-DECLARE crsInactiveSubscriptions CURSOR FAST_FORWARD READ_ONLY FOR	SELECT [publication_name], [publisher_server], [publisher_db], [subscriber_server], [subscriber_db], [subscription_articles], [distributor_server]
-																	FROM [monitoring].[statsReplicationLatency]
-																	WHERE [subscription_status] = 1 /* subscribed subscriptions */
+DECLARE crsInactiveSubscriptions CURSOR FAST_FORWARD READ_ONLY FOR	SELECT    srl.[publication_name], srl.[publisher_server], srl.[publisher_db], srl.[subscriber_server]
+																			, srl.[subscriber_db], srl.[subscription_articles], srl.[distributor_server]
+																	FROM [monitoring].[statsReplicationLatency] srl
+																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication'
+																												AND asr.[alert_name] IN ('subscription not active')
+																												AND asr.[active] = 1
+																												AND (asr.[skip_value] = ('[' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '](' + srl.[publication_name] + ')'))
+																												AND (    asr.[skip_value2] IS NULL 
+																													 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ('[' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + ']'))
+																													)
+																	WHERE	srl.[subscription_status] = 1 /* subscribed subscriptions */
+																			AND asr.[id] IS NULL
 OPEN crsInactiveSubscriptions
 FETCH NEXT FROM crsInactiveSubscriptions INTO @publicationName, @publicationServer, @publisherDB, @subcriptionServer, @subscriptionDB, @subscriptionArticles, @distributorServer
 WHILE @@FETCH_STATUS=0
@@ -266,13 +283,12 @@ WHILE @@FETCH_STATUS=0
 		EXEC @serverToRun @queryToRun
 
 		SET @queryToRun = N''
-		SET @queryToRun = @queryToRun + N'			
+		SET @queryToRun = @queryToRun + N'
 			CREATE PROCEDURE dbo.usp_monGetReplicationLatency
 				  @publisherDB			[sysname]
 				, @publicationName		[sysname]
 				, @replicationDelay		[int] = 15
-				, @iterations			[int] = 1
-				, @iterationDelay		[varchar](10) = N''00:00:05''
+				, @operationDelay		[varchar](10) = N''00:00:05''
 			AS
 			/*
 				original code source:
@@ -313,10 +329,10 @@ WHILE @@FETCH_STATUS=0
 					, [overall_latency]		[int] NULL
 				);
 
-			SET @currentIteration = 0
+			SET @currentIteration = 1
 			SET @currentDateTime  = GETDATE()
 
-			WHILE @currentIteration < @iterations
+			WHILE @currentIteration <= 1
 				begin
 					/* Insert a new tracer token in the publication database */
 					SET @queryToRun = N''EXECUTE ['' + @publisherDB + N''].sys.sp_postTracerToken @publication = @publicationName, @tracer_token_id = @tokenID OUTPUT''
@@ -331,7 +347,7 @@ WHILE @@FETCH_STATUS=0
 					WHILE GETDATE() <= DATEADD(ss, @replicationDelay, @tokenStartTime)
 						begin
 							/* Give a few seconds to allow the record to reach the subscriber */
-							WAITFOR DELAY @iterationDelay
+							WAITFOR DELAY @operationDelay
 
 							SET @queryToRun = N''EXECUTE ['' + @publisherDB + N''].sys.sp_helpTracerTokenHistory @publicationName, @tokenID'' 
 							PRINT @queryToRun
@@ -368,12 +384,17 @@ WHILE @@FETCH_STATUS=0
 						, [tracer_id] = @tokenID
 					WHERE [iteration] IS NULL;
 
-					DELETE FROM @temptokenresult
-
-					/* Wait for the specified time period before creating another token */
-					WAITFOR DELAY @iterationDelay
-
-					SET @currentIteration = @currentIteration + 1;
+					DELETE FROM @temptokenresult		
+					
+					/* add retry mechanism for 1st iteration */
+					IF	@currentIteration=1
+						AND EXISTS(SELECT * FROM [dbo].[replicationTokenResults] WHERE [publication] = @publicationName AND [publisher_db] = @publisherDB AND [overall_latency] IS NULL)
+						begin
+							DELETE FROM [dbo].[replicationTokenResults] 
+							WHERE [publication] = @publicationName AND [publisher_db] = @publisherDB
+						end
+					ELSE
+						SET @currentIteration = @currentIteration + 1;					
 				end;
 
 			/* perform cleanup */
@@ -384,7 +405,7 @@ WHILE @@FETCH_STATUS=0
 			EXEC sp_executesql @queryToRun, @queryParam , @publicationName = @publicationName
 														, @currentDateTime = @currentDateTime
 
-			/* SELECT * FROM [dbo].[replicationTokenResults] */'
+			/* SELECT * FROM [dbo].[replicationTokenResults]  */'
 
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @serverToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
@@ -441,7 +462,7 @@ WHILE @@FETCH_STATUS=0
 			begin
 
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'EXEC [' + @publicationServer + '].tempdb.dbo.usp_monGetReplicationLatency @publisherDB = ''' + @publisherDB + N''', @publicationName = ''' + @publicationName + N''', @replicationDelay = ' + CAST(@alertThresholdCriticalReplicationLatencySec AS [nvarchar]) + N', @iterations = ' + CAST(@iterations  AS [nvarchar]) + N', @iterationDelay = ''' + @iterationDelay + N''';'
+				SET @queryToRun = @queryToRun + N'EXEC [' + @publicationServer + '].tempdb.dbo.usp_monGetReplicationLatency @publisherDB = ''' + @publisherDB + N''', @publicationName = ''' + @publicationName + N''', @replicationDelay = ' + CAST(@alertThresholdCriticalReplicationLatencySec AS [nvarchar]) + N', @operationDelay = ''' + @operationDelay + N''';'
 
 				INSERT	INTO [dbo].[jobExecutionQueue](	[instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id],
 														[job_name], [job_step_name], [job_database_name], [job_command])
@@ -640,12 +661,12 @@ DECLARE crsReplicationAlarms CURSOR FOR	SELECT  DISTINCT
 													'</detail></alert>' AS [event_message]
 										FROM [dbo].[vw_catalogInstanceNames]  cin
 										INNER JOIN [monitoring].[statsReplicationLatency] srl ON srl.[project_id] = cin.[project_id] AND srl.[publisher_server] = cin.[instance_name]
-										LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication latency'
-																						AND asr.[alert_name] IN ('')
+										LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication'
+																						AND asr.[alert_name] IN ('replication latency')
 																						AND asr.[active] = 1
-																						AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])
-																						AND (   asr.[skip_value2] IS NULL 
-																							 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = (srl.[subscriber_server] + '.' + srl.[subscriber_db]))
+																						AND (asr.[skip_value] = ('[' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '](' + srl.[publication_name] + ')'))
+																						AND (    asr.[skip_value2] IS NULL 
+																								OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ('[' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + ']'))
 																							)
 										WHERE cin.[instance_active]=1
 												AND cin.[project_id] = @projectID
@@ -653,6 +674,7 @@ DECLARE crsReplicationAlarms CURSOR FOR	SELECT  DISTINCT
 												AND (srl.[overall_latency] IS NULL OR srl.[overall_latency]>=@alertThresholdCriticalReplicationLatencySec)									
 												AND srl.[subscription_status] = 2 /* active subscriptions */
 												AND srl.[state] = 2 /* run analysis and get data jobs completed successfully */
+												AND asr.[id] IS NULL
 										ORDER BY [instance_name], [object_name]
 OPEN crsReplicationAlarms
 FETCH NEXT FROM crsReplicationAlarms INTO @instanceName, @objectName, @severity, @eventName, @eventMessage

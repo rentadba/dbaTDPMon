@@ -382,3 +382,6 @@
 
 /* 13.01.2016 */
 	- add replication monitoring alert: The subscription is not active. Subscription must have active in order to post a tracer token.
+
+/* 19.01.2016 */
+	- add retry step for replication latency alert: an alert will be triggered only after the retry step

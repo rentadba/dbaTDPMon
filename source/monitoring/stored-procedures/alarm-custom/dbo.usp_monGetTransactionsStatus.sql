@@ -48,7 +48,9 @@ CREATE TABLE #blockedSessionInfo
 (
 	[id]					[int] IDENTITY(1,1),
 	[session_id]			[smallint],
-	[blocking_session_id]	[smallint]
+	[blocking_session_id]	[smallint],
+	[wait_duration_sec]		[int],
+	[wait_type]				[nvarchar](60)
 )
 
  
@@ -83,7 +85,9 @@ CREATE TABLE #monTransactionsStatus
 	[sessions_blocked]					[smallint],
 	[sql_handle]						[varbinary](64),
 	[request_completed]					[bit],
-	[is_session_blocked]				[bit]
+	[is_session_blocked]				[bit],
+	[wait_duration_sec]					[int],
+	[wait_type]							[nvarchar](60)
 )
 
 SET @executionLevel = 0
@@ -171,13 +175,15 @@ WHILE @@FETCH_STATUS=0
 				SET @queryToRun = N''
 				SET @queryToRun = @queryToRun + N'SELECT  owt.[session_id]
 														, owt.[blocking_session_id]
+														, owt.[wait_duration_ms] / 1000
+														, owt.[wait_type]
 												FROM sys.dm_os_waiting_tasks owt WITH (READPAST)
 												INNER JOIN sys.dm_exec_sessions es WITH (READPAST) ON es.[session_id] = owt.[session_id]'
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 				
 				BEGIN TRY
-						INSERT	INTO #blockedSessionInfo([session_id], [blocking_session_id])
+						INSERT	INTO #blockedSessionInfo([session_id], [blocking_session_id], [wait_duration_sec], [wait_type])
 								EXEC (@queryToRun)
 				END TRY
 				BEGIN CATCH
@@ -226,7 +232,7 @@ WHILE @@FETCH_STATUS=0
 														, es.[session_id]
 														, es.[host_name]
 														, es.[program_name]
-														, es.[login_name]
+														, CASE WHEN ISNULL(es.[login_name], '''') <> '''' THEN es.[login_name] ELSE sp.[loginame] END [login_name]
 														, DATEDIFF(ss, es.[last_request_start_time], es.[last_request_end_time]) AS [last_request_elapsed_time_seconds]
 														, sp.[sql_handle]
 														, CASE WHEN er.[session_id] IS NULL THEN 1 ELSE 0 END AS [request_completed]
@@ -242,12 +248,14 @@ WHILE @@FETCH_STATUS=0
 										 , x.[program_name]
 										 , x.[login_name]
 										 , ti.[transaction_begin_time]
-										 , x.[last_request_elapsed_time_seconds]
+										 , CASE WHEN x.[last_request_elapsed_time_seconds] < 0 THEN 0 ELSE x.[last_request_elapsed_time_seconds] END AS [last_request_elapsed_time_seconds]
 										 , ti.[elapsed_time_seconds] AS [transaction_elapsed_time_seconds]
 										 , bk.[sessions_blocked]
 										 , x.[sql_handle]
 										 , x.[request_completed]
 										 , CASE WHEN si.[blocking_session_id] IS NOT NULL THEN 1 ELSE 0 END AS [is_session_blocked]
+										 , si.[wait_duration_sec]
+										 , si.[wait_type]
 									FROM (' + @queryToRun + N') x
 									INNER JOIN #transactionInfo ti ON ti.[session_id] = x.[session_id]
 									LEFT JOIN 
@@ -272,7 +280,7 @@ WHILE @@FETCH_STATUS=0
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				BEGIN TRY
-						INSERT	INTO #monTransactionsStatus([server_name], [session_id], [database_name], [host_name], [program_name], [login_name], [transaction_begin_time], [last_request_elapsed_time_seconds], [transaction_elapsed_time_seconds], [sessions_blocked], [sql_handle], [request_completed], [is_session_blocked])
+						INSERT	INTO #monTransactionsStatus([server_name], [session_id], [database_name], [host_name], [program_name], [login_name], [transaction_begin_time], [last_request_elapsed_time_seconds], [transaction_elapsed_time_seconds], [sessions_blocked], [sql_handle], [request_completed], [is_session_blocked], [wait_duration_sec], [wait_type])
 								EXEC (@queryToRun)
 				END TRY
 				BEGIN CATCH
@@ -290,12 +298,12 @@ WHILE @@FETCH_STATUS=0
 		/* save results to stats table */
 		INSERT INTO [monitoring].[statsTransactionsStatus]([instance_id], [project_id], [event_date_utc]
 																, [database_name], [session_id], [transaction_begin_time], [host_name], [program_name], [login_name]
-																, [last_request_elapsed_time_seconds], [transaction_elapsed_time_seconds], [sessions_blocked], [sql_handle]
-																, [request_completed], [is_session_blocked])
+																, [last_request_elapsed_time_sec], [transaction_elapsed_time_sec], [sessions_blocked], [sql_handle]
+																, [request_completed], [is_session_blocked], [wait_duration_sec], [wait_type])
 				SELECT    @instanceID, @projectID, GETUTCDATE()
 						, [database_name], [session_id], [transaction_begin_time], [host_name], [program_name], [login_name]
 						, [last_request_elapsed_time_seconds], [transaction_elapsed_time_seconds], [sessions_blocked], [sql_handle]
-						, [request_completed], [is_session_blocked]
+						, [request_completed], [is_session_blocked], [wait_duration_sec], [wait_type]
 				FROM #monTransactionsStatus
 								
 		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion

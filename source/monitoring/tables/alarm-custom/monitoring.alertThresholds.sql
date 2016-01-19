@@ -45,5 +45,6 @@ INSERT	INTO [monitoring].[alertThresholds] ([category], [alert_name], [operator]
 		SELECT 'disk-space', 'Logical Disk: Free Disk Space (MB)', '<', 3000.0, 2048.0  UNION ALL
 		SELECT 'replication', 'Replication Latency', '>', 15.0, 20.0 UNION ALL
 		SELECT 'performance', 'Running Transaction Elapsed Time (sec)', '>', 1800, 3600.0 UNION ALL
-		SELECT 'performance', 'Uncommitted Transaction Elapsed Time (sec)', '>', 900, 1800.0
+		SELECT 'performance', 'Uncommitted Transaction Elapsed Time (sec)', '>', 900, 1800.0 UNION ALL
+		SELECT 'performance', 'Blocking Transaction Elapsed Time (sec)', '>', 600, 900.0
 GO

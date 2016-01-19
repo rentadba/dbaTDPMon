@@ -77,8 +77,7 @@ http://dbaTDPMon.codeplex.com',
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'EXEC [dbo].[usp_monAlarmCustomReplicationLatency]	  @projectCode			= ' + CASE WHEN @projectCode IS NOT NULL THEN N'''' + @projectCode + '''' ELSE 'NULL' END + N'
 																			, @sqlServerNameFilter	= ''%''
-																			, @iterations			= 1
-																			, @iterationDelay		= N''00:00:01''
+																			, @operationDelay		= N''00:00:01''
 																			, @debugMode			= 0
 '
 	
