@@ -113,6 +113,25 @@ WHERE	[alert_name] = 'Blocking Transaction Elapsed Time (sec)'
 		AND [is_warning_limit_enabled]=1
 SET @alertThresholdWarningBlocking = ISNULL(@alertThresholdWarningBlocking, 600)
 
+------------------------------------------------------------------------------------------------------------------------------------------
+DECLARE   @alertThresholdCriticalTempdb[int]
+		, @alertThresholdWarningTempdb [int] 
+		
+SELECT	@alertThresholdCriticalTempdb = [critical_limit]
+FROM	[monitoring].[alertThresholds]
+WHERE	[alert_name] = 'tempdb: space used by a single session'
+		AND [category] = 'performance'
+		AND [is_critical_limit_enabled]=1
+SET @alertThresholdCriticalTempdb = ISNULL(@alertThresholdCriticalTempdb, 16384)
+
+
+SELECT	@alertThresholdWarningTempdb = [warning_limit]
+FROM	[monitoring].[alertThresholds]
+WHERE	[alert_name] = 'tempdb: space used by a single session'
+		AND [category] = 'performance'
+		AND [is_warning_limit_enabled]=1
+SET @alertThresholdWarningTempdb = ISNULL(@alertThresholdWarningTempdb, 8192)
+
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 SET @strMessage='--Generate internal jobs..'
@@ -179,7 +198,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
 															'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
 															'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
-															'<database_name>' + db.[database_name] + '</database_name>' + 
+															'<databases>' + db.[database_name] + '</databases>' + 
 															'<host_name>' + sts.[host_name] + '</host_name>' + 
 															'<program_name>' + sts.[program_name] + '</program_name>' + 
 															'<login_name>' + sts.[login_name] + '</login_name>' + 
@@ -232,7 +251,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
 															'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
 															'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
-															'<database_name>' + db.[database_name] + '</database_name>' + 
+															'<databases>' + db.[database_name] + '</databases>' + 
 															'<host_name>' + sts.[host_name] + '</host_name>' + 
 															'<program_name>' + sts.[program_name] + '</program_name>' + 
 															'<login_name>' + sts.[login_name] + '</login_name>' + 
@@ -284,7 +303,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
 															'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
 															'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
-															'<database_name>' + db.[database_name] + '</database_name>' + 
+															'<databases>' + db.[database_name] + '</databases>' + 
 															'<host_name>' + sts.[host_name] + '</host_name>' + 
 															'<program_name>' + sts.[program_name] + '</program_name>' + 
 															'<login_name>' + sts.[login_name] + '</login_name>' + 
@@ -337,7 +356,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
 															'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
 															'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
-															'<database_name>' + db.[database_name] + '</database_name>' + 
+															'<databases>' + db.[database_name] + '</databases>' + 
 															'<host_name>' + sts.[host_name] + '</host_name>' + 
 															'<program_name>' + sts.[program_name] + '</program_name>' + 
 															'<login_name>' + sts.[login_name] + '</login_name>' + 
@@ -389,7 +408,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
 															'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
 															'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
-															'<database_name>' + db.[database_name] + '</database_name>' + 
+															'<databases>' + db.[database_name] + '</databases>' + 
 															'<host_name>' + sts.[host_name] + '</host_name>' + 
 															'<program_name>' + sts.[program_name] + '</program_name>' + 
 															'<login_name>' + sts.[login_name] + '</login_name>' + 
@@ -442,7 +461,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
 															'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
 															'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
-															'<database_name>' + db.[database_name] + '</database_name>' + 
+															'<databases>' + db.[database_name] + '</databases>' + 
 															'<host_name>' + sts.[host_name] + '</host_name>' + 
 															'<program_name>' + sts.[program_name] + '</program_name>' + 
 															'<login_name>' + sts.[login_name] + '</login_name>' + 
@@ -478,6 +497,109 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 														AND cin.[instance_name] LIKE @sqlServerNameFilter
 														AND sts.[wait_duration_sec] >= @alertThresholdCriticalBlocking
 														AND sts.[is_session_blocked] = 1
+
+												UNION ALL
+
+												SELECT  DISTINCT
+														  cin.[instance_name] AS [instance_name]
+														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') AS [object_name]
+														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END AS [child_object_name]
+														, 'warning'				AS [severity]
+														, 'tempdb space'	AS [event_name]
+														, '<alert><detail>' + 
+															'<severity>warning</severity>' + 
+															'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
+															'<counter_name>tempdb space</counter_name>' + 
+															'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+															'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
+															'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
+															'<databases>' + db.[database_name] + '</databases>' + 
+															'<host_name>' + sts.[host_name] + '</host_name>' + 
+															'<program_name>' + sts.[program_name] + '</program_name>' + 
+															'<login_name>' + sts.[login_name] + '</login_name>' + 
+															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END + '</sql_handle>' + 
+															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
+															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
+															'<tempdb_usage>' + CAST(sts.[tempdb_space_used_mb] AS [nvarchar]) + '</tempdb_usage>' + 
+															'<threshold_value>' + CAST(@alertThresholdWarningTempdb AS [nvarchar]) + '</threshold_value>' + 
+															'<measure_unit>mb</measure_unit>' + 
+															'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+															'</detail></alert>' AS [event_message]
+												FROM [dbo].[vw_catalogInstanceNames]  cin
+												INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
+												INNER JOIN
+														(
+															SELECT [session_id],
+																	STUFF((
+																			SELECT ', ' + [database_name]
+																			FROM [monitoring].[statsTransactionsStatus]
+																			WHERE [session_id] = sts.[session_id]
+																			ORDER BY [database_name]
+																			FOR XML PATH ('')
+																		) ,1,2,'') [database_name]
+															FROM [monitoring].[statsTransactionsStatus] sts
+															GROUP BY [session_id]
+														)db ON db.[session_id] = sts.[session_id]
+												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
+																								AND asr.[alert_name] IN ('tempdb: space used by a single session')
+																								AND asr.[active] = 1
+																								AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+												WHERE cin.[instance_active]=1
+														AND cin.[project_id] = @projectID
+														AND cin.[instance_name] LIKE @sqlServerNameFilter
+														AND sts.[tempdb_space_used_mb] >= @alertThresholdWarningTempdb
+														AND sts.[tempdb_space_used_mb] < @alertThresholdCriticalTempdb
+												
+												UNION ALL
+
+												SELECT  DISTINCT
+														  cin.[instance_name] AS [instance_name]
+														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') AS [object_name]
+														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END AS [child_object_name]
+														, 'critical'			AS [severity]
+														, 'tempdb space'	AS [event_name]
+														, '<alert><detail>' + 
+															'<severity>critical</severity>' + 
+															'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
+															'<counter_name>tempdb space</counter_name>' + 
+															'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+															'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
+															'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
+															'<databases>' + db.[database_name] + '</databases>' + 
+															'<host_name>' + sts.[host_name] + '</host_name>' + 
+															'<program_name>' + sts.[program_name] + '</program_name>' + 
+															'<login_name>' + sts.[login_name] + '</login_name>' + 
+															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END + '</sql_handle>' + 
+															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
+															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
+															'<tempdb_usage>' + CAST(sts.[tempdb_space_used_mb] AS [nvarchar]) + '</tempdb_usage>' + 
+															'<threshold_value>' + CAST(@alertThresholdWarningTempdb AS [nvarchar]) + '</threshold_value>' + 
+															'<measure_unit>mb</measure_unit>' + 
+															'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+															'</detail></alert>' AS [event_message]
+												FROM [dbo].[vw_catalogInstanceNames]  cin
+												INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
+												INNER JOIN
+														(
+															SELECT [session_id],
+																	STUFF((
+																			SELECT ', ' + [database_name]
+																			FROM [monitoring].[statsTransactionsStatus]
+																			WHERE [session_id] = sts.[session_id]
+																			ORDER BY [database_name]
+																			FOR XML PATH ('')
+																		) ,1,2,'') [database_name]
+															FROM [monitoring].[statsTransactionsStatus] sts
+															GROUP BY [session_id]
+														)db ON db.[session_id] = sts.[session_id]
+												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
+																								AND asr.[alert_name] IN ('tempdb: space used by a single session')
+																								AND asr.[active] = 1
+																								AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+												WHERE cin.[instance_active]=1
+														AND cin.[project_id] = @projectID
+														AND cin.[instance_name] LIKE @sqlServerNameFilter
+														AND sts.[tempdb_space_used_mb] >= @alertThresholdCriticalTempdb
 												ORDER BY [instance_name], [object_name]
 OPEN crsTransactionStatusAlarms
 FETCH NEXT FROM crsTransactionStatusAlarms INTO @instanceName, @databaseName, @childObjectName, @severity, @eventName, @eventMessage

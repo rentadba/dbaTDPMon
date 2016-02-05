@@ -80,6 +80,7 @@ CREATE TABLE #jobHistory
 		, [run_time]		[nvarchar](32)
 		, [duration]		[nvarchar](32)
 		, [message]			[nvarchar](max)
+		, [log_filename]	[nvarchar](512)
 	)
 
 SET @queryToRun = N''
@@ -92,6 +93,7 @@ IF @currentlyRunning = 0
 					, SUBSTRING([run_time], 1, 2) + '':'' + SUBSTRING([run_time], 3, 2) + '':'' + SUBSTRING([run_time], 5, 2) AS [run_time]
 					, SUBSTRING([run_duration], 1, 2) + ''h '' + SUBSTRING([run_duration], 3, 2) + ''m '' + SUBSTRING([run_duration], 5, 2) + ''s'' AS [duration]
 					, [message]
+					, [output_file_name]
 			FROM (		
 					SELECT    h.[step_id]
 							, h.[step_name]
@@ -106,7 +108,9 @@ IF @currentlyRunning = 0
 							, REPLICATE(''0'', 6 - LEN(CAST(h.[run_time] AS varchar))) + CAST(h.[run_time] AS varchar) AS [run_time]
 							, REPLICATE(''0'', 6 - LEN(CAST(h.[run_duration] AS varchar))) + CAST(h.[run_duration] AS varchar) AS [run_duration]
 							, CASE WHEN [run_status] IN (0, 2) THEN LEFT(h.[message], 256) ELSE '''' END AS [message]
+							, sjs.[output_file_name]
 					FROM [msdb].[dbo].[sysjobhistory] h
+					LEFT JOIN [msdb].[dbo].[sysjobsteps] sjs ON sjs.[job_id] = h.[job_id] AND sjs.[step_id] = h.[step_id]
 					WHERE	 h.[instance_id] < (
 												SELECT TOP 1 [instance_id] 
 												FROM (	
@@ -147,6 +151,7 @@ ELSE
 					, SUBSTRING([run_time], 1, 2) + '':'' + SUBSTRING([run_time], 3, 2) + '':'' + SUBSTRING([run_time], 5, 2) AS [run_time]
 					, SUBSTRING([run_duration], 1, 2) + ''h '' + SUBSTRING([run_duration], 3, 2) + ''m '' + SUBSTRING([run_duration], 5, 2) + ''s'' AS [duration]
 					, [message]
+					, [output_file_name]
 			FROM (		
 					SELECT    h.[step_id]
 							, h.[step_name]
@@ -161,7 +166,9 @@ ELSE
 							, REPLICATE(''0'', 6 - LEN(CAST(h.[run_time] AS varchar))) + CAST(h.[run_time] AS varchar) AS [run_time]
 							, REPLICATE(''0'', 6 - LEN(CAST(h.[run_duration] AS varchar))) + CAST(h.[run_duration] AS varchar) AS [run_duration]
 							, CASE WHEN [run_status] IN (0, 2) THEN LEFT(h.[message], 256) ELSE '''' END AS [message]
+							, sjs.[output_file_name]
 					FROM [msdb].[dbo].[sysjobhistory] h
+					LEFT JOIN [msdb].[dbo].[sysjobsteps] sjs ON sjs.[job_id] = h.[job_id] AND sjs.[step_id] = h.[step_id]
 					WHERE	 h.[instance_id] > ISNULL((
 														SELECT TOP 1 [instance_id] 
 														FROM (	
@@ -178,7 +185,7 @@ ELSE
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 
 IF @debugMode=1	PRINT @queryToRun
-INSERT	INTO #jobHistory([step_id], [step_name], [run_status], [run_date], [run_time], [duration], [message])
+INSERT	INTO #jobHistory([step_id], [step_name], [run_status], [run_date], [run_time], [duration], [message], [log_filename])
 		EXEC (@queryToRun)
 
 -----------------------------------------------------------------------------------------------------
@@ -197,9 +204,56 @@ FROM #jobHistory
 
 SET @eventMessageData = '<job-history>' + @eventMessageData + '</job-history>'
 
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
 IF @sendLogAsAttachment=0
 	SET @logFileLocation = NULL
+ELSE
+	IF @logFileLocation IS NULL
+		SELECT TOP 1 @logFileLocation = [log_filename]
+		FROM #jobHistory
+		WHERE [run_status] = 'Failed'
+		ORDER BY [step_id]
 
+/* check if @logFileLocation exists	*/
+IF @logFileLocation IS NOT NULL
+	begin
+		IF object_id('#fileExists') IS NOT NULL DROP TABLE #fileExists
+		CREATE TABLE #fileExists
+					(
+						[file_exists]				[bit]	NULL,
+						[file_is_directory]			[bit]	NULL,
+						[parent_directory_exists]	[bit]	NULL
+					)
+
+		DECLARE	  @serverEdition			[sysname]
+				, @serverVersionStr			[sysname]
+				, @serverVersionNum			[numeric](9,6)
+				, @nestedExecutionLevel		[tinyint]
+
+		EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
+												@serverEdition			= @serverEdition OUT,
+												@serverVersionStr		= @serverVersionStr OUT,
+												@serverVersionNum		= @serverVersionNum OUT,
+												@executionLevel			= @nestedExecutionLevel,
+												@debugMode				= @debugMode
+
+		IF @sqlServerName=@@SERVERNAME
+				SET @queryToRun = N'master.dbo.xp_fileexist ''' + @logFileLocation + ''''
+		else
+			IF @serverVersionNum<11
+				SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC master.dbo.xp_fileexist ''''' + @logFileLocation + ''''';'')x'
+			ELSE
+				SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''master.dbo.xp_fileexist ''''''''' + @logFileLocation + ''''''''' '''') WITH RESULT SETS(([File Exists] [int], [File is a Directory] [int], [Parent Directory Exists] [int])) '')x'
+
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+		INSERT	INTO #fileExists([file_exists], [file_is_directory], [parent_directory_exists])
+				EXEC (@queryToRun)
+
+		IF (SELECT [file_exists] FROM #fileExists)=0
+			SET @logFileLocation = NULL
+	end
+/*-------------------------------------------------------------------------------------------------------------------------------*/
 
 --if one of the job steps failed, will fail the job
 DECLARE @failedSteps [int]

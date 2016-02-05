@@ -33,7 +33,8 @@ CREATE TABLE [monitoring].[statsTransactionsStatus]
 	[sql_handle]						[varbinary](64),
 	[request_completed]					[bit],
 	[wait_duration_sec]					[int],
-	[wait_type]							[nvarchar](60)
+	[wait_type]							[nvarchar](60),
+	[tempdb_space_used_mb]				[int],
 	CONSTRAINT [PK_statsTransactionsStatus] PRIMARY KEY  CLUSTERED 
 	(
 		[id],

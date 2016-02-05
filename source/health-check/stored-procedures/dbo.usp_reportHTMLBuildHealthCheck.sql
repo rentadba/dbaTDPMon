@@ -1699,7 +1699,8 @@ BEGIN TRY
 																																	AND (    rsr.[skip_value]=ssajh.[instance_name]
 																																		 AND ISNULL(rsr.[skip_value2], '') = ISNULL(ssajh.[job_name], '') 
 																																		)
-																						WHERE ssajh.[last_execution_status] = 4
+																						WHERE	ssajh.[project_id]=@projectID
+																								AND ssajh.[last_execution_status] = 4
 																								AND ssajh.[last_execution_date] IS NOT NULL
 																								AND ssajh.[last_execution_time] IS NOT NULL
 																								AND (ssajh.[running_time_sec]/3600) >= @configMaxJobRunningTimeInHours
@@ -2689,13 +2690,16 @@ BEGIN TRY
 			IF OBJECT_ID('tempdb..#filteredStatsIndexesFrequentlyFragmented]') IS NOT NULL
 				DROP TABLE #filteredStatsIndexesFrequentlyFragmented
 
-			SELECT *
+			SELECT iff.*
 			INTO #filteredStatsIndexesFrequentlyFragmented
 			FROM [dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectCode, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, @analyzeIndexMaintenanceOperation) iff
+			INNER JOIN [dbo].[vw_catalogInstanceNames]  cin ON iff.[instance_name] = cin.[instance_name]
 			LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 														AND rsr.[rule_id] = 16777216
 														AND rsr.[active] = 1
 														AND (rsr.[skip_value]=iff.[instance_name])
+			WHERE cin.[instance_active] = 1
+				 AND cin.[project_id] = @projectID
 
 			CREATE INDEX IX_filteredStatsIndexesFrequentlyFragmented_InstanceName ON #filteredStatsIndexesFrequentlyFragmented([instance_name])
 

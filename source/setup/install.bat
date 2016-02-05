@@ -437,6 +437,10 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.statsTransactionsStatus.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.statsSQLAgentJobs.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+
 echo Monitoring: Creating Functions / Stored Procedures
 
 sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\alarm-custom\dbo.usp_monAlarmCustomFreeDiskSpace.sql" -d %dbname%  -b -r 1
@@ -449,6 +453,12 @@ sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\alarm-custo
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\alarm-custom\dbo.usp_monAlarmCustomTransactionsStatus.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\alarm-custom\dbo.usp_monGetSQLAgentFailedJobs.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\alarm-custom\dbo.usp_monAlarmCustomSQLAgentFailedJobs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 
@@ -464,6 +474,10 @@ if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - TransactionStatus.sql" -d %dbname% -v dbName=%dbname% projectCode=%project% -b -r 1
 if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - SQLAgentFailedJobs.sql" -d %dbname% -v dbName=%dbname% projectCode=%project% -b -r 1
+if errorlevel 1 goto install_err
+
 
 if %module%=="all" goto done
 goto done

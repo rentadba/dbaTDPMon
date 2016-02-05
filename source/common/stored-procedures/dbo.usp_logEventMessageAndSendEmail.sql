@@ -55,7 +55,7 @@ DECLARE @projectID					[smallint],
 		@emailSubject				[nvarchar](256),
 		@queryToRun					[nvarchar](max),
 		@ReturnValue				[int],
-		@ErrMessage					[nvarchar](256),
+		@ErrMessage					[nvarchar](1024),
 		@clientName					[nvarchar](260),
 		@eventData					[varchar](8000),
 		@ignoreAlertsForError1222	[bit],
@@ -227,48 +227,6 @@ IF @eventType=6	AND @eventMessageXML IS NOT NULL
 		SET @HTMLBody = REPLACE(@HTMLBody, '<li: ', '<li>')
 		SET @HTMLBody = REPLACE(@HTMLBody, '<ul: li: ', '<ul><li>')
 		SET @HTMLBody = REPLACE(@HTMLBody, '</ul: ', '</ul>')
-
-		/*
-		EXEC @PrepareXmlStatus= sp_xml_preparedocument @handle OUTPUT, @eventMessageXML  
-
-		SET @HTMLBody =@HTMLBody + COALESCE(
-								CAST ( ( 
-										SELECT	
-												li = 'target-name: ' + [target_name], '',
-												li = 'machine-name: ' + [machine_name], '',
-												li = 'measure-unit: ' + [measure_unit], '',
-												li = 'current-value: ' + CAST([current_value] AS [varchar](32)), '',
-												li = 'current-percentage: ' + CAST([current_percentage] AS [varchar](32)), '',
-												li = 'reference-value: ' + CAST([refference_value] AS [varchar](32)), '',
-												li = 'reference-percentage: ' + CAST([refference_percentage] AS [varchar](32)), '',
-												li = 'threshold-value: ' + CAST([threshold_value] AS [varchar](32)), '',
-												li = 'threshold-percentage: ' + CAST([threshold_percentage] AS [varchar](32)), '',
-												li = 'severity: ' + [severity], '',
-												li = 'event-date (utc): ' + CAST([event_date_utc] AS [varchar](32)), ''
-										FROM (
-												SELECT  *
-												FROM    OPENXML(@handle, '/alert/detail', 2)  
-														WITH (											
-																[severity]					[sysname],
-																[instance_name]				[sysname],
-																[machine_name]				[sysname],
-																[counter_name]				[sysname],
-																[target_name]				[nvarchar](512),
-																[measure_unit]				[sysname],
-																[current_value]				[numeric](18,3),
-																[current_percentage]		[numeric](18,3),
-																[refference_value]			[numeric](18,3),
-																[refference_percentage]		[numeric](18,3),
-																[threshold_value]			[numeric](18,3),
-																[threshold_percentage]		[numeric](18,3),
-																[event_date_utc]			[sysname]															)  
-											)x
-										FOR XML PATH('ul'), TYPE 
-							) AS NVARCHAR(MAX) )
-							, '') ;
-		
-		EXEC sp_xml_removedocument @handle 
-		*/
 	end
 
 -----------------------------------------------------------------------------------------------------
@@ -286,7 +244,7 @@ IF @eventType IN (2, 5)	AND @eventMessageXML IS NOT NULL
 									<TH>Run Date</TH>
 									<TH>Run Time</TH>
 									<TH>Run Duration</TH>
-									<TH>Message</TH>' +
+									<TH >Message</TH>' +
 								CAST ( ( 
 										SELECT	TD = [step_id], '',
 												TD = [step_name], '',

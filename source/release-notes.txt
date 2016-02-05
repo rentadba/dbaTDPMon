@@ -385,3 +385,12 @@
 
 /* 19.01.2016 */
 	- add retry step for replication latency alert: an alert will be triggered only after the retry step
+
+/* 20.01.2016 */
+	- enhance transaction monitoring: detect and alert on tempdb space used by a single session
+
+/*----------------------------------------------------------------------*/
+/* February 2016 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 03.02.2016 */
+	- add monitoring job and alert for detecting SQL Agent failed jobs

@@ -53,6 +53,16 @@ CREATE TABLE #blockedSessionInfo
 	[wait_type]				[nvarchar](60)
 )
 
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF object_id('tempdb..#sessionTempdbUsage') IS NOT NULL  DROP TABLE #sessionTempdbUsage
+
+CREATE TABLE #sessionTempdbUsage
+(
+	[id]					[int] IDENTITY(1,1),
+	[session_id]			[smallint],
+	[request_id]			[smallint],
+	[space_used_mb]			[int]
+)
  
 /*-------------------------------------------------------------------------------------------------------------------------------*/
 IF object_id('tempdb..#transactionInfo') IS NOT NULL  DROP TABLE #transactionInfo
@@ -87,7 +97,8 @@ CREATE TABLE #monTransactionsStatus
 	[request_completed]					[bit],
 	[is_session_blocked]				[bit],
 	[wait_duration_sec]					[int],
-	[wait_type]							[nvarchar](60)
+	[wait_type]							[nvarchar](60),
+	[tempdb_space_used_mb]				[int]
 )
 
 SET @executionLevel = 0
@@ -226,10 +237,40 @@ WHILE @@FETCH_STATUS=0
 									, '[transaction-info]:' + @strMessage
 				END CATCH
 
+
+				SET @queryToRun = N''
+				SET @queryToRun = @queryToRun + N'SELECT [session_id], [request_id], SUM([space_used_mb]) AS [space_used_mb]
+												FROM (
+														SELECT	[session_id], [request_id],
+																SUM(([internal_objects_alloc_page_count] - [internal_objects_dealloc_page_count])*8)/1024 AS [space_used_mb]
+														FROM sys.dm_db_task_space_usage
+														GROUP BY [session_id], [request_id]
+														)x
+												WHERE x.[space_used_mb] > 0
+												GROUP BY [session_id], [request_id]'
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+				
+				BEGIN TRY
+						INSERT	INTO #sessionTempdbUsage([session_id], [request_id], [space_used_mb])
+								EXEC (@queryToRun)
+				END TRY
+				BEGIN CATCH
+					SET @strMessage = ERROR_MESSAGE()
+					PRINT @strMessage
+					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+							SELECT  @instanceID
+									, @projectID
+									, GETUTCDATE()
+									, 'dbo.usp_monGetTransactionsStatus'
+									, '[session-tempdb-info]:' + @strMessage
+				END CATCH
+
 			
 				SET @queryToRun = N''
 				SET @queryToRun = @queryToRun + N'SELECT  @@SERVERNAME AS [server_name]
 														, es.[session_id]
+														, er.[request_id]
 														, es.[host_name]
 														, es.[program_name]
 														, CASE WHEN ISNULL(es.[login_name], '''') <> '''' THEN es.[login_name] ELSE sp.[loginame] END [login_name]
@@ -256,8 +297,10 @@ WHILE @@FETCH_STATUS=0
 										 , CASE WHEN si.[blocking_session_id] IS NOT NULL THEN 1 ELSE 0 END AS [is_session_blocked]
 										 , si.[wait_duration_sec]
 										 , si.[wait_type]
+										 , stu.[space_used_mb] AS [tempdb_space_used_mb]
 									FROM (' + @queryToRun + N') x
 									INNER JOIN #transactionInfo ti ON ti.[session_id] = x.[session_id]
+									LEFT JOIN #sessionTempdbUsage stu ON stu.[session_id] = x.[session_id] AND stu.[request_id] = x.[request_id]
 									LEFT JOIN 
 										(
 											SELECT si.[session_id], ISNULL(bk.[sessions_blocked], 0) AS [sessions_blocked]
@@ -280,7 +323,7 @@ WHILE @@FETCH_STATUS=0
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				BEGIN TRY
-						INSERT	INTO #monTransactionsStatus([server_name], [session_id], [database_name], [host_name], [program_name], [login_name], [transaction_begin_time], [last_request_elapsed_time_seconds], [transaction_elapsed_time_seconds], [sessions_blocked], [sql_handle], [request_completed], [is_session_blocked], [wait_duration_sec], [wait_type])
+						INSERT	INTO #monTransactionsStatus([server_name], [session_id], [database_name], [host_name], [program_name], [login_name], [transaction_begin_time], [last_request_elapsed_time_seconds], [transaction_elapsed_time_seconds], [sessions_blocked], [sql_handle], [request_completed], [is_session_blocked], [wait_duration_sec], [wait_type], [tempdb_space_used_mb])
 								EXEC (@queryToRun)
 				END TRY
 				BEGIN CATCH
@@ -299,11 +342,11 @@ WHILE @@FETCH_STATUS=0
 		INSERT INTO [monitoring].[statsTransactionsStatus]([instance_id], [project_id], [event_date_utc]
 																, [database_name], [session_id], [transaction_begin_time], [host_name], [program_name], [login_name]
 																, [last_request_elapsed_time_sec], [transaction_elapsed_time_sec], [sessions_blocked], [sql_handle]
-																, [request_completed], [is_session_blocked], [wait_duration_sec], [wait_type])
+																, [request_completed], [is_session_blocked], [wait_duration_sec], [wait_type], [tempdb_space_used_mb])
 				SELECT    @instanceID, @projectID, GETUTCDATE()
 						, [database_name], [session_id], [transaction_begin_time], [host_name], [program_name], [login_name]
 						, [last_request_elapsed_time_seconds], [transaction_elapsed_time_seconds], [sessions_blocked], [sql_handle]
-						, [request_completed], [is_session_blocked], [wait_duration_sec], [wait_type]
+						, [request_completed], [is_session_blocked], [wait_duration_sec], [wait_type], [tempdb_space_used_mb]
 				FROM #monTransactionsStatus
 								
 		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
