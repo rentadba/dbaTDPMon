@@ -188,7 +188,7 @@ DECLARE   @instanceName		[sysname]
 DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 														  cin.[instance_name] AS [instance_name]
 														, db.[database_name] AS [object_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END AS [child_object_name]
+														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
 														, 'warning'			AS [severity]
 														, 'running transaction'	AS [event_name]
 														, '<alert><detail>' + 
@@ -202,7 +202,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															'<host_name>' + sts.[host_name] + '</host_name>' + 
 															'<program_name>' + sts.[program_name] + '</program_name>' + 
 															'<login_name>' + sts.[login_name] + '</login_name>' + 
-															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END + '</sql_handle>' + 
+															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
 															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
 															'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
 															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
@@ -217,14 +217,35 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															SELECT [session_id],
 																	STUFF((
 																			SELECT ', ' + [database_name]
-																			FROM [monitoring].[statsTransactionsStatus]
-																			WHERE [session_id] = sts.[session_id]
+																			FROM (
+																					SELECT DISTINCT [database_name]
+																					FROM [monitoring].[statsTransactionsStatus]
+																					WHERE [session_id] = sts.[session_id]
+																				)db
 																			ORDER BY [database_name]
 																			FOR XML PATH ('')
 																		) ,1,2,'') [database_name]
 															FROM [monitoring].[statsTransactionsStatus] sts
 															GROUP BY [session_id]
 														)db ON db.[session_id] = sts.[session_id]
+												LEFT JOIN
+														(
+															SELECT [session_id],
+																	STUFF((
+																			SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
+																			FROM (
+																					SELECT DISTINCT [sql_handle]
+																					FROM [monitoring].[statsTransactionsStatus]
+																					WHERE [session_id] = sts.[session_id]
+																						 AND [sql_handle] IS NOT NULL
+																						 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
+																				)db
+																			ORDER BY [sql_handle]
+																			FOR XML PATH ('')
+																		) ,1,2,'') [sql_handle]
+															FROM [monitoring].[statsTransactionsStatus] sts
+															GROUP BY [session_id]
+														)sh ON sh.[session_id] = sts.[session_id]
 												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																								AND asr.[alert_name] IN ('Running Transaction Elapsed Time (sec)')
 																								AND asr.[active] = 1
@@ -241,7 +262,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 												SELECT  DISTINCT
 														  cin.[instance_name] AS [instance_name]
 														, db.[database_name] AS [object_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END AS [child_object_name]
+														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
 														, 'critical'			AS [severity]
 														, 'running transaction'	AS [event_name]
 														, '<alert><detail>' + 
@@ -255,7 +276,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															'<host_name>' + sts.[host_name] + '</host_name>' + 
 															'<program_name>' + sts.[program_name] + '</program_name>' + 
 															'<login_name>' + sts.[login_name] + '</login_name>' + 
-															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END + '</sql_handle>' + 
+															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
 															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
 															'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
 															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
@@ -270,14 +291,35 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															SELECT [session_id],
 																	STUFF((
 																			SELECT ', ' + [database_name]
-																			FROM [monitoring].[statsTransactionsStatus]
-																			WHERE [session_id] = sts.[session_id]
+																			FROM (
+																					SELECT DISTINCT [database_name]
+																					FROM [monitoring].[statsTransactionsStatus]
+																					WHERE [session_id] = sts.[session_id]
+																				)db
 																			ORDER BY [database_name]
 																			FOR XML PATH ('')
 																		) ,1,2,'') [database_name]
 															FROM [monitoring].[statsTransactionsStatus] sts
 															GROUP BY [session_id]
 														)db ON db.[session_id] = sts.[session_id]
+												LEFT JOIN
+														(
+															SELECT [session_id],
+																	STUFF((
+																			SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
+																			FROM (
+																					SELECT DISTINCT [sql_handle]
+																					FROM [monitoring].[statsTransactionsStatus]
+																					WHERE [session_id] = sts.[session_id]
+																						 AND [sql_handle] IS NOT NULL
+																						 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
+																				)db
+																			ORDER BY [sql_handle]
+																			FOR XML PATH ('')
+																		) ,1,2,'') [sql_handle]
+															FROM [monitoring].[statsTransactionsStatus] sts
+															GROUP BY [session_id]
+														)sh ON sh.[session_id] = sts.[session_id]
 												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																								AND asr.[alert_name] IN ('Running Transaction Elapsed Time (sec)')
 																								AND asr.[active] = 1
@@ -293,7 +335,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 												SELECT  DISTINCT
 														  cin.[instance_name] AS [instance_name]
 														, db.[database_name] AS [object_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END AS [child_object_name]
+														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
 														, 'warning'			AS [severity]
 														, 'uncommitted transaction'	AS [event_name]
 														, '<alert><detail>' + 
@@ -307,7 +349,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															'<host_name>' + sts.[host_name] + '</host_name>' + 
 															'<program_name>' + sts.[program_name] + '</program_name>' + 
 															'<login_name>' + sts.[login_name] + '</login_name>' + 
-															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END + '</sql_handle>' + 
+															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
 															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
 															'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
 															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
@@ -322,14 +364,35 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															SELECT [session_id],
 																	STUFF((
 																			SELECT ', ' + [database_name]
-																			FROM [monitoring].[statsTransactionsStatus]
-																			WHERE [session_id] = sts.[session_id]
+																			FROM (
+																					SELECT DISTINCT [database_name]
+																					FROM [monitoring].[statsTransactionsStatus]
+																					WHERE [session_id] = sts.[session_id]
+																				)db
 																			ORDER BY [database_name]
 																			FOR XML PATH ('')
 																		) ,1,2,'') [database_name]
 															FROM [monitoring].[statsTransactionsStatus] sts
 															GROUP BY [session_id]
 														)db ON db.[session_id] = sts.[session_id]
+												LEFT JOIN
+														(
+															SELECT [session_id],
+																	STUFF((
+																			SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
+																			FROM (
+																					SELECT DISTINCT [sql_handle]
+																					FROM [monitoring].[statsTransactionsStatus]
+																					WHERE [session_id] = sts.[session_id]
+																						 AND [sql_handle] IS NOT NULL
+																						 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
+																				)db
+																			ORDER BY [sql_handle]
+																			FOR XML PATH ('')
+																		) ,1,2,'') [sql_handle]
+															FROM [monitoring].[statsTransactionsStatus] sts
+															GROUP BY [session_id]
+														)sh ON sh.[session_id] = sts.[session_id]
 												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																								AND asr.[alert_name] IN ('Uncommitted Transaction Elapsed Time (sec)')
 																								AND asr.[active] = 1
@@ -346,7 +409,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 												SELECT  DISTINCT
 														  cin.[instance_name] AS [instance_name]
 														, db.[database_name] AS [object_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END AS [child_object_name]
+														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
 														, 'critical'			AS [severity]
 														, 'uncommitted transaction'	AS [event_name]
 														, '<alert><detail>' + 
@@ -360,7 +423,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															'<host_name>' + sts.[host_name] + '</host_name>' + 
 															'<program_name>' + sts.[program_name] + '</program_name>' + 
 															'<login_name>' + sts.[login_name] + '</login_name>' + 
-															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END + '</sql_handle>' + 
+															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
 															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
 															'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
 															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
@@ -375,14 +438,35 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															SELECT [session_id],
 																	STUFF((
 																			SELECT ', ' + [database_name]
-																			FROM [monitoring].[statsTransactionsStatus]
-																			WHERE [session_id] = sts.[session_id]
+																			FROM (
+																					SELECT DISTINCT [database_name]
+																					FROM [monitoring].[statsTransactionsStatus]
+																					WHERE [session_id] = sts.[session_id]
+																				)db
 																			ORDER BY [database_name]
 																			FOR XML PATH ('')
 																		) ,1,2,'') [database_name]
 															FROM [monitoring].[statsTransactionsStatus] sts
 															GROUP BY [session_id]
 														)db ON db.[session_id] = sts.[session_id]
+												LEFT JOIN
+														(
+															SELECT [session_id],
+																	STUFF((
+																			SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
+																			FROM (
+																					SELECT DISTINCT [sql_handle]
+																					FROM [monitoring].[statsTransactionsStatus]
+																					WHERE [session_id] = sts.[session_id]
+																						 AND [sql_handle] IS NOT NULL
+																						 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
+																				)db
+																			ORDER BY [sql_handle]
+																			FOR XML PATH ('')
+																		) ,1,2,'') [sql_handle]
+															FROM [monitoring].[statsTransactionsStatus] sts
+															GROUP BY [session_id]
+														)sh ON sh.[session_id] = sts.[session_id]
 												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																								AND asr.[alert_name] IN ('Uncommitted Transaction Elapsed Time (sec)')
 																								AND asr.[active] = 1
@@ -398,7 +482,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 												SELECT  DISTINCT
 														  cin.[instance_name] AS [instance_name]
 														, db.[database_name] AS [object_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END AS [child_object_name]
+														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
 														, 'warning'				AS [severity]
 														, 'blocked transaction'	AS [event_name]
 														, '<alert><detail>' + 
@@ -412,7 +496,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															'<host_name>' + sts.[host_name] + '</host_name>' + 
 															'<program_name>' + sts.[program_name] + '</program_name>' + 
 															'<login_name>' + sts.[login_name] + '</login_name>' + 
-															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END + '</sql_handle>' + 
+															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
 															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
 															'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
 															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
@@ -427,14 +511,35 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															SELECT [session_id],
 																	STUFF((
 																			SELECT ', ' + [database_name]
-																			FROM [monitoring].[statsTransactionsStatus]
-																			WHERE [session_id] = sts.[session_id]
+																			FROM (
+																					SELECT DISTINCT [database_name]
+																					FROM [monitoring].[statsTransactionsStatus]
+																					WHERE [session_id] = sts.[session_id]
+																				)db
 																			ORDER BY [database_name]
 																			FOR XML PATH ('')
 																		) ,1,2,'') [database_name]
 															FROM [monitoring].[statsTransactionsStatus] sts
 															GROUP BY [session_id]
 														)db ON db.[session_id] = sts.[session_id]
+												LEFT JOIN
+														(
+															SELECT [session_id],
+																	STUFF((
+																			SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
+																			FROM (
+																					SELECT DISTINCT [sql_handle]
+																					FROM [monitoring].[statsTransactionsStatus]
+																					WHERE [session_id] = sts.[session_id]
+																						 AND [sql_handle] IS NOT NULL
+																						 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
+																				)db
+																			ORDER BY [sql_handle]
+																			FOR XML PATH ('')
+																		) ,1,2,'') [sql_handle]
+															FROM [monitoring].[statsTransactionsStatus] sts
+															GROUP BY [session_id]
+														)sh ON sh.[session_id] = sts.[session_id]
 												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																								AND asr.[alert_name] IN ('Blocking Transaction Elapsed Time (sec)')
 																								AND asr.[active] = 1
@@ -451,7 +556,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 												SELECT  DISTINCT
 														  cin.[instance_name] AS [instance_name]
 														, db.[database_name] AS [object_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END AS [child_object_name]
+														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
 														, 'critical'			AS [severity]
 														, 'blocked transaction'	AS [event_name]
 														, '<alert><detail>' + 
@@ -465,7 +570,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															'<host_name>' + sts.[host_name] + '</host_name>' + 
 															'<program_name>' + sts.[program_name] + '</program_name>' + 
 															'<login_name>' + sts.[login_name] + '</login_name>' + 
-															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END + '</sql_handle>' + 
+															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
 															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
 															'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
 															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
@@ -480,14 +585,35 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															SELECT [session_id],
 																	STUFF((
 																			SELECT ', ' + [database_name]
-																			FROM [monitoring].[statsTransactionsStatus]
-																			WHERE [session_id] = sts.[session_id]
+																			FROM (
+																					SELECT DISTINCT [database_name]
+																					FROM [monitoring].[statsTransactionsStatus]
+																					WHERE [session_id] = sts.[session_id]
+																				)db
 																			ORDER BY [database_name]
 																			FOR XML PATH ('')
 																		) ,1,2,'') [database_name]
 															FROM [monitoring].[statsTransactionsStatus] sts
 															GROUP BY [session_id]
 														)db ON db.[session_id] = sts.[session_id]
+												LEFT JOIN
+														(
+															SELECT [session_id],
+																	STUFF((
+																			SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
+																			FROM (
+																					SELECT DISTINCT [sql_handle]
+																					FROM [monitoring].[statsTransactionsStatus]
+																					WHERE [session_id] = sts.[session_id]
+																						 AND [sql_handle] IS NOT NULL
+																						 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
+																				)db
+																			ORDER BY [sql_handle]
+																			FOR XML PATH ('')
+																		) ,1,2,'') [sql_handle]
+															FROM [monitoring].[statsTransactionsStatus] sts
+															GROUP BY [session_id]
+														)sh ON sh.[session_id] = sts.[session_id]
 												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																								AND asr.[alert_name] IN ('Blocking Transaction Elapsed Time (sec)')
 																								AND asr.[active] = 1
@@ -503,7 +629,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 												SELECT  DISTINCT
 														  cin.[instance_name] AS [instance_name]
 														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') AS [object_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END AS [child_object_name]
+														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
 														, 'warning'				AS [severity]
 														, 'tempdb space'	AS [event_name]
 														, '<alert><detail>' + 
@@ -517,7 +643,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															'<host_name>' + sts.[host_name] + '</host_name>' + 
 															'<program_name>' + sts.[program_name] + '</program_name>' + 
 															'<login_name>' + sts.[login_name] + '</login_name>' + 
-															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END + '</sql_handle>' + 
+															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
 															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
 															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
 															'<tempdb_usage>' + CAST(sts.[tempdb_space_used_mb] AS [nvarchar]) + '</tempdb_usage>' + 
@@ -532,14 +658,35 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															SELECT [session_id],
 																	STUFF((
 																			SELECT ', ' + [database_name]
-																			FROM [monitoring].[statsTransactionsStatus]
-																			WHERE [session_id] = sts.[session_id]
+																			FROM (
+																					SELECT DISTINCT [database_name]
+																					FROM [monitoring].[statsTransactionsStatus]
+																					WHERE [session_id] = sts.[session_id]
+																				)db
 																			ORDER BY [database_name]
 																			FOR XML PATH ('')
 																		) ,1,2,'') [database_name]
 															FROM [monitoring].[statsTransactionsStatus] sts
 															GROUP BY [session_id]
 														)db ON db.[session_id] = sts.[session_id]
+												LEFT JOIN
+														(
+															SELECT [session_id],
+																	STUFF((
+																			SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
+																			FROM (
+																					SELECT DISTINCT [sql_handle]
+																					FROM [monitoring].[statsTransactionsStatus]
+																					WHERE [session_id] = sts.[session_id]
+																						 AND [sql_handle] IS NOT NULL
+																						 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
+																				)db
+																			ORDER BY [sql_handle]
+																			FOR XML PATH ('')
+																		) ,1,2,'') [sql_handle]
+															FROM [monitoring].[statsTransactionsStatus] sts
+															GROUP BY [session_id]
+														)sh ON sh.[session_id] = sts.[session_id]
 												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																								AND asr.[alert_name] IN ('tempdb: space used by a single session')
 																								AND asr.[active] = 1
@@ -555,7 +702,7 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 												SELECT  DISTINCT
 														  cin.[instance_name] AS [instance_name]
 														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') AS [object_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END AS [child_object_name]
+														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
 														, 'critical'			AS [severity]
 														, 'tempdb space'	AS [event_name]
 														, '<alert><detail>' + 
@@ -569,11 +716,11 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															'<host_name>' + sts.[host_name] + '</host_name>' + 
 															'<program_name>' + sts.[program_name] + '</program_name>' + 
 															'<login_name>' + sts.[login_name] + '</login_name>' + 
-															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("sts.[sql_handle]") )', 'VARCHAR(64)') ELSE N'' END + '</sql_handle>' + 
+															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
 															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
 															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
 															'<tempdb_usage>' + CAST(sts.[tempdb_space_used_mb] AS [nvarchar]) + '</tempdb_usage>' + 
-															'<threshold_value>' + CAST(@alertThresholdWarningTempdb AS [nvarchar]) + '</threshold_value>' + 
+															'<threshold_value>' + CAST(@alertThresholdCriticalTempdb AS [nvarchar]) + '</threshold_value>' + 
 															'<measure_unit>mb</measure_unit>' + 
 															'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
 															'</detail></alert>' AS [event_message]
@@ -584,14 +731,35 @@ DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
 															SELECT [session_id],
 																	STUFF((
 																			SELECT ', ' + [database_name]
-																			FROM [monitoring].[statsTransactionsStatus]
-																			WHERE [session_id] = sts.[session_id]
+																			FROM (
+																					SELECT DISTINCT [database_name]
+																					FROM [monitoring].[statsTransactionsStatus]
+																					WHERE [session_id] = sts.[session_id]
+																				)db
 																			ORDER BY [database_name]
 																			FOR XML PATH ('')
 																		) ,1,2,'') [database_name]
 															FROM [monitoring].[statsTransactionsStatus] sts
 															GROUP BY [session_id]
 														)db ON db.[session_id] = sts.[session_id]
+												LEFT JOIN
+														(
+															SELECT [session_id],
+																	STUFF((
+																			SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
+																			FROM (
+																					SELECT DISTINCT [sql_handle]
+																					FROM [monitoring].[statsTransactionsStatus]
+																					WHERE [session_id] = sts.[session_id]
+																						 AND [sql_handle] IS NOT NULL
+																						 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
+																				)db
+																			ORDER BY [sql_handle]
+																			FOR XML PATH ('')
+																		) ,1,2,'') [sql_handle]
+															FROM [monitoring].[statsTransactionsStatus] sts
+															GROUP BY [session_id]
+														)sh ON sh.[session_id] = sts.[session_id]
 												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																								AND asr.[alert_name] IN ('tempdb: space used by a single session')
 																								AND asr.[active] = 1

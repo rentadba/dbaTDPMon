@@ -257,10 +257,20 @@ DEALLOCATE crsInactiveSubscriptions
 ------------------------------------------------------------------------------------------------------------------------------------------
 RAISERROR('--Deploy temporary objects for Replication Latency analysis...', 10, 1) WITH NOWAIT
 
-DECLARE crsActivePublications CURSOR FAST_FORWARD READ_ONLY FOR	SELECT DISTINCT [publisher_server]
-																FROM [monitoring].[statsReplicationLatency]
-																WHERE [subscription_status] = 2 /* active subscriptions */
-																		AND [publication_type] = 0 /* only transactional publications */
+DECLARE crsActivePublications CURSOR FAST_FORWARD READ_ONLY FOR	SELECT DISTINCT srl.[publisher_server]
+																FROM [monitoring].[statsReplicationLatency] srl
+																LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication'
+																											AND asr.[alert_name] IN ('subscription marked inactive', 'subscription not active')
+																											AND asr.[active] = 1
+																											AND (asr.[skip_value] = ('[' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '](' + srl.[publication_name] + ')'))
+																											AND (    asr.[skip_value2] IS NULL 
+																													OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ('[' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + ']'))
+																												)
+
+																WHERE srl.[subscription_status] = 2 /* active subscriptions */
+																		AND srl.[publication_type] = 0 /* only transactional publications */
+																		AND asr.[id] IS NULL
+
 OPEN crsActivePublications
 FETCH NEXT FROM crsActivePublications INTO @publicationServer
 WHILE @@FETCH_STATUS=0
@@ -332,7 +342,7 @@ WHILE @@FETCH_STATUS=0
 			SET @currentIteration = 1
 			SET @currentDateTime  = GETDATE()
 
-			WHILE @currentIteration <= 1
+			WHILE @currentIteration <= 2
 				begin
 					/* Insert a new tracer token in the publication database */
 					SET @queryToRun = N''EXECUTE ['' + @publisherDB + N''].sys.sp_postTracerToken @publication = @publicationName, @tracer_token_id = @tokenID OUTPUT''
@@ -392,9 +402,11 @@ WHILE @@FETCH_STATUS=0
 						begin
 							DELETE FROM [dbo].[replicationTokenResults] 
 							WHERE [publication] = @publicationName AND [publisher_db] = @publisherDB
+							
+							SET @currentIteration = @currentIteration + 1;					
 						end
 					ELSE
-						SET @currentIteration = @currentIteration + 1;					
+						SET @currentIteration = 3;	
 				end;
 
 			/* perform cleanup */
@@ -592,10 +604,19 @@ WHERE	jeq.[module] = 'monitoring'
 ------------------------------------------------------------------------------------------------------------------------------------------
 RAISERROR('--Perform cleanup...', 10, 1) WITH NOWAIT
 
-DECLARE crsActivePublications CURSOR FAST_FORWARD READ_ONLY FOR	SELECT DISTINCT [publisher_server]
-																FROM	[monitoring].[statsReplicationLatency]
-																WHERE	[subscription_status] = 2 /* active subscriptions */
-																		AND [publication_type] = 0 /* only transactional publications */
+DECLARE crsActivePublications CURSOR FAST_FORWARD READ_ONLY FOR	SELECT DISTINCT srl.[publisher_server]
+																FROM [monitoring].[statsReplicationLatency] srl
+																LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication'
+																											AND asr.[alert_name] IN ('subscription marked inactive', 'subscription not active')
+																											AND asr.[active] = 1
+																											AND (asr.[skip_value] = ('[' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '](' + srl.[publication_name] + ')'))
+																											AND (    asr.[skip_value2] IS NULL 
+																													OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ('[' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + ']'))
+																												)
+
+																WHERE srl.[subscription_status] = 2 /* active subscriptions */
+																		AND srl.[publication_type] = 0 /* only transactional publications */
+																		AND asr.[id] IS NULL
 OPEN crsActivePublications
 FETCH NEXT FROM crsActivePublications INTO @publicationServer
 WHILE @@FETCH_STATUS=0

@@ -180,8 +180,13 @@ WHILE @@FETCH_STATUS=0
 				END CATCH
 
 
-				DECLARE crsFailedJobs CURSOR READ_ONLY FOR	SELECT [job_name]
-															FROM #statsSQLAgentJobs
+				DECLARE crsFailedJobs CURSOR READ_ONLY FOR	SELECT j.[job_name]
+															FROM #statsSQLAgentJobs j
+															LEFT JOIN [monitoring].[statsSQLAgentJobs] saj ON	saj.[project_id] = @projectID
+																												AND saj.[instance_id] = @instanceID
+																												AND saj.[job_name] = j.[job_name]
+																												AND saj.[last_completion_time] = j.[last_completion_time]
+															WHERE saj.[job_name] IS NULL
 				OPEN crsFailedJobs
 				FETCH NEXT FROM crsFailedJobs INTO @jobName
 				WHILE @@FETCH_STATUS=0
@@ -205,8 +210,13 @@ WHILE @@FETCH_STATUS=0
 		/* save results to stats table */
 		INSERT INTO [monitoring].[statsSQLAgentJobs]([instance_id], [project_id], [event_date_utc], [job_name], [job_completion_status], [last_completion_time], [last_completion_time_utc], [local_server_date_utc])
 				SELECT    @instanceID, @projectID, GETUTCDATE()
-						, [job_name], [job_completion_status], [last_completion_time], [last_completion_time_utc], [local_server_date_utc]
-				FROM #statsSQLAgentJobs
+						, j.[job_name], j.[job_completion_status], j.[last_completion_time], j.[last_completion_time_utc], j.[local_server_date_utc]
+				FROM #statsSQLAgentJobs j
+				LEFT JOIN [monitoring].[statsSQLAgentJobs] saj ON	saj.[project_id] = @projectID
+																	AND saj.[instance_id] = @instanceID
+																	AND saj.[job_name] = j.[job_name]
+																	AND saj.[last_completion_time] = j.[last_completion_time]
+				WHERE saj.[job_name] IS NULL
 								
 		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
 	end

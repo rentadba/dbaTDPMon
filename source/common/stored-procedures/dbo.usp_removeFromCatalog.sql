@@ -124,6 +124,12 @@ BEGIN TRY
 		WHERE cin.[project_id] = @projectID
 				AND cin.[id] = @instanceID
 
+		-----------------------------------------------------------------------------------------------------
+		DELETE ssaj
+		FROM [monitoring].statsSQLAgentJobs ssaj
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = ssaj.[project_id] AND cin.[id] = ssaj.[instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[id] = @instanceID				
 				
 		-----------------------------------------------------------------------------------------------------
 		DELETE FROM  dbo.catalogDatabaseNames 
