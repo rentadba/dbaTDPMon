@@ -46,11 +46,11 @@ DECLARE	  @serverEdition			[sysname]
 IF object_id('#serverPropertyConfig') IS NOT NULL DROP TABLE #serverPropertyConfig
 CREATE TABLE #serverPropertyConfig
 		(
-			[config_name]	[sysname]	NULL,
-			[minimum]		[int]		NULL,
-			[maximum]		[int]		NULL,
-			[config_value]	[int]		NULL,
-			[run_value]		[int]		NULL
+			[config_name]	[sysname]		NULL,
+			[minimum]		[sql_variant]	NULL,
+			[maximum]		[sql_variant]	NULL,
+			[config_value]	[sql_variant]	NULL,
+			[run_value]		[sql_variant]	NULL
 		)
 
 -----------------------------------------------------------------------------------------
@@ -72,14 +72,20 @@ SET @queryToRun = N''
 SET @queryToRun = @queryToRun + N'EXEC master.dbo.sp_configure'
 	
 IF @sqlServerName<>@@SERVERNAME
-	SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+	begin
+		IF @serverVersionNum < 11
+			SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+		ELSE
+			SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''') WITH RESULT SETS(([name] [nvarchar](70), [minimum] [sql_variant], [maximum] [sql_variant], [config_value] [sql_variant], [run_value] [sql_variant]))'')'
+	end
+
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 INSERT	INTO #serverPropertyConfig--([config_name], [minimum], [maximum], [config_value], [run_value])
 		EXEC (@queryToRun)
 
 SET @queryToRun = N'SELECT   @optionIsAvailable = CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
-						   , @optionCurrentValue = MAX(config_value)
+						   , @optionCurrentValue = MAX(CAST(config_value AS [int]))
 					FROM #serverPropertyConfig
 					WHERE [config_name] = @configOptionName'
 SET @queryParameters = N'@optionIsAvailable [bit] OUTPUT, @optionCurrentValue [int] OUTPUT, @configOptionName [sysname]'
@@ -107,9 +113,15 @@ IF @optionIsAvailable=1 AND ISNULL(@optionCurrentValue, 0) <> @configOptionValue
 		--check the new value
 		SET @queryToRun = N''
 		SET @queryToRun = @queryToRun + N'EXEC master.dbo.sp_configure'
-	
+
 		IF @sqlServerName<>@@SERVERNAME
-			SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+			begin
+				IF @serverVersionNum < 11
+					SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+				ELSE
+					SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''') WITH RESULT SETS(([name] [nvarchar](70), [minimum] [sql_variant], [maximum] [sql_variant], [config_value] [sql_variant], [run_value] [sql_variant]))'')'
+			end
+
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		DELETE FROM #serverPropertyConfig

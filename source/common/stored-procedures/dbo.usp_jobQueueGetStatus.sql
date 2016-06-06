@@ -150,10 +150,14 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 																@debugMode		= @debugMode
 							end
 						ELSE
-							SET @runningJobs = @runningJobs + 1
+							begin
+								IF @currentRunning <> 0
+									SET @runningJobs = @runningJobs + 1
+							end
 					end
 				ELSE
-					SET @runningJobs = @runningJobs + 1
+					IF @currentRunning <> 0
+						SET @runningJobs = @runningJobs + 1
 
 				FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName
 			end

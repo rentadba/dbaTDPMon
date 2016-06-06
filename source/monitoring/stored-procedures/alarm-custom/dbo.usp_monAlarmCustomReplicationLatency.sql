@@ -167,6 +167,7 @@ DECLARE crsInactiveSubscriptions CURSOR FAST_FORWARD READ_ONLY FOR	SELECT    srl
 																													)
 																	WHERE	srl.[subscription_status] = 0 /* inactive subscriptions */
 																			AND asr.[id] IS NULL
+																			AND srl.[publisher_server] LIKE @sqlServerNameFilter
 OPEN crsInactiveSubscriptions
 FETCH NEXT FROM crsInactiveSubscriptions INTO @publicationName, @publicationServer, @publisherDB, @subcriptionServer, @subscriptionDB, @subscriptionArticles, @distributorServer
 WHILE @@FETCH_STATUS=0
@@ -220,6 +221,7 @@ DECLARE crsInactiveSubscriptions CURSOR FAST_FORWARD READ_ONLY FOR	SELECT    srl
 																													)
 																	WHERE	srl.[subscription_status] = 1 /* subscribed subscriptions */
 																			AND asr.[id] IS NULL
+																			AND srl.[publisher_server] LIKE @sqlServerNameFilter
 OPEN crsInactiveSubscriptions
 FETCH NEXT FROM crsInactiveSubscriptions INTO @publicationName, @publicationServer, @publisherDB, @subcriptionServer, @subscriptionDB, @subscriptionArticles, @distributorServer
 WHILE @@FETCH_STATUS=0
@@ -270,6 +272,7 @@ DECLARE crsActivePublications CURSOR FAST_FORWARD READ_ONLY FOR	SELECT DISTINCT 
 																WHERE srl.[subscription_status] = 2 /* active subscriptions */
 																		AND srl.[publication_type] = 0 /* only transactional publications */
 																		AND asr.[id] IS NULL
+																		AND srl.[publisher_server] LIKE @sqlServerNameFilter
 
 OPEN crsActivePublications
 FETCH NEXT FROM crsActivePublications INTO @publicationServer
@@ -367,16 +370,13 @@ WHILE @@FETCH_STATUS=0
 									EXEC sp_executesql @queryToRun, @queryParam , @publicationName = @publicationName
 																				, @tokenID = @tokenID
 
-							IF NOT EXISTS(SELECT * FROM @temptokenResult WHERE ISNULL([subscriber_latency], [overall_latency]) IS NULL)
+							IF NOT EXISTS(	SELECT * FROM @temptokenResult 
+											WHERE [subscriber_latency] IS NULL OR [overall_latency] IS NULL OR [distributor_latency] IS NULL
+										 )													
 								BREAK
 							ELSE
-								DELETE FROM @temptokenResult
+								DELETE FROM @temptokenResult							
 						end										
-
-					/* Store our results in a temp table for retrieval later */
-					INSERT	INTO @temptokenResult ([distributor_latency], [subscriber], [subscriber_db], [subscriber_latency], [overall_latency])
-							EXEC sp_executesql @queryToRun, @queryParam , @publicationName = @publicationName
-																		, @tokenID = @tokenID
 
 					INSERT	[dbo].[replicationTokenResults] ([publisher_db], [publication], [distributor_latency], [subscriber], [subscriber_db], [subscriber_latency], [overall_latency])
 							SELECT    @publisherDB
@@ -390,7 +390,7 @@ WHILE @@FETCH_STATUS=0
 
 					/* Assign the iteration and token id to the results for easier investigation */
 					UPDATE [dbo].[replicationTokenResults]
-					SET   [iteration] = @currentIteration + 1
+					SET   [iteration] = @currentIteration
 						, [tracer_id] = @tokenID
 					WHERE [iteration] IS NULL;
 
@@ -398,7 +398,10 @@ WHILE @@FETCH_STATUS=0
 					
 					/* add retry mechanism for 1st iteration */
 					IF	@currentIteration=1
-						AND EXISTS(SELECT * FROM [dbo].[replicationTokenResults] WHERE [publication] = @publicationName AND [publisher_db] = @publisherDB AND [overall_latency] IS NULL)
+						AND EXISTS(	SELECT * FROM [dbo].[replicationTokenResults] 
+									WHERE	[publication] = @publicationName AND [publisher_db] = @publisherDB 
+											AND ([overall_latency] IS NULL OR [distributor_latency] IS NULL OR [subscriber_latency] IS NULL)
+									)
 						begin
 							DELETE FROM [dbo].[replicationTokenResults] 
 							WHERE [publication] = @publicationName AND [publisher_db] = @publisherDB
@@ -455,6 +458,7 @@ DECLARE crsActivePublishers	CURSOR FAST_FORWARD READ_ONLY FOR	SELECT DISTINCT ci
 																		AND [publication_type] = 0 /* only transactional publications */
 																		AND cin.[active] = 1
 																		AND cin.[project_id] = @projectID
+																		AND srl.[publisher_server] LIKE @sqlServerNameFilter
 OPEN crsActivePublishers
 FETCH NEXT FROM crsActivePublishers INTO @publisherInstanceID, @publicationServer
 WHILE @@FETCH_STATUS=0
@@ -467,6 +471,7 @@ WHILE @@FETCH_STATUS=0
 																		WHERE	[subscription_status] = 2 /* active subscriptions */
 																				AND srl.[publisher_server] = @publicationServer
 																				AND [publication_type] = 0 /* only transactional publications */
+																				AND srl.[publisher_server] LIKE @sqlServerNameFilter
 																			
 		OPEN crsActivePublications
 		FETCH NEXT FROM crsActivePublications INTO @publicationName, @publisherDB
@@ -498,7 +503,7 @@ RAISERROR('--Running jobs to compute replication latency..', 10, 1) WITH NOWAIT
 EXEC dbo.usp_jobQueueExecute	@projectCode		= @projectCode,
 								@moduleFilter		= 'monitoring',
 								@descriptorFilter	= 'usp_monAlarmCustomReplicationLatency',
-								@waitForDelay		= '00:00:10',
+								@waitForDelay		= DEFAULT,
 								@debugMode			= @debugMode
 
 UPDATE srl
@@ -522,6 +527,7 @@ DECLARE crsActivePublishers	CURSOR FAST_FORWARD READ_ONLY FOR	SELECT DISTINCT ci
 																		AND [publication_type] = 0 /* only transactional publications */
 																		AND cin.[active] = 1
 																		AND cin.[project_id] = @projectID
+																		AND srl.[publisher_server] LIKE @sqlServerNameFilter
 OPEN crsActivePublishers
 FETCH NEXT FROM crsActivePublishers INTO @publisherInstanceID, @publicationServer
 WHILE @@FETCH_STATUS=0
@@ -534,6 +540,7 @@ WHILE @@FETCH_STATUS=0
 																		WHERE	[subscription_status] = 2 /* active subscriptions */
 																				AND srl.[publisher_server] = @publicationServer
 																				AND [publication_type] = 0 /* only transactional publications */
+																				AND srl.[publisher_server] LIKE @sqlServerNameFilter
 		OPEN crsActivePublications
 		FETCH NEXT FROM crsActivePublications INTO @publicationName, @publisherDB
 		WHILE @@FETCH_STATUS=0
@@ -559,7 +566,9 @@ WHILE @@FETCH_STATUS=0
 													and srl.[publication_name] = x.[publication] 
 													AND srl.[subscriber_server] = x.[subscriber] 
 													AND srl.[subscriber_db] = x.[subscriber_db]
-													AND srl.[publisher_server] = ''' + @publicationServer + N''''
+													AND srl.[publisher_server] = ''' + @publicationServer + N'''
+									WHERE srl.[publisher_db]=''' + @publisherDB + N'''
+										AND srl.[publication_name]=''' + @publicationName + N''''
 		
 				INSERT	INTO [dbo].[jobExecutionQueue](	[instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id],
 														[job_name], [job_step_name], [job_database_name], [job_command])
@@ -583,7 +592,7 @@ RAISERROR('--Running GetData jobs..', 10, 1) WITH NOWAIT
 EXEC dbo.usp_jobQueueExecute	@projectCode		= @projectCode,
 								@moduleFilter		= 'monitoring',
 								@descriptorFilter	= 'usp_monAlarmCustomReplicationLatency',
-								@waitForDelay		= '00:00:10',
+								@waitForDelay		= DEFAULT,
 								@debugMode			= @debugMode
 
 UPDATE [monitoring].[statsReplicationLatency] SET [distributor_latency] = NULL	WHERE [distributor_latency] = 2147483647
@@ -604,7 +613,7 @@ WHERE	jeq.[module] = 'monitoring'
 ------------------------------------------------------------------------------------------------------------------------------------------
 RAISERROR('--Perform cleanup...', 10, 1) WITH NOWAIT
 
-DECLARE crsActivePublications CURSOR FAST_FORWARD READ_ONLY FOR	SELECT DISTINCT srl.[publisher_server]
+DECLARE crsActivePublications CURSOR FAST_FORWARD READ_ONLY FOR	SELECT DISTINCT srl.[publisher_server], srl.[publication_name], srl.[publisher_db]
 																FROM [monitoring].[statsReplicationLatency] srl
 																LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication'
 																											AND asr.[alert_name] IN ('subscription marked inactive', 'subscription not active')
@@ -617,8 +626,9 @@ DECLARE crsActivePublications CURSOR FAST_FORWARD READ_ONLY FOR	SELECT DISTINCT 
 																WHERE srl.[subscription_status] = 2 /* active subscriptions */
 																		AND srl.[publication_type] = 0 /* only transactional publications */
 																		AND asr.[id] IS NULL
+																		AND srl.[publisher_server] LIKE @sqlServerNameFilter
 OPEN crsActivePublications
-FETCH NEXT FROM crsActivePublications INTO @publicationServer
+FETCH NEXT FROM crsActivePublications INTO @publicationServer, @publicationName, @publisherDB
 WHILE @@FETCH_STATUS=0
 	begin
 		SET @strMessage='--	running on server: ' + @publicationServer
@@ -641,13 +651,23 @@ WHILE @@FETCH_STATUS=0
 		SET @queryToRun = N''
 		SET @queryToRun = @queryToRun + N'
 			IF EXISTS(SELECT * FROM sysobjects WHERE [name] = ''replicationTokenResults'' AND [type]=''U'')
-				DROP TABLE dbo.replicationTokenResults'
+				DELETE FROM dbo.replicationTokenResults WHERE [publisher_db]=''' + @publisherDB + N''' AND [publication] = ''' + @publicationName + N''''
 
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @serverToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 		EXEC @serverToRun @queryToRun
 
-		FETCH NEXT FROM crsActivePublications INTO @publicationServer
+		SET @queryToRun = N''
+		SET @queryToRun = @queryToRun + N'
+			IF EXISTS(SELECT * FROM sysobjects WHERE [name] = ''replicationTokenResults'' AND [type]=''U'')
+				IF NOT EXISTS(SELECT * FROM dbo.replicationTokenResults)
+					DROP TABLE dbo.replicationTokenResults'
+
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @serverToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
+		EXEC @serverToRun @queryToRun
+
+		FETCH NEXT FROM crsActivePublications INTO @publicationServer, @publicationName, @publisherDB
 	end
 CLOSE crsActivePublications
 DEALLOCATE crsActivePublications

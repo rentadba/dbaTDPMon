@@ -314,6 +314,12 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDatabaseBackup.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDatabaseGetMostRecentBackupFromLocation.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpRestoreDatabaseAs.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 
 echo *-----------------------------------------------------------------------------*
 echo Maintenance Plan: Creating SQL Server Agent Jobs
@@ -461,6 +467,10 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\alarm-custom\dbo.usp_monAlarmCustomSQLAgentFailedJobs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\alarm-custom\dbo.usp_monReplicationPublicationLatency.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+
 
 echo *-----------------------------------------------------------------------------*
 echo Monitoring: Creating SQL Server Agent Jobs
@@ -477,6 +487,8 @@ if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - SQLAgentFailedJobs.sql" -d %dbname% -v dbName=%dbname% projectCode=%project% -b -r 1
 if errorlevel 1 goto install_err
+
+
 
 
 if %module%=="all" goto done

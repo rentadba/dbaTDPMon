@@ -169,7 +169,7 @@ EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrin
 EXEC dbo.usp_jobQueueExecute	@projectCode		= @projectCode,
 								@moduleFilter		= 'monitoring',
 								@descriptorFilter	= 'usp_monAlarmCustomTransactionsStatus',
-								@waitForDelay		= '00:00:10',
+								@waitForDelay		= DEFAULT,
 								@debugMode			= @debugMode
 
 ------------------------------------------------------------------------------------------------------------------------------------------
