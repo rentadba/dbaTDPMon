@@ -400,3 +400,6 @@
 /*----------------------------------------------------------------------*/
 /* 02.06.2016 */
 	- fix various small bugs on monitoring
+
+/* 08.06.2016 */
+	- updated documentation with monitoring module

@@ -3,7 +3,7 @@ GO
 
 SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
 GO
-UPDATE [dbo].[appConfigurations] SET [value] = N'2016.06.02' WHERE [module] = 'common' AND [name] = 'Application Version'
+UPDATE [dbo].[appConfigurations] SET [value] = N'2016.06.08' WHERE [module] = 'common' AND [name] = 'Application Version'
 GO
 
 /* common module */
@@ -2740,19 +2740,19 @@ BEGIN TRY
 			END + 
  			CASE WHEN (@flgActions & 8 = 8) 
 				 THEN N'
-				<TR VALIGN="TOP" class="color-1">
-					<TD ALIGN=LEFT class="summary-style add-border color-1">
+				<TR VALIGN="TOP" class="color-2">
+					<TD ALIGN=LEFT class="summary-style add-border color-2">
 						Disk Space Information
 					</TD>
-					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
+					<TD ALIGN=CENTER class="summary-style add-border color-2">' +
 					CASE WHEN (@flgOptions & 65536 = 65536)
-						  THEN N'<A HREF="#DiskSpaceInformationCompleteDetails" class="summary-style color-1">Complete Details</A>'
+						  THEN N'<A HREF="#DiskSpaceInformationCompleteDetails" class="summary-style color-2">Complete Details</A>'
 						  ELSE N'Complete Details'
 					END + N'
 					</TD>
-					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
+					<TD ALIGN=CENTER class="summary-style add-border color-2">' +
 					CASE WHEN (@flgOptions & 131072 = 131072)
-						  THEN N'<A HREF="#DiskSpaceInformationPermissionErrors" class="summary-style color-1">Permission Errors {DiskSpaceInformationPermissionErrorsCount}</A>'
+						  THEN N'<A HREF="#DiskSpaceInformationPermissionErrors" class="summary-style color-2">Permission Errors {DiskSpaceInformationPermissionErrorsCount}</A>'
 						  ELSE N'Permission Errors'
 					END + N'
 					</TD>
@@ -2761,19 +2761,19 @@ BEGIN TRY
 			END + 
  			CASE WHEN (@flgActions & 16 = 16) 
 				 THEN N'
-				<TR VALIGN="TOP" class="color-2">
-					<TD ALIGN=LEFT class="summary-style add-border color-2">
+				<TR VALIGN="TOP" class="color-1">
+					<TD ALIGN=LEFT class="summary-style add-border color-1">
 						Errorlog Messages
 					</TD>
-					<TD ALIGN=CENTER class="summary-style add-border color-2">' +
+					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
 					CASE WHEN (@flgOptions & 2097152 = 2097152)
-						  THEN N'<A HREF="#ErrorlogMessagesCompleteDetails" class="summary-style color-2">Complete Details</A>'
+						  THEN N'<A HREF="#ErrorlogMessagesCompleteDetails" class="summary-style color-1">Complete Details</A>'
 						  ELSE N'Complete Details'
 					END + N'
 					</TD>
-					<TD ALIGN=CENTER class="summary-style add-border color-2">' +
+					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
 					CASE WHEN (@flgOptions & 524288 = 524288)
-						  THEN N'<A HREF="#ErrorlogMessagesPermissionErrors" class="summary-style color-2">Permission Errors {ErrorlogMessagesPermissionErrorsCount}</A>'
+						  THEN N'<A HREF="#ErrorlogMessagesPermissionErrors" class="summary-style color-1">Permission Errors {ErrorlogMessagesPermissionErrorsCount}</A>'
 						  ELSE N'Permission Errors;'
 					END + N'
 					</TD>
@@ -2782,19 +2782,19 @@ BEGIN TRY
 			END + 
  			CASE WHEN (@flgActions & 32 = 32) 
 				 THEN N'
-				<TR VALIGN="TOP" class="color-1">
-					<TD ALIGN=LEFT class="summary-style add-border color-1">
+				<TR VALIGN="TOP" class="color-2">
+					<TD ALIGN=LEFT class="summary-style add-border color-2">
 						OS Event Messages
 					</TD>
-					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
+					<TD ALIGN=CENTER class="summary-style add-border color-2">' +
 					CASE WHEN (@flgOptions & 134217728 = 134217728)
-						  THEN N'<A HREF="#OSEventMessagesCompleteDetails" class="summary-style color-1">Complete Details</A>'
+						  THEN N'<A HREF="#OSEventMessagesCompleteDetails" class="summary-style color-2">Complete Details</A>'
 						  ELSE N'Complete Details'
 					END + N'
 					</TD>
-					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
+					<TD ALIGN=CENTER class="summary-style add-border color-2">' +
 					CASE WHEN (@flgOptions & 67108864 = 67108864)
-						  THEN N'<A HREF="#OSEventMessagesPermissionErrors" class="summary-style color-1">Permission Errors {OSEventMessagesPermissionErrorsCount}</A>'
+						  THEN N'<A HREF="#OSEventMessagesPermissionErrors" class="summary-style color-2">Permission Errors {OSEventMessagesPermissionErrorsCount}</A>'
 						  ELSE N'Permission Errors;'
 					END + N'
 					</TD>
@@ -5812,6 +5812,9 @@ RETURN @ReturnValue
 GO
 
 
+
+
+
 --update job: Discovery & Health Check
 RAISERROR('update job: Discovery & Health Check', 10, 1) WITH NOWAIT
 GO
@@ -5823,7 +5826,7 @@ SELECT @projectCode = [value] FROM dbo.appConfigurations WHERE [name] = 'Default
 SET @queryToRun = N'
 ' + CASE WHEN @projectCode IS NULL 
 			THEN N'TRUNCATE TABLE [dbo].[logAnalysisMessages]' 
-			ELSE N'DELETE lam FROM [dbo].[logAnalysisMessages] lam INNER JOIN [dbo].[catalogProjects] cp ON cp.[id] = lam.[project_id] WHERE cp.[name] = ''' + @projectCode + N''''
+			ELSE N'DELETE lam FROM [dbo].[logAnalysisMessages] lam INNER JOIN [dbo].[catalogProjects] cp ON cp.[id] = lam.[project_id] WHERE cp.[code] = ''' + @projectCode + N''''
 	END + N'
 EXEC [dbo].[usp_refreshProjectCatalogsAndDiscovery] @projectCode	 = ''' + @projectCode + N''',
 													@runDiscovery	 = 0,
@@ -6894,6 +6897,50 @@ GO
 IF NOT EXISTS(SELECT * FROM [monitoring].[alertThresholds] WHERE [category]='performance' AND [alert_name] = 'tempdb: space used by a single session')
 	INSERT	INTO [monitoring].[alertThresholds] ([category], [alert_name], [operator], [warning_limit], [critical_limit])
 		SELECT 'performance', 'tempdb: space used by a single session', '>', 8192, 16384
+GO
+
+
+RAISERROR('Update table: [monitoring].[alertSkipRules]', 10, 1) WITH NOWAIT
+GO
+SET NOCOUNT ON
+-----------------------------------------------------------------------------------------------------
+RAISERROR('		...insert default data', 10, 1) WITH NOWAIT
+GO
+IF NOT EXISTS(SELECT * FROM [monitoring].[alertSkipRules] WHERE [category]='disk-space' AND [alert_name]='Logical Disk: Free Disk Space (%)')
+INSERT	INTO [monitoring].[alertSkipRules] ([category], [alert_name], [skip_value], [skip_value2], [active])
+		SELECT 'disk-space', 'Logical Disk: Free Disk Space (%)', NULL, NULL, 0
+
+IF NOT EXISTS(SELECT * FROM [monitoring].[alertSkipRules] WHERE [category]='disk-space' AND [alert_name]='Logical Disk: Free Disk Space (MB)')
+INSERT	INTO [monitoring].[alertSkipRules] ([category], [alert_name], [skip_value], [skip_value2], [active])
+		SELECT 'disk-space', 'Logical Disk: Free Disk Space (MB)', NULL, NULL, 0
+
+IF NOT EXISTS(SELECT * FROM [monitoring].[alertSkipRules] WHERE [category]='replication' AND [alert_name]='subscription marked inactive')
+INSERT	INTO [monitoring].[alertSkipRules] ([category], [alert_name], [skip_value], [skip_value2], [active])
+		SELECT 'replication', 'subscription marked inactive', '[PublisherServer].[PublishedDB](PublicationName)', '[SubscriberServer].[SubscriberDB]', 0
+
+IF NOT EXISTS(SELECT * FROM [monitoring].[alertSkipRules] WHERE [category]='replication' AND [alert_name]='subscription not active')
+INSERT	INTO [monitoring].[alertSkipRules] ([category], [alert_name], [skip_value], [skip_value2], [active])
+		SELECT 'replication', 'subscription not active', '[PublisherServer].[PublishedDB](PublicationName)', '[SubscriberServer].[SubscriberDB]', 0
+
+IF NOT EXISTS(SELECT * FROM [monitoring].[alertSkipRules] WHERE [category]='replication' AND [alert_name]='replication latency')
+INSERT	INTO [monitoring].[alertSkipRules] ([category], [alert_name], [skip_value], [skip_value2], [active])
+		SELECT 'replication', 'replication latency', '[PublisherServer].[PublishedDB](PublicationName)', '[SubscriberServer].[SubscriberDB]', 0
+
+IF NOT EXISTS(SELECT * FROM [monitoring].[alertSkipRules] WHERE [category]='performance' AND [alert_name]='Running Transaction Elapsed Time (sec)')
+INSERT	INTO [monitoring].[alertSkipRules] ([category], [alert_name], [skip_value], [skip_value2], [active])
+		SELECT 'performance', 'Running Transaction Elapsed Time (sec)', 'InstanceName', NULL, 0
+
+IF NOT EXISTS(SELECT * FROM [monitoring].[alertSkipRules] WHERE [category]='performance' AND [alert_name]='Uncommitted Transaction Elapsed Time (sec)')
+INSERT	INTO [monitoring].[alertSkipRules] ([category], [alert_name], [skip_value], [skip_value2], [active])
+		SELECT 'performance', 'Uncommitted Transaction Elapsed Time (sec)', 'InstanceName', NULL, 0
+
+IF NOT EXISTS(SELECT * FROM [monitoring].[alertSkipRules] WHERE [category]='performance' AND [alert_name]='Blocking Transaction Elapsed Time (sec)')
+INSERT	INTO [monitoring].[alertSkipRules] ([category], [alert_name], [skip_value], [skip_value2], [active])
+		SELECT 'performance', 'Blocking Transaction Elapsed Time (sec)', 'InstanceName', NULL, 0
+
+IF NOT EXISTS(SELECT * FROM [monitoring].[alertSkipRules] WHERE [category]='performance' AND [alert_name]='tempdb: space used by a single session')
+INSERT	INTO [monitoring].[alertSkipRules] ([category], [alert_name], [skip_value], [skip_value2], [active])
+		SELECT 'performance', 'tempdb: space used by a single session', 'InstanceName', NULL, 0
 GO
 
 
@@ -9920,6 +9967,11 @@ QuitWithRollback:
 EndSave:
 
 ---------------------------------------------------------------------------------------------------
+GO
+
+RAISERROR('update jobs description..', 10, 1) WITH NOWAIT
+GO
+UPDATE msdb.dbo.sysjobs SET [description]=REPLACE([description], 'codeple.com', 'codeplex.com') WHERE [description] LIKE '%codeple.com%'
 GO
 
 USE [dbaTDPMon]

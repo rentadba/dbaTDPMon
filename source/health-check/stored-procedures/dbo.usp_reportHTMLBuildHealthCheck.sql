@@ -902,19 +902,19 @@ BEGIN TRY
 			END + 
  			CASE WHEN (@flgActions & 8 = 8) 
 				 THEN N'
-				<TR VALIGN="TOP" class="color-1">
-					<TD ALIGN=LEFT class="summary-style add-border color-1">
+				<TR VALIGN="TOP" class="color-2">
+					<TD ALIGN=LEFT class="summary-style add-border color-2">
 						Disk Space Information
 					</TD>
-					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
+					<TD ALIGN=CENTER class="summary-style add-border color-2">' +
 					CASE WHEN (@flgOptions & 65536 = 65536)
-						  THEN N'<A HREF="#DiskSpaceInformationCompleteDetails" class="summary-style color-1">Complete Details</A>'
+						  THEN N'<A HREF="#DiskSpaceInformationCompleteDetails" class="summary-style color-2">Complete Details</A>'
 						  ELSE N'Complete Details'
 					END + N'
 					</TD>
-					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
+					<TD ALIGN=CENTER class="summary-style add-border color-2">' +
 					CASE WHEN (@flgOptions & 131072 = 131072)
-						  THEN N'<A HREF="#DiskSpaceInformationPermissionErrors" class="summary-style color-1">Permission Errors {DiskSpaceInformationPermissionErrorsCount}</A>'
+						  THEN N'<A HREF="#DiskSpaceInformationPermissionErrors" class="summary-style color-2">Permission Errors {DiskSpaceInformationPermissionErrorsCount}</A>'
 						  ELSE N'Permission Errors'
 					END + N'
 					</TD>
@@ -923,19 +923,19 @@ BEGIN TRY
 			END + 
  			CASE WHEN (@flgActions & 16 = 16) 
 				 THEN N'
-				<TR VALIGN="TOP" class="color-2">
-					<TD ALIGN=LEFT class="summary-style add-border color-2">
+				<TR VALIGN="TOP" class="color-1">
+					<TD ALIGN=LEFT class="summary-style add-border color-1">
 						Errorlog Messages
 					</TD>
-					<TD ALIGN=CENTER class="summary-style add-border color-2">' +
+					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
 					CASE WHEN (@flgOptions & 2097152 = 2097152)
-						  THEN N'<A HREF="#ErrorlogMessagesCompleteDetails" class="summary-style color-2">Complete Details</A>'
+						  THEN N'<A HREF="#ErrorlogMessagesCompleteDetails" class="summary-style color-1">Complete Details</A>'
 						  ELSE N'Complete Details'
 					END + N'
 					</TD>
-					<TD ALIGN=CENTER class="summary-style add-border color-2">' +
+					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
 					CASE WHEN (@flgOptions & 524288 = 524288)
-						  THEN N'<A HREF="#ErrorlogMessagesPermissionErrors" class="summary-style color-2">Permission Errors {ErrorlogMessagesPermissionErrorsCount}</A>'
+						  THEN N'<A HREF="#ErrorlogMessagesPermissionErrors" class="summary-style color-1">Permission Errors {ErrorlogMessagesPermissionErrorsCount}</A>'
 						  ELSE N'Permission Errors;'
 					END + N'
 					</TD>
@@ -944,19 +944,19 @@ BEGIN TRY
 			END + 
  			CASE WHEN (@flgActions & 32 = 32) 
 				 THEN N'
-				<TR VALIGN="TOP" class="color-1">
-					<TD ALIGN=LEFT class="summary-style add-border color-1">
+				<TR VALIGN="TOP" class="color-2">
+					<TD ALIGN=LEFT class="summary-style add-border color-2">
 						OS Event Messages
 					</TD>
-					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
+					<TD ALIGN=CENTER class="summary-style add-border color-2">' +
 					CASE WHEN (@flgOptions & 134217728 = 134217728)
-						  THEN N'<A HREF="#OSEventMessagesCompleteDetails" class="summary-style color-1">Complete Details</A>'
+						  THEN N'<A HREF="#OSEventMessagesCompleteDetails" class="summary-style color-2">Complete Details</A>'
 						  ELSE N'Complete Details'
 					END + N'
 					</TD>
-					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
+					<TD ALIGN=CENTER class="summary-style add-border color-2">' +
 					CASE WHEN (@flgOptions & 67108864 = 67108864)
-						  THEN N'<A HREF="#OSEventMessagesPermissionErrors" class="summary-style color-1">Permission Errors {OSEventMessagesPermissionErrorsCount}</A>'
+						  THEN N'<A HREF="#OSEventMessagesPermissionErrors" class="summary-style color-2">Permission Errors {OSEventMessagesPermissionErrorsCount}</A>'
 						  ELSE N'Permission Errors;'
 					END + N'
 					</TD>

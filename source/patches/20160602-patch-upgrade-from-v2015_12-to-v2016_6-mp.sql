@@ -3,7 +3,7 @@ GO
 
 SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
 GO
-UPDATE [dbo].[appConfigurations] SET [value] = N'2016.06.02' WHERE [module] = 'common' AND [name] = 'Application Version'
+UPDATE [dbo].[appConfigurations] SET [value] = N'2016.06.08' WHERE [module] = 'common' AND [name] = 'Application Version'
 GO
 
 /* common module */
@@ -2073,6 +2073,11 @@ PRINT '--' + @queryToRun
 EXEC sp_executesql @queryToRun
 GO
 
+
+RAISERROR('update jobs description..', 10, 1) WITH NOWAIT
+GO
+UPDATE msdb.dbo.sysjobs SET [description]=REPLACE([description], 'codeple.com', 'codeplex.com') WHERE [description] LIKE '%codeple.com%'
+GO
 
 SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
 GO

@@ -317,8 +317,6 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDatabaseGetMostRecentBackupFromLocation.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpRestoreDatabaseAs.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
 
 
 echo *-----------------------------------------------------------------------------*

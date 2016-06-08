@@ -42,7 +42,16 @@ RAISERROR('		...insert default data', 10, 1) WITH NOWAIT
 GO
 SET NOCOUNT ON
 GO
-INSERT	INTO [monitoring].[alertSkipRules] ([category], [alert_name], [skip_value], [active])
-		SELECT 'disk-space', 'Logical Disk: Free Disk Space (%)', NULL, 0 UNION ALL
-		SELECT 'disk-space', 'Logical Disk: Free Disk Space (MB)', NULL, 0
+INSERT	INTO [monitoring].[alertSkipRules] ([category], [alert_name], [skip_value], [skip_value2], [active])
+		SELECT 'disk-space', 'Logical Disk: Free Disk Space (%)', NULL, NULL, 0 UNION ALL
+		SELECT 'disk-space', 'Logical Disk: Free Disk Space (MB)', NULL, NULL, 0 UNION ALL
+		SELECT 'replication', 'subscription marked inactive', '[PublisherServer].[PublishedDB](PublicationName)', '[SubscriberServer].[SubscriberDB]', 0 UNION ALL
+		SELECT 'replication', 'subscription not active', '[PublisherServer].[PublishedDB](PublicationName)', '[SubscriberServer].[SubscriberDB]', 0 UNION ALL
+		SELECT 'replication', 'replication latency', '[PublisherServer].[PublishedDB](PublicationName)', '[SubscriberServer].[SubscriberDB]', 0 UNION ALL
+		SELECT 'performance', 'Running Transaction Elapsed Time (sec)', 'InstanceName', NULL, 0 UNION ALL
+		SELECT 'performance', 'Uncommitted Transaction Elapsed Time (sec)', 'InstanceName', NULL, 0 UNION ALL
+		SELECT 'performance', 'Blocking Transaction Elapsed Time (sec)', 'InstanceName', NULL, 0 UNION ALL
+		SELECT 'performance', 'tempdb: space used by a single session', 'InstanceName', NULL, 0
 GO
+
+

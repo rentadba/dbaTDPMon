@@ -69,7 +69,7 @@ BEGIN TRANSACTION
 											@notify_level_page=0, 
 											@delete_level=0, 
 											@description=N'SQL Server instance discovery and daily health check report
-http://dbaTDPMon.codeple.com', 
+http://dbaTDPMon.codeplex.com', 
 											@category_name=N'Database Maintenance', 
 											@owner_login_name=N'sa', 
 											@job_id = @jobId OUTPUT
@@ -80,7 +80,7 @@ http://dbaTDPMon.codeple.com',
 	SET @queryToRun = N'
 	' + CASE WHEN @projectCode IS NULL 
 			 THEN N'TRUNCATE TABLE [dbo].[logAnalysisMessages]' 
-			 ELSE N'DELETE lam FROM [dbo].[logAnalysisMessages] lam INNER JOIN [dbo].[catalogProjects] cp ON cp.[id] = lam.[project_id] WHERE cp.[name] = ''' + @projectCode + N''''
+			 ELSE N'DELETE lam FROM [dbo].[logAnalysisMessages] lam INNER JOIN [dbo].[catalogProjects] cp ON cp.[id] = lam.[project_id] WHERE cp.[code] = ''' + @projectCode + N''''
 		END + N'
 	EXEC [dbo].[usp_refreshProjectCatalogsAndDiscovery] @projectCode	 = ''' + @projectCode + N''',
 														@runDiscovery	 = 0,
