@@ -403,3 +403,6 @@
 
 /* 08.06.2016 */
 	- updated documentation with monitoring module
+
+/* 11.06.2016 */
+	- fix small bugs on maintenance-plans
