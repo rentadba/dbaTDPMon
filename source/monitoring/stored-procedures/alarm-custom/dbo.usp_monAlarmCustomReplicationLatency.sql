@@ -657,16 +657,6 @@ WHILE @@FETCH_STATUS=0
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 		EXEC @serverToRun @queryToRun
 
-		SET @queryToRun = N''
-		SET @queryToRun = @queryToRun + N'
-			IF EXISTS(SELECT * FROM sysobjects WHERE [name] = ''replicationTokenResults'' AND [type]=''U'')
-				IF NOT EXISTS(SELECT * FROM dbo.replicationTokenResults)
-					DROP TABLE dbo.replicationTokenResults'
-
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @serverToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
-		EXEC @serverToRun @queryToRun
-
 		FETCH NEXT FROM crsActivePublications INTO @publicationServer, @publicationName, @publisherDB
 	end
 CLOSE crsActivePublications
