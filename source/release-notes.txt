@@ -406,3 +406,6 @@
 
 /* 11.06.2016 */
 	- fix small bugs on maintenance-plans
+
+/* 20.06.2016 */
+	- fix bug on replication latency monitoring / false alerts due to internal job failures

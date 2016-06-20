@@ -130,7 +130,7 @@ SET @runningJobs  = 0
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 DECLARE crsJobQueue CURSOR FOR	SELECT  [id], [instance_name]
-										, [job_name], [job_step_name], [job_database_name], [job_command]
+										, [job_name], [job_step_name], [job_database_name], REPLACE([job_command], '''', '''''') AS [job_command]
 								FROM [dbo].[vw_jobExecutionQueue]
 								WHERE  [project_id] = @projectID 
 										AND [module] LIKE @moduleFilter
@@ -158,7 +158,6 @@ WHILE @@FETCH_STATUS=0
 		IF @logFileLocation IS NULL SET @logFileLocation =N'C:\'
 		SET @logFileLocation = @logFileLocation + N'job-' + @jobName + N'.log'
 
-		SET @jobCommand = REPLACE(@jobCommand, '''', '''''')
 		---------------------------------------------------------------------------------------------------
 		/* defining job and start it */
 		EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
