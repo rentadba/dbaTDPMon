@@ -76,6 +76,15 @@ WHERE	[alert_name] = 'Replication Latency'
 		AND [is_warning_limit_enabled]=1
 SET @alertThresholdWarningReplicationLatencySec = ISNULL(@alertThresholdWarningReplicationLatencySec, 15)
 
+---------------------------------------------------------------------------------------------
+--get configuration values
+---------------------------------------------------------------------------------------------
+DECLARE @queryLockTimeOut [int]
+SELECT	@queryLockTimeOut=[value] 
+FROM	[dbo].[appConfigurations] 
+WHERE	[name] = 'Default lock timeout (ms)'
+		AND [module] = 'common'
+				
 ------------------------------------------------------------------------------------------------------------------------------------------
 RAISERROR('--Delete existing information....', 10, 1) WITH NOWAIT
 
@@ -549,7 +558,7 @@ WHILE @@FETCH_STATUS=0
 				SET @queryToRun = @queryToRun + N'SELECT * FROM tempdb.[dbo].[replicationTokenResults] WHERE [publication]=''' + @publicationName + N''' AND [publisher_db] = ''' + @publisherDB + N''''
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@publicationServer, @queryToRun)
 
-				SET @queryToRun = 'UPDATE srl
+				SET @queryToRun = N'UPDATE srl
 										SET   srl.[distributor_latency] = x.[distributor_latency]
 											, srl.[subscriber_latency] = x.[subscriber_latency]
 											, srl.[overall_latency] = x.[overall_latency]
@@ -569,6 +578,8 @@ WHILE @@FETCH_STATUS=0
 													AND srl.[publisher_server] = ''' + @publicationServer + N'''
 									WHERE srl.[publisher_db]=''' + @publisherDB + N'''
 										AND srl.[publication_name]=''' + @publicationName + N''''
+
+				SET @queryToRun = N'SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; ' + @queryToRun
 		
 				INSERT	INTO [dbo].[jobExecutionQueue](	[instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id],
 														[job_name], [job_step_name], [job_database_name], [job_command])
@@ -648,6 +659,7 @@ WHILE @@FETCH_STATUS=0
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 		EXEC @serverToRun @queryToRun
 
+		/*
 		SET @queryToRun = N''
 		SET @queryToRun = @queryToRun + N'
 			IF EXISTS(SELECT * FROM sysobjects WHERE [name] = ''replicationTokenResults'' AND [type]=''U'')
@@ -656,7 +668,7 @@ WHILE @@FETCH_STATUS=0
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @serverToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 		EXEC @serverToRun @queryToRun
-
+		*/
 		FETCH NEXT FROM crsActivePublications INTO @publicationServer, @publicationName, @publisherDB
 	end
 CLOSE crsActivePublications
