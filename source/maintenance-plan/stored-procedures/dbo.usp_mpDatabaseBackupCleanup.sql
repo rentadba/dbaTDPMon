@@ -16,9 +16,10 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseBackupCleanup]
 		@backupFileExtension	[nvarchar](8),			/*  BAK - cleanup full/incremental database backup
 															TRN - cleanup transaction log backup
 														*/
-		@flgOptions				[int]	= 128,			/* 32 - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
+		@flgOptions				[int]	= 448,			/* 32 - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
+														   64 - create folders for each database (default)
 														  128 - when performing cleanup, delete also orphans diff and log backups, when cleanup full database backups(default)
-														  256 - for +2k5 versions, use xp_delete_file option
+														  256 - for +2k5 versions, use xp_delete_file option (default)
 														 2048 - change retention policy from RetentionDays to RetentionBackupsCount (number of full database backups to be kept)
 															  - this may be forced by setting to true property 'Change retention policy from RetentionDays to RetentionFullBackupsCount'
 														*/
@@ -115,6 +116,25 @@ WHERE	[name]='Change retention policy from RetentionDays to RetentionBackupsCoun
 
 SET @forceChangeRetentionPolicy = LOWER(ISNULL(@forceChangeRetentionPolicy, 'false'))
 
+-----------------------------------------------------------------------------------------
+--get default backup location
+IF @backupLocation IS NULL
+	begin
+		SELECT	@backupLocation = [value]
+		FROM	[dbo].[appConfigurations]
+		WHERE	[name] = N'Default backup location'
+				AND [module] = 'maintenance-plan'
+
+		IF @backupLocation IS NULL
+			begin
+				SET @queryToRun= 'ERROR: @backupLocation parameter value not set'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=1
+			end
+
+		IF RIGHT(@backupLocation, 1)<>'\' SET @backupLocation = @backupLocation + N'\'
+		SET @backupLocation = @backupLocation + @sqlServerName + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
+	end
+	
 -----------------------------------------------------------------------------------------
 --changing backup expiration date from RetentionDays to full/diff database backup count
 IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'

@@ -26,7 +26,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseBackup]
 											       32 - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
 												   64 - create folders for each database (default)
 												  128 - when performing cleanup, delete also orphans diff and log backups, when cleanup full database backups(default)
-												  256 - for +2k5 versions, use xp_delete_file option
+												  256 - for +2k5 versions, use xp_delete_file option (default)
 												  512 - skip databases involved in log shipping (primary or secondary or logs, secondary for full/diff backups) (default)
 												 1024 - on alwayson availability groups, for secondary replicas, force copy-only backups (default)
 												 2048 - change retention policy from RetentionDays to RetentionBackupsCount (number of full database backups to be kept)
