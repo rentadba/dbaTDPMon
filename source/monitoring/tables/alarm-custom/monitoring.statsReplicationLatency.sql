@@ -52,5 +52,3 @@ CREATE INDEX [IX_statsReplicationLatency_ProjectID] ON [monitoring].[statsReplic
 GO
 CREATE INDEX [IX_statsReplicationLatency_PublicationName] ON [monitoring].[statsReplicationLatency]([publication_name], [publisher_server], [publisher_db]) ON [FG_Statistics_Index]
 GO
-CREATE INDEX [IX_statsReplicationLatency_PublisherDB_SubcriptionDB] ON [monitoring].[statsReplicationLatency]([publisher_db], [subscriber_server], [subscriber_db]) ON [FG_Statistics_Index]
-GO
