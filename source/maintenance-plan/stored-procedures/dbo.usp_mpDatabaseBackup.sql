@@ -164,6 +164,22 @@ IF @serverVersionNum >= 9
 		FROM #serverPropertyConfig
 
 		SET @databaseStateDesc = ISNULL(@databaseStateDesc, 'NULL')
+
+		/* check for the standby property */
+		IF  @databaseStateDesc IN ('ONLINE')
+			begin
+				SET @queryToRun = N'SELECT CONVERT([sysname], DATABASEPROPERTYEX(''' + @dbName + N''', ''IsInStandBy'')) AS [state]' 
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+				DELETE FROM #serverPropertyConfig
+				INSERT	INTO #serverPropertyConfig([value])
+						EXEC (@queryToRun)
+
+				IF (SELECT [value] FROM #serverPropertyConfig) = '1'
+					SET @databaseStateDesc = 'STANDBY'
+			end
+
 	end
 ELSE
 	begin

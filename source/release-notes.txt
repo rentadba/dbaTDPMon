@@ -409,3 +409,6 @@
 
 /* 20.06.2016 */
 	- fix bug on replication latency monitoring / false alerts due to internal job failures
+
+/* 21.06.2016 */
+	- updated the documentation
