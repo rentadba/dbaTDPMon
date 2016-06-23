@@ -17,7 +17,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseBackup]
 														2 - perform differential database backup
 														4 - perform transaction log backup
 													*/
-		@flgOptions			[int] = 1883,		/*  1 - use CHECKSUM (default)
+		@flgOptions			[int] = 6107,		/*  1 - use CHECKSUM (default)
 													2 - use COMPRESSION, if available (default)
 													4 - use COPY_ONLY
 													8 - force change backup type (default): if log is set, and no database backup is found, a database backup will be first triggered
@@ -31,6 +31,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseBackup]
 												 1024 - on alwayson availability groups, for secondary replicas, force copy-only backups (default)
 												 2048 - change retention policy from RetentionDays to RetentionBackupsCount (number of full database backups to be kept)
 													  - this may be forced by setting to true property 'Change retention policy from RetentionDays to RetentionBackupsCount'
+												 4096 - use xp_dirtree to identify orphan backup files to be deleted, when using option 128 (default)
 												*/
 		@retentionDays		[smallint]	= NULL,
 		@executionLevel		[tinyint]	=  0,

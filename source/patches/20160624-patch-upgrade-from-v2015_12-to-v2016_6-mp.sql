@@ -3,7 +3,7 @@ GO
 
 SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
 GO
-UPDATE [dbo].[appConfigurations] SET [value] = N'2016.06.21' WHERE [module] = 'common' AND [name] = 'Application Version'
+UPDATE [dbo].[appConfigurations] SET [value] = N'2016.06.24' WHERE [module] = 'common' AND [name] = 'Application Version'
 GO
 
 /* common module */
@@ -151,6 +151,629 @@ IF @optionIsAvailable=1 AND ISNULL(@optionCurrentValue, 0) <> @configOptionValue
 	end
 GO
 
+
+
+RAISERROR('Create procedure: [dbo].[usp_logEventMessageAndSendEmail]', 10, 1) WITH NOWAIT
+GO---
+IF  EXISTS (
+	    SELECT * 
+	      FROM sys.objects 
+	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_logEventMessageAndSendEmail]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_logEventMessageAndSendEmail]
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE [dbo].[usp_logEventMessageAndSendEmail]
+		@projectCode			[sysname]=NULL,
+		@sqlServerName			[sysname]=NULL,
+		@dbName					[sysname] = NULL,
+		@objectName				[nvarchar](512) = NULL,
+		@childObjectName		[sysname] = NULL,
+		@module					[sysname],
+		@eventName				[nvarchar](256) = NULL,
+		@parameters				[nvarchar](512) = NULL,			/* may contain the attach file name */
+		@eventMessage			[varchar](8000) = NULL,
+		@dbMailProfileName		[sysname] = NULL,
+		@recipientsList			[nvarchar](1024) = NULL,
+		@eventType				[smallint]=1,	/*	0 - info
+													1 - alert 
+													2 - job-history
+													3 - report-html
+													4 - action
+													5 - backup-job-history
+													6 - alert-custom
+												*/
+		@additionalOption		[smallint]=0
+/* WITH ENCRYPTION */
+WITH RECOMPILE
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 05.11.2014
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+SET NOCOUNT ON
+
+DECLARE @projectID					[smallint],
+		@instanceID					[smallint],		
+		@alertFrequency				[int],
+		@alertSent					[int],
+		@isEmailSent				[bit],
+		@isFloodControl				[bit],
+		@HTMLBody					[nvarchar](max),
+		@emailSubject				[nvarchar](256),
+		@queryToRun					[nvarchar](max),
+		@ReturnValue				[int],
+		@ErrMessage					[nvarchar](1024),
+		@clientName					[nvarchar](260),
+		@eventData					[varchar](8000),
+		@ignoreAlertsForError1222	[bit],
+		@errorCode					[int],
+		@eventMessageXML			[xml]
+		
+
+DECLARE   @handle				[int]
+		, @PrepareXmlStatus		[int]
+
+SET @ReturnValue=1
+
+-----------------------------------------------------------------------------------------------------
+--get default project code
+IF @projectCode IS NULL
+	SELECT	@projectCode = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = 'Default project code'
+			AND [module] = 'common'
+
+SELECT @projectID = [id]
+FROM [dbo].[catalogProjects]
+WHERE [code] = @projectCode 
+
+-----------------------------------------------------------------------------------------------------
+SELECT  @instanceID = [id] 
+FROM	[dbo].[catalogInstanceNames]  
+WHERE	[name] = @sqlServerName
+		AND [project_id] = @projectID
+
+		
+-----------------------------------------------------------------------------------------------------
+--
+-----------------------------------------------------------------------------------------------------
+--get default database mail profile name from configuration table
+IF UPPER(@dbMailProfileName)='NULL'
+	SET @dbMailProfileName = NULL
+		
+IF @dbMailProfileName IS NULL
+	SELECT	@dbMailProfileName=[value] 
+	FROM	[dbo].[appConfigurations] 
+	WHERE	[name]='Database Mail profile name to use for sending emails'
+			AND [module] = 'common'
+
+IF @recipientsList = ''		SET @recipientsList = NULL
+IF @dbMailProfileName = ''	SET @dbMailProfileName = NULL
+
+
+IF @recipientsList IS NULL
+	SELECT	@recipientsList=[value] 
+	FROM	[dbo].[appConfigurations] 
+	WHERE  (@eventType IN (1, 6) AND [name]='Default recipients list - Alerts (semicolon separated)' AND [module] = 'common')
+		OR (@eventType IN (2, 5) AND [name]='Default recipients list - Job Status (semicolon separated)' AND [module] = 'common')
+		OR (@eventType=3 AND [name]='Default recipients list - Reports (semicolon separated)' AND [module] = 'common')
+
+-----------------------------------------------------------------------------------------------------
+--get alert repeat frequency, default every 60 minutes
+-----------------------------------------------------------------------------------------------------
+SELECT	@alertFrequency = [value]
+FROM	[dbo].[appConfigurations]
+WHERE	[name]='Alert repeat interval (minutes)'
+		AND [module] = 'common'
+
+SELECT @alertFrequency = ISNULL(@alertFrequency, 60)
+
+
+-----------------------------------------------------------------------------------------------------
+--check what alerts can be ignored
+-----------------------------------------------------------------------------------------------------
+SELECT	@ignoreAlertsForError1222 = CASE WHEN LOWER([value])='true' THEN 1 ELSE 0 END
+FROM	[dbo].[appConfigurations]
+WHERE	[name]='Ignore alerts for: Error 1222 - Lock request time out period exceeded'
+		AND [module] = 'common'
+
+SET @ignoreAlertsForError1222 = ISNULL(@ignoreAlertsForError1222, 0)
+
+
+-----------------------------------------------------------------------------------------------------
+--check if alert should be sent
+-----------------------------------------------------------------------------------------------------
+SET @alertSent=0
+IF @projectID IS NOT NULL AND @instanceID IS NOT NULL
+	SELECT @alertSent=COUNT(*)
+	FROM [dbo].[logEventMessages]
+	WHERE	[instance_id] = @instanceID
+			AND [project_id] = @projectID
+			AND [module] = @module
+			AND [event_name] = @eventName
+			AND [event_type] = @eventType
+			AND ISNULL([database_name], '') = ISNULL(@dbName, '')
+			AND ISNULL([object_name], '') = ISNULL(@objectName, '')
+			AND ISNULL([child_object_name], '') = ISNULL(@childObjectName, '')
+			AND ISNULL([parameters], '') = ISNULL(@parameters, '')
+			AND DATEDIFF(mi, [event_date_utc], GETUTCDATE()) BETWEEN 0 AND @alertFrequency
+			AND [is_email_sent] = 1
+			AND @eventType IN (1, 6)
+
+
+-----------------------------------------------------------------------------------------------------
+--processing the xml message
+-----------------------------------------------------------------------------------------------------
+SET @eventMessage = REPLACE(@eventMessage, '&', '&amp;')
+
+SET @eventMessageXML = CAST(@eventMessage AS [xml])
+SET @HTMLBody = N''
+
+-----------------------------------------------------------------------------------------------------
+--alert details
+IF @eventType=1	AND @eventMessageXML IS NOT NULL
+	begin
+		EXEC @PrepareXmlStatus= sp_xml_preparedocument @handle OUTPUT, @eventMessageXML  
+
+		SET @HTMLBody =@HTMLBody + COALESCE(
+								CAST ( ( 
+										SELECT	li = 'error number: ' + CAST([error_code] AS [nvarchar](32)), '',
+												li = [error_string], '',
+												li = [query_executed], '',
+												li = 'duration: ' + CAST([duration_seconds] AS [nvarchar](32)) + ' seconds', '',
+												li = 'event-date (utc): ' + CAST([event_date_utc] AS [varchar](32)), ''
+										FROM (
+												SELECT  *
+												FROM    OPENXML(@handle, '/alert/detail', 2)  
+														WITH (
+																[error_code]		[int],
+																[error_string]		[nvarchar](max),
+																[query_executed]	[nvarchar](max),
+																[duration_seconds]	[bigint],
+																[event_date_utc]	[sysname]
+															)  
+											)x
+										FOR XML PATH('ul'), TYPE 
+							) AS NVARCHAR(MAX) )
+							, '') ;
+			
+		SELECT	@errorCode = [error_code]
+		FROM (
+				SELECT  *
+				FROM    OPENXML(@handle, '/alert/detail', 2)  
+						WITH (
+								[error_code]		[int],
+								[error_string]		[nvarchar](max),
+								[query_executed]	[nvarchar](max),
+								[duration_seconds]	[bigint]
+							)  
+			)x
+		EXEC sp_xml_removedocument @handle 
+	end
+
+-----------------------------------------------------------------------------------------------------
+--alert details
+IF @eventType=6	AND @eventMessageXML IS NOT NULL
+	begin
+		SET @HTMLBody = @HTMLBody + REPLACE(REPLACE(REPLACE(REPLACE(CAST(@eventMessageXML AS [nvarchar](max)), '<alert><detail>', '<ul>'), '</detail></alert>', '</ul>'), '><', '><li><'), '<li></ul>','</ul>')
+
+		DECLARE @strPos		[int],
+				@strPos2	[int]
+
+		SET @strPos = CHARINDEX('</', @HTMLBody)
+		WHILE @strPos <> 0
+			BEGIN
+				SET @strPos2 = CHARINDEX('><', @HTMLBody, @strPos)
+				SET @HTMLBody = SUBSTRING(@HTMLBody, 1, @strPos+1) + SUBSTRING(@HTMLBody, @strPos2, LEN(@HTMLBody))
+	
+				SET @strPos = CHARINDEX('</', @HTMLBody, @strPos2)
+			END
+		SET @HTMLBody = REPLACE(@HTMLBody, '</>', '')
+		SET @HTMLBody = REPLACE(@HTMLBody, '><', '>')
+		SET @HTMLBody = REPLACE(@HTMLBody, '>', ': ')
+		SET @HTMLBody = REPLACE(@HTMLBody, '<li: ', '<li>')
+		SET @HTMLBody = REPLACE(@HTMLBody, '<ul: li: ', '<ul><li>')
+		SET @HTMLBody = REPLACE(@HTMLBody, '</ul: ', '</ul>')
+	end
+
+-----------------------------------------------------------------------------------------------------
+--job-status details
+IF @eventType IN (2, 5)	AND @eventMessageXML IS NOT NULL
+	begin
+		EXEC @PrepareXmlStatus= sp_xml_preparedocument @handle OUTPUT, @eventMessageXML  
+
+		SET @HTMLBody =@HTMLBody + COALESCE(
+							N'<TABLE BORDER="1">' +
+							N'<TR>' +
+								N'<TH>Step ID</TH>
+									<TH>Step Name</TH>
+									<TH>Run Status</TH>
+									<TH>Run Date</TH>
+									<TH>Run Time</TH>
+									<TH>Run Duration</TH>
+									<TH >Message</TH>' +
+								CAST ( ( 
+										SELECT	TD = [step_id], '',
+												TD = [step_name], '',
+												TD = [run_status], '',
+												TD = [run_date], '',
+												TD = [run_time], '',
+												TD = [duration], '',
+												TD = [message], ''
+										FROM (
+												SELECT  *
+												FROM    OPENXML(@handle, '/job-history/job-step', 2)  
+														WITH (
+																[step_id]		[int],
+																[step_name]		[sysname],
+																[run_status]	[nvarchar](32),
+																[run_date]		[nvarchar](32),
+																[run_time]		[nvarchar](32),
+																[duration]		[nvarchar](32),
+																[message]		[nvarchar](max)
+															)  
+											)x
+										FOR XML PATH('TR'), TYPE 
+							) AS NVARCHAR(MAX) ) +
+							N'</TABLE>', '') ;
+
+		EXEC sp_xml_removedocument @handle 
+
+		-- go out in style
+		SET @HTMLBody = N'
+						<style>
+							body {
+								/*background-color: #F0F8FF;*/
+								font-family: Arial, Tahoma;
+							}
+							h1 {
+								font-size: 20px;
+								font-weight: bold;
+							}
+							table {
+								border-color: #ccc;
+								border-collapse: collapse;
+							}
+							th {
+								font-size: 12px;
+								font-weight: bold;
+								font-color: #000000;
+								border-spacing: 2px;
+								border-style: solid;
+								border-width: 1px;
+								border-color: #ccc;
+								background-color: #00AEEF;
+								padding: 4px;
+							}
+							td {
+								font-size: 12px;
+								border-spacing: 2px;
+								border-style: solid;
+								border-width: 1px;
+								border-color: #ccc;
+								background-color: #EDF8FE;
+								padding: 4px;
+								white-space: nowrap;
+							}
+						</style>' + @HTMLBody
+	end
+
+-----------------------------------------------------------------------------------------------------
+--report details
+IF @eventType=3	AND @eventMessageXML IS NOT NULL
+	begin
+		EXEC @PrepareXmlStatus= sp_xml_preparedocument @handle OUTPUT, @eventMessageXML  
+
+		DECLARE @xmlMessage			[nvarchar](max),
+				@xmlFileName		[nvarchar](max),
+				@xmlHTTPAddress		[nvarchar](max),
+				@xmlRelativePath	[nvarchar](max)
+
+		SELECT TOP 1 @xmlMessage = [message],
+						@xmlFileName = [file_name],
+						@xmlHTTPAddress = [http_address],
+						@xmlRelativePath = [relative_path]
+		FROM    OPENXML(@handle, '/report-html/detail', 2)  
+				WITH (
+						[message]		[nvarchar](max),
+						[file_name]		[nvarchar](max),
+						[http_address]	[nvarchar](max),
+						[relative_path]	[nvarchar](max)
+					)  
+
+		EXEC sp_xml_removedocument @handle 
+
+		SET @HTMLBody =@HTMLBody + @xmlMessage + N'<br>File name: <b>' + @xmlFileName + N'</b><br>'
+	
+		IF @xmlHTTPAddress IS NOT NULL				
+			begin
+				SET @HTMLBody = @HTMLBody + N'Full report file is available for download <A HREF="' + @xmlHTTPAddress + @xmlRelativePath + @xmlFileName + '">here</A><br>'
+				SET @HTMLBody = @HTMLBody + N'Browser support: IE 8, Firefox 3.5 and Google Chrome 7 (on lower versions, some features may be missing).<br>'
+			end
+	end
+
+
+-----------------------------------------------------------------------------------------------------
+--backup-job-status details
+IF @eventType IN (5) AND @eventMessageXML IS NOT NULL
+	begin
+		DECLARE   @jobStartTime [datetime]
+
+		EXEC @PrepareXmlStatus= sp_xml_preparedocument @handle OUTPUT, @eventMessageXML  
+			
+		SELECT    @jobStartTime = MIN([job_step_start_time])
+		FROM	(
+					SELECT CASE WHEN [run_date] IS NOT NULL AND [run_time] IS NOT NULL
+								THEN CONVERT([datetime], ([run_date] + ' ' + [run_time]), 120) 
+								ELSE GETDATE()
+							END AS [job_step_start_time]
+					FROM (
+							SELECT  *
+							FROM    OPENXML(@handle, '/job-history/job-step', 2)  
+									WITH (
+											[step_id]		[int],
+											[step_name]		[sysname],
+											[run_status]	[nvarchar](32),
+											[run_date]		[nvarchar](32),
+											[run_time]		[nvarchar](32),
+											[duration]		[nvarchar](32)
+										)  
+						)x
+				)y
+
+		EXEC sp_xml_removedocument @handle 
+
+		DECLARE @xmlBackupSet TABLE
+			(
+				  [database_name]	[sysname]
+				, [type]			[nvarchar](32)
+				, [start_date]		[nvarchar](32)
+				, [duration]		[nvarchar](32)
+				, [size]			[nvarchar](32)
+				, [size_bytes]		[bigint]
+				, [verified]		[nvarchar](8)
+				, [file_name]		[nvarchar](512)
+				, [error_code]		[int]
+			)
+
+
+		DECLARE @xmlSkippedActions TABLE
+			(
+				  [database_name]	[sysname]
+				, [backup_type]		[nvarchar](32)
+				, [date]			[nvarchar](32)
+				, [reason]			[nvarchar](512)
+			)
+
+		INSERT	INTO @xmlBackupSet([database_name], [type], [start_date], [duration], [size], [size_bytes], [verified], [file_name], [error_code])
+				SELECT [database_name], [type], [start_date], [duration], [size], [size_bytes], [verified], [file_name], [error_code]
+				FROM (
+						SELECT	  ref.value ('database_name[1]', 'sysname') as [database_name]
+								, ref.value ('type[1]', 'nvarchar(32)') as [type]
+								, ref.value ('start_date[1]', '[datetime]') as [start_date]
+								, ref.value ('duration[1]', 'nvarchar(32)') as [duration]
+								, ref.value ('size[1]', 'nvarchar(32)') as [size]
+								, ref.value ('size_bytes[1]', 'bigint') as [size_bytes]
+								, ref.value ('verified[1]', 'nvarchar(8)') as [verified]
+								, ref.value ('file_name[1]', 'nvarchar(512)') as [file_name]
+								, ref.value ('error_code[1]', 'int') as [error_code]
+						FROM (
+								SELECT	CAST([message] AS [xml]) AS [message_xml]
+								FROM	[dbo].[logEventMessages]
+								WHERE	[message] LIKE '<backupset>%'
+										AND ISNULL([project_id], 0) = ISNULL(@projectID, 0)
+										AND ISNULL([instance_id], 0) = ISNULL(@instanceID, 0)
+										AND [event_type]=0
+							)x CROSS APPLY [message_xml].nodes ('//backupset/detail') R(ref)								
+					)bs
+				WHERE [start_date] BETWEEN @jobStartTime AND GETDATE()
+
+
+		INSERT	INTO @xmlSkippedActions ([database_name], [backup_type], [date], [reason])
+				SELECT [database_name], [backup_type], [date], [reason]
+				FROM (
+						SELECT	  ref.value ('affected_object[1]', 'sysname') as [database_name]
+								, ref.value ('type[1]', 'nvarchar(32)') as [backup_type]
+								, ref.value ('date[1]', '[datetime]') as [date]
+								, ref.value ('reason[1]', 'nvarchar(512)') as [reason]
+						FROM (
+								SELECT	CAST([message] AS [xml]) AS [message_xml]
+								FROM	[dbo].[logEventMessages]
+								WHERE	[message] LIKE '<skipaction>%'
+										AND ISNULL([project_id], 0) = ISNULL(@projectID, 0)
+										AND ISNULL([instance_id], 0) = ISNULL(@instanceID, 0)
+										AND [event_type]=0
+										AND [event_name] = 'database backup'
+							)x CROSS APPLY [message_xml].nodes ('//skipaction/detail') R(ref)	
+					) sa
+				WHERE [date] BETWEEN @jobStartTime AND GETDATE()
+
+
+		SET @HTMLBody =@HTMLBody + N'<br><br>'
+		SET @HTMLBody =@HTMLBody + COALESCE(
+							N'<TABLE BORDER="1">' +
+							N'<TR>' +
+								N'	<TH>Database Name</TH>
+									<TH>Backup Type</TH>
+									<TH>Start Time</TH>
+									<TH>Run Duration</TH>
+									<TH>Size</TH>
+									<TH>Verified</TH>
+									<TH>File Name</TH>
+									<TH>Error Code</TH>' +
+								CAST ( ( 
+										SELECT	TD = [database_name], '',
+												TD = [type], '',
+												TD = [start_date], '',
+												TD = [duration], '',
+												TD = [size], '',
+												TD = [verified], '',
+												TD = [file_name], '',
+												TD = [error_code], ''
+										FROM (
+												SELECT	TOP (100) PERCENT *
+												FROM @xmlBackupSet							
+												ORDER BY [database_name]
+											)x
+										FOR XML PATH('TR'), TYPE 
+							) AS NVARCHAR(MAX) ) +
+							N'</TABLE>', '') ;
+
+		IF (SELECT COUNT(*) FROM @xmlSkippedActions)>0
+			begin
+				SET @HTMLBody =@HTMLBody + N'<br><br>'
+				SET @HTMLBody =@HTMLBody + COALESCE(
+									N'<TABLE BORDER="1">' +
+									N'<TR>' +
+										N'	<TH>Database Name</TH>
+											<TH>Backup Type</TH>
+											<TH>Date</TH>
+											<TH>Reason</TH>' +
+										CAST ( ( 
+												SELECT	TD = [database_name], '',
+														TD = [backup_type], '',
+														TD = [date], '',
+														TD = [reason], ''
+												FROM (
+														SELECT	TOP (100) PERCENT *
+														FROM @xmlSkippedActions							
+														ORDER BY [database_name]
+													)x
+												FOR XML PATH('TR'), TYPE 
+									) AS NVARCHAR(MAX) ) +
+									N'</TABLE>', '') ;
+			end
+
+		--if any of the backups had failed, send notification
+		IF @additionalOption=0
+			SELECT @additionalOption = COUNT(*)
+			FROM @xmlBackupSet
+			WHERE [error_code]<>0
+	end
+
+
+SET @HTMLBody = REPLACE(@HTMLBody, N'&amp;', N'&')
+SET @HTMLBody = REPLACE(@HTMLBody, N'&amp;lt;', N'<')
+SET @HTMLBody = REPLACE(@HTMLBody, N'&amp;gt;', N'>')
+
+
+-----------------------------------------------------------------------------------------------------
+--get notification status
+-----------------------------------------------------------------------------------------------------
+IF @eventType IN (2, 5)
+	begin
+		DECLARE @notifyOnlyFailedJobs [nvarchar](32)
+
+		SELECT	@notifyOnlyFailedJobs = LOWER([value])
+		FROM	[dbo].[appConfigurations]
+		WHERE	[name]='Notify job status only for Failed jobs'
+				AND [module] = 'common'
+
+
+		IF @notifyOnlyFailedJobs = 'true' AND @additionalOption=0
+			SET @recipientsList=NULL
+	end
+	
+IF @eventType IN (1)
+	begin
+		IF @ignoreAlertsForError1222=1 AND @errorCode=1222
+			begin
+				SET @alertSent=1
+				SET @isFloodControl=1
+				SET @recipientsList=NULL
+			end
+	end
+
+-----------------------------------------------------------------------------------------------------
+--
+-----------------------------------------------------------------------------------------------------
+SET @isEmailSent	= 0 
+SET @isFloodControl	= 0
+
+IF @alertSent=0
+	begin
+		SET @projectCode = ISNULL(@projectCode, 'N/A')
+		
+		SET @emailSubject = CASE WHEN @projectID IS NOT NULL THEN N'[' + @projectCode + '] ' ELSE N'' END 
+							+ CASE	WHEN @eventType=0 THEN N'info'
+									WHEN @eventType=1 THEN N'alert'
+									WHEN @eventType IN (2, 5) THEN N'job status'
+									WHEN @eventType=3 THEN N'report'
+									WHEN @eventType=4 THEN N'action'
+									WHEN @eventType=6 THEN N'alert'
+								END	 
+							+ N' on ' + N'[' +  @sqlServerName + ']: ' 
+							+ CASE WHEN @dbName IS NOT NULL THEN QUOTENAME(@dbName) + N' - ' ELSE N'' END 
+							+ CASE	WHEN @eventType=1 THEN N'[error] - '
+									WHEN @eventType IN (2, 5) THEN 
+											CASE	WHEN @additionalOption=0 
+													THEN N'[completed] - '
+													ELSE N'[failed] - '
+											END	
+									ELSE N''
+								END
+							+ @eventName
+							+ CASE WHEN @objectName IS NOT NULL THEN N' - ' + @objectName ELSE N'' END
+			
+		SET @HTMLBody = @HTMLBody + N'<HR><P STYLE="font-family: Arial, Tahoma; font-size:10px;">This email is sent by [' + @@SERVERNAME + N'].	Generated by dbaTDPMon.<br><P>'
+				
+		-----------------------------------------------------------------------------------------------------		
+		IF @recipientsList IS NOT NULL AND @dbMailProfileName IS NOT NULL
+			begin
+				-----------------------------------------------------------------------------------------------------
+				--sending email using dbmail
+				-----------------------------------------------------------------------------------------------------
+				IF @eventType in (2, 3, 5) AND @parameters IS NOT NULL
+					EXEC msdb.dbo.sp_send_dbmail  @profile_name		= @dbMailProfileName
+												, @recipients		= @recipientsList
+												, @subject			= @emailSubject
+												, @body				= @HTMLBody
+												, @file_attachments = @parameters
+												, @body_format		= 'HTML'
+				ELSE
+					EXEC msdb.dbo.sp_send_dbmail  @profile_name		= @dbMailProfileName
+												, @recipients		= @recipientsList
+												, @subject			= @emailSubject
+												, @body				= @HTMLBody
+												, @file_attachments = NULL
+												, @body_format		= 'HTML'			
+					
+				SET @isEmailSent=1
+
+				EXEC [dbo].[usp_logPrintMessage] @customMessage='email sent', @raiseErrorAsPrint=1, @messagRootLevel=0, @messageTreelevel=1, @stopExecution=0
+			end
+	end
+ELSE
+	begin
+		SET @isFloodControl=1
+	end
+
+SET @eventData = SUBSTRING(CAST(@eventMessageXML AS [varchar](8000)), 1, 8000)
+EXEC [dbo].[usp_logEventMessage]	@projectCode			= @projectCode,
+									@sqlServerName			= @sqlServerName,
+									@dbName					= @dbName,
+									@objectName				= @objectName,
+									@childObjectName		= @childObjectName,
+									@module					= @module,
+									@eventName				= @eventName,
+									@parameters				= @parameters,
+									@eventMessage			= @eventData,
+									@eventType				= @eventType,
+									@recipientsList			= @recipientsList,
+									@isEmailSent			= @isEmailSent,
+									@isFloodControl			= @isFloodControl
+
+
+RETURN @ReturnValue
+GO
 
 
 
@@ -459,7 +1082,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseBackup]
 														2 - perform differential database backup
 														4 - perform transaction log backup
 													*/
-		@flgOptions			[int] = 1883,		/*  1 - use CHECKSUM (default)
+		@flgOptions			[int] = 6107,		/*  1 - use CHECKSUM (default)
 													2 - use COMPRESSION, if available (default)
 													4 - use COPY_ONLY
 													8 - force change backup type (default): if log is set, and no database backup is found, a database backup will be first triggered
@@ -473,6 +1096,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseBackup]
 												 1024 - on alwayson availability groups, for secondary replicas, force copy-only backups (default)
 												 2048 - change retention policy from RetentionDays to RetentionBackupsCount (number of full database backups to be kept)
 													  - this may be forced by setting to true property 'Change retention policy from RetentionDays to RetentionBackupsCount'
+												 4096 - use xp_dirtree to identify orphan backup files to be deleted, when using option 128 (default)
 												*/
 		@retentionDays		[smallint]	= NULL,
 		@executionLevel		[tinyint]	=  0,
@@ -1064,12 +1688,13 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseBackupCleanup]
 		@backupFileExtension	[nvarchar](8),			/*  BAK - cleanup full/incremental database backup
 															TRN - cleanup transaction log backup
 														*/
-		@flgOptions				[int]	= 448,			/* 32 - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
+		@flgOptions				[int]	= 4544,			/* 32 - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
 														   64 - create folders for each database (default)
 														  128 - when performing cleanup, delete also orphans diff and log backups, when cleanup full database backups(default)
 														  256 - for +2k5 versions, use xp_delete_file option (default)
 														 2048 - change retention policy from RetentionDays to RetentionBackupsCount (number of full database backups to be kept)
 															  - this may be forced by setting to true property 'Change retention policy from RetentionDays to RetentionFullBackupsCount'
+														 4096 - use xp_dirtree to identify orphan backup files to be deleted, when using option 128 (default)
 														*/
 		@retentionDays			[smallint]	= 14,
 		@executionLevel			[tinyint]	=  0,
@@ -1429,6 +2054,7 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 					end		
 			end											
 		
+		/* identify backup files to be deleted, based on msdb information */
 		SET @queryToRun=N''
 		SET @queryToRun = @queryToRun + N'SELECT bs.[backup_set_id], bmf.[physical_device_name]
 										FROM [msdb].[dbo].[backupset] bs
@@ -1473,6 +2099,46 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 						EXEC (@queryToRun)
 			end
 
+
+		/* identify backup files to be deleted, based on file existence on disk */
+		/* use xp_dirtree to identify orphan backup files to be deleted, when using option 128 (default) */
+		IF @flgOptions & 128 = 128 AND @flgOptions & 4096 = 4096 
+			begin
+				IF OBJECT_ID('tempdb..#backupFilesOnDisk') IS NOT NULL DROP TABLE #backupFilesOnDisk
+				CREATE TABLE #backupFilesOnDisk
+				(
+					  [id]			[int] IDENTITY(1, 1)
+					, [file_name]	[nvarchar](260)
+					, [depth]		[int]
+					, [is_file]		[int]
+					, [create_time]	[varchar](20)
+				)
+
+				SET @queryToRun = N'EXEC xp_dirtree ''' + @backupLocation + ''', 8, 1';
+				IF @sqlServerName<>@@SERVERNAME
+					begin
+						IF @serverVersionNum < 11
+							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+						ELSE
+							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''') WITH RESULT SETS(([subdirectory] [nvarchar](260), [depth] [int], [file] [int]))'')'
+					end
+
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				DELETE FROM #backupFilesOnDisk
+				INSERT INTO #backupFilesOnDisk([file_name], [depth], [is_file])
+						EXEC (@queryToRun)
+
+				/* remove files which are no longer on disk */
+				IF EXISTS(SELECT * FROM #backupFilesOnDisk)
+					DELETE bd
+					FROM #backupDevice bd
+					LEFT JOIN #backupFilesOnDisk bf ON (@backupLocation + bf.[file_name]) = bd.[physical_device_name] 
+					WHERE bf.[file_name] IS NULL
+			end
+
+
+		/* remove the backup files, one by one */
 		DECLARE crsCleanupBackupFiles CURSOR FOR	SELECT [physical_device_name]
 													FROM #backupDevice														
 													ORDER BY [backup_set_id] ASC
@@ -1528,6 +2194,426 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 RETURN @errorCode
 GO
 
+
+
+RAISERROR('Create procedure: [dbo].[usp_mpDatabaseGetMostRecentBackupFromLocation]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sysobjects 
+	     WHERE id = OBJECT_ID(N'[dbo].[usp_mpDatabaseGetMostRecentBackupFromLocation]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_mpDatabaseGetMostRecentBackupFromLocation]
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE [dbo].[usp_mpDatabaseGetMostRecentBackupFromLocation]
+		  @serverToRun			[sysname]
+		, @forSQLServerName		[sysname] = '%'
+		, @forDatabaseName		[sysname]
+		, @backupLocation		[nvarchar](512)
+		, @backupType			[nvarchar](32) = 'full' /* options available: FULL, DIFF, LOG */
+		, @nameConvention		[nvarchar](32) = 'dbaTDPMon' /*options available: dbaTDPMon, Ola */
+		, @debugMode			[bit]=0
+/* WITH ENCRYPTION */
+WITH RECOMPILE
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2016 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 18.05.2016
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+SET NOCOUNT ON
+
+DECLARE   @queryToRun				[nvarchar](1024)
+
+DECLARE	  @serverEdition			[sysname]
+		, @serverVersionStr			[sysname]
+		, @serverVersionNum			[numeric](9,6)
+
+DECLARE @optionXPIsAvailable		[bit],
+		@optionXPValue				[int],
+		@optionXPHasChanged			[bit],
+		@optionAdvancedIsAvailable	[bit],
+		@optionAdvancedValue		[int],
+		@optionAdvancedHasChanged	[bit]
+
+SET NOCOUNT ON
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF object_id('tempdb..#serverPropertyConfig') IS NOT NULL DROP TABLE #serverPropertyConfig
+CREATE TABLE #serverPropertyConfig
+			(
+				[value]			[sysname]	NULL
+			)
+
+-----------------------------------------------------------------------------------------
+--get destination server running version/edition
+EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @serverToRun,
+										@serverEdition			= @serverEdition OUT,
+										@serverVersionStr		= @serverVersionStr OUT,
+										@serverVersionNum		= @serverVersionNum OUT,
+										@executionLevel			= 0,
+										@debugMode				= @debugMode
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+SELECT  @optionXPIsAvailable		= 0,
+		@optionXPValue				= 0,
+		@optionXPHasChanged			= 0,
+		@optionAdvancedIsAvailable	= 0,
+		@optionAdvancedValue		= 0,
+		@optionAdvancedHasChanged	= 0
+
+IF @serverVersionNum>=9
+	begin
+		/* enable xp_cmdshell configuration option */
+		EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @serverToRun,
+															@configOptionName	= 'xp_cmdshell',
+															@configOptionValue	= 1,
+															@optionIsAvailable	= @optionXPIsAvailable OUT,
+															@optionCurrentValue	= @optionXPValue OUT,
+															@optionHasChanged	= @optionXPHasChanged OUT,
+															@executionLevel		= 0,
+															@debugMode			= @debugMode
+
+		IF @optionXPIsAvailable = 0
+			begin
+				/* enable show advanced options configuration option */
+				EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @serverToRun,
+																	@configOptionName	= 'show advanced options',
+																	@configOptionValue	= 1,
+																	@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
+																	@optionCurrentValue	= @optionAdvancedValue OUT,
+																	@optionHasChanged	= @optionAdvancedHasChanged OUT,
+																	@executionLevel		= 0,
+																	@debugMode			= @debugMode
+
+				IF @optionAdvancedIsAvailable = 1 AND (@optionAdvancedValue=1 OR @optionAdvancedHasChanged=1)
+					EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @serverToRun,
+																		@configOptionName	= 'xp_cmdshell',
+																		@configOptionValue	= 1,
+																		@optionIsAvailable	= @optionXPIsAvailable OUT,
+																		@optionCurrentValue	= @optionXPValue OUT,
+																		@optionHasChanged	= @optionXPHasChanged OUT,
+																		@executionLevel		= 0,
+																		@debugMode			= @debugMode
+			end
+
+		IF @optionXPIsAvailable=0 OR @optionXPValue=0
+			begin
+				set @queryToRun='xp_cmdshell component is turned off. Cannot continue'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+				--RETURN 1
+			end		
+	end
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+	IF OBJECT_ID('tempdb..#backupFiles') IS NOT NULL DROP TABLE #backupFiles;
+	CREATE TABLE #backupFiles
+	(
+		  [id]			[int] IDENTITY(1, 1)
+		, [file_name]	[nvarchar](260)
+		, [depth]		[int]
+		, [is_file]		[int]
+		, [create_time]	[varchar](20)
+	)
+
+IF RIGHT(@backupLocation, 1)<>'\' 
+	SET @backupLocation = @backupLocation + '\'
+IF @forSQLServerName <> '%' 
+	SET @backupLocation = @backupLocation + 
+							CASE	WHEN @nameConvention='dbaTDPMon' THEN @forSQLServerName
+									WHEN @nameConvention='Ola' THEN REPLACE(@forSQLServerName, '\', '$')
+							END + '\' + 
+							@forDatabaseName + '\' + 
+							CASE	WHEN @nameConvention='dbaTDPMon' THEN ''
+									WHEN @nameConvention='Ola' THEN @backupType + '\'
+							END
+	
+SET @queryToRun = N'EXEC xp_dirtree ''' + @backupLocation + ''', 8, 1';
+IF @serverToRun<>@@SERVERNAME
+	begin
+		IF @serverVersionNum < 11
+			SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @serverToRun + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+		ELSE
+			SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @serverToRun + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''') WITH RESULT SETS(([subdirectory] [nvarchar](260), [depth] [int], [file] [int]))'')'
+	end
+
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+DELETE FROM #backupFiles
+INSERT INTO #backupFiles([file_name], [depth], [is_file])
+		EXEC (@queryToRun)
+
+
+IF @nameConvention = 'dbaTDPMon'
+	begin
+		SET @backupType = CASE	WHEN LOWER(@backupType) = 'full' THEN '_full.BAK'
+								WHEN LOWER(@backupType) = 'diff' THEN '_diff.BAK'
+								WHEN LOWER(@backupType) = 'log' THEN '_log.TRN'
+						  END
+		UPDATE #backupFiles
+			SET [create_time] = SUBSTRING([file_name], CHARINDEX('_' + @forDatabaseName + '_', [file_name], 1) + LEN(@forDatabaseName) + 2, 15)
+		WHERE	CHARINDEX('_' + @forDatabaseName + '_', [file_name], 1) <> 0
+				AND CHARINDEX(@backupType, [file_name], 1) <> 0
+	end
+
+IF @nameConvention = 'Ola'
+	begin
+		SET @backupType = CASE	WHEN LOWER(@backupType) = 'full' THEN '_full_'
+								WHEN LOWER(@backupType) = 'diff' THEN '_diff_'
+								WHEN LOWER(@backupType) = 'log' THEN '_log_'
+						  END
+		UPDATE #backupFiles
+			SET [create_time] = SUBSTRING([file_name], CHARINDEX( @backupType, [file_name], 1) + LEN(@backupType) , 15)
+		WHERE	CHARINDEX('_' + @forDatabaseName + '_', [file_name], 1) <> 0
+				AND CHARINDEX(@backupType, [file_name], 1) <> 0
+
+	end
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+/* get last backup type with full path */
+DECLARE   @fileName		[nvarchar](512)
+		, @depth		[int]
+		, @id			[int]
+		, @timeStamp	[varchar](20)
+
+SELECT TOP 1 
+	   @id = [id]
+	 , @fileName = [file_name]
+	 , @depth = [depth]
+	 , @timeStamp = [create_time]
+FROM #backupFiles 
+WHERE [create_time] IS NOT NULL
+ORDER BY [create_time] DESC
+
+WHILE @depth>0
+	begin
+		SELECT TOP 1
+			@fileName = [file_name] + '\' + @fileName
+		FROM #backupFiles
+		WHERE [id] < @id
+			AND [depth] = @depth -1
+		ORDER BY [id] DESC
+
+		SET @depth = @depth -1
+	end
+
+SET @fileName = @backupLocation + @fileName
+SELECT @fileName AS [file_name], @timeStamp AS [time_stamp]
+
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF @serverVersionNum>=9 AND (@optionXPHasChanged=1 OR @optionAdvancedHasChanged=1)
+	begin
+		/* disable xp_cmdshell configuration option */
+		IF @optionXPHasChanged = 1
+			EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @serverToRun,
+																@configOptionName	= 'xp_cmdshell',
+																@configOptionValue	= 0,
+																@optionIsAvailable	= @optionXPIsAvailable OUT,
+																@optionCurrentValue	= @optionXPValue OUT,
+																@optionHasChanged	= @optionXPHasChanged OUT,
+																@executionLevel		= 0,
+																@debugMode			= @debugMode
+
+		/* disable show advanced options configuration option */
+		IF @optionAdvancedHasChanged = 1
+				EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @serverToRun,
+																	@configOptionName	= 'show advanced options',
+																	@configOptionValue	= 0,
+																	@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
+																	@optionCurrentValue	= @optionAdvancedValue OUT,
+																	@optionHasChanged	= @optionAdvancedHasChanged OUT,
+																	@executionLevel		= 0,
+																	@debugMode			= @debugMode
+	end
+GO
+
+
+
+RAISERROR('Create procedure: [dbo].[usp_mpRestoreDatabaseAs]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sysobjects 
+	     WHERE id = OBJECT_ID(N'[dbo].[usp_mpRestoreDatabaseAs]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_mpRestoreDatabaseAs]
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE [dbo].[usp_mpRestoreDatabaseAs]
+		  @forDatabaseName				[sysname]
+		, @toDatabaseName				[sysname]
+		, @restorePathForData			[nvarchar](260)
+		, @restorePathForLog			[nvarchar](260)
+		, @addTimeStampSuffixToFiles	[bit] = 0
+AS
+
+SET NOCOUNT ON
+DECLARE   @queryToRun		[nvarchar](max)
+		, @BackupFileName	[nvarchar](260)
+		, @LogicalName		[sysname]
+		, @logicalFileType	[char](1)
+		, @PhysicalName		[nvarchar](260)
+		, @timeStampSuffix	[nvarchar](20)
+
+IF OBJECT_ID('tempdb..#mostRecentBackupFile') IS NOT NULL DROP TABLE #mostRecentBackupFile
+CREATE TABLE #mostRecentBackupFile
+	(
+		  [file_name]	[nvarchar](260)
+		, [time_stamp]	[nvarchar](20)
+		, [type]		[sysname]	NULL
+	)
+		
+SET @queryToRun = N''
+SET @queryToRun = @queryToRun + N'
+DECLARE	  @serverToRun			[sysname]
+		, @forSQLServerName		[sysname]
+		, @backupLocation		[nvarchar](512)
+		, @backupType			[nvarchar](32)
+		, @nameConvention		[nvarchar](32)
+
+
+SELECT    @serverToRun = [RunSQLFrom]
+		, @forSQLServerName = [ServerName]
+		, @backupLocation = [BackupLocation]
+		, @backupType = ''full''
+		, @nameConvention = [BackupMode]
+FROM DbaAdmin.refresh.ClientSourceData
+WHERE [DatabaseName] = ''' + @forDatabaseName + '''
+
+EXEC dbaTDPMon.[dbo].[usp_mpDatabaseGetMostRecentBackupFromLocation]	  @serverToRun		= @serverToRun
+																		, @forSQLServerName = @forSQLServerName
+																		, @forDatabaseName	= ''' + @forDatabaseName + '''
+																		, @backupLocation	= @backupLocation
+																		, @backupType		= @backupType
+																		, @nameConvention	= @nameConvention
+																		, @debugMode		= 0
+'
+
+SET @queryToRun = N'SELECT * FROM OPENQUERY([AWISMONDB1], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''') WITH RESULT SETS(([file_name] [nvarchar](260), [time_stamp] [nvarchar](20)))'')'
+
+/* get latest full database backup */
+--PRINT @queryToRun
+INSERT	INTO #mostRecentBackupFile([file_name], [time_stamp])
+		EXEC (@queryToRun)
+
+UPDATE #mostRecentBackupFile SET [type]='full' WHERE [type] IS NULL
+
+/* get latest differential database backup */
+SET @queryToRun = REPLACE(@queryToRun, '@backupType = ''''''''full''''''''', '@backupType = ''''''''diff''''''''')
+
+--PRINT @queryToRun
+INSERT	INTO #mostRecentBackupFile([file_name], [time_stamp])
+		EXEC (@queryToRun)
+
+UPDATE #mostRecentBackupFile SET [type]='diff' WHERE [type] IS NULL
+
+DELETE FROM #mostRecentBackupFile
+WHERE	[type]='diff' 
+		AND CAST(REPLACE([time_stamp], '_', '') AS [bigint]) < (
+																SELECT CAST(REPLACE([time_stamp], '_', '') AS [bigint]) 
+																FROM #mostRecentBackupFile 
+																WHERE [type]='full'
+																)
+
+IF @addTimeStampSuffixToFiles=1
+	SELECT @timeStampSuffix = MAX([time_stamp])
+	FROM #mostRecentBackupFile
+
+		
+IF OBJECT_ID('tempdb..#dbFileList') IS NOT NULL DROP TABLE #dbFileList;
+CREATE TABLE #dbFileList
+(
+	  [LogicalName]				nvarchar(128)
+	, [PhysicalName]			nvarchar(260)
+	, [Type]					char(1)
+	, [FileGroupName]			nvarchar(128)
+	, [Size]					numeric(20,0)
+	, [MaxSize]					numeric(20,0)
+	, [FileID]					bigint
+	, [CreateLSN]				numeric(25,0)
+	, [DropLSN]					numeric(25,0) NULL
+	, [UniqueID]				uniqueidentifier
+	, [ReadOnlyLSN]				numeric(25,0) NULL
+	, [ReadWriteLSN]			numeric(25,0) NULL
+	, [BackupSizeInBytes]		bigint
+	, [SourceBlockSize]			int
+	, [FileGroupID]				int
+	, [LogGroupGUID]			uniqueidentifier NULL
+	, [DifferentialBaseLSN]		numeric(25,0) NULL
+	, [DifferentialBaseGUID]	uniqueidentifier
+	, [IsReadOnly]				bit
+	, [IsPresent]				bit
+	, [TDEThumbprint]			varbinary(32)
+)
+
+/* restore last full database backup */
+SELECT @BackupFileName = [file_name] FROM #mostRecentBackupFile WHERE [type]='full'
+
+SET @queryToRun = N'RESTORE FILELISTONLY FROM DISK = ''' + @BackupFileName + ''';';
+INSERT	INTO #dbFileList 
+		EXEC (@queryToRun)
+
+SET @queryToRun = N'RESTORE DATABASE [' + @toDatabaseName + N'] FROM DISK = ''' + @BackupFileName + N''' WITH STATS=1, REPLACE, NORECOVERY';
+			
+DECLARE crsdbFileList CURSOR FOR	SELECT [LogicalName], [PhysicalName], [Type] 
+									FROM #dbFileList;
+OPEN crsdbFileList;
+FETCH NEXT FROM crsdbFileList INTO @LogicalName, @PhysicalName, @logicalFileType;
+WHILE @@FETCH_STATUS = 0
+	begin
+		SET @PhysicalName = RIGHT(@PhysicalName, CHARINDEX('\', REVERSE(@PhysicalName)) - 1)
+		IF @addTimeStampSuffixToFiles=1
+			SET @PhysicalName = SUBSTRING(@PhysicalName, 1, LEN(@PhysicalName)-4) + 
+								'_' + @timeStampSuffix + 
+								'_' + REPLACE(REPLACE(REPLACE(CONVERT([varchar](19), GETDATE(), 121), '-', ''), ':', ''), ' ', '_') + 
+								SUBSTRING(@PhysicalName, LEN(@PhysicalName)-3, 4)
+
+		SET @queryToRun = @queryToRun + N', MOVE ''' + @LogicalName + ''' TO ''' + 
+							CASE	WHEN @logicalFileType='D' THEN @restorePathForData
+									WHEN @logicalFileType='L' THEN @restorePathForLog
+							END  + @PhysicalName + '''';
+				
+		FETCH NEXT FROM crsdbFileList INTO @LogicalName, @PhysicalName, @logicalFileType;
+	end
+		
+CLOSE crsdbFileList;
+DEALLOCATE crsdbFileList;			
+
+/* kill existing database connections*/
+EXEC [dbaTDPMon].[dbo].[usp_mpDatabaseKillConnections]	@SQLServerName	= @@SERVERNAME,
+														@DBName			= @toDatabaseName,
+														@flgOptions		= 3
+
+PRINT '--' + @queryToRun
+EXEC sp_executesql @queryToRun
+
+
+/* restore last differential backup */
+SET @BackupFileName=NULL
+SELECT @BackupFileName = [file_name] FROM #mostRecentBackupFile WHERE [type]='diff'
+
+IF @BackupFileName IS NOT NULL
+	begin
+		SET @queryToRun = N'RESTORE DATABASE [' + @toDatabaseName + N'] FROM DISK = ''' + @BackupFileName + N''' WITH STATS=1, REPLACE, NORECOVERY';
+
+		PRINT '--' + @queryToRun
+		EXEC sp_executesql @queryToRun
+	end
+
+
+SET @queryToRun = N'RESTORE DATABASE [' + @toDatabaseName + N'] WITH RECOVERY';
+PRINT '--' + @queryToRun
+EXEC sp_executesql @queryToRun
+GO
 
 
 RAISERROR('update jobs description..', 10, 1) WITH NOWAIT
@@ -2267,243 +3353,6 @@ IF @flgActions & 128 = 128
 	end
 
 RETURN @errorCode
-GO
-
-
-RAISERROR('Create procedure: [dbo].[usp_jobQueueExecute]', 10, 1) WITH NOWAIT
-GO
-SET QUOTED_IDENTIFIER ON 
-GO
-SET ANSI_NULLS ON 
-GO
-
-if exists (select * from dbo.sysobjects where id = object_id(N'[dbo].[usp_jobQueueExecute]') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-drop procedure [dbo].[usp_jobQueueExecute]
-GO
-
-CREATE PROCEDURE dbo.usp_jobQueueExecute
-		@projectCode			[varchar](32) = NULL,
-		@moduleFilter			[varchar](32) = '%',
-		@descriptorFilter		[varchar](256)= '%',
-		@waitForDelay			[varchar](8) = '00:00:30',
-		@debugMode				[bit]=0
-/* WITH ENCRYPTION */
-AS
-
--- ============================================================================
--- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
--- ============================================================================
--- Author			 : Dan Andrei STEFAN
--- Create date		 : 2004-2014
--- Module			 : Database Analysis & Performance Monitoring
--- ============================================================================
-
-SET NOCOUNT ON
-
-DECLARE   @projectID				[smallint]
-		, @jobName					[sysname]
-		, @jobStepName				[sysname]
-		, @jobDBName				[sysname]
-		, @sqlServerName			[sysname]
-		, @jobCommand				[nvarchar](max)
-		, @logFileLocation			[nvarchar](512)
-		, @jobQueueID				[int]
-
-		, @configParallelJobs		[smallint]
-		, @configMaxNumberOfRetries	[smallint]
-		, @configFailMasterJob		[bit]
-		, @runningJobs				[smallint]
-		, @executedJobs				[smallint]
-		, @jobQueueCount			[smallint]
-
-		, @strMessage				[varchar](8000)	
-		, @currentRunning			[int]
-		, @lastExecutionStatus		[int]
-		, @lastExecutionDate		[varchar](10)
-		, @lastExecutionTime 		[varchar](8)
-		, @runningTimeSec			[bigint]
-
-
-------------------------------------------------------------------------------------------------------------------------------------------
---get default project code
-IF @projectCode IS NULL
-	SELECT	@projectCode = [value]
-	FROM	[dbo].[appConfigurations]
-	WHERE	[name] = 'Default project code'
-			AND [module] = 'common'
-
-SELECT @projectID = [id]
-FROM [dbo].[catalogProjects]
-WHERE [code] = @projectCode 
-
-IF @projectID IS NULL
-	begin
-		SET @strMessage=N'ERROR: The value specifief for Project Code is not valid.'
-		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
-	end
-	
-------------------------------------------------------------------------------------------------------------------------------------------
---check if parallel collector is enabled
-BEGIN TRY
-	SELECT	@configParallelJobs = [value]
-	FROM	[dbo].[appConfigurations]
-	WHERE	[name] = N'Parallel Data Collecting Jobs'
-			AND [module] = 'common'
-END TRY
-BEGIN CATCH
-	SET @configParallelJobs = 1
-END CATCH
-
-SET @configParallelJobs = ISNULL(@configParallelJobs, 1)
-
-
-------------------------------------------------------------------------------------------------------------------------------------------
---get the number of retries in case of a failure
-BEGIN TRY
-	SELECT	@configMaxNumberOfRetries = [value]
-	FROM	[dbo].[appConfigurations]
-	WHERE	[name] = N'Maximum number of retries at failed job'
-			AND [module] = 'common'
-END TRY
-BEGIN CATCH
-	SET @configMaxNumberOfRetries = 3
-END CATCH
-
-SET @configMaxNumberOfRetries = ISNULL(@configMaxNumberOfRetries, 3)
-
-
-------------------------------------------------------------------------------------------------------------------------------------------
---get the number of retries in case of a failure
-BEGIN TRY
-	SELECT	@configFailMasterJob = CASE WHEN lower([value])='true' THEN 1 ELSE 0 END
-	FROM	[dbo].[appConfigurations]
-	WHERE	[name] = N'Fail master job if any queued job fails'
-			AND [module] = 'common'
-END TRY
-BEGIN CATCH
-	SET @configFailMasterJob = 0
-END CATCH
-
-SET @configFailMasterJob = ISNULL(@configFailMasterJob, 0)
-
-------------------------------------------------------------------------------------------------------------------------------------------
-SELECT @jobQueueCount = COUNT(*)
-FROM [dbo].[vw_jobExecutionQueue]
-WHERE  [project_id] = @projectID 
-		AND [module] LIKE @moduleFilter
-		AND [descriptor] LIKE @descriptorFilter
-		AND [status]=-1
-
-
-SET @strMessage='Number of jobs in the queue to be executed : ' + CAST(@jobQueueCount AS [varchar]) 
-EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
-SET @runningJobs  = 0
-
-------------------------------------------------------------------------------------------------------------------------------------------
-DECLARE crsJobQueue CURSOR FOR	SELECT  [id], [instance_name]
-										, [job_name], [job_step_name], [job_database_name], REPLACE([job_command], '''', '''''') AS [job_command]
-								FROM [dbo].[vw_jobExecutionQueue]
-								WHERE  [project_id] = @projectID 
-										AND [module] LIKE @moduleFilter
-										AND [descriptor] LIKE @descriptorFilter
-										AND [status]=-1
-								ORDER BY [id]
-OPEN crsJobQueue
-FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand
-SET @executedJobs = 1
-WHILE @@FETCH_STATUS=0
-	begin
-		SET @strMessage='Executing job# : ' + CAST(@executedJobs AS [varchar]) + ' / ' + CAST(@jobQueueCount AS [varchar])
-		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
-		SET @strMessage='Create SQL Agent job : "' + @jobName + '"'
-		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
-
-		---------------------------------------------------------------------------------------------------
-		/* setting the job name & job log location */
-		SELECT @logFileLocation = REVERSE(SUBSTRING(REVERSE([value]), CHARINDEX('\', REVERSE([value])), LEN(REVERSE([value]))))
-		FROM (
-				SELECT CAST(SERVERPROPERTY('ErrorLogFileName') AS [nvarchar](1024)) AS [value]
-			)er
-
-		IF @logFileLocation IS NULL SET @logFileLocation =N'C:\'
-		SET @logFileLocation = @logFileLocation + N'job-' + @jobName + N'.log'
-
-		---------------------------------------------------------------------------------------------------
-		/* defining job and start it */
-		EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
-										@jobName		= @jobName,
-										@operation		= 'Clean',
-										@dbName			= @jobDBName, 
-										@jobStepName 	= @jobStepName,
-										@debugMode		= @debugMode
-
-		EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
-										@jobName		= @jobName,
-										@operation		= 'Add',
-										@dbName			= @jobDBName, 
-										@jobStepName 	= @jobStepName,
-										@jobStepCommand	= @jobCommand,
-										@jobLogFileName	= @logFileLocation,
-										@jobStepRetries = @configMaxNumberOfRetries,
-										@debugMode		= @debugMode
-
-		---------------------------------------------------------------------------------------------------
-		/* starting job */
-		EXEC dbo.usp_sqlAgentJobStartAndWatch	@sqlServerName						= @sqlServerName,
-												@jobName							= @jobName,
-												@stepToStart						= 1,
-												@stepToStop							= 1,
-												@waitForDelay						= @waitForDelay,
-												@dontRunIfLastExecutionSuccededLast	= 0,
-												@startJobIfPrevisiousErrorOcured	= 1,
-												@watchJob							= 0,
-												@debugMode							= @debugMode
-		
-		/* mark job as running */
-		UPDATE [dbo].[jobExecutionQueue] SET [status]=4 WHERE [id] = @jobQueueID	
-		SET @runningJobs = @runningJobs + 1
-
-		SET @runningJobs = @executedJobs
-		EXEC @runningJobs = dbo.usp_jobQueueGetStatus	@projectCode			= @projectCode,
-														@moduleFilter			= @moduleFilter,
-														@descriptorFilter		= @descriptorFilter,
-														@waitForDelay			= @waitForDelay,
-														@minJobToRunBeforeExit	= @configParallelJobs,
-														@executionLevel			= 1,
-														@debugMode				= @debugMode
-		---------------------------------------------------------------------------------------------------
-		IF @runningJobs < @jobQueueCount
-			begin
-				FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand
-				SET @executedJobs = @executedJobs + 1
-			end
-	end
-CLOSE crsJobQueue
-DEALLOCATE crsJobQueue
-
-EXEC dbo.usp_jobQueueGetStatus	@projectCode			= @projectCode,
-								@moduleFilter			= @moduleFilter,
-								@descriptorFilter		= @descriptorFilter,
-								@waitForDelay			= @waitForDelay,
-								@minJobToRunBeforeExit	= 0,
-								@executionLevel			= 1,
-								@debugMode				= @debugMode
-
-IF @configFailMasterJob=1 
-	AND EXISTS(	SELECT *
-			FROM [dbo].[vw_jobExecutionQueue]
-			WHERE  [project_id] = @projectID 
-					AND [module] LIKE @moduleFilter
-					AND [descriptor] LIKE @descriptorFilter
-					AND [status]=0 /* failed */
-			)
-		EXEC [dbo].[usp_logPrintMessage]	@customMessage		= 'Execution failed. Check log for internal job failures (dbo.vw_jobExecutionQueue).',
-											@raiseErrorAsPrint	= 1,
-											@messagRootLevel	= 0,
-											@messageTreelevel	= 1,
-											@stopExecution		= 1
 GO
 
 

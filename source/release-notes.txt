@@ -413,3 +413,6 @@
 /* 21.06.2016 */
 	- updated the documentation
 	- fix small bugs and made dbo.usp_mpDatabaseBackupCleanup able to run as standalone (thank you Dragos Esanu)
+
+/* 23.06.2016 */
+	- add new option for backup cleanup, in order to speed the process: 4096 - use xp_dirtree to identify orphan backup files to be deleted

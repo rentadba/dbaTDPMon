@@ -16,12 +16,13 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseBackupCleanup]
 		@backupFileExtension	[nvarchar](8),			/*  BAK - cleanup full/incremental database backup
 															TRN - cleanup transaction log backup
 														*/
-		@flgOptions				[int]	= 448,			/* 32 - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
+		@flgOptions				[int]	= 4544,			/* 32 - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
 														   64 - create folders for each database (default)
 														  128 - when performing cleanup, delete also orphans diff and log backups, when cleanup full database backups(default)
 														  256 - for +2k5 versions, use xp_delete_file option (default)
 														 2048 - change retention policy from RetentionDays to RetentionBackupsCount (number of full database backups to be kept)
 															  - this may be forced by setting to true property 'Change retention policy from RetentionDays to RetentionFullBackupsCount'
+														 4096 - use xp_dirtree to identify orphan backup files to be deleted, when using option 128 (default)
 														*/
 		@retentionDays			[smallint]	= 14,
 		@executionLevel			[tinyint]	=  0,
@@ -381,6 +382,7 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 					end		
 			end											
 		
+		/* identify backup files to be deleted, based on msdb information */
 		SET @queryToRun=N''
 		SET @queryToRun = @queryToRun + N'SELECT bs.[backup_set_id], bmf.[physical_device_name]
 										FROM [msdb].[dbo].[backupset] bs
@@ -425,6 +427,46 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 						EXEC (@queryToRun)
 			end
 
+
+		/* identify backup files to be deleted, based on file existence on disk */
+		/* use xp_dirtree to identify orphan backup files to be deleted, when using option 128 (default) */
+		IF @flgOptions & 128 = 128 AND @flgOptions & 4096 = 4096 
+			begin
+				IF OBJECT_ID('tempdb..#backupFilesOnDisk') IS NOT NULL DROP TABLE #backupFilesOnDisk
+				CREATE TABLE #backupFilesOnDisk
+				(
+					  [id]			[int] IDENTITY(1, 1)
+					, [file_name]	[nvarchar](260)
+					, [depth]		[int]
+					, [is_file]		[int]
+					, [create_time]	[varchar](20)
+				)
+
+				SET @queryToRun = N'EXEC xp_dirtree ''' + @backupLocation + ''', 8, 1';
+				IF @sqlServerName<>@@SERVERNAME
+					begin
+						IF @serverVersionNum < 11
+							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+						ELSE
+							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''') WITH RESULT SETS(([subdirectory] [nvarchar](260), [depth] [int], [file] [int]))'')'
+					end
+
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				DELETE FROM #backupFilesOnDisk
+				INSERT INTO #backupFilesOnDisk([file_name], [depth], [is_file])
+						EXEC (@queryToRun)
+
+				/* remove files which are no longer on disk */
+				IF EXISTS(SELECT * FROM #backupFilesOnDisk)
+					DELETE bd
+					FROM #backupDevice bd
+					LEFT JOIN #backupFilesOnDisk bf ON (@backupLocation + bf.[file_name]) = bd.[physical_device_name] 
+					WHERE bf.[file_name] IS NULL
+			end
+
+
+		/* remove the backup files, one by one */
 		DECLARE crsCleanupBackupFiles CURSOR FOR	SELECT [physical_device_name]
 													FROM #backupDevice														
 													ORDER BY [backup_set_id] ASC
