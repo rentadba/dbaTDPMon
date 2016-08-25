@@ -75,7 +75,7 @@ IF @projectID IS NULL
 BEGIN TRY
 	SELECT	@configParallelJobs = [value]
 	FROM	[dbo].[appConfigurations]
-	WHERE	[name] = N'Parallel Data Collecting Jobs'
+	WHERE	[name] = N'Parallel Execution Jobs'
 			AND [module] = 'common'
 END TRY
 BEGIN CATCH
@@ -119,7 +119,9 @@ SELECT @jobQueueCount = COUNT(*)
 FROM [dbo].[vw_jobExecutionQueue]
 WHERE  [project_id] = @projectID 
 		AND [module] LIKE @moduleFilter
-		AND [descriptor] LIKE @descriptorFilter
+		AND (    [descriptor] LIKE @descriptorFilter
+			  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
+			)			
 		AND [status]=-1
 
 
@@ -134,7 +136,9 @@ DECLARE crsJobQueue CURSOR FOR	SELECT  [id], [instance_name]
 								FROM [dbo].[vw_jobExecutionQueue]
 								WHERE  [project_id] = @projectID 
 										AND [module] LIKE @moduleFilter
-										AND [descriptor] LIKE @descriptorFilter
+										AND (    [descriptor] LIKE @descriptorFilter
+											  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
+											)			
 										AND [status]=-1
 								ORDER BY [id]
 OPEN crsJobQueue
@@ -211,6 +215,8 @@ WHILE @@FETCH_STATUS=0
 CLOSE crsJobQueue
 DEALLOCATE crsJobQueue
 
+WAITFOR DELAY @waitForDelay
+	
 EXEC dbo.usp_jobQueueGetStatus	@projectCode			= @projectCode,
 								@moduleFilter			= @moduleFilter,
 								@descriptorFilter		= @descriptorFilter,
@@ -224,7 +230,9 @@ IF @configFailMasterJob=1
 			FROM [dbo].[vw_jobExecutionQueue]
 			WHERE  [project_id] = @projectID 
 					AND [module] LIKE @moduleFilter
-					AND [descriptor] LIKE @descriptorFilter
+					AND (    [descriptor] LIKE @descriptorFilter
+						  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
+						)			
 					AND [status]=0 /* failed */
 			)
 		EXEC [dbo].[usp_logPrintMessage]	@customMessage		= 'Execution failed. Check log for internal job failures (dbo.vw_jobExecutionQueue).',

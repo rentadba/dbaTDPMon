@@ -69,7 +69,9 @@ SELECT @runningJobs = COUNT(*)
 FROM [dbo].[vw_jobExecutionQueue]
 WHERE  [project_id] = @projectID 
 		AND [module] LIKE @moduleFilter
-		AND [descriptor] LIKE @descriptorFilter
+		AND (    [descriptor] LIKE @descriptorFilter
+			  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
+			)			
 		AND [status]=4
 
 WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) OR (@runningJobs > @minJobToRunBeforeExit AND @minJobToRunBeforeExit = 0)
@@ -82,7 +84,9 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 											FROM [dbo].[vw_jobExecutionQueue]
 											WHERE  [project_id] = @projectID 
 													AND [module] LIKE @moduleFilter
-													AND [descriptor] LIKE @descriptorFilter
+													AND (    [descriptor] LIKE @descriptorFilter
+														  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
+														)			
 													AND [status]=4
 											ORDER BY [id]
 		OPEN crsRunningJobs
@@ -196,7 +200,9 @@ IF @minJobToRunBeforeExit=0
 											INNER JOIN #existingSQLAgentJobs esaj ON esaj.[job_name] = jeq.[job_name]
 											WHERE  jeq.[project_id] = @projectID 
 													AND jeq.[module] LIKE @moduleFilter
-													AND jeq.[descriptor] LIKE @descriptorFilter
+													AND (    [descriptor] LIKE @descriptorFilter
+														  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
+														)			
 													AND jeq.[status]<>-1
 											ORDER BY jeq.[id]
 		OPEN crsRunningJobs

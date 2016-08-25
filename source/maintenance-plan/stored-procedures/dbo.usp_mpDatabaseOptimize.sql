@@ -21,7 +21,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseOptimize]
 		@PageThreshold				[int]		=  1000,
 		@RebuildIndexPageCountLimit	[int]		= 2147483647,	--16TB/no limit
 		@StatsSamplePercent			[smallint]	=   100,
-		@StatsAgeDays				[smallint]	=     7,
+		@StatsAgeDays				[smallint]	=   365,
 		@StatsChangePercent			[smallint]	=     1,
 		@MaxDOP						[smallint]	=	  1,
 		@MaxRunningTimeInMinutes	[smallint]	=     0,

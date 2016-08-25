@@ -142,8 +142,13 @@ WHILE @@FETCH_STATUS=0
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 
-		INSERT	INTO [monitoring].[statsReplicationLatency]([project_id], [distributor_server], [publication_name], [publication_type], [publisher_server], [publisher_db], [subscriber_server], [subscriber_db], [subscription_status], [subscription_type], [subscription_articles])
-				EXEC (@queryToRun)
+		BEGIN TRY
+			INSERT	INTO [monitoring].[statsReplicationLatency]([project_id], [distributor_server], [publication_name], [publication_type], [publisher_server], [publisher_db], [subscriber_server], [subscriber_db], [subscription_status], [subscription_type], [subscription_articles])
+					EXEC (@queryToRun)
+		END TRY
+		BEGIN CATCH
+			PRINT ERROR_MESSAGE()
+		END CATCH
 
 		FETCH NEXT FROM crsReplicationDistributorServers INTO @sqlServerName
 	end
@@ -302,7 +307,12 @@ WHILE @@FETCH_STATUS=0
 
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @serverToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
-		EXEC @serverToRun @queryToRun
+		BEGIN TRY
+			EXEC @serverToRun @queryToRun
+		END TRY
+		BEGIN CATCH
+			PRINT ERROR_MESSAGE()
+		END CATCH
 
 		SET @queryToRun = N''
 		SET @queryToRun = @queryToRun + N'
@@ -433,7 +443,13 @@ WHILE @@FETCH_STATUS=0
 
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @serverToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
-		EXEC @serverToRun @queryToRun
+		BEGIN TRY
+			EXEC @serverToRun @queryToRun
+		END TRY
+		BEGIN CATCH
+			PRINT ERROR_MESSAGE()
+		END CATCH
+
 
 		FETCH NEXT FROM crsActivePublications INTO @publicationServer
 	end
@@ -657,7 +673,12 @@ WHILE @@FETCH_STATUS=0
 
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @serverToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
-		EXEC @serverToRun @queryToRun
+		BEGIN TRY
+			EXEC @serverToRun @queryToRun
+		END TRY
+		BEGIN CATCH
+			PRINT ERROR_MESSAGE()
+		END CATCH
 
 		/*
 		SET @queryToRun = N''

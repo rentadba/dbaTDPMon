@@ -38,7 +38,7 @@ GO
 SET NOCOUNT ON
 GO
 INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
-		  SELECT 'common'			AS [module], 'Application Version'															AS [name], N'2016.06.24'AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Application Version'															AS [name], N'2016.08.25'AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Default project code'															AS [name], '$(projectCode)'	AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Database Mail profile name to use for sending emails'							AS [name], NULL			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Default recipients list - Reports (semicolon separated)'						AS [name], NULL			AS [value]		UNION ALL
@@ -65,7 +65,7 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 		  SELECT 'health-check'		AS [module], 'Collect Information OS Events'												AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'health-check'		AS [module], 'Collect OS Events timeout (seconds)'											AS [name], '600'		AS [value]		UNION ALL
 		  SELECT 'health-check'		AS [module], 'Collect OS Events from last hours'											AS [name], '24'			AS [value]		UNION ALL
-		  SELECT 'common'			AS [module], 'Parallel Data Collecting Jobs'												AS [name], '16'			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Parallel Execution Jobs'														AS [name], '16'			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Maximum number of retries at failed job'										AS [name], '3'			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Fail master job if any queued job fails'										AS [name], 'false'		AS [value]
 GO
@@ -102,12 +102,12 @@ GO
 
 
 ---------------------------------------------------------------------------------------------
---enable Parallel Data Collecting Jobs
+--enable Parallel Execution Jobs
 ---------------------------------------------------------------------------------------------
 UPDATE [dbo].[appConfigurations] 
 	SET [value]= CASE WHEN 4 * (SELECT [cpu_count] FROM sys.dm_os_sys_info)  > 32 
 						THEN 32
 						ELSE 4 * (SELECT [cpu_count] FROM sys.dm_os_sys_info)
 				END
-WHERE [module] = 'common' AND [name] = 'Parallel Data Collecting Jobs'
+WHERE [module] = 'common' AND [name] = 'Parallel Execution Jobs'
 GO

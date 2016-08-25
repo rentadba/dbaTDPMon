@@ -57,7 +57,7 @@ IF @projectID IS NULL
 BEGIN TRY
 	SELECT	@configParallelJobs = [value]
 	FROM	[dbo].[appConfigurations]
-	WHERE	[name] = N'Parallel Data Collecting Jobs'
+	WHERE	[name] = N'Parallel Execution Jobs'
 			AND [module] = 'common'
 END TRY
 BEGIN CATCH
@@ -73,7 +73,7 @@ WHERE [project_id] = @projectID
 		AND [name] = @@SERVERNAME
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-DECLARE crsCollectorDescriptior CURSOR READ_ONLY FAST_FORWARD FOR	SELECT [descriptor]
+DECLARE crsCollectorDescriptor CURSOR READ_ONLY FAST_FORWARD FOR	SELECT [descriptor]
 																	FROM
 																		(
 																			SELECT 'dbo.usp_hcCollectDatabaseDetails' AS [descriptor] UNION ALL
@@ -84,8 +84,8 @@ DECLARE crsCollectorDescriptior CURSOR READ_ONLY FAST_FORWARD FOR	SELECT [descri
 																			SELECT 'dbo.usp_hcCollectEventMessages' AS [descriptor]
 																		)X
 																	WHERE [descriptor] LIKE @collectorDescriptor
-OPEN crsCollectorDescriptior
-FETCH NEXT FROM crsCollectorDescriptior INTO @codeDescriptor
+OPEN crsCollectorDescriptor
+FETCH NEXT FROM crsCollectorDescriptor INTO @codeDescriptor
 WHILE @@FETCH_STATUS=0
 	begin
 		SET @strMessage='Generating queue for : ' + @codeDescriptor
@@ -307,8 +307,8 @@ WHILE @@FETCH_STATUS=0
 				WHERE y.[row_no] <> 1
 			end
 			
-		FETCH NEXT FROM crsCollectorDescriptior INTO @codeDescriptor
+		FETCH NEXT FROM crsCollectorDescriptor INTO @codeDescriptor
 	end
-CLOSE crsCollectorDescriptior
-DEALLOCATE crsCollectorDescriptior
+CLOSE crsCollectorDescriptor
+DEALLOCATE crsCollectorDescriptor
 GO
