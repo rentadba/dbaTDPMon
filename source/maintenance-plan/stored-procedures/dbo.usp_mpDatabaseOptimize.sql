@@ -643,7 +643,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 												, sp.[last_updated]
 												, sp.[rows]
 												, ABS(sp.[modification_counter]) AS [modification_counter]
-												, (ABS(sp.[modification_counter]) * 100. / sp.[rows]) AS [percent_changes]
+												, (ABS(sp.[modification_counter]) * 100. / CAST(sp.[rows] AS [float])) AS [percent_changes]
 										FROM [' + @DBName + '].sys.stats ss
 										INNER JOIN [' + @DBName + '].sys.objects ob	ON ob.[object_id] = ss.[object_id]
 										INNER JOIN [' + @DBName + '].sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]' + N'
@@ -659,7 +659,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 														 ( 
 															  DATEDIFF(dd, sp.[last_updated], GETDATE()) < ' + CAST(@StatsAgeDays AS [nvarchar](32)) + N' 
 														  AND sp.[modification_counter] <> 0 
-														  AND (ABS(sp.[modification_counter]) * 100. / sp.[rows]) >= ' + CAST(@StatsChangePercent AS [nvarchar](32)) + N'
+														  AND (ABS(sp.[modification_counter]) * 100. / CAST(sp.[rows] AS [float])) >= ' + CAST(@StatsChangePercent AS [nvarchar](32)) + N'
 														 )
 													)'
 				ELSE

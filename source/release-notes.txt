@@ -416,3 +416,10 @@
 
 /* 23.06.2016 */
 	- add new option for backup cleanup, in order to speed the process: 4096 - use xp_dirtree to identify orphan backup files to be deleted
+
+
+/*----------------------------------------------------------------------*/
+/* August 2016 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 25.06.2016 */
+	- add parallel database maintenance jobs (backups, consistency checks, index and statistics)
