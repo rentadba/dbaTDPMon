@@ -192,15 +192,19 @@ WHILE @@FETCH_STATUS=0
 				WHILE @@FETCH_STATUS=0
 					begin
 						/* generating alarm/email event */
-						EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@sqlServerName			= @sqlServerName,
-																		@jobName				= @jobName,
-																		@logFileLocation		= NULL,
-																		@module					= 'monitoring',
-																		@sendLogAsAttachment	= 1,
-																		@eventType				= 2,
-																		@currentlyRunning		= 0,
-																		@debugMode				= @debugMode
-
+						BEGIN TRY
+							EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@sqlServerName			= @sqlServerName,
+																			@jobName				= @jobName,
+																			@logFileLocation		= NULL,
+																			@module					= 'monitoring',
+																			@sendLogAsAttachment	= 1,
+																			@eventType				= 2,
+																			@currentlyRunning		= 0,
+																			@debugMode				= @debugMode
+						END TRY
+						BEGIN CATCH
+							PRINT ERROR_MESSAGE()
+						END CATCH
 						FETCH NEXT FROM crsFailedJobs INTO @jobName
 					end
 				CLOSE crsFailedJobs

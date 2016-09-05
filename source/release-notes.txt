@@ -421,5 +421,8 @@
 /*----------------------------------------------------------------------*/
 /* August 2016 new features & fixes
 /*----------------------------------------------------------------------*/
-/* 25.06.2016 */
+/* 25.08.2016 */
 	- add parallel database maintenance jobs (backups, consistency checks, index and statistics)
+
+/* 29.08.2016 */
+	- fix small bugs on failed jobs monitoring
