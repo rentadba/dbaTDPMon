@@ -15,7 +15,7 @@ set module=%3
 set project=%4
 set data_files_path=%5
 set log_files_path=%6
-set userid=%6
+set userid=%7
 set password=%8
 
 if !%4==! set project="DEFAULT"
