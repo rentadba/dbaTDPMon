@@ -332,10 +332,19 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Maintenance - User DBs.sql" -d %dbname% -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Maintenance - User DBs - Parallel.sql" -d %dbname% -v dbName=%dbname% -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Full and Diff.sql" -d %dbname% -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Full and Diff - Parallel.sql" -d %dbname% -v dbName=%dbname% -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Log.sql" -d %dbname% -v dbName=%dbname% -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Log - Parallel.sql" -d %dbname% -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
 if %module%=="all" goto hc

@@ -38,7 +38,7 @@ GO
 SET NOCOUNT ON
 GO
 INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
-		  SELECT 'common'			AS [module], 'Application Version'															AS [name], N'2016.09.05'AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Application Version'															AS [name], N'2016.10.14'AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Default project code'															AS [name], '$(projectCode)'	AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Database Mail profile name to use for sending emails'							AS [name], NULL			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Default recipients list - Reports (semicolon separated)'						AS [name], NULL			AS [value]		UNION ALL
@@ -105,9 +105,9 @@ GO
 --enable Parallel Execution Jobs
 ---------------------------------------------------------------------------------------------
 UPDATE [dbo].[appConfigurations] 
-	SET [value]= CASE WHEN 4 * (SELECT [cpu_count] FROM sys.dm_os_sys_info)  > 32 
+	SET [value]= CASE WHEN 2 * (SELECT [cpu_count] FROM sys.dm_os_sys_info)  > 32 
 						THEN 32
-						ELSE 4 * (SELECT [cpu_count] FROM sys.dm_os_sys_info)
+						ELSE 2 * (SELECT [cpu_count] FROM sys.dm_os_sys_info)
 				END
 WHERE [module] = 'common' AND [name] = 'Parallel Execution Jobs'
 GO

@@ -1,3 +1,12 @@
+USE [dbaTDPMon]
+GO
+
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+UPDATE [dbo].[appConfigurations] SET [value] = N'2016.09.26' WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+
+
 RAISERROR('Create procedure: [dbo].[usp_mpDatabaseConsistencyCheck]', 10, 1) WITH NOWAIT
 GO
 IF  EXISTS (
@@ -729,4 +738,11 @@ IF @flgActions & 128 = 128
 	end
 
 RETURN @errorCode
+GO
+
+
+
+USE [dbaTDPMon]
+GO
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
 GO

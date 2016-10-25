@@ -1,3 +1,13 @@
+USE [dbaTDPMon]
+GO
+
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+UPDATE [dbo].[appConfigurations] SET [value] = N'2016.10.14' WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+
+
+
 RAISERROR('Create procedure: [dbo].[usp_mpJobQueueCreate]', 10, 1) WITH NOWAIT
 GO
 IF  EXISTS (
@@ -497,4 +507,10 @@ WHILE @@FETCH_STATUS=0
 	end
 CLOSE crsActiveInstances
 DEALLOCATE crsActiveInstances
+GO
+
+
+USE [dbaTDPMon]
+GO
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
 GO
