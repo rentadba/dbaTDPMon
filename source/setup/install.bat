@@ -467,43 +467,43 @@ echo *--------------------------------------------------------------------------
 if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\schema\create-schema-monitoring.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.alertThresholds.sql" -d %dbname%  -b -r 1
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\monitoring.alertThresholds.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.alertSkipRules.sql" -d %dbname%  -b -r 1
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\monitoring.alertSkipRules.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.statsReplicationLatency.sql" -d %dbname%  -b -r 1
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\monitoring.statsReplicationLatency.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.statsTransactionsStatus.sql" -d %dbname%  -b -r 1
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\monitoring.statsTransactionsStatus.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.statsSQLAgentJobs.sql" -d %dbname%  -b -r 1
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\monitoring.statsSQLAgentJobs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 
 echo Monitoring: Creating Functions / Stored Procedures
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\alarm-custom\dbo.usp_monAlarmCustomFreeDiskSpace.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\dbo.usp_monAlarmCustomFreeDiskSpace.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\alarm-custom\dbo.usp_monAlarmCustomReplicationLatency.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\dbo.usp_monAlarmCustomReplicationLatency.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\alarm-custom\dbo.usp_monGetTransactionsStatus.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\dbo.usp_monGetTransactionsStatus.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\alarm-custom\dbo.usp_monAlarmCustomTransactionsStatus.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\dbo.usp_monAlarmCustomTransactionsStatus.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\alarm-custom\dbo.usp_monGetSQLAgentFailedJobs.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\dbo.usp_monGetSQLAgentFailedJobs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\alarm-custom\dbo.usp_monAlarmCustomSQLAgentFailedJobs.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\dbo.usp_monAlarmCustomSQLAgentFailedJobs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\alarm-custom\dbo.usp_monReplicationPublicationLatency.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\dbo.usp_monReplicationPublicationLatency.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 
