@@ -117,7 +117,10 @@ WHILE @@FETCH_STATUS=0
 																					SELECT 'dbo.usp_mpDatabaseBackup(Data)' AS [descriptor] UNION ALL
 																					SELECT 'dbo.usp_mpDatabaseBackup(Log)' AS [descriptor]
 																				)X
-																			WHERE [descriptor] LIKE @jobDescriptor
+																			WHERE (    [descriptor] LIKE @jobDescriptor
+																					OR ISNULL(CHARINDEX([descriptor], @jobDescriptor), 0) <> 0
+																				  )			
+
 		OPEN crsCollectorDescriptor
 		FETCH NEXT FROM crsCollectorDescriptor INTO @codeDescriptor
 		WHILE @@FETCH_STATUS=0
@@ -137,7 +140,7 @@ WHILE @@FETCH_STATUS=0
 					begin
 						/*-------------------------------------------------------------------*/
 						/* Weekly: Database Consistency Check - only once a week on Saturday */
-						IF @flgActions & 1 = 1 AND DATEPART(dw, GETUTCDATE())=7
+						IF @flgActions & 1 = 1 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Database Consistency Check', GETDATE()) = 1
 							INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 																   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 																   , [job_command])
@@ -146,7 +149,7 @@ WHILE @@FETCH_STATUS=0
 											DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseConsistencyCheck' + ' - Database Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']' AS [job_name],
 											'Run'		AS [job_step_name],
 											DB_NAME()	AS [job_database_name],
-											'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName	= ''' + @forSQLServerName + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 1, @flgOptions = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+											'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName	= ''' + @forSQLServerName + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 1, @flgOptions = 3, @debugMode = ' + CAST(@debugMode AS [varchar])
 									FROM
 										(
 											SELECT [name] AS [database_name]
@@ -161,12 +164,12 @@ WHILE @@FETCH_STATUS=0
 						/*-------------------------------------------------------------------*/
 						/* Daily: Allocation Consistency Check */
 						/* when running DBCC CHECKDB, skip running DBCC CHECKALLOC*/
-						IF DATEPART(dw, GETUTCDATE())=7
+						IF [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Database Consistency Check', GETDATE()) = 1
 							SET @featureflgActions = 8
 						ELSE
 							SET @featureflgActions = 12
 
-						IF @flgActions & 2 = 2
+						IF @flgActions & 2 = 2 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Allocation Consistency Check', GETDATE()) = 1
 							INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 																	   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 																	   , [job_command])
@@ -190,7 +193,7 @@ WHILE @@FETCH_STATUS=0
 
 						/*-------------------------------------------------------------------*/
 						/* Weekly: Tables Consistency Check - only once a week on Sunday*/
-						IF @flgActions & 4 = 4 AND  DATEPART(dw, GETUTCDATE())=1
+						IF @flgActions & 4 = 4 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Tables Consistency Check', GETDATE()) = 1
 							INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 																   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 																   , [job_command])
@@ -213,7 +216,7 @@ WHILE @@FETCH_STATUS=0
 
 						/*-------------------------------------------------------------------*/
 						/* Weekly: Reference Consistency Check - only once a week on Sunday*/
-						IF @flgActions & 8 = 8 AND DATEPART(dw, GETUTCDATE())=1
+						IF @flgActions & 8 = 8 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Reference Consistency Check', GETDATE()) = 1
 							INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 																   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 																   , [job_command])
@@ -236,7 +239,7 @@ WHILE @@FETCH_STATUS=0
 
 						/*-------------------------------------------------------------------*/
 						/* Monthly: Perform Correction to Space Usage - on the first Saturday of the month */
-						IF @flgActions & 16 = 16 AND DATEPART(dw, GETUTCDATE())=7 AND DATEPART(dd, GETUTCDATE())<=7
+						IF @flgActions & 16 = 16 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Perform Correction to Space Usage', GETDATE()) = 1
 							INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 																   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 																   , [job_command])
@@ -264,7 +267,7 @@ WHILE @@FETCH_STATUS=0
 					begin
 						/*-------------------------------------------------------------------*/
 						/* Daily: Rebuild Heap Tables - only for SQL versions +2K5*/
-						IF @flgActions & 32 = 32 AND @serverVersionNum > 9
+						IF @flgActions & 32 = 32 AND @serverVersionNum > 9 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseOptimize', 'Rebuild Heap Tables', GETDATE()) = 1
 							INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 																   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 																   , [job_command])
@@ -288,11 +291,11 @@ WHILE @@FETCH_STATUS=0
 						/*-------------------------------------------------------------------*/
 						/* Daily: Rebuild or Reorganize Indexes*/
 					
-						IF @flgActions & 64 = 64 
+						IF @flgActions & 64 = 64 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseOptimize', 'Rebuild or Reorganize Indexes', GETDATE()) = 1
 							begin
 								SET @featureflgActions = 3
 								
-								IF @flgActions & 128 = 128	/* Daily: Update Statistics */
+								IF @flgActions & 128 = 128 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseOptimize', 'Update Statistics', GETDATE()) = 1 /* Daily: Update Statistics */
 									SET @featureflgActions = 11
 
 								INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
@@ -317,7 +320,7 @@ WHILE @@FETCH_STATUS=0
 							end
 						/*-------------------------------------------------------------------*/
 						/* Daily: Update Statistics */
-						IF @flgActions & 128 = 128 AND NOT (@flgActions & 64 = 64)
+						IF @flgActions & 128 = 128 AND NOT (@flgActions & 64 = 64) AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseOptimize', 'Update Statistics', GETDATE()) = 1
 							INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 																	, [for_instance_id], [job_name], [job_step_name], [job_database_name]
 																	, [job_command])
@@ -344,7 +347,7 @@ WHILE @@FETCH_STATUS=0
 					begin
 						/*-------------------------------------------------------------------*/
 						/* Weekly: Shrink Database (TRUNCATEONLY) - only once a week on Sunday*/
-						IF @flgActions & 256 = 256 AND DATEPART(dw, GETUTCDATE())= 1
+						IF @flgActions & 256 = 256 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseShrink', 'Shrink Database (TRUNCATEONLY)', GETDATE()) = 1
 							INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 																   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 																   , [job_command])
@@ -367,7 +370,7 @@ WHILE @@FETCH_STATUS=0
 
 						/*-------------------------------------------------------------------*/
 						/* Monthly: Shrink Log File - on the first Saturday of the month */
-						IF @flgActions & 512 = 512 AND DATEPART(dw, GETUTCDATE())=7 AND DATEPART(dd, GETUTCDATE())<=7
+						IF @flgActions & 512 = 512 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseShrink', 'Shrink Log File', GETDATE()) = 1
 							INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 																   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 																   , [job_command])
@@ -395,7 +398,7 @@ WHILE @@FETCH_STATUS=0
 					begin
 						/*-------------------------------------------------------------------*/
 						/* Daily: Backup User Databases (diff) */
-						IF @flgActions & 1024 = 1024 AND DATEPART(dw, GETUTCDATE())<>7
+						IF @flgActions & 1024 = 1024 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseBackup', 'User Databases (diff)', GETDATE()) = 1
 							INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 																	, [for_instance_id], [job_name], [job_step_name], [job_database_name]
 																	, [job_command])
@@ -417,7 +420,7 @@ WHILE @@FETCH_STATUS=0
 
 						/*-------------------------------------------------------------------*/
 						/* Weekly: User Databases (full) - only once a week on Saturday */
-						IF @flgActions & 2048 = 2048 AND DATEPART(dw, GETUTCDATE())=7
+						IF @flgActions & 2048 = 2048 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseBackup', 'User Databases (full)', GETDATE()) = 1
 							INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 																	, [for_instance_id], [job_name], [job_step_name], [job_database_name]
 																	, [job_command])
@@ -439,7 +442,7 @@ WHILE @@FETCH_STATUS=0
 
 						/*-------------------------------------------------------------------*/
 						/* Weekly: System Databases (full) - only once a week on Saturday */
-						IF @flgActions & 4096 = 4096 AND DATEPART(dw, GETUTCDATE())=7
+						IF @flgActions & 4096 = 4096 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseBackup', 'System Databases (full)', GETDATE()) = 1
 							INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 																	, [for_instance_id], [job_name], [job_step_name], [job_database_name]
 																	, [job_command])
@@ -465,7 +468,7 @@ WHILE @@FETCH_STATUS=0
 					begin
 						/*-------------------------------------------------------------------*/
 						/* Hourly: Backup User Databases Transaction Log */
-						IF @flgActions & 8192 = 8192
+						IF @flgActions & 8192 = 8192 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseBackup', 'User Databases Transaction Log', GETDATE()) = 1
 							INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 																	, [for_instance_id], [job_name], [job_step_name], [job_database_name]
 																	, [job_command])

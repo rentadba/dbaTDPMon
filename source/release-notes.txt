@@ -417,7 +417,6 @@
 /* 23.06.2016 */
 	- add new option for backup cleanup, in order to speed the process: 4096 - use xp_dirtree to identify orphan backup files to be deleted
 
-
 /*----------------------------------------------------------------------*/
 /* August 2016 new features & fixes
 /*----------------------------------------------------------------------*/
@@ -426,3 +425,24 @@
 
 /* 29.08.2016 */
 	- fix small bugs on failed jobs monitoring
+	
+/*----------------------------------------------------------------------*/
+/* September 2016 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 05.09.2016 */
+	- parallel database maintenance jobs enhancements
+
+/* 26.09.2016 */
+	- fix small bugs on parallel database maintenance jobs
+	
+/*----------------------------------------------------------------------*/
+/* October 2016 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 14.10.2016 */
+	- fix small bugs on parallel database maintenance jobs
+
+/* 26.10.2016 */
+	- add maintenance plan internal custom weekly scheduler, in order to remove DATEPART (dw) hardcoded calls from stored procedures / jobs
+
+/* 29.10.2016 */
+	- add "default" schedule to all internal tasks and to new projects, when added

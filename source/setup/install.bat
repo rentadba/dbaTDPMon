@@ -232,7 +232,8 @@ if errorlevel 1 goto install_err
 if "%runscript%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_reportHTMLGetStorageFolder.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -Q "EXEC dbo.usp_refreshMachineCatalogs DEFAULT, @@SERVERNAME;" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
 
 if %module%=="all" goto mp
 if %module%=="health-check" goto hc
@@ -253,11 +254,24 @@ if errorlevel 1 goto install_err
 if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.logInternalAction.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.internalTasks.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.internalScheduler.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\views\maintenance-plan.vw_internalScheduler.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+
 echo *-----------------------------------------------------------------------------*
 echo Maintenance Plan: Creating Functions / Stored Procedures
 echo *-----------------------------------------------------------------------------*
 
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\functions\dbo.ufn_mpBackupBuildFileName.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\functions\dbo.ufn_mpCheckTaskSchedulerForDate.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpCheckIndexOnlineOperation.sql" -d %dbname%  -b -r 1
@@ -415,6 +429,18 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_reportHTMLBuildHealthCheck.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpCheckIndexOnlineOperation.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpMarkInternalAction.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpAlterTableForeignKeys.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpAlterTableIndexes.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcChangeFillFactorForIndexesFrequentlyFragmented.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -441,19 +467,19 @@ echo *--------------------------------------------------------------------------
 if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\schema\create-schema-monitoring.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.alertThresholds.sql" -d %dbname%  -b -r 1
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.alertThresholds.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.alertSkipRules.sql" -d %dbname%  -b -r 1
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.alertSkipRules.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.statsReplicationLatency.sql" -d %dbname%  -b -r 1
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.statsReplicationLatency.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.statsTransactionsStatus.sql" -d %dbname%  -b -r 1
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.statsTransactionsStatus.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.statsSQLAgentJobs.sql" -d %dbname%  -b -r 1
+if "%run2k5mode%"=="true" sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\alarm-custom\monitoring.statsSQLAgentJobs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 

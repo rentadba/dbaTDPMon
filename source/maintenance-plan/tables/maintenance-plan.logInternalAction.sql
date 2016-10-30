@@ -13,9 +13,10 @@
 -----------------------------------------------------------------------------------------------------
 RAISERROR('Create table: [maintenance-plan].[logInternalAction]', 10, 1) WITH NOWAIT
 GO
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[maintenance-plan].[logInternalAction]') AND type in (N'U'))
+IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[maintenance-plan].[logInternalAction]') AND type in (N'U'))
 DROP TABLE [maintenance-plan].[logInternalAction]
 GO
+
 CREATE TABLE [maintenance-plan].[logInternalAction]
 (
 	[id]				[bigint] IDENTITY (1, 1)NOT NULL,

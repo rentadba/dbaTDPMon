@@ -135,7 +135,7 @@ IF (DAY(GETDATE())=1)
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'
 /* only once a week on Saturday */
-IF DATEPART(dw, GETUTCDATE())=7
+IF DATENAME(weekday, GETDATE()) = ''Saturday''
 	EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= @@SERVERNAME,
 												@dbName					= ''master'',
 												@tableSchema			= ''%'',
@@ -171,7 +171,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'
 /* only once a week on Saturday */
-IF DATEPART(dw, GETUTCDATE())=7
+IF DATENAME(weekday, GETDATE()) = ''Saturday''
 	EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= @@SERVERNAME,
 												@dbName					= ''msdb'',
 												@tableSchema			= ''%'',
@@ -208,7 +208,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'
 /* only once a week on Saturday */
-IF DATEPART(dw, GETUTCDATE())=7
+IF DATENAME(weekday, GETDATE()) = ''Saturday''
 	EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= @@SERVERNAME,
 												@dbName					= ''model'',
 												@tableSchema			= ''%'',
@@ -244,7 +244,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'
 /* only once a week on Saturday */
-IF DATEPART(dw, GETUTCDATE())=7
+IF DATENAME(weekday, GETDATE()) = ''Saturday''
 	EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= @@SERVERNAME,
 												@dbName					= ''tempdb'',
 												@tableSchema			= ''%'',
@@ -280,7 +280,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'
 /* only once a week on Saturday */
-IF DATEPART(dw, GETUTCDATE())=7 AND EXISTS (SELECT * FROM sys.databases WHERE [name]=''distribution'')
+IF DATENAME(weekday, GETDATE()) = ''Saturday'' AND EXISTS (SELECT * FROM sys.databases WHERE [name]=''distribution'')
 	EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= @@SERVERNAME,
 												@dbName					= ''distribution'',
 												@tableSchema			= ''%'',
@@ -554,7 +554,7 @@ END CATCH'
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = '
 /* only once a week on Sunday */
-IF DATEPART(dw, GETUTCDATE())=1
+IF DATENAME(weekday, GETDATE()) = ''Sunday''
 	EXEC [dbo].[usp_mpDatabaseOptimize]		@SQLServerName			= @@SERVERNAME,
 											@DBName					= ''master'',
 											@TableSchema			= ''%'',
@@ -596,7 +596,7 @@ IF DATEPART(dw, GETUTCDATE())=1
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = '
 /* only once a week on Sunday */
-IF DATEPART(dw, GETUTCDATE())=1
+IF DATENAME(weekday, GETDATE()) = ''Sunday''
 	EXEC [dbo].[usp_mpDatabaseOptimize]		@SQLServerName			= @@SERVERNAME,
 											@DBName					= ''msdb'',
 											@TableSchema			= ''%'',
@@ -639,7 +639,7 @@ IF DATEPART(dw, GETUTCDATE())=1
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 /* only once a week on Monday */
-IF DATEPART(dw, GETUTCDATE())= 2
+IF DATENAME(weekday, GETDATE()) = ''Monday''
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases
@@ -702,7 +702,7 @@ IF DATEPART(dw, GETUTCDATE())= 2
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 /* on the first Saturday of the month */
-IF DATEPART(dw, GETUTCDATE())=7 AND DATEPART(dd, GETUTCDATE())<=7
+IF DATENAME(weekday, GETDATE()) = ''Saturday'' AND DATEPART(dd, GETUTCDATE())<=7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases

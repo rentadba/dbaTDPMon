@@ -38,7 +38,7 @@ GO
 SET NOCOUNT ON
 GO
 INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
-		  SELECT 'common'			AS [module], 'Application Version'															AS [name], N'2016.10.14'AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Application Version'															AS [name], N'2016.10.30'AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Default project code'															AS [name], '$(projectCode)'	AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Database Mail profile name to use for sending emails'							AS [name], NULL			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Default recipients list - Reports (semicolon separated)'						AS [name], NULL			AS [value]		UNION ALL
@@ -55,7 +55,7 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 
 		  SELECT 'maintenance-plan' AS [module], 'Default backup location'														AS [name], NULL			AS [value]		UNION ALL
 		  SELECT 'maintenance-plan' AS [module], 'Default backup retention (days)'												AS [name], '7'			AS [value]		UNION ALL
-		  SELECT 'maintenance-plan' AS [module], 'Change retention policy from RetentionDays to RetentionBackupsCount'			AS [name], 'true'		AS [value]		UNION ALL
+		  SELECT 'maintenance-plan' AS [module], 'Change retention policy from RetentionDays to RetentionBackupsCount'			AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'maintenance-plan' AS [module], 'Force cleanup of ghost records'												AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'maintenance-plan' AS [module], 'Ghost records cleanup threshold'												AS [name], '131072'		AS [value]		UNION ALL
 

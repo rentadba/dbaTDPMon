@@ -15,7 +15,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseConsistencyCheck]
 		@tableSchema			[sysname]	=  '%',
 		@tableName				[sysname]   =  '%',
 		@flgActions				[smallint]	=   12,
-		@flgOptions				[int]		=    3,
+		@flgOptions				[int]		=    0,
 		@executionLevel			[tinyint]	=    0,
 		@debugMode				[bit]		=    0
 /* WITH ENCRYPTION */
@@ -52,9 +52,9 @@ AS
 --							  should be performed once at 2 weeks
 --					  128 	- Cleaning wasted space in Database (variable-length column) (DBCC CLEANTABLE)
 --							  should be performed once a year
---		@flgOptions	    1	- run DBCC CHECKDB/DBCC CHECKTABLE using PHYSICAL_ONLY (default). 
+--		@flgOptions	    1	- run DBCC CHECKDB/DBCC CHECKTABLE using PHYSICAL_ONLY
 --							  by default DBCC CHECKDB is doing all consistency checks and for a VLDB it may take a very long time
---					    2  - use NOINDEX when running DBCC CHECKTABLE. Index consistency errors are not critical (default)
+--					    2  - use NOINDEX when running DBCC CHECKTABLE. Index consistency errors are not critical
 --					   32  - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
 
 --		@debugMode			- 1 - print dynamic SQL statements / 0 - no statements will be displayed

@@ -137,7 +137,7 @@ http://dbaTDPMon.codeplex.com',
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 /* only once a week on Saturday */
-IF DATEPART(dw, GETUTCDATE())=7
+IF DATENAME(weekday, GETDATE()) = ''Saturday''
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases
@@ -165,7 +165,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 															@tableSchema			= ''%'',
 															@tableName				= ''%'',
 															@flgActions				= 1,
-															@flgOptions				= DEFAULT,
+															@flgOptions				= 3,
 															@debugMode				= DEFAULT
 				
 				FETCH NEXT FROM crsDatabases INTO @databaseName
@@ -203,7 +203,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 							, @flgActions	[int]
 	
 	/* when running DBCC CHECKDB, skip running DBCC CHECKALLOC*/
-	IF DATEPART(dw, GETUTCDATE())=7
+	IF DATENAME(weekday, GETDATE()) = ''Saturday''
 		SET @flgActions = 8
 	ELSE
 		SET @flgActions = 12
@@ -271,7 +271,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 /* only once a week on Sunday */
-IF DATEPART(dw, GETUTCDATE())=1
+IF DATENAME(weekday, GETDATE()) = ''Sunday''
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases
@@ -335,7 +335,7 @@ IF DATEPART(dw, GETUTCDATE())=1
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 /* only once a week on Sunday */
-IF DATEPART(dw, GETUTCDATE())=1
+IF DATENAME(weekday, GETDATE()) = ''Sunday''
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases
@@ -400,7 +400,7 @@ IF DATEPART(dw, GETUTCDATE())=1
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 /* only once a week on Monday */
-IF DATEPART(dw, GETUTCDATE())=2
+IF DATENAME(weekday, GETDATE()) = ''Monday''
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases
@@ -660,7 +660,7 @@ IF DATEPART(dw, GETUTCDATE())=2
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 /* only once a week on Monday */
-IF DATEPART(dw, GETUTCDATE())= 2
+IF DATENAME(weekday, GETDATE()) = ''Monday''
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases
@@ -723,7 +723,7 @@ IF DATEPART(dw, GETUTCDATE())= 2
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 /* on the first Saturday of the month */
-IF DATEPART(dw, GETUTCDATE())=7 AND DATEPART(dd, GETUTCDATE())<=7
+IF DATENAME(weekday, GETDATE()) = ''Saturday'' AND DATEPART(dd, GETUTCDATE())<=7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases

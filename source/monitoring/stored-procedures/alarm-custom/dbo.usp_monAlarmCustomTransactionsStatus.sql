@@ -1,3 +1,5 @@
+SET QUOTED_IDENTIFIER ON
+GO
 RAISERROR('Create procedure: [dbo].[usp_monAlarmCustomTransactionsStatus]', 10, 1) WITH NOWAIT
 GO
 IF  EXISTS (

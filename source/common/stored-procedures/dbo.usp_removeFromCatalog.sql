@@ -9,7 +9,7 @@ DROP PROCEDURE [dbo].[usp_removeFromCatalog]
 GO
 
 CREATE PROCEDURE [dbo].[usp_removeFromCatalog]
-		@projectCode		[varchar](32),
+		@projectCode		[varchar](32)=NULL,
 		@sqlServerName		[sysname],
 		@debugMode			[bit] = 0
 /* WITH ENCRYPTION */
@@ -37,14 +37,21 @@ BEGIN TRY
 	SET @returnValue=1
 
 	-----------------------------------------------------------------------------------------------------
+	--get default project code
+	IF @projectCode IS NULL
+		SELECT	@projectCode = [value]
+		FROM	[dbo].[appConfigurations]
+		WHERE	[name] = 'Default project code'
+				AND [module] = 'common'
+
 	SELECT @projectID = [id]
 	FROM [dbo].[catalogProjects]
 	WHERE [code] = @projectCode 
 
 	IF @projectID IS NULL
 		begin
-			SET @errMessage=N'The value specifief for Project Code is not valid.'
-			RAISERROR(@errMessage, 16, 1) WITH NOWAIT
+			SET @errMessage=N'ERROR: The value specifief for Project Code is not valid.'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		end
 
 	SELECT   @instanceID = [id]

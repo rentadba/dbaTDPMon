@@ -106,7 +106,7 @@ http://dbaTDPMon.codeplex.com',
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 
 /* only once a week on Saturday */
-IF DATEPART(dw, GETUTCDATE())=7
+IF DATENAME(weekday, GETDATE()) = ''Saturday''
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases
@@ -164,7 +164,7 @@ IF DATEPART(dw, GETUTCDATE())=7
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 
 /* all days except Saturday */
-IF DATEPART(dw, GETUTCDATE())<>7
+IF DATENAME(weekday, GETDATE()) <> ''Saturday''
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases
@@ -224,7 +224,7 @@ IF DATEPART(dw, GETUTCDATE())<>7
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 
 /* only once a week on Saturday */
-IF DATEPART(dw, GETUTCDATE())=7
+IF DATENAME(weekday, GETDATE()) = ''Saturday''
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases

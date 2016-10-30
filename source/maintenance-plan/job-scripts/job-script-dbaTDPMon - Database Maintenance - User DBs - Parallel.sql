@@ -84,23 +84,9 @@ http://dbaTDPMon.codeplex.com',
 	SET @queryToRun=N'EXEC [dbo].[usp_mpJobQueueCreate]	@projectCode		= DEFAULT,
 														@module				= ''maintenance-plan'',
 														@sqlServerNameFilter = @@SERVERNAME,
-														@jobDescriptor		=''dbo.usp_mpDatabaseConsistencyCheck'',
+														@jobDescriptor		=''dbo.usp_mpDatabaseConsistencyCheck;dbo.usp_mpDatabaseOptimize;dbo.usp_mpDatabaseShrink'',
 														@flgActions			= DEFAULT,
-														@debugMode			= DEFAULT
-
-EXEC [dbo].[usp_mpJobQueueCreate]	@projectCode		= DEFAULT,
-									@module				= ''maintenance-plan'',
-									@sqlServerNameFilter = @@SERVERNAME,
-									@jobDescriptor		=''dbo.usp_mpDatabaseOptimize'',
-									@flgActions			= DEFAULT,
-									@debugMode			= DEFAULT
-
-EXEC [dbo].[usp_mpJobQueueCreate]	@projectCode		= DEFAULT,
-									@module				= ''maintenance-plan'',
-									@sqlServerNameFilter = @@SERVERNAME,
-									@jobDescriptor		=''dbo.usp_mpDatabaseShrink'',
-									@flgActions			= DEFAULT,
-									@debugMode			= DEFAULT'
+														@debugMode			= DEFAULT'
 
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
