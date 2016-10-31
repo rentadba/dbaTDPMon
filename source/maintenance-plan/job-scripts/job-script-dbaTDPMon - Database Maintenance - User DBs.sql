@@ -723,7 +723,7 @@ IF DATENAME(weekday, GETDATE()) = ''Monday''
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'DECLARE @databaseName [sysname]
 /* on the first Saturday of the month */
-IF DATENAME(weekday, GETDATE()) = ''Saturday'' AND DATEPART(dd, GETUTCDATE())<=7
+IF DATENAME(weekday, GETDATE()) = ''Saturday'' AND DATEPART(dd, GETDATE())<=7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases
