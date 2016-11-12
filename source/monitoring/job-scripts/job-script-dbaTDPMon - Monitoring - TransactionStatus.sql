@@ -20,13 +20,27 @@ DECLARE   @job_name			[sysname]
 		, @databaseName		[sysname]
 		, @projectCode		[nvarchar](32)
 
-SELECT @logFileLocation = REVERSE(SUBSTRING(REVERSE([value]), CHARINDEX('\', REVERSE([value])), LEN(REVERSE([value]))))
-FROM (
-		SELECT CAST(SERVERPROPERTY('ErrorLogFileName') AS [nvarchar](1024)) AS [value]
-	)er
+------------------------------------------------------------------------------------------------------------------------------------------
+--get default folder for SQL Agent jobs
+BEGIN TRY
+	SELECT	@logFileLocation = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = N'Default folder for logs'
+			AND [module] = 'common'
+END TRY
+BEGIN CATCH
+	SET @logFileLocation = NULL
+END CATCH
 
+IF @logFileLocation IS NULL
+		SELECT @logFileLocation = REVERSE(SUBSTRING(REVERSE([value]), CHARINDEX('\', REVERSE([value])), LEN(REVERSE([value]))))
+		FROM (
+				SELECT CAST(SERVERPROPERTY('ErrorLogFileName') AS [nvarchar](1024)) AS [value]
+			)er
 
-IF @logFileLocation IS NULL SET @logFileLocation = N'C:\'
+SET @logFileLocation = ISNULL(@logFileLocation, N'C:\')
+IF RIGHT(@logFileLocation, 1)<>'\' SET @logFileLocation = @logFileLocation + '\'
+
 
 ---------------------------------------------------------------------------------------------------
 /* setting the job name & job log location */

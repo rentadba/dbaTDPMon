@@ -446,3 +446,9 @@
 
 /* 29.10.2016 */
 	- add "default" schedule to all internal tasks and to new projects, when added
+
+/*----------------------------------------------------------------------*/
+/* November 2016 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 12.11.2016 */
+	- add default log folder parameter in appConfigurations; all created jobs will write the logs in the value path, if set

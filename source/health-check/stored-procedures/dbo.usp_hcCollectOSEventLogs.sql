@@ -72,12 +72,26 @@ CREATE TABLE #psOutput
 	)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-SELECT @psFileLocation = REVERSE(SUBSTRING(REVERSE([value]), CHARINDEX('\', REVERSE([value])), LEN(REVERSE([value]))))
-FROM (
-		SELECT CAST(SERVERPROPERTY('ErrorLogFileName') AS [nvarchar](1024)) AS [value]
-	)er
-	
-IF @psFileLocation IS NULL SET @psFileLocation =N'C:\'
+--get default folder
+BEGIN TRY
+	SELECT	@psFileLocation = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = N'Default folder for logs'
+			AND [module] = 'common'
+END TRY
+BEGIN CATCH
+	SET @psFileLocation = NULL
+END CATCH
+
+IF @psFileLocation IS NULL
+		SELECT @psFileLocation = REVERSE(SUBSTRING(REVERSE([value]), CHARINDEX('\', REVERSE([value])), LEN(REVERSE([value]))))
+		FROM (
+				SELECT CAST(SERVERPROPERTY('ErrorLogFileName') AS [nvarchar](1024)) AS [value]
+			)er
+
+SET @psFileLocation = ISNULL(@psFileLocation, N'C:\')
+IF RIGHT(@psFileLocation, 1)<>'\' SET @psFileLocation = @psFileLocation + '\'
+
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default project code

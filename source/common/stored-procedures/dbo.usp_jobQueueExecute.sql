@@ -34,6 +34,7 @@ DECLARE   @projectID				[smallint]
 		, @jobDBName				[sysname]
 		, @sqlServerName			[sysname]
 		, @jobCommand				[nvarchar](max)
+		, @defaultLogFileLocation	[nvarchar](512)
 		, @logFileLocation			[nvarchar](512)
 		, @jobQueueID				[int]
 
@@ -50,6 +51,8 @@ DECLARE   @projectID				[smallint]
 		, @lastExecutionDate		[varchar](10)
 		, @lastExecutionTime 		[varchar](8)
 		, @runningTimeSec			[bigint]
+		, @jobCurrentRunning		[bit]
+		, @retryAttempts			[tinyint]
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
@@ -115,6 +118,27 @@ END CATCH
 SET @configFailMasterJob = ISNULL(@configFailMasterJob, 0)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
+--get default folder for SQL Agent jobs
+BEGIN TRY
+	SELECT	@defaultLogFileLocation = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = N'Default folder for logs'
+			AND [module] = 'common'
+END TRY
+BEGIN CATCH
+	SET @defaultLogFileLocation = NULL
+END CATCH
+
+IF @defaultLogFileLocation IS NULL
+		SELECT @defaultLogFileLocation = REVERSE(SUBSTRING(REVERSE([value]), CHARINDEX('\', REVERSE([value])), LEN(REVERSE([value]))))
+		FROM (
+				SELECT CAST(SERVERPROPERTY('ErrorLogFileName') AS [nvarchar](1024)) AS [value]
+			)er
+
+SET @defaultLogFileLocation = ISNULL(@defaultLogFileLocation, N'C:\')
+IF RIGHT(@defaultLogFileLocation, 1)<>'\' SET @defaultLogFileLocation = @defaultLogFileLocation + '\'
+
+------------------------------------------------------------------------------------------------------------------------------------------
 SELECT @jobQueueCount = COUNT(*)
 FROM [dbo].[vw_jobExecutionQueue]
 WHERE  [project_id] = @projectID 
@@ -153,14 +177,54 @@ WHILE @@FETCH_STATUS=0
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
 
 		---------------------------------------------------------------------------------------------------
-		/* setting the job name & job log location */
-		SELECT @logFileLocation = REVERSE(SUBSTRING(REVERSE([value]), CHARINDEX('\', REVERSE([value])), LEN(REVERSE([value]))))
-		FROM (
-				SELECT CAST(SERVERPROPERTY('ErrorLogFileName') AS [nvarchar](1024)) AS [value]
-			)er
+		/* setting the job name & job log location */	
+		SET @logFileLocation = @defaultLogFileLocation + N'job-' + @jobName + N'.log'
 
-		IF @logFileLocation IS NULL SET @logFileLocation =N'C:\'
-		SET @logFileLocation = @logFileLocation + N'job-' + @jobName + N'.log'
+		---------------------------------------------------------------------------------------------------
+		/* check if job is running and stop it */
+		SET @jobCurrentRunning = 0
+		EXEC  dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
+												@jobName				= @jobName,
+												@strMessage				= DEFAULT,	
+												@currentRunning			= @jobCurrentRunning OUTPUT,			
+												@lastExecutionStatus	= DEFAULT,			
+												@lastExecutionDate		= DEFAULT,		
+												@lastExecutionTime 		= DEFAULT,	
+												@runningTimeSec			= DEFAULT,
+												@selectResult			= DEFAULT,
+												@extentedStepDetails	= DEFAULT,		
+												@debugMode				= DEFAULT
+
+		IF @jobCurrentRunning=1
+			begin
+				RAISERROR('--Job is still running. Stopping...', 10, 1) WITH NOWAIT
+				SET @retryAttempts = 1
+				WHILE @jobCurrentRunning = 1 AND @retryAttempts <= @configMaxNumberOfRetries
+					begin
+						EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
+														@jobName		= @jobName,
+														@operation		= 'Stop',
+														@dbName			= @jobDBName, 
+														@jobStepName 	= @jobStepName,
+														@debugMode		= @debugMode
+						WAITFOR DELAY @waitForDelay
+
+						SET @jobCurrentRunning = 0
+						EXEC  dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
+																@jobName				= @jobName,
+																@strMessage				= DEFAULT,	
+																@currentRunning			= @jobCurrentRunning OUTPUT,			
+																@lastExecutionStatus	= DEFAULT,			
+																@lastExecutionDate		= DEFAULT,		
+																@lastExecutionTime 		= DEFAULT,	
+																@runningTimeSec			= DEFAULT,
+																@selectResult			= DEFAULT,
+																@extentedStepDetails	= DEFAULT,		
+																@debugMode				= DEFAULT
+						
+						SET @retryAttempts = @retryAttempts + 1
+					end
+			end
 
 		---------------------------------------------------------------------------------------------------
 		/* defining job and start it */
