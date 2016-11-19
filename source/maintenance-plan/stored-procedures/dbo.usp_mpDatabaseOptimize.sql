@@ -15,7 +15,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseOptimize]
 		@TableSchema				[sysname]	=   '%',
 		@TableName					[sysname]   =   '%',
 		@flgActions					[smallint]	=    27,
-		@flgOptions					[int]		= 45697,--32768 + 8192 + 4096 + 512 + 128 + 1
+		@flgOptions					[int]		= 45185,--32768 + 8192 + 4096 + 128 + 1
 		@DefragIndexThreshold		[smallint]	=     5,
 		@RebuildIndexThreshold		[smallint]	=    30,
 		@PageThreshold				[int]		=  1000,
@@ -61,7 +61,7 @@ AS
 --					    64  - When enabling foreign key constraints, do no check values. Default behaviour is to enabled foreign key constraint with check option
 --					   128  - Create statistics on index columns only (default). Default behaviour is to not create statistics on all eligible columns
 --					   256  - Create statistics using default sample scan. Default behaviour is to create statistics using fullscan mode
---					   512  - update auto-created statistics (default)
+--					   512  - update auto-created statistics
 --					  1024	- get index statistics using DETAILED analysis (default is to use LIMITED)
 --							  for heaps, will always use DETAILED in order to get page density and forwarded records information
 --					  4096  - rebuild/reorganize indexes using ONLINE=ON, if applicable (default)
