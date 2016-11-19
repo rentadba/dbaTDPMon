@@ -24,7 +24,7 @@ DECLARE   @job_name			[sysname]
 --get default folder for SQL Agent jobs
 BEGIN TRY
 	SELECT	@logFileLocation = [value]
-	FROM	[dbo].[appConfigurations]
+	FROM	[$(dbName)].[dbo].[appConfigurations]
 	WHERE	[name] = N'Default folder for logs'
 			AND [module] = 'common'
 END TRY

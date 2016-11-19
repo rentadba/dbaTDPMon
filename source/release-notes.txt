@@ -452,3 +452,6 @@
 /*----------------------------------------------------------------------*/
 /* 12.11.2016 */
 	- add default log folder parameter in appConfigurations; all created jobs will write the logs in the value path, if set
+
+/* 19.11.2016 */
+	- fix SQL Server 2000 installation and maintenance plans execution

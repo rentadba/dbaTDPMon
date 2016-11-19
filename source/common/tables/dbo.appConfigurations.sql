@@ -105,14 +105,14 @@ GO
 ---------------------------------------------------------------------------------------------
 --enable Parallel Execution Jobs
 ---------------------------------------------------------------------------------------------
-DECLARE   @queryToRun 		[varchar](4000)
-	, @SQLMajorVersion 	[int]
+DECLARE   @queryToRun 		[nvarchar](4000)
+		, @SQLMajorVersion 	[int]
 
 SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(CAST(SERVERPROPERTY('ProductVersion') AS [varchar](32)), ''), 2), '.', '') 
 
 
-SET @queryToRun=''
-SET @queryToRun = @queryToRun + '
+SET @queryToRun=N''
+SET @queryToRun = @queryToRun + N'
 UPDATE [dbo].[appConfigurations] 
 	SET [value]= CASE WHEN 2 * (SELECT [cpu_count] FROM sys.dm_os_sys_info)  > 32 
 						THEN 32
