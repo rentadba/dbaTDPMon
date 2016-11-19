@@ -29,15 +29,10 @@ SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(CAST(SERVERPROPERTY('ProductVersio
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default folder for SQL Agent jobs
-BEGIN TRY
-	SELECT	@logFileLocation = [value]
-	FROM	[dbo].[appConfigurations]
-	WHERE	[name] = N'Default folder for logs'
-			AND [module] = 'common'
-END TRY
-BEGIN CATCH
-	SET @logFileLocation = NULL
-END CATCH
+SELECT	@logFileLocation = [value]
+FROM	[$(dbName)].[dbo].[appConfigurations]
+WHERE	[name] = N'Default folder for logs'
+		AND [module] = 'common'
 
 IF @logFileLocation IS NULL
 		SELECT @logFileLocation = REVERSE(SUBSTRING(REVERSE([value]), CHARINDEX('\', REVERSE([value])), LEN(REVERSE([value]))))

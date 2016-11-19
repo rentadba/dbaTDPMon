@@ -105,10 +105,21 @@ GO
 ---------------------------------------------------------------------------------------------
 --enable Parallel Execution Jobs
 ---------------------------------------------------------------------------------------------
+DECLARE   @queryToRun 		[varchar](4000)
+	, @SQLMajorVersion 	[int]
+
+SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(CAST(SERVERPROPERTY('ProductVersion') AS [varchar](32)), ''), 2), '.', '') 
+
+
+SET @queryToRun=''
+SET @queryToRun = @queryToRun + '
 UPDATE [dbo].[appConfigurations] 
 	SET [value]= CASE WHEN 2 * (SELECT [cpu_count] FROM sys.dm_os_sys_info)  > 32 
 						THEN 32
 						ELSE 2 * (SELECT [cpu_count] FROM sys.dm_os_sys_info)
 				END
-WHERE [module] = 'common' AND [name] = 'Parallel Execution Jobs'
+WHERE [module] = ''common'' AND [name] = ''Parallel Execution Jobs'''
+
+IF @SQLMajorVersion > 8
+	EXEC sp_executesql @queryToRun
 GO

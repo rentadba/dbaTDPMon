@@ -430,7 +430,7 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 
 		/* identify backup files to be deleted, based on file existence on disk */
 		/* use xp_dirtree to identify orphan backup files to be deleted, when using option 128 (default) */
-		IF @flgOptions & 128 = 128 AND @flgOptions & 4096 = 4096 
+		IF @flgOptions & 128 = 128 AND @flgOptions & 4096 = 4096 AND @serverVersionNum>=9
 			begin
 				IF OBJECT_ID('tempdb..#backupFilesOnDisk') IS NOT NULL DROP TABLE #backupFilesOnDisk
 				CREATE TABLE #backupFilesOnDisk

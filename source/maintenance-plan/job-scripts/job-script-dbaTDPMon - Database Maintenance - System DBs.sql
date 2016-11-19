@@ -12,6 +12,8 @@
 -------------------------------------------------------------------------------
 RAISERROR('Create job: Database Maintenance - System DBs', 10, 1) WITH NOWAIT
 GO
+
+
 USE [msdb]
 GO
 
@@ -28,15 +30,10 @@ SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(CAST(SERVERPROPERTY('ProductVersio
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default folder for SQL Agent jobs
-BEGIN TRY
-	SELECT	@logFileLocation = [value]
-	FROM	[dbo].[appConfigurations]
-	WHERE	[name] = N'Default folder for logs'
-			AND [module] = 'common'
-END TRY
-BEGIN CATCH
-	SET @logFileLocation = NULL
-END CATCH
+SELECT	@logFileLocation = [value]
+FROM	[$(dbName)].[dbo].[appConfigurations]
+WHERE	[name] = N'Default folder for logs'
+		AND [module] = 'common'
 
 IF @logFileLocation IS NULL
 		SELECT @logFileLocation = REVERSE(SUBSTRING(REVERSE([value]), CHARINDEX('\', REVERSE([value])), LEN(REVERSE([value]))))
@@ -293,7 +290,7 @@ IF DATENAME(weekday, GETDATE()) = ''Saturday''
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'
 /* only once a week on Saturday */
-IF DATENAME(weekday, GETDATE()) = ''Saturday'' AND EXISTS (SELECT * FROM sys.databases WHERE [name]=''distribution'')
+IF DATENAME(weekday, GETDATE()) = ''Saturday'' AND EXISTS (SELECT * FROM master.dbo.sysdatabases WHERE [name]=''distribution'')
 	EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= @@SERVERNAME,
 												@dbName					= ''distribution'',
 												@tableSchema			= ''%'',
