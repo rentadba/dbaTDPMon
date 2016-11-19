@@ -146,7 +146,8 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 								WHERE [id] = @jobQueueID
 
 								/* removing job */
-								PRINT '@lastExecutionStatus = ' + CAST(@lastExecutionStatus AS varchar)
+								PRINT '--Debug info: @lastExecutionStatus = ' + CAST(@lastExecutionStatus AS varchar) + '; @currentRunning=' + CAST(@currentRunning AS varchar)
+
 								EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
 																@jobName		= @jobName,
 																@operation		= 'Clean',
@@ -232,7 +233,7 @@ IF @minJobToRunBeforeExit=0
 				IF @currentRunning = 0
 					begin
 						/* removing job */
-						PRINT '@lastExecutionStatus = ' + CAST(@lastExecutionStatus AS varchar)
+						PRINT '--Debug info: @lastExecutionStatus = ' + CAST(@lastExecutionStatus AS varchar) + '; @currentRunning=' + CAST(@currentRunning AS varchar)
 
 						EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
 														@jobName		= @jobName,
