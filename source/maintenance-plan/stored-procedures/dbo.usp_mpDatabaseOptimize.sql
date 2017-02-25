@@ -474,14 +474,14 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 		SET @queryToRun='Rebuilding database heap tables...'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		DECLARE crsTableList CURSOR FOR 	SELECT	DISTINCT doil.[table_schema], doil.[table_name], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[page_density_deviation], doil.[forwarded_records_percentage]
-		   									FROM	#databaseObjectsWithIndexList doil
-											WHERE	(    doil.[avg_fragmentation_in_percent] >= @RebuildIndexThreshold
-													  OR doil.[forwarded_records_percentage] >= @DefragIndexThreshold
-													  OR doil.[page_density_deviation] >= @RebuildIndexThreshold
-													)
-													AND doil.[index_type] IN (0)
-											ORDER BY doil.[table_schema], doil.[table_name]
+		DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR 	SELECT	DISTINCT doil.[table_schema], doil.[table_name], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[page_density_deviation], doil.[forwarded_records_percentage]
+		   													FROM	#databaseObjectsWithIndexList doil
+															WHERE	(    doil.[avg_fragmentation_in_percent] >= @RebuildIndexThreshold
+																	  OR doil.[forwarded_records_percentage] >= @DefragIndexThreshold
+																	  OR doil.[page_density_deviation] >= @RebuildIndexThreshold
+																	)
+																	AND doil.[index_type] IN (0)
+															ORDER BY doil.[table_schema], doil.[table_name]
 		OPEN crsTableList
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName, @CurrentFragmentation, @CurrentPageCount, @CurentPageDensityDeviation, @CurrentForwardedRecordsPercent
 		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
@@ -839,47 +839,9 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 		SET @queryToRun=N'Defragmenting database tables indexes (fragmentation between ' + CAST(@DefragIndexThreshold AS [nvarchar]) + ' and ' + CAST(CAST(@RebuildIndexThreshold AS NUMERIC(6,2)) AS [nvarchar]) + ') and more than ' + CAST(@PageThreshold AS [nvarchar](4000)) + ' pages...'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 		
-		DECLARE crsTableList CURSOR FOR	SELECT	DISTINCT doil.[table_schema], doil.[table_name]
-		   								FROM	#databaseObjectsWithIndexList doil
-										WHERE	doil.[page_count] >= @PageThreshold
-												AND doil.[index_type] <> 0 /* heap tables will be excluded */
-												AND	( 
-														(
-															 doil.[avg_fragmentation_in_percent] >= @DefragIndexThreshold 
-														 AND doil.[avg_fragmentation_in_percent] < @RebuildIndexThreshold
-														)
-													OR  /* when DETAILED analysis is selected, page density information will be used to reorganize / rebuild an index */
-														(	  @flgOptions & 1024 = 1024 
-														 AND doil.[page_density_deviation] >= @DefragIndexThreshold 
-														 AND doil.[page_density_deviation] < @RebuildIndexThreshold
-														)
-													OR
-														(	/* for very large tables, will performed reorganize instead of rebuild */
-															doil.[page_count] >= @RebuildIndexPageCountLimit
-															AND	( 
-																	(
-																		doil.[avg_fragmentation_in_percent] >= @RebuildIndexThreshold
-																	)
-																OR  /* when DETAILED analysis is selected, page density information will be used to reorganize / rebuild an index */
-																	(	  @flgOptions & 1024 = 1024 
-																		AND doil.[page_density_deviation] >= @RebuildIndexThreshold
-																	)
-																)
-														)
-													)
-										ORDER BY doil.[table_schema], doil.[table_name]
-		OPEN crsTableList
-		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
-		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
-			begin
-				SET @queryToRun=N'[' + @CurrentTableSchema+ '].[' + @CurrentTableName + ']'
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
-
-				DECLARE crsIndexesToDegfragment CURSOR FOR 	SELECT	DISTINCT doil.[index_name], doil.[index_type], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[object_id], doil.[index_id], doil.[page_density_deviation], doil.[fill_factor]
-							   								FROM	#databaseObjectsWithIndexList doil
-   															WHERE	doil.[table_name] = @CurrentTableName
-																	AND doil.[table_schema] = @CurrentTableSchema
-																	AND doil.[page_count] >= @PageThreshold
+		DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT	DISTINCT doil.[table_schema], doil.[table_name]
+		   													FROM	#databaseObjectsWithIndexList doil
+															WHERE	doil.[page_count] >= @PageThreshold
 																	AND doil.[index_type] <> 0 /* heap tables will be excluded */
 																	AND	( 
 																			(
@@ -904,8 +866,46 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 																						)
 																					)
 																			)
-																		)																		
-															ORDER BY doil.[index_id]
+																		)
+															ORDER BY doil.[table_schema], doil.[table_name]
+		OPEN crsTableList
+		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
+		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
+			begin
+				SET @queryToRun=N'[' + @CurrentTableSchema+ '].[' + @CurrentTableName + ']'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+				DECLARE crsIndexesToDegfragment CURSOR LOCAL FAST_FORWARD FOR 	SELECT	DISTINCT doil.[index_name], doil.[index_type], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[object_id], doil.[index_id], doil.[page_density_deviation], doil.[fill_factor]
+							   													FROM	#databaseObjectsWithIndexList doil
+   																				WHERE	doil.[table_name] = @CurrentTableName
+																						AND doil.[table_schema] = @CurrentTableSchema
+																						AND doil.[page_count] >= @PageThreshold
+																						AND doil.[index_type] <> 0 /* heap tables will be excluded */
+																						AND	( 
+																								(
+																									 doil.[avg_fragmentation_in_percent] >= @DefragIndexThreshold 
+																								 AND doil.[avg_fragmentation_in_percent] < @RebuildIndexThreshold
+																								)
+																							OR  /* when DETAILED analysis is selected, page density information will be used to reorganize / rebuild an index */
+																								(	  @flgOptions & 1024 = 1024 
+																								 AND doil.[page_density_deviation] >= @DefragIndexThreshold 
+																								 AND doil.[page_density_deviation] < @RebuildIndexThreshold
+																								)
+																							OR
+																								(	/* for very large tables, will performed reorganize instead of rebuild */
+																									doil.[page_count] >= @RebuildIndexPageCountLimit
+																									AND	( 
+																											(
+																												doil.[avg_fragmentation_in_percent] >= @RebuildIndexThreshold
+																											)
+																										OR  /* when DETAILED analysis is selected, page density information will be used to reorganize / rebuild an index */
+																											(	  @flgOptions & 1024 = 1024 
+																												AND doil.[page_density_deviation] >= @RebuildIndexThreshold
+																											)
+																										)
+																								)
+																							)																		
+																				ORDER BY doil.[index_id]
 				OPEN crsIndexesToDegfragment
 				FETCH NEXT FROM crsIndexesToDegfragment INTO @IndexName, @IndexType, @CurrentFragmentation, @CurrentPageCount, @ObjectID, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor
 				WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
@@ -1005,21 +1005,21 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 		SET @queryToRun='Rebuilding database tables indexes (fragmentation between ' + CAST(@RebuildIndexThreshold AS [nvarchar]) + ' and 100) or small tables (no more than ' + CAST(@PageThreshold AS [nvarchar](4000)) + ' pages)...'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 																		
-		DECLARE crsTableList CURSOR FOR 	SELECT	DISTINCT doil.[table_schema], doil.[table_name]
-		   									FROM	#databaseObjectsWithIndexList doil
-											WHERE	    doil.[index_type] <> 0 /* heap tables will be excluded */
-													AND doil.[page_count] >= @PageThreshold
-													AND doil.[page_count] < @RebuildIndexPageCountLimit
-													AND	( 
-															(
-																doil.[avg_fragmentation_in_percent] >= @RebuildIndexThreshold
-															)
-														OR  /* when DETAILED analysis is selected, page density information will be used to reorganize / rebuild an index */
-															(	  @flgOptions & 1024 = 1024 
-															 AND doil.[page_density_deviation] >= @RebuildIndexThreshold
-															)
-														)
-											ORDER BY doil.[table_schema], doil.[table_name]
+		DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR 	SELECT	DISTINCT doil.[table_schema], doil.[table_name]
+		   													FROM	#databaseObjectsWithIndexList doil
+															WHERE	    doil.[index_type] <> 0 /* heap tables will be excluded */
+																	AND doil.[page_count] >= @PageThreshold
+																	AND doil.[page_count] < @RebuildIndexPageCountLimit
+																	AND	( 
+																			(
+																				doil.[avg_fragmentation_in_percent] >= @RebuildIndexThreshold
+																			)
+																		OR  /* when DETAILED analysis is selected, page density information will be used to reorganize / rebuild an index */
+																			(	  @flgOptions & 1024 = 1024 
+																			 AND doil.[page_density_deviation] >= @RebuildIndexThreshold
+																			)
+																		)
+															ORDER BY doil.[table_schema], doil.[table_name]
 		OPEN crsTableList
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
 		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
@@ -1484,10 +1484,10 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				, @percentChanges			[decimal](38,2)
 				, @statsAge					[int]
 
-		DECLARE crsTableList2 CURSOR FOR	SELECT [table_schema], [table_name], COUNT(*) AS [stats_count]
-											FROM #databaseObjectsWithStatisticsList	
-											GROUP BY [table_schema], [table_name]
-											ORDER BY [table_name]
+		DECLARE crsTableList2 CURSOR LOCAL FAST_FORWARD FOR	SELECT [table_schema], [table_name], COUNT(*) AS [stats_count]
+															FROM #databaseObjectsWithStatisticsList	
+															GROUP BY [table_schema], [table_name]
+															ORDER BY [table_name]
 		OPEN crsTableList2
 		FETCH NEXT FROM crsTableList2 INTO @CurrentTableSchema, @CurrentTableName, @statsCount
 		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
@@ -1497,12 +1497,12 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				SET @IndexID=1
-				DECLARE crsTableStatsList CURSOR FOR	SELECT	  [stats_name], [auto_created], [rows], [modification_counter], [last_updated], [percent_changes]
-																, DATEDIFF(dd, [last_updated], GETDATE()) AS [stats_age]
-														FROM	#databaseObjectsWithStatisticsList	
-														WHERE	[table_schema] = @CurrentTableSchema
-																AND [table_name] = @CurrentTableName
-														ORDER BY [stats_name]
+				DECLARE crsTableStatsList CURSOR LOCAL FAST_FORWARD FOR	SELECT	  [stats_name], [auto_created], [rows], [modification_counter], [last_updated], [percent_changes]
+																				, DATEDIFF(dd, [last_updated], GETDATE()) AS [stats_age]
+																		FROM	#databaseObjectsWithStatisticsList	
+																		WHERE	[table_schema] = @CurrentTableSchema
+																				AND [table_name] = @CurrentTableName
+																		ORDER BY [stats_name]
 				OPEN crsTableStatsList
 				FETCH NEXT FROM crsTableStatsList INTO @IndexName, @statsAutoCreated, @tableRows, @statsModificationCounter, @lastUpdated, @percentChanges, @statsAge
 				WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)

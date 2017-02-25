@@ -455,3 +455,15 @@
 
 /* 19.11.2016 */
 	- fix SQL Server 2000 installation and maintenance plans execution
+
+/*----------------------------------------------------------------------*/
+/* January 2017 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 21.01.2017 */
+	- code review / code and flow optimization
+
+/*----------------------------------------------------------------------*/
+/* February 2017 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 25.02.2017 */
+	- code review & bug fixes; merge code with changes made by Razvan Puscasu

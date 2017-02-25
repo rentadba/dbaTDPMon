@@ -139,6 +139,24 @@ SET @defaultLogFileLocation = ISNULL(@defaultLogFileLocation, N'C:\')
 IF RIGHT(@defaultLogFileLocation, 1)<>'\' SET @defaultLogFileLocation = @defaultLogFileLocation + '\'
 
 ------------------------------------------------------------------------------------------------------------------------------------------
+--create folder on disk
+DECLARE @queryToRun nvarchar(1024)
+SET @queryToRun = N'EXEC [' + DB_NAME() + '].[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @@SERVERNAME + N''',
+																			@folderName		= ''' + @defaultLogFileLocation + N''',
+																			@executionLevel	= 1,
+																			@debugMode		= ' + CAST(@debugMode AS [nvarchar]) 
+
+EXEC  [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @@SERVERNAME,
+									@dbName			= NULL,
+									@module			= 'dbo.usp_jobQueueExecute',
+									@eventName		= 'create folder on disk',
+									@queryToRun  	= @queryToRun,
+									@flgOptions		= 32,
+									@executionLevel	= 1,
+									@debugMode		= @debugMode
+
+
+------------------------------------------------------------------------------------------------------------------------------------------
 SELECT @jobQueueCount = COUNT(*)
 FROM [dbo].[vw_jobExecutionQueue]
 WHERE  [project_id] = @projectID 
@@ -152,19 +170,22 @@ WHERE  [project_id] = @projectID
 SET @strMessage='Number of jobs in the queue to be executed : ' + CAST(@jobQueueCount AS [varchar]) 
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
+IF @jobQueueCount=0
+	RETURN;
+
 SET @runningJobs  = 0
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-DECLARE crsJobQueue CURSOR FOR	SELECT  [id], [instance_name]
-										, [job_name], [job_step_name], [job_database_name], REPLACE([job_command], '''', '''''') AS [job_command]
-								FROM [dbo].[vw_jobExecutionQueue]
-								WHERE  [project_id] = @projectID 
-										AND [module] LIKE @moduleFilter
-										AND (    [descriptor] LIKE @descriptorFilter
-											  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
-											)			
-										AND [status]=-1
-								ORDER BY [id]
+DECLARE crsJobQueue CURSOR LOCAL FAST_FORWARD FOR	SELECT  [id], [instance_name]
+															, [job_name], [job_step_name], [job_database_name], REPLACE([job_command], '''', '''''') AS [job_command]
+													FROM [dbo].[vw_jobExecutionQueue]
+													WHERE  [project_id] = @projectID 
+															AND [module] LIKE @moduleFilter
+															AND (    [descriptor] LIKE @descriptorFilter
+																  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
+																)			
+															AND [status]=-1
+													ORDER BY [id]
 OPEN crsJobQueue
 FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand
 SET @executedJobs = 1
@@ -262,13 +283,27 @@ WHILE @@FETCH_STATUS=0
 		SET @runningJobs = @runningJobs + 1
 
 		SET @runningJobs = @executedJobs
-		EXEC @runningJobs = dbo.usp_jobQueueGetStatus	@projectCode			= @projectCode,
-														@moduleFilter			= @moduleFilter,
-														@descriptorFilter		= @descriptorFilter,
-														@waitForDelay			= @waitForDelay,
-														@minJobToRunBeforeExit	= @configParallelJobs,
-														@executionLevel			= 1,
-														@debugMode				= @debugMode
+
+		BEGIN TRY
+			EXEC @runningJobs = dbo.usp_jobQueueGetStatus	@projectCode			= @projectCode,
+															@moduleFilter			= @moduleFilter,
+															@descriptorFilter		= @descriptorFilter,
+															@waitForDelay			= @waitForDelay,
+															@minJobToRunBeforeExit	= @configParallelJobs,
+															@executionLevel			= 1,
+															@debugMode				= @debugMode
+		END TRY
+		BEGIN CATCH
+				 DECLARE @ErrorNumber INT = ERROR_NUMBER();
+				DECLARE @ErrorLine INT = ERROR_LINE();
+				DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+				DECLARE @ErrorSeverity INT = ERROR_SEVERITY();
+				DECLARE @ErrorState INT = ERROR_STATE();
+ 
+				PRINT 'Actual error number: ' + CAST(@ErrorNumber AS VARCHAR(10));
+				PRINT 'Actual line number: ' + CAST(@ErrorLine AS VARCHAR(10));
+		END CATCH
+		
 		---------------------------------------------------------------------------------------------------
 		IF @runningJobs < @jobQueueCount
 			begin

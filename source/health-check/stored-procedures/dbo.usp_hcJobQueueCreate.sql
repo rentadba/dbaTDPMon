@@ -73,17 +73,17 @@ WHERE [project_id] = @projectID
 		AND [name] = @@SERVERNAME
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-DECLARE crsCollectorDescriptor CURSOR READ_ONLY FAST_FORWARD FOR	SELECT [descriptor]
-																	FROM
-																		(
-																			SELECT 'dbo.usp_hcCollectDatabaseDetails' AS [descriptor] UNION ALL
-																			SELECT 'dbo.usp_hcCollectSQLServerAgentJobsStatus' AS [descriptor] UNION ALL
-																			SELECT 'dbo.usp_hcCollectDiskSpaceUsage' AS [descriptor] UNION ALL
-																			SELECT 'dbo.usp_hcCollectErrorlogMessages' AS [descriptor] UNION ALL
-																			SELECT 'dbo.usp_hcCollectOSEventLogs' AS [descriptor] UNION ALL
-																			SELECT 'dbo.usp_hcCollectEventMessages' AS [descriptor]
-																		)X
-																	WHERE [descriptor] LIKE @collectorDescriptor
+DECLARE crsCollectorDescriptor CURSOR LOCAL FAST_FORWARD FOR	SELECT [descriptor]
+																FROM
+																	(
+																		SELECT 'dbo.usp_hcCollectDatabaseDetails' AS [descriptor] UNION ALL
+																		SELECT 'dbo.usp_hcCollectSQLServerAgentJobsStatus' AS [descriptor] UNION ALL
+																		SELECT 'dbo.usp_hcCollectDiskSpaceUsage' AS [descriptor] UNION ALL
+																		SELECT 'dbo.usp_hcCollectErrorlogMessages' AS [descriptor] UNION ALL
+																		SELECT 'dbo.usp_hcCollectOSEventLogs' AS [descriptor] UNION ALL
+																		SELECT 'dbo.usp_hcCollectEventMessages' AS [descriptor]
+																	)X
+																WHERE [descriptor] LIKE @collectorDescriptor
 OPEN crsCollectorDescriptor
 FETCH NEXT FROM crsCollectorDescriptor INTO @codeDescriptor
 WHILE @@FETCH_STATUS=0

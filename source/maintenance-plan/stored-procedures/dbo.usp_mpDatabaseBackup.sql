@@ -376,7 +376,7 @@ IF @flgActions & 4 = 4
 --------------------------------------------------------------------------------------------------
 --create destination path: <@backupLocation>\@sqlServerName\@dbName
 IF RIGHT(@backupLocation, 1)<>'\' SET @backupLocation = @backupLocation + N'\'
-SET @backupLocation = @backupLocation + @sqlServerName + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
+SET @backupLocation = @backupLocation + REPLACE(@sqlServerName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
 
 SET @queryToRun = N'EXEC [' + DB_NAME() + '].[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @sqlServerName + N''',
 																			@folderName		= ''' + @backupLocation + N''',
@@ -427,7 +427,8 @@ IF @flgOptions & 8 = 8
 		IF @flgActions & 2 = 2 OR @flgActions & 4 = 4
 			begin
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + 'SELECT COUNT(*) FROM msdb.dbo.backupset WHERE [database_name]=''' + @dbName + N''' AND [type] IN (''D''' + CASE WHEN @flgActions & 4 = 4 THEN N', ''I''' ELSE N'' END + N')'
+				SET @queryToRun = @queryToRun + 'SELECT COUNT(*) FROM msdb.dbo.backupset WHERE [server_name] = N''' + @sqlServerName + ''' AND [database_name]=''' + @dbName + N''' AND [type] IN (''D''' + CASE WHEN @flgActions & 4 = 4 THEN N', ''I''' ELSE N'' END + N')'
+
 				IF @serverVersionNum >= 9
 					SET @queryToRun = @queryToRun + N' AND [is_copy_only]=0'
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)

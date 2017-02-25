@@ -95,7 +95,7 @@ http://dbaTDPMon.codeplex.com',
 '
 	
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
-												@step_name=N'Analyze Replication Latency',
+												@step_name=N'Check Alarm',
 												@step_id=1, 
 												@cmdexec_success_code=0, 
 												@on_success_action=3, 

@@ -374,9 +374,9 @@ IF @flgActions & 2 = 2
 		SET @queryToRun=N'Tables/views consistency check ' + CASE WHEN @flgOptions & 1 = 1 THEN '(PHYSICAL_ONLY)' ELSE '' END + CASE WHEN @flgOptions & 2 = 2 THEN '(NOINDEX)' ELSE '' END + '...' + ' [' + @dbName + ']'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		DECLARE crsTableList CURSOR FOR	SELECT DISTINCT [table_schema], [table_name] 
-										FROM #databaseTableList	
-										ORDER BY [table_name]
+		DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [table_schema], [table_name] 
+															FROM #databaseTableList	
+															ORDER BY [table_name]
 		OPEN crsTableList
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
 		WHILE @@FETCH_STATUS = 0
@@ -473,9 +473,9 @@ IF @flgActions & 16 = 16
 		SET @queryToRun=N'Table constraints consistency check ...' + ' [' + @dbName + ']'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 		
-		DECLARE crsTableList CURSOR FOR	SELECT DISTINCT [table_schema], [table_name] 
-										FROM #databaseTableList	
-										ORDER BY [table_name]
+		DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [table_schema], [table_name] 
+															FROM #databaseTableList	
+															ORDER BY [table_name]
 		OPEN crsTableList
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
 		WHILE @@FETCH_STATUS = 0
@@ -580,9 +580,9 @@ IF @flgActions & 32 = 32
 				INSERT	INTO #databaseTableListIdent([table_schema], [table_name])
 						EXEC (@queryToRun)
 
-				DECLARE crsTableList CURSOR FOR	SELECT DISTINCT [table_schema], [table_name] 
-												FROM #databaseTableListIdent	
-												ORDER BY [table_name]
+				DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [table_schema], [table_name] 
+																	FROM #databaseTableListIdent	
+																	ORDER BY [table_name]
 				OPEN crsTableList
 				FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
 				WHILE @@FETCH_STATUS = 0
@@ -643,9 +643,9 @@ IF @flgActions & 64 = 64
 			end
 		ELSE
 			begin
-				DECLARE crsTableList CURSOR FOR	SELECT DISTINCT [table_schema], [table_name] 
-												FROM #databaseTableList	
-												ORDER BY [table_name]
+				DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [table_schema], [table_name] 
+																	FROM #databaseTableList	
+																	ORDER BY [table_name]
 				OPEN crsTableList
 				FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
 				WHILE @@FETCH_STATUS = 0
@@ -697,9 +697,9 @@ IF @flgActions & 128 = 128
 		SET @queryToRun=N'Cleaning wasted space in variable length columns...' + ' [' + @dbName + ']'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		DECLARE crsTableList CURSOR FOR	SELECT DISTINCT [table_schema], [table_name] 
-										FROM #databaseTableList	
-										ORDER BY [table_name]
+		DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [table_schema], [table_name] 
+															FROM #databaseTableList	
+															ORDER BY [table_name]
 		OPEN crsTableList
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
 		WHILE @@FETCH_STATUS = 0

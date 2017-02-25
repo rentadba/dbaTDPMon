@@ -479,15 +479,15 @@ ELSE
 					
 					SET @maxLengthStepName = ISNULL(@maxLengthStepName, 16)
 
-					DECLARE crsJobDetails CURSOR FOR	SELECT DISTINCT   [step_id]
-																		, [step_name]
-																		, [run_status]
-																		, [run_date]
-																		, [run_time]
-																		, [run_duration]
-																		, [message]
-														FROM #jobRunStepDetails
-														ORDER BY [run_date], [run_time]
+					DECLARE crsJobDetails CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT   [step_id]
+																						, [step_name]
+																						, [run_status]
+																						, [run_date]
+																						, [run_time]
+																						, [run_duration]
+																						, [message]
+																		FROM #jobRunStepDetails
+																		ORDER BY [run_date], [run_time]
 					OPEN crsJobDetails
 					FETCH NEXT FROM crsJobDetails INTO @StepID, @StepName, @RunStatusDetail, @RunDateDetail, @RunTimeDetail, @RunDurationDetail, @queryToRun
 

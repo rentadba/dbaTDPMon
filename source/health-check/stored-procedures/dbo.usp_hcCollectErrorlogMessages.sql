@@ -113,12 +113,12 @@ WHERE cin.[project_id] = @projectID
 SET @strMessage= 'Step 2: Get Errorlog messages...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 		
-DECLARE crsActiveInstances CURSOR LOCAL FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
-												FROM	[dbo].[vw_catalogInstanceNames] cin
-												WHERE 	cin.[project_id] = @projectID
-														AND cin.[instance_active]=1
-														AND cin.[instance_name] LIKE @sqlServerNameFilter
-												ORDER BY cin.[instance_name]
+DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
+															FROM	[dbo].[vw_catalogInstanceNames] cin
+															WHERE 	cin.[project_id] = @projectID
+																	AND cin.[instance_active]=1
+																	AND cin.[instance_name] LIKE @sqlServerNameFilter
+															ORDER BY cin.[instance_name]
 OPEN crsActiveInstances
 FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
 WHILE @@FETCH_STATUS=0
@@ -178,9 +178,10 @@ WHILE @@FETCH_STATUS=0
 				SET @strMessage= 'rebuild messages for ContinuationRows'
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
 
-				DECLARE crsErrorlogContinuation CURSOR FAST_FORWARD FOR SELECT [id], [text]
-																		FROM #xpReadErrorLog
-																		WHERE [continuation_row]=1
+				/*
+				DECLARE crsErrorlogContinuation CURSOR LOCAL FAST_FORWARD FOR	SELECT [id], [text]
+																				FROM #xpReadErrorLog
+																				WHERE [continuation_row]=1
 				OPEN crsErrorlogContinuation
 				FETCH NEXT FROM crsErrorlogContinuation INTO @lineID, @strMessage
 				WHILE @@FETCH_STATUS=0
@@ -193,7 +194,19 @@ WHILE @@FETCH_STATUS=0
 					end
 				CLOSE crsErrorlogContinuation
 				DEALLOCATE crsErrorlogContinuation
-				
+				*/
+
+				UPDATE S
+					SET S.[text] = S.[text] + D.[text]
+				FROM #xpReadErrorLog S
+				INNER JOIN 
+					(
+						SELECT [id], [text]
+						FROM #xpReadErrorLog
+						WHERE [continuation_row]=1
+					) D ON S.[id] = D.[id]-1
+
+
 				DELETE 
 				FROM #xpReadErrorLog
 				WHERE [continuation_row]=1

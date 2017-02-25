@@ -503,10 +503,6 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\dbo.usp_monAlarmCustomSQLAgentFailedJobs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\dbo.usp_monReplicationPublicationLatency.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-
 
 echo *-----------------------------------------------------------------------------*
 echo Monitoring: Creating SQL Server Agent Jobs

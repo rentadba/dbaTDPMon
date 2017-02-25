@@ -138,12 +138,12 @@ WHERE cin.[project_id] = @projectID
 -------------------------------------------------------------------------------------------------------------------------
 RAISERROR('--Step 2: Get Database Details Information....', 10, 1) WITH NOWAIT
 		
-DECLARE crsActiveInstances CURSOR LOCAL FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
-												FROM	[dbo].[vw_catalogInstanceNames] cin
-												WHERE 	cin.[project_id] = @projectID
-														AND cin.[instance_active]=1
-														AND cin.[instance_name] LIKE @sqlServerNameFilter
-												ORDER BY cin.[instance_name]
+DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
+															FROM	[dbo].[vw_catalogInstanceNames] cin
+															WHERE 	cin.[project_id] = @projectID
+																	AND cin.[instance_active]=1
+																	AND cin.[instance_name] LIKE @sqlServerNameFilter
+															ORDER BY cin.[instance_name]
 OPEN crsActiveInstances
 FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
 WHILE @@FETCH_STATUS=0
@@ -160,14 +160,14 @@ WHILE @@FETCH_STATUS=0
 			SET @SQLMajorVersion = 8
 		END CATCH
 
-		DECLARE crsActiveDatabases CURSOR LOCAL FOR 	SELECT	cdn.[catalog_database_id], cdn.[database_id], cdn.[database_name]
-														FROM	[dbo].[vw_catalogDatabaseNames] cdn
-														WHERE 	cdn.[project_id] = @projectID
-																AND cdn.[instance_id] = @instanceID
-																AND cdn.[active]=1
-																AND cdn.[database_name] LIKE @databaseNameFilter
-																AND CHARINDEX(cdn.[state_desc], 'ONLINE, READ ONLY')<>0
-														ORDER BY cdn.[database_name]
+		DECLARE crsActiveDatabases CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cdn.[catalog_database_id], cdn.[database_id], cdn.[database_name]
+																	FROM	[dbo].[vw_catalogDatabaseNames] cdn
+																	WHERE 	cdn.[project_id] = @projectID
+																			AND cdn.[instance_id] = @instanceID
+																			AND cdn.[active]=1
+																			AND cdn.[database_name] LIKE @databaseNameFilter
+																			AND CHARINDEX(cdn.[state_desc], 'ONLINE, READ ONLY')<>0
+																	ORDER BY cdn.[database_name]
 		OPEN crsActiveDatabases	
 		FETCH NEXT FROM crsActiveDatabases INTO @catalogDatabaseID, @databaseID, @databaseName
 		WHILE @@FETCH_STATUS=0
@@ -185,7 +185,7 @@ WHILE @@FETCH_STATUS=0
 														, SUM([space_used_kb])	AS [space_used_mb]
 														, MAX(CAST([is_growth_limited] AS [tinyint])) AS [is_growth_limited]
 												FROM (		
-														SELECT    [name], [size] * 8 as [size_kb]
+														SELECT    [name], CAST([size] AS [int]) * 8 AS [size_kb]
 																, CAST(FILEPROPERTY([name], ''''''''SpaceUsed'''''''') AS [int]) * 8	AS [space_used_kb]
 																, CAST(FILEPROPERTY([name], ''''''''IsLogFile'''''''') AS [bit])		AS [is_logfile]
 																, REPLACE(LEFT([' + CASE WHEN @SQLMajorVersion <=8 THEN N'filename' ELSE N'physical_name' END + N'], 2), '''''''':'''''''', '''''''''''''''') AS [drive]

@@ -187,590 +187,590 @@ DECLARE   @instanceName		[sysname]
 		, @severity			[sysname]
 		, @eventMessage		[nvarchar](max)
 
-DECLARE crsTransactionStatusAlarms CURSOR FOR	SELECT  DISTINCT
-														  cin.[instance_name] AS [instance_name]
-														, db.[database_name] AS [object_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
-														, 'warning'			AS [severity]
-														, 'running transaction'	AS [event_name]
-														, '<alert><detail>' + 
-															'<severity>warning</severity>' + 
-															'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
-															'<counter_name>running transaction</counter_name>' + 
-															'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
-															'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
-															'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
-															'<databases>' + db.[database_name] + '</databases>' + 
-															'<host_name>' + sts.[host_name] + '</host_name>' + 
-															'<program_name>' + sts.[program_name] + '</program_name>' + 
-															'<login_name>' + sts.[login_name] + '</login_name>' + 
-															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
-															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
-															'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
-															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
-															'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdWarningRunning*1000) + '</threshold_value>' + 
-															'<measure_unit>sec</measure_unit>' + 
-															'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
-															'</detail></alert>' AS [event_message]
-												FROM [dbo].[vw_catalogInstanceNames]  cin
-												INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
-												INNER JOIN
-														(
-															SELECT [session_id],
-																	STUFF((
-																			SELECT ', ' + [database_name]
-																			FROM (
-																					SELECT DISTINCT [database_name]
-																					FROM [monitoring].[statsTransactionsStatus]
-																					WHERE [session_id] = sts.[session_id]
-																				)db
-																			ORDER BY [database_name]
-																			FOR XML PATH ('')
-																		) ,1,2,'') [database_name]
-															FROM [monitoring].[statsTransactionsStatus] sts
-															GROUP BY [session_id]
-														)db ON db.[session_id] = sts.[session_id]
-												LEFT JOIN
-														(
-															SELECT [session_id],
-																	STUFF((
-																			SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
-																			FROM (
-																					SELECT DISTINCT [sql_handle]
-																					FROM [monitoring].[statsTransactionsStatus]
-																					WHERE [session_id] = sts.[session_id]
-																						 AND [sql_handle] IS NOT NULL
-																						 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
-																				)db
-																			ORDER BY [sql_handle]
-																			FOR XML PATH ('')
-																		) ,1,2,'') [sql_handle]
-															FROM [monitoring].[statsTransactionsStatus] sts
-															GROUP BY [session_id]
-														)sh ON sh.[session_id] = sts.[session_id]
-												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
-																								AND asr.[alert_name] IN ('Running Transaction Elapsed Time (sec)')
-																								AND asr.[active] = 1
-																								AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
-												WHERE cin.[instance_active]=1
-														AND cin.[project_id] = @projectID
-														AND cin.[instance_name] LIKE @sqlServerNameFilter
-														AND sts.[transaction_elapsed_time_sec] >= @alertThresholdWarningRunning 
-														AND sts.[transaction_elapsed_time_sec] < @alertThresholdCriticalRunning 
-														AND sts.[request_completed] = 0 /* running transaction */
+DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINCT
+																			  cin.[instance_name] AS [instance_name]
+																			, db.[database_name] AS [object_name]
+																			, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
+																			, 'warning'			AS [severity]
+																			, 'running transaction'	AS [event_name]
+																			, '<alert><detail>' + 
+																				'<severity>warning</severity>' + 
+																				'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
+																				'<counter_name>running transaction</counter_name>' + 
+																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
+																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
+																				'<databases>' + db.[database_name] + '</databases>' + 
+																				'<host_name>' + sts.[host_name] + '</host_name>' + 
+																				'<program_name>' + sts.[program_name] + '</program_name>' + 
+																				'<login_name>' + sts.[login_name] + '</login_name>' + 
+																				'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
+																				'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
+																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
+																				'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
+																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdWarningRunning*1000) + '</threshold_value>' + 
+																				'<measure_unit>sec</measure_unit>' + 
+																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'</detail></alert>' AS [event_message]
+																	FROM [dbo].[vw_catalogInstanceNames]  cin
+																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
+																	INNER JOIN
+																			(
+																				SELECT [session_id],
+																						STUFF((
+																								SELECT ', ' + [database_name]
+																								FROM (
+																										SELECT DISTINCT [database_name]
+																										FROM [monitoring].[statsTransactionsStatus]
+																										WHERE [session_id] = sts.[session_id]
+																									)db
+																								ORDER BY [database_name]
+																								FOR XML PATH ('')
+																							) ,1,2,'') [database_name]
+																				FROM [monitoring].[statsTransactionsStatus] sts
+																				GROUP BY [session_id]
+																			)db ON db.[session_id] = sts.[session_id]
+																	LEFT JOIN
+																			(
+																				SELECT [session_id],
+																						STUFF((
+																								SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
+																								FROM (
+																										SELECT DISTINCT [sql_handle]
+																										FROM [monitoring].[statsTransactionsStatus]
+																										WHERE [session_id] = sts.[session_id]
+																											 AND [sql_handle] IS NOT NULL
+																											 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
+																									)db
+																								ORDER BY [sql_handle]
+																								FOR XML PATH ('')
+																							) ,1,2,'') [sql_handle]
+																				FROM [monitoring].[statsTransactionsStatus] sts
+																				GROUP BY [session_id]
+																			)sh ON sh.[session_id] = sts.[session_id]
+																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
+																													AND asr.[alert_name] IN ('Running Transaction Elapsed Time (sec)')
+																													AND asr.[active] = 1
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+																	WHERE cin.[instance_active]=1
+																			AND cin.[project_id] = @projectID
+																			AND cin.[instance_name] LIKE @sqlServerNameFilter
+																			AND sts.[transaction_elapsed_time_sec] >= @alertThresholdWarningRunning 
+																			AND sts.[transaction_elapsed_time_sec] < @alertThresholdCriticalRunning 
+																			AND sts.[request_completed] = 0 /* running transaction */
 												
-												UNION ALL
+																	UNION ALL
 
-												SELECT  DISTINCT
-														  cin.[instance_name] AS [instance_name]
-														, db.[database_name] AS [object_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
-														, 'critical'			AS [severity]
-														, 'running transaction'	AS [event_name]
-														, '<alert><detail>' + 
-															'<severity>critical</severity>' + 
-															'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
-															'<counter_name>running transaction</counter_name>' + 
-															'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
-															'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
-															'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
-															'<databases>' + db.[database_name] + '</databases>' + 
-															'<host_name>' + sts.[host_name] + '</host_name>' + 
-															'<program_name>' + sts.[program_name] + '</program_name>' + 
-															'<login_name>' + sts.[login_name] + '</login_name>' + 
-															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
-															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
-															'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
-															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
-															'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdCriticalRunning*1000) + '</threshold_value>' + 
-															'<measure_unit>sec</measure_unit>' + 
-															'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
-															'</detail></alert>' AS [event_message]
-												FROM [dbo].[vw_catalogInstanceNames]  cin
-												INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
-												INNER JOIN
-														(
-															SELECT [session_id],
-																	STUFF((
-																			SELECT ', ' + [database_name]
-																			FROM (
-																					SELECT DISTINCT [database_name]
-																					FROM [monitoring].[statsTransactionsStatus]
-																					WHERE [session_id] = sts.[session_id]
-																				)db
-																			ORDER BY [database_name]
-																			FOR XML PATH ('')
-																		) ,1,2,'') [database_name]
-															FROM [monitoring].[statsTransactionsStatus] sts
-															GROUP BY [session_id]
-														)db ON db.[session_id] = sts.[session_id]
-												LEFT JOIN
-														(
-															SELECT [session_id],
-																	STUFF((
-																			SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
-																			FROM (
-																					SELECT DISTINCT [sql_handle]
-																					FROM [monitoring].[statsTransactionsStatus]
-																					WHERE [session_id] = sts.[session_id]
-																						 AND [sql_handle] IS NOT NULL
-																						 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
-																				)db
-																			ORDER BY [sql_handle]
-																			FOR XML PATH ('')
-																		) ,1,2,'') [sql_handle]
-															FROM [monitoring].[statsTransactionsStatus] sts
-															GROUP BY [session_id]
-														)sh ON sh.[session_id] = sts.[session_id]
-												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
-																								AND asr.[alert_name] IN ('Running Transaction Elapsed Time (sec)')
-																								AND asr.[active] = 1
-																								AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
-												WHERE cin.[instance_active]=1
-														AND cin.[project_id] = @projectID
-														AND cin.[instance_name] LIKE @sqlServerNameFilter
-														AND sts.[transaction_elapsed_time_sec] >= @alertThresholdCriticalRunning
-														AND sts.[request_completed] = 0 /* running transaction */
+																	SELECT  DISTINCT
+																			  cin.[instance_name] AS [instance_name]
+																			, db.[database_name] AS [object_name]
+																			, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
+																			, 'critical'			AS [severity]
+																			, 'running transaction'	AS [event_name]
+																			, '<alert><detail>' + 
+																				'<severity>critical</severity>' + 
+																				'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
+																				'<counter_name>running transaction</counter_name>' + 
+																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
+																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
+																				'<databases>' + db.[database_name] + '</databases>' + 
+																				'<host_name>' + sts.[host_name] + '</host_name>' + 
+																				'<program_name>' + sts.[program_name] + '</program_name>' + 
+																				'<login_name>' + sts.[login_name] + '</login_name>' + 
+																				'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
+																				'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
+																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
+																				'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
+																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdCriticalRunning*1000) + '</threshold_value>' + 
+																				'<measure_unit>sec</measure_unit>' + 
+																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'</detail></alert>' AS [event_message]
+																	FROM [dbo].[vw_catalogInstanceNames]  cin
+																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
+																	INNER JOIN
+																			(
+																				SELECT [session_id],
+																						STUFF((
+																								SELECT ', ' + [database_name]
+																								FROM (
+																										SELECT DISTINCT [database_name]
+																										FROM [monitoring].[statsTransactionsStatus]
+																										WHERE [session_id] = sts.[session_id]
+																									)db
+																								ORDER BY [database_name]
+																								FOR XML PATH ('')
+																							) ,1,2,'') [database_name]
+																				FROM [monitoring].[statsTransactionsStatus] sts
+																				GROUP BY [session_id]
+																			)db ON db.[session_id] = sts.[session_id]
+																	LEFT JOIN
+																			(
+																				SELECT [session_id],
+																						STUFF((
+																								SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
+																								FROM (
+																										SELECT DISTINCT [sql_handle]
+																										FROM [monitoring].[statsTransactionsStatus]
+																										WHERE [session_id] = sts.[session_id]
+																											 AND [sql_handle] IS NOT NULL
+																											 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
+																									)db
+																								ORDER BY [sql_handle]
+																								FOR XML PATH ('')
+																							) ,1,2,'') [sql_handle]
+																				FROM [monitoring].[statsTransactionsStatus] sts
+																				GROUP BY [session_id]
+																			)sh ON sh.[session_id] = sts.[session_id]
+																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
+																													AND asr.[alert_name] IN ('Running Transaction Elapsed Time (sec)')
+																													AND asr.[active] = 1
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+																	WHERE cin.[instance_active]=1
+																			AND cin.[project_id] = @projectID
+																			AND cin.[instance_name] LIKE @sqlServerNameFilter
+																			AND sts.[transaction_elapsed_time_sec] >= @alertThresholdCriticalRunning
+																			AND sts.[request_completed] = 0 /* running transaction */
 												
-												UNION ALL
+																	UNION ALL
 												
-												SELECT  DISTINCT
-														  cin.[instance_name] AS [instance_name]
-														, db.[database_name] AS [object_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
-														, 'warning'			AS [severity]
-														, 'uncommitted transaction'	AS [event_name]
-														, '<alert><detail>' + 
-															'<severity>warning</severity>' + 
-															'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
-															'<counter_name>uncommitted transaction</counter_name>' + 
-															'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
-															'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
-															'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
-															'<databases>' + db.[database_name] + '</databases>' + 
-															'<host_name>' + sts.[host_name] + '</host_name>' + 
-															'<program_name>' + sts.[program_name] + '</program_name>' + 
-															'<login_name>' + sts.[login_name] + '</login_name>' + 
-															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
-															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
-															'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
-															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
-															'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdWarningUncommitted*1000) + '</threshold_value>' + 
-															'<measure_unit>sec</measure_unit>' + 
-															'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
-															'</detail></alert>' AS [event_message]
-												FROM [dbo].[vw_catalogInstanceNames]  cin
-												INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
-												INNER JOIN
-														(
-															SELECT [session_id],
-																	STUFF((
-																			SELECT ', ' + [database_name]
-																			FROM (
-																					SELECT DISTINCT [database_name]
-																					FROM [monitoring].[statsTransactionsStatus]
-																					WHERE [session_id] = sts.[session_id]
-																				)db
-																			ORDER BY [database_name]
-																			FOR XML PATH ('')
-																		) ,1,2,'') [database_name]
-															FROM [monitoring].[statsTransactionsStatus] sts
-															GROUP BY [session_id]
-														)db ON db.[session_id] = sts.[session_id]
-												LEFT JOIN
-														(
-															SELECT [session_id],
-																	STUFF((
-																			SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
-																			FROM (
-																					SELECT DISTINCT [sql_handle]
-																					FROM [monitoring].[statsTransactionsStatus]
-																					WHERE [session_id] = sts.[session_id]
-																						 AND [sql_handle] IS NOT NULL
-																						 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
-																				)db
-																			ORDER BY [sql_handle]
-																			FOR XML PATH ('')
-																		) ,1,2,'') [sql_handle]
-															FROM [monitoring].[statsTransactionsStatus] sts
-															GROUP BY [session_id]
-														)sh ON sh.[session_id] = sts.[session_id]
-												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
-																								AND asr.[alert_name] IN ('Uncommitted Transaction Elapsed Time (sec)')
-																								AND asr.[active] = 1
-																								AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
-												WHERE cin.[instance_active]=1
-														AND cin.[project_id] = @projectID
-														AND cin.[instance_name] LIKE @sqlServerNameFilter
-														AND sts.[transaction_elapsed_time_sec] >= @alertThresholdWarningUncommitted 
-														AND sts.[transaction_elapsed_time_sec] < @alertThresholdCriticalUncommitted 
-														AND sts.[request_completed] = 1 /* uncommitted transaction / request has completed */
+																	SELECT  DISTINCT
+																			  cin.[instance_name] AS [instance_name]
+																			, db.[database_name] AS [object_name]
+																			, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
+																			, 'warning'			AS [severity]
+																			, 'uncommitted transaction'	AS [event_name]
+																			, '<alert><detail>' + 
+																				'<severity>warning</severity>' + 
+																				'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
+																				'<counter_name>uncommitted transaction</counter_name>' + 
+																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
+																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
+																				'<databases>' + db.[database_name] + '</databases>' + 
+																				'<host_name>' + sts.[host_name] + '</host_name>' + 
+																				'<program_name>' + sts.[program_name] + '</program_name>' + 
+																				'<login_name>' + sts.[login_name] + '</login_name>' + 
+																				'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
+																				'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
+																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
+																				'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
+																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdWarningUncommitted*1000) + '</threshold_value>' + 
+																				'<measure_unit>sec</measure_unit>' + 
+																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'</detail></alert>' AS [event_message]
+																	FROM [dbo].[vw_catalogInstanceNames]  cin
+																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
+																	INNER JOIN
+																			(
+																				SELECT [session_id],
+																						STUFF((
+																								SELECT ', ' + [database_name]
+																								FROM (
+																										SELECT DISTINCT [database_name]
+																										FROM [monitoring].[statsTransactionsStatus]
+																										WHERE [session_id] = sts.[session_id]
+																									)db
+																								ORDER BY [database_name]
+																								FOR XML PATH ('')
+																							) ,1,2,'') [database_name]
+																				FROM [monitoring].[statsTransactionsStatus] sts
+																				GROUP BY [session_id]
+																			)db ON db.[session_id] = sts.[session_id]
+																	LEFT JOIN
+																			(
+																				SELECT [session_id],
+																						STUFF((
+																								SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
+																								FROM (
+																										SELECT DISTINCT [sql_handle]
+																										FROM [monitoring].[statsTransactionsStatus]
+																										WHERE [session_id] = sts.[session_id]
+																											 AND [sql_handle] IS NOT NULL
+																											 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
+																									)db
+																								ORDER BY [sql_handle]
+																								FOR XML PATH ('')
+																							) ,1,2,'') [sql_handle]
+																				FROM [monitoring].[statsTransactionsStatus] sts
+																				GROUP BY [session_id]
+																			)sh ON sh.[session_id] = sts.[session_id]
+																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
+																													AND asr.[alert_name] IN ('Uncommitted Transaction Elapsed Time (sec)')
+																													AND asr.[active] = 1
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+																	WHERE cin.[instance_active]=1
+																			AND cin.[project_id] = @projectID
+																			AND cin.[instance_name] LIKE @sqlServerNameFilter
+																			AND sts.[transaction_elapsed_time_sec] >= @alertThresholdWarningUncommitted 
+																			AND sts.[transaction_elapsed_time_sec] < @alertThresholdCriticalUncommitted 
+																			AND sts.[request_completed] = 1 /* uncommitted transaction / request has completed */
 												
-												UNION ALL
+																	UNION ALL
 
-												SELECT  DISTINCT
-														  cin.[instance_name] AS [instance_name]
-														, db.[database_name] AS [object_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
-														, 'critical'			AS [severity]
-														, 'uncommitted transaction'	AS [event_name]
-														, '<alert><detail>' + 
-															'<severity>critical</severity>' + 
-															'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
-															'<counter_name>uncommitted transaction</counter_name>' + 
-															'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
-															'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
-															'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
-															'<databases>' + db.[database_name] + '</databases>' + 
-															'<host_name>' + sts.[host_name] + '</host_name>' + 
-															'<program_name>' + sts.[program_name] + '</program_name>' + 
-															'<login_name>' + sts.[login_name] + '</login_name>' + 
-															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
-															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
-															'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
-															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
-															'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdCriticalUncommitted*1000) + '</threshold_value>' + 
-															'<measure_unit>sec</measure_unit>' + 
-															'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
-															'</detail></alert>' AS [event_message]
-												FROM [dbo].[vw_catalogInstanceNames]  cin
-												INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
-												INNER JOIN
-														(
-															SELECT [session_id],
-																	STUFF((
-																			SELECT ', ' + [database_name]
-																			FROM (
-																					SELECT DISTINCT [database_name]
-																					FROM [monitoring].[statsTransactionsStatus]
-																					WHERE [session_id] = sts.[session_id]
-																				)db
-																			ORDER BY [database_name]
-																			FOR XML PATH ('')
-																		) ,1,2,'') [database_name]
-															FROM [monitoring].[statsTransactionsStatus] sts
-															GROUP BY [session_id]
-														)db ON db.[session_id] = sts.[session_id]
-												LEFT JOIN
-														(
-															SELECT [session_id],
-																	STUFF((
-																			SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
-																			FROM (
-																					SELECT DISTINCT [sql_handle]
-																					FROM [monitoring].[statsTransactionsStatus]
-																					WHERE [session_id] = sts.[session_id]
-																						 AND [sql_handle] IS NOT NULL
-																						 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
-																				)db
-																			ORDER BY [sql_handle]
-																			FOR XML PATH ('')
-																		) ,1,2,'') [sql_handle]
-															FROM [monitoring].[statsTransactionsStatus] sts
-															GROUP BY [session_id]
-														)sh ON sh.[session_id] = sts.[session_id]
-												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
-																								AND asr.[alert_name] IN ('Uncommitted Transaction Elapsed Time (sec)')
-																								AND asr.[active] = 1
-																								AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
-												WHERE cin.[instance_active]=1
-														AND cin.[project_id] = @projectID
-														AND cin.[instance_name] LIKE @sqlServerNameFilter
-														AND sts.[transaction_elapsed_time_sec] >= @alertThresholdCriticalUncommitted
-														AND sts.[request_completed] = 1 /* uncommitted transaction / request has completed */
+																	SELECT  DISTINCT
+																			  cin.[instance_name] AS [instance_name]
+																			, db.[database_name] AS [object_name]
+																			, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
+																			, 'critical'			AS [severity]
+																			, 'uncommitted transaction'	AS [event_name]
+																			, '<alert><detail>' + 
+																				'<severity>critical</severity>' + 
+																				'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
+																				'<counter_name>uncommitted transaction</counter_name>' + 
+																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
+																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
+																				'<databases>' + db.[database_name] + '</databases>' + 
+																				'<host_name>' + sts.[host_name] + '</host_name>' + 
+																				'<program_name>' + sts.[program_name] + '</program_name>' + 
+																				'<login_name>' + sts.[login_name] + '</login_name>' + 
+																				'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
+																				'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
+																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
+																				'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
+																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdCriticalUncommitted*1000) + '</threshold_value>' + 
+																				'<measure_unit>sec</measure_unit>' + 
+																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'</detail></alert>' AS [event_message]
+																	FROM [dbo].[vw_catalogInstanceNames]  cin
+																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
+																	INNER JOIN
+																			(
+																				SELECT [session_id],
+																						STUFF((
+																								SELECT ', ' + [database_name]
+																								FROM (
+																										SELECT DISTINCT [database_name]
+																										FROM [monitoring].[statsTransactionsStatus]
+																										WHERE [session_id] = sts.[session_id]
+																									)db
+																								ORDER BY [database_name]
+																								FOR XML PATH ('')
+																							) ,1,2,'') [database_name]
+																				FROM [monitoring].[statsTransactionsStatus] sts
+																				GROUP BY [session_id]
+																			)db ON db.[session_id] = sts.[session_id]
+																	LEFT JOIN
+																			(
+																				SELECT [session_id],
+																						STUFF((
+																								SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
+																								FROM (
+																										SELECT DISTINCT [sql_handle]
+																										FROM [monitoring].[statsTransactionsStatus]
+																										WHERE [session_id] = sts.[session_id]
+																											 AND [sql_handle] IS NOT NULL
+																											 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
+																									)db
+																								ORDER BY [sql_handle]
+																								FOR XML PATH ('')
+																							) ,1,2,'') [sql_handle]
+																				FROM [monitoring].[statsTransactionsStatus] sts
+																				GROUP BY [session_id]
+																			)sh ON sh.[session_id] = sts.[session_id]
+																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
+																													AND asr.[alert_name] IN ('Uncommitted Transaction Elapsed Time (sec)')
+																													AND asr.[active] = 1
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+																	WHERE cin.[instance_active]=1
+																			AND cin.[project_id] = @projectID
+																			AND cin.[instance_name] LIKE @sqlServerNameFilter
+																			AND sts.[transaction_elapsed_time_sec] >= @alertThresholdCriticalUncommitted
+																			AND sts.[request_completed] = 1 /* uncommitted transaction / request has completed */
 
-												UNION ALL
+																	UNION ALL
 
-												SELECT  DISTINCT
-														  cin.[instance_name] AS [instance_name]
-														, db.[database_name] AS [object_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
-														, 'warning'				AS [severity]
-														, 'blocked transaction'	AS [event_name]
-														, '<alert><detail>' + 
-															'<severity>warning</severity>' + 
-															'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
-															'<counter_name>blocked transaction</counter_name>' + 
-															'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
-															'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
-															'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
-															'<databases>' + db.[database_name] + '</databases>' + 
-															'<host_name>' + sts.[host_name] + '</host_name>' + 
-															'<program_name>' + sts.[program_name] + '</program_name>' + 
-															'<login_name>' + sts.[login_name] + '</login_name>' + 
-															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
-															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
-															'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
-															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
-															'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdWarningBlocking*1000) + '</threshold_value>' + 
-															'<measure_unit>sec</measure_unit>' + 
-															'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
-															'</detail></alert>' AS [event_message]
-												FROM [dbo].[vw_catalogInstanceNames]  cin
-												INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
-												INNER JOIN
-														(
-															SELECT [session_id],
-																	STUFF((
-																			SELECT ', ' + [database_name]
-																			FROM (
-																					SELECT DISTINCT [database_name]
-																					FROM [monitoring].[statsTransactionsStatus]
-																					WHERE [session_id] = sts.[session_id]
-																				)db
-																			ORDER BY [database_name]
-																			FOR XML PATH ('')
-																		) ,1,2,'') [database_name]
-															FROM [monitoring].[statsTransactionsStatus] sts
-															GROUP BY [session_id]
-														)db ON db.[session_id] = sts.[session_id]
-												LEFT JOIN
-														(
-															SELECT [session_id],
-																	STUFF((
-																			SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
-																			FROM (
-																					SELECT DISTINCT [sql_handle]
-																					FROM [monitoring].[statsTransactionsStatus]
-																					WHERE [session_id] = sts.[session_id]
-																						 AND [sql_handle] IS NOT NULL
-																						 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
-																				)db
-																			ORDER BY [sql_handle]
-																			FOR XML PATH ('')
-																		) ,1,2,'') [sql_handle]
-															FROM [monitoring].[statsTransactionsStatus] sts
-															GROUP BY [session_id]
-														)sh ON sh.[session_id] = sts.[session_id]
-												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
-																								AND asr.[alert_name] IN ('Blocking Transaction Elapsed Time (sec)')
-																								AND asr.[active] = 1
-																								AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
-												WHERE cin.[instance_active]=1
-														AND cin.[project_id] = @projectID
-														AND cin.[instance_name] LIKE @sqlServerNameFilter
-														AND sts.[wait_duration_sec] >= @alertThresholdWarningBlocking
-														AND sts.[wait_duration_sec] < @alertThresholdCriticalBlocking
-														AND sts.[is_session_blocked] = 1
+																	SELECT  DISTINCT
+																			  cin.[instance_name] AS [instance_name]
+																			, db.[database_name] AS [object_name]
+																			, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
+																			, 'warning'				AS [severity]
+																			, 'blocked transaction'	AS [event_name]
+																			, '<alert><detail>' + 
+																				'<severity>warning</severity>' + 
+																				'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
+																				'<counter_name>blocked transaction</counter_name>' + 
+																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
+																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
+																				'<databases>' + db.[database_name] + '</databases>' + 
+																				'<host_name>' + sts.[host_name] + '</host_name>' + 
+																				'<program_name>' + sts.[program_name] + '</program_name>' + 
+																				'<login_name>' + sts.[login_name] + '</login_name>' + 
+																				'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
+																				'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
+																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
+																				'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
+																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdWarningBlocking*1000) + '</threshold_value>' + 
+																				'<measure_unit>sec</measure_unit>' + 
+																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'</detail></alert>' AS [event_message]
+																	FROM [dbo].[vw_catalogInstanceNames]  cin
+																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
+																	INNER JOIN
+																			(
+																				SELECT [session_id],
+																						STUFF((
+																								SELECT ', ' + [database_name]
+																								FROM (
+																										SELECT DISTINCT [database_name]
+																										FROM [monitoring].[statsTransactionsStatus]
+																										WHERE [session_id] = sts.[session_id]
+																									)db
+																								ORDER BY [database_name]
+																								FOR XML PATH ('')
+																							) ,1,2,'') [database_name]
+																				FROM [monitoring].[statsTransactionsStatus] sts
+																				GROUP BY [session_id]
+																			)db ON db.[session_id] = sts.[session_id]
+																	LEFT JOIN
+																			(
+																				SELECT [session_id],
+																						STUFF((
+																								SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
+																								FROM (
+																										SELECT DISTINCT [sql_handle]
+																										FROM [monitoring].[statsTransactionsStatus]
+																										WHERE [session_id] = sts.[session_id]
+																											 AND [sql_handle] IS NOT NULL
+																											 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
+																									)db
+																								ORDER BY [sql_handle]
+																								FOR XML PATH ('')
+																							) ,1,2,'') [sql_handle]
+																				FROM [monitoring].[statsTransactionsStatus] sts
+																				GROUP BY [session_id]
+																			)sh ON sh.[session_id] = sts.[session_id]
+																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
+																													AND asr.[alert_name] IN ('Blocking Transaction Elapsed Time (sec)')
+																													AND asr.[active] = 1
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+																	WHERE cin.[instance_active]=1
+																			AND cin.[project_id] = @projectID
+																			AND cin.[instance_name] LIKE @sqlServerNameFilter
+																			AND sts.[wait_duration_sec] >= @alertThresholdWarningBlocking
+																			AND sts.[wait_duration_sec] < @alertThresholdCriticalBlocking
+																			AND sts.[is_session_blocked] = 1
 												
-												UNION ALL
+																	UNION ALL
 
-												SELECT  DISTINCT
-														  cin.[instance_name] AS [instance_name]
-														, db.[database_name] AS [object_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
-														, 'critical'			AS [severity]
-														, 'blocked transaction'	AS [event_name]
-														, '<alert><detail>' + 
-															'<severity>critical</severity>' + 
-															'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
-															'<counter_name>blocked transaction</counter_name>' + 
-															'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
-															'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
-															'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
-															'<databases>' + db.[database_name] + '</databases>' + 
-															'<host_name>' + sts.[host_name] + '</host_name>' + 
-															'<program_name>' + sts.[program_name] + '</program_name>' + 
-															'<login_name>' + sts.[login_name] + '</login_name>' + 
-															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
-															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
-															'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
-															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
-															'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdCriticalBlocking*1000) + '</threshold_value>' + 
-															'<measure_unit>sec</measure_unit>' + 
-															'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
-															'</detail></alert>' AS [event_message]
-												FROM [dbo].[vw_catalogInstanceNames]  cin
-												INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
-												INNER JOIN
-														(
-															SELECT [session_id],
-																	STUFF((
-																			SELECT ', ' + [database_name]
-																			FROM (
-																					SELECT DISTINCT [database_name]
-																					FROM [monitoring].[statsTransactionsStatus]
-																					WHERE [session_id] = sts.[session_id]
-																				)db
-																			ORDER BY [database_name]
-																			FOR XML PATH ('')
-																		) ,1,2,'') [database_name]
-															FROM [monitoring].[statsTransactionsStatus] sts
-															GROUP BY [session_id]
-														)db ON db.[session_id] = sts.[session_id]
-												LEFT JOIN
-														(
-															SELECT [session_id],
-																	STUFF((
-																			SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
-																			FROM (
-																					SELECT DISTINCT [sql_handle]
-																					FROM [monitoring].[statsTransactionsStatus]
-																					WHERE [session_id] = sts.[session_id]
-																						 AND [sql_handle] IS NOT NULL
-																						 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
-																				)db
-																			ORDER BY [sql_handle]
-																			FOR XML PATH ('')
-																		) ,1,2,'') [sql_handle]
-															FROM [monitoring].[statsTransactionsStatus] sts
-															GROUP BY [session_id]
-														)sh ON sh.[session_id] = sts.[session_id]
-												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
-																								AND asr.[alert_name] IN ('Blocking Transaction Elapsed Time (sec)')
-																								AND asr.[active] = 1
-																								AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
-												WHERE cin.[instance_active]=1
-														AND cin.[project_id] = @projectID
-														AND cin.[instance_name] LIKE @sqlServerNameFilter
-														AND sts.[wait_duration_sec] >= @alertThresholdCriticalBlocking
-														AND sts.[is_session_blocked] = 1
+																	SELECT  DISTINCT
+																			  cin.[instance_name] AS [instance_name]
+																			, db.[database_name] AS [object_name]
+																			, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
+																			, 'critical'			AS [severity]
+																			, 'blocked transaction'	AS [event_name]
+																			, '<alert><detail>' + 
+																				'<severity>critical</severity>' + 
+																				'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
+																				'<counter_name>blocked transaction</counter_name>' + 
+																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
+																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
+																				'<databases>' + db.[database_name] + '</databases>' + 
+																				'<host_name>' + sts.[host_name] + '</host_name>' + 
+																				'<program_name>' + sts.[program_name] + '</program_name>' + 
+																				'<login_name>' + sts.[login_name] + '</login_name>' + 
+																				'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
+																				'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
+																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
+																				'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
+																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdCriticalBlocking*1000) + '</threshold_value>' + 
+																				'<measure_unit>sec</measure_unit>' + 
+																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'</detail></alert>' AS [event_message]
+																	FROM [dbo].[vw_catalogInstanceNames]  cin
+																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
+																	INNER JOIN
+																			(
+																				SELECT [session_id],
+																						STUFF((
+																								SELECT ', ' + [database_name]
+																								FROM (
+																										SELECT DISTINCT [database_name]
+																										FROM [monitoring].[statsTransactionsStatus]
+																										WHERE [session_id] = sts.[session_id]
+																									)db
+																								ORDER BY [database_name]
+																								FOR XML PATH ('')
+																							) ,1,2,'') [database_name]
+																				FROM [monitoring].[statsTransactionsStatus] sts
+																				GROUP BY [session_id]
+																			)db ON db.[session_id] = sts.[session_id]
+																	LEFT JOIN
+																			(
+																				SELECT [session_id],
+																						STUFF((
+																								SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
+																								FROM (
+																										SELECT DISTINCT [sql_handle]
+																										FROM [monitoring].[statsTransactionsStatus]
+																										WHERE [session_id] = sts.[session_id]
+																											 AND [sql_handle] IS NOT NULL
+																											 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
+																									)db
+																								ORDER BY [sql_handle]
+																								FOR XML PATH ('')
+																							) ,1,2,'') [sql_handle]
+																				FROM [monitoring].[statsTransactionsStatus] sts
+																				GROUP BY [session_id]
+																			)sh ON sh.[session_id] = sts.[session_id]
+																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
+																													AND asr.[alert_name] IN ('Blocking Transaction Elapsed Time (sec)')
+																													AND asr.[active] = 1
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+																	WHERE cin.[instance_active]=1
+																			AND cin.[project_id] = @projectID
+																			AND cin.[instance_name] LIKE @sqlServerNameFilter
+																			AND sts.[wait_duration_sec] >= @alertThresholdCriticalBlocking
+																			AND sts.[is_session_blocked] = 1
 
-												UNION ALL
+																	UNION ALL
 
-												SELECT  DISTINCT
-														  cin.[instance_name] AS [instance_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') AS [object_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
-														, 'warning'				AS [severity]
-														, 'tempdb space'	AS [event_name]
-														, '<alert><detail>' + 
-															'<severity>warning</severity>' + 
-															'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
-															'<counter_name>tempdb space</counter_name>' + 
-															'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
-															'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
-															'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
-															'<databases>' + db.[database_name] + '</databases>' + 
-															'<host_name>' + sts.[host_name] + '</host_name>' + 
-															'<program_name>' + sts.[program_name] + '</program_name>' + 
-															'<login_name>' + sts.[login_name] + '</login_name>' + 
-															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
-															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
-															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
-															'<tempdb_usage>' + CAST(sts.[tempdb_space_used_mb] AS [nvarchar]) + '</tempdb_usage>' + 
-															'<threshold_value>' + CAST(@alertThresholdWarningTempdb AS [nvarchar]) + '</threshold_value>' + 
-															'<measure_unit>mb</measure_unit>' + 
-															'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
-															'</detail></alert>' AS [event_message]
-												FROM [dbo].[vw_catalogInstanceNames]  cin
-												INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
-												INNER JOIN
-														(
-															SELECT [session_id],
-																	STUFF((
-																			SELECT ', ' + [database_name]
-																			FROM (
-																					SELECT DISTINCT [database_name]
-																					FROM [monitoring].[statsTransactionsStatus]
-																					WHERE [session_id] = sts.[session_id]
-																				)db
-																			ORDER BY [database_name]
-																			FOR XML PATH ('')
-																		) ,1,2,'') [database_name]
-															FROM [monitoring].[statsTransactionsStatus] sts
-															GROUP BY [session_id]
-														)db ON db.[session_id] = sts.[session_id]
-												LEFT JOIN
-														(
-															SELECT [session_id],
-																	STUFF((
-																			SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
-																			FROM (
-																					SELECT DISTINCT [sql_handle]
-																					FROM [monitoring].[statsTransactionsStatus]
-																					WHERE [session_id] = sts.[session_id]
-																						 AND [sql_handle] IS NOT NULL
-																						 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
-																				)db
-																			ORDER BY [sql_handle]
-																			FOR XML PATH ('')
-																		) ,1,2,'') [sql_handle]
-															FROM [monitoring].[statsTransactionsStatus] sts
-															GROUP BY [session_id]
-														)sh ON sh.[session_id] = sts.[session_id]
-												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
-																								AND asr.[alert_name] IN ('tempdb: space used by a single session')
-																								AND asr.[active] = 1
-																								AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
-												WHERE cin.[instance_active]=1
-														AND cin.[project_id] = @projectID
-														AND cin.[instance_name] LIKE @sqlServerNameFilter
-														AND sts.[tempdb_space_used_mb] >= @alertThresholdWarningTempdb
-														AND sts.[tempdb_space_used_mb] < @alertThresholdCriticalTempdb
+																	SELECT  DISTINCT
+																			  cin.[instance_name] AS [instance_name]
+																			, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') AS [object_name]
+																			, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
+																			, 'warning'				AS [severity]
+																			, 'tempdb space'	AS [event_name]
+																			, '<alert><detail>' + 
+																				'<severity>warning</severity>' + 
+																				'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
+																				'<counter_name>tempdb space</counter_name>' + 
+																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
+																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
+																				'<databases>' + db.[database_name] + '</databases>' + 
+																				'<host_name>' + sts.[host_name] + '</host_name>' + 
+																				'<program_name>' + sts.[program_name] + '</program_name>' + 
+																				'<login_name>' + sts.[login_name] + '</login_name>' + 
+																				'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
+																				'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
+																				'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
+																				'<tempdb_usage>' + CAST(sts.[tempdb_space_used_mb] AS [nvarchar]) + '</tempdb_usage>' + 
+																				'<threshold_value>' + CAST(@alertThresholdWarningTempdb AS [nvarchar]) + '</threshold_value>' + 
+																				'<measure_unit>mb</measure_unit>' + 
+																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'</detail></alert>' AS [event_message]
+																	FROM [dbo].[vw_catalogInstanceNames]  cin
+																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
+																	INNER JOIN
+																			(
+																				SELECT [session_id],
+																						STUFF((
+																								SELECT ', ' + [database_name]
+																								FROM (
+																										SELECT DISTINCT [database_name]
+																										FROM [monitoring].[statsTransactionsStatus]
+																										WHERE [session_id] = sts.[session_id]
+																									)db
+																								ORDER BY [database_name]
+																								FOR XML PATH ('')
+																							) ,1,2,'') [database_name]
+																				FROM [monitoring].[statsTransactionsStatus] sts
+																				GROUP BY [session_id]
+																			)db ON db.[session_id] = sts.[session_id]
+																	LEFT JOIN
+																			(
+																				SELECT [session_id],
+																						STUFF((
+																								SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
+																								FROM (
+																										SELECT DISTINCT [sql_handle]
+																										FROM [monitoring].[statsTransactionsStatus]
+																										WHERE [session_id] = sts.[session_id]
+																											 AND [sql_handle] IS NOT NULL
+																											 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
+																									)db
+																								ORDER BY [sql_handle]
+																								FOR XML PATH ('')
+																							) ,1,2,'') [sql_handle]
+																				FROM [monitoring].[statsTransactionsStatus] sts
+																				GROUP BY [session_id]
+																			)sh ON sh.[session_id] = sts.[session_id]
+																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
+																													AND asr.[alert_name] IN ('tempdb: space used by a single session')
+																													AND asr.[active] = 1
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+																	WHERE cin.[instance_active]=1
+																			AND cin.[project_id] = @projectID
+																			AND cin.[instance_name] LIKE @sqlServerNameFilter
+																			AND sts.[tempdb_space_used_mb] >= @alertThresholdWarningTempdb
+																			AND sts.[tempdb_space_used_mb] < @alertThresholdCriticalTempdb
 												
-												UNION ALL
+																	UNION ALL
 
-												SELECT  DISTINCT
-														  cin.[instance_name] AS [instance_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') AS [object_name]
-														, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
-														, 'critical'			AS [severity]
-														, 'tempdb space'	AS [event_name]
-														, '<alert><detail>' + 
-															'<severity>critical</severity>' + 
-															'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
-															'<counter_name>tempdb space</counter_name>' + 
-															'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
-															'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
-															'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
-															'<databases>' + db.[database_name] + '</databases>' + 
-															'<host_name>' + sts.[host_name] + '</host_name>' + 
-															'<program_name>' + sts.[program_name] + '</program_name>' + 
-															'<login_name>' + sts.[login_name] + '</login_name>' + 
-															'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
-															'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
-															'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
-															'<tempdb_usage>' + CAST(sts.[tempdb_space_used_mb] AS [nvarchar]) + '</tempdb_usage>' + 
-															'<threshold_value>' + CAST(@alertThresholdCriticalTempdb AS [nvarchar]) + '</threshold_value>' + 
-															'<measure_unit>mb</measure_unit>' + 
-															'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
-															'</detail></alert>' AS [event_message]
-												FROM [dbo].[vw_catalogInstanceNames]  cin
-												INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
-												INNER JOIN
-														(
-															SELECT [session_id],
-																	STUFF((
-																			SELECT ', ' + [database_name]
-																			FROM (
-																					SELECT DISTINCT [database_name]
-																					FROM [monitoring].[statsTransactionsStatus]
-																					WHERE [session_id] = sts.[session_id]
-																				)db
-																			ORDER BY [database_name]
-																			FOR XML PATH ('')
-																		) ,1,2,'') [database_name]
-															FROM [monitoring].[statsTransactionsStatus] sts
-															GROUP BY [session_id]
-														)db ON db.[session_id] = sts.[session_id]
-												LEFT JOIN
-														(
-															SELECT [session_id],
-																	STUFF((
-																			SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
-																			FROM (
-																					SELECT DISTINCT [sql_handle]
-																					FROM [monitoring].[statsTransactionsStatus]
-																					WHERE [session_id] = sts.[session_id]
-																						 AND [sql_handle] IS NOT NULL
-																						 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
-																				)db
-																			ORDER BY [sql_handle]
-																			FOR XML PATH ('')
-																		) ,1,2,'') [sql_handle]
-															FROM [monitoring].[statsTransactionsStatus] sts
-															GROUP BY [session_id]
-														)sh ON sh.[session_id] = sts.[session_id]
-												LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
-																								AND asr.[alert_name] IN ('tempdb: space used by a single session')
-																								AND asr.[active] = 1
-																								AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
-												WHERE cin.[instance_active]=1
-														AND cin.[project_id] = @projectID
-														AND cin.[instance_name] LIKE @sqlServerNameFilter
-														AND sts.[tempdb_space_used_mb] >= @alertThresholdCriticalTempdb
-												ORDER BY [instance_name], [object_name]
+																	SELECT  DISTINCT
+																			  cin.[instance_name] AS [instance_name]
+																			, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') AS [object_name]
+																			, 'session_id=' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') + CASE WHEN sh.[sql_handle] IS NOT NULL THEN '; sqlhandle=' + sh.[sql_handle] ELSE N'' END AS [child_object_name]
+																			, 'critical'			AS [severity]
+																			, 'tempdb space'	AS [event_name]
+																			, '<alert><detail>' + 
+																				'<severity>critical</severity>' + 
+																				'<instance_name>' + cin.[instance_name] + '</instance_name>' + 
+																				'<counter_name>tempdb space</counter_name>' + 
+																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
+																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
+																				'<databases>' + db.[database_name] + '</databases>' + 
+																				'<host_name>' + sts.[host_name] + '</host_name>' + 
+																				'<program_name>' + sts.[program_name] + '</program_name>' + 
+																				'<login_name>' + sts.[login_name] + '</login_name>' + 
+																				'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN sh.[sql_handle] ELSE N'' END + '</sql_handle>' + 
+																				'<transaction_begin_time>' + CONVERT([varchar](20), sts.[transaction_begin_time], 120) + '</transaction_begin_time>' + 
+																				'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
+																				'<tempdb_usage>' + CAST(sts.[tempdb_space_used_mb] AS [nvarchar]) + '</tempdb_usage>' + 
+																				'<threshold_value>' + CAST(@alertThresholdCriticalTempdb AS [nvarchar]) + '</threshold_value>' + 
+																				'<measure_unit>mb</measure_unit>' + 
+																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'</detail></alert>' AS [event_message]
+																	FROM [dbo].[vw_catalogInstanceNames]  cin
+																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
+																	INNER JOIN
+																			(
+																				SELECT [session_id],
+																						STUFF((
+																								SELECT ', ' + [database_name]
+																								FROM (
+																										SELECT DISTINCT [database_name]
+																										FROM [monitoring].[statsTransactionsStatus]
+																										WHERE [session_id] = sts.[session_id]
+																									)db
+																								ORDER BY [database_name]
+																								FOR XML PATH ('')
+																							) ,1,2,'') [database_name]
+																				FROM [monitoring].[statsTransactionsStatus] sts
+																				GROUP BY [session_id]
+																			)db ON db.[session_id] = sts.[session_id]
+																	LEFT JOIN
+																			(
+																				SELECT [session_id],
+																						STUFF((
+																								SELECT ', ' + '0x' + CAST('' AS XML).value('xs:hexBinary(sql:column("[sql_handle]") )', 'VARCHAR(64)')
+																								FROM (
+																										SELECT DISTINCT [sql_handle]
+																										FROM [monitoring].[statsTransactionsStatus]
+																										WHERE [session_id] = sts.[session_id]
+																											 AND [sql_handle] IS NOT NULL
+																											 AND [sql_handle] <> 0x0000000000000000000000000000000000000000
+																									)db
+																								ORDER BY [sql_handle]
+																								FOR XML PATH ('')
+																							) ,1,2,'') [sql_handle]
+																				FROM [monitoring].[statsTransactionsStatus] sts
+																				GROUP BY [session_id]
+																			)sh ON sh.[session_id] = sts.[session_id]
+																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
+																													AND asr.[alert_name] IN ('tempdb: space used by a single session')
+																													AND asr.[active] = 1
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+																	WHERE cin.[instance_active]=1
+																			AND cin.[project_id] = @projectID
+																			AND cin.[instance_name] LIKE @sqlServerNameFilter
+																			AND sts.[tempdb_space_used_mb] >= @alertThresholdCriticalTempdb
+																	ORDER BY [instance_name], [object_name]
 OPEN crsTransactionStatusAlarms
 FETCH NEXT FROM crsTransactionStatusAlarms INTO @instanceName, @databaseName, @childObjectName, @severity, @eventName, @eventMessage
 WHILE @@FETCH_STATUS=0

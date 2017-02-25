@@ -38,7 +38,7 @@ GO
 SET NOCOUNT ON
 GO
 INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
-		  SELECT 'common'			AS [module], 'Application Version'															AS [name], N'2016.11.12'AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Application Version'															AS [name], N'2017.01.21'AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Default project code'															AS [name], '$(projectCode)'	AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Database Mail profile name to use for sending emails'							AS [name], NULL			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Default recipients list - Reports (semicolon separated)'						AS [name], NULL			AS [value]		UNION ALL
@@ -52,6 +52,10 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 		  SELECT 'common'			AS [module], 'Log action events'															AS [name], 'true'		AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Log events retention (days)'													AS [name], '15'			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Default lock timeout (ms)'													AS [name], '5000'		AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Default folder for logs'														AS [name], NULL			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Parallel Execution Jobs'														AS [name], '16'			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Maximum number of retries at failed job'										AS [name], '3'			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Fail master job if any queued job fails'										AS [name], 'false'		AS [value]		UNION ALL
 
 		  SELECT 'maintenance-plan' AS [module], 'Default backup location'														AS [name], NULL			AS [value]		UNION ALL
 		  SELECT 'maintenance-plan' AS [module], 'Default backup retention (days)'												AS [name], '7'			AS [value]		UNION ALL
@@ -64,11 +68,7 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 		  SELECT 'health-check'		AS [module], 'Collect Warning OS Events'													AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'health-check'		AS [module], 'Collect Information OS Events'												AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'health-check'		AS [module], 'Collect OS Events timeout (seconds)'											AS [name], '600'		AS [value]		UNION ALL
-		  SELECT 'health-check'		AS [module], 'Collect OS Events from last hours'											AS [name], '24'			AS [value]		UNION ALL
-		  SELECT 'common'			AS [module], 'Parallel Execution Jobs'														AS [name], '16'			AS [value]		UNION ALL
-		  SELECT 'common'			AS [module], 'Maximum number of retries at failed job'										AS [name], '3'			AS [value]		UNION ALL
-		  SELECT 'common'			AS [module], 'Fail master job if any queued job fails'										AS [name], 'false'		AS [value]		UNION ALL
-		  SELECT 'common'			AS [module], 'Default folder for logs'														AS [name], NULL			AS [value]
+		  SELECT 'health-check'		AS [module], 'Collect OS Events from last hours'											AS [name], '24'			AS [value]
 GO
 
 ---------------------------------------------------------------------------------------------
@@ -98,7 +98,11 @@ EXEC master.dbo.xp_instance_regread N'HKEY_LOCAL_MACHINE',N'Software\Microsoft\M
 									'no_output'
 
 IF @defaultBackupDirectory IS NOT NULL
-	UPDATE [dbo].[appConfigurations] SET [value] = @defaultBackupDirectory WHERE [module] = 'maintenance-plan' AND [name] = 'Default backup location'
+	begin
+		UPDATE [dbo].[appConfigurations] SET [value] = @defaultBackupDirectory WHERE [module] = 'maintenance-plan' AND [name] = 'Default backup location'
+		UPDATE [dbo].[appConfigurations] SET [value] = @defaultBackupDirectory + '\html-reports' WHERE [module] = 'common' AND [name] = 'Local storage path for HTML reports'
+		UPDATE [dbo].[appConfigurations] SET [value] = @defaultBackupDirectory + '\job-logs' WHERE [module] = 'common' AND [name] = 'Default folder for logs'
+	end
 GO
 
 
@@ -114,9 +118,9 @@ SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(CAST(SERVERPROPERTY('ProductVersio
 SET @queryToRun=N''
 SET @queryToRun = @queryToRun + N'
 UPDATE [dbo].[appConfigurations] 
-	SET [value]= CASE WHEN 2 * (SELECT [cpu_count] FROM sys.dm_os_sys_info)  > 32 
+	SET [value]= CASE	WHEN (SELECT [cpu_count] FROM sys.dm_os_sys_info)  > 32 
 						THEN 32
-						ELSE 2 * (SELECT [cpu_count] FROM sys.dm_os_sys_info)
+						ELSE (SELECT [cpu_count] FROM sys.dm_os_sys_info)
 				END
 WHERE [module] = ''common'' AND [name] = ''Parallel Execution Jobs'''
 

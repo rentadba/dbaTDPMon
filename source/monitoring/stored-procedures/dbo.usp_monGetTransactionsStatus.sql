@@ -157,12 +157,12 @@ WHERE cin.[project_id] = @projectID
 SET @strMessage='--Step 2: Get Instance Details Information...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 		
-DECLARE crsActiveInstances CURSOR LOCAL FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
-												FROM	[dbo].[vw_catalogInstanceNames] cin
-												WHERE 	cin.[project_id] = @projectID
-														AND cin.[instance_active]=1
-														AND cin.[instance_name] LIKE @sqlServerNameFilter
-												ORDER BY cin.[instance_name]
+DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
+															FROM	[dbo].[vw_catalogInstanceNames] cin
+															WHERE 	cin.[project_id] = @projectID
+																	AND cin.[instance_active]=1
+																	AND cin.[instance_name] LIKE @sqlServerNameFilter
+															ORDER BY cin.[instance_name]
 OPEN crsActiveInstances
 FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
 WHILE @@FETCH_STATUS=0

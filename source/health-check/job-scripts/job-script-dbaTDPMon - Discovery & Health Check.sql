@@ -91,10 +91,6 @@ http://dbaTDPMon.codeplex.com',
 
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'
-	' + CASE WHEN @projectCode IS NULL 
-			 THEN N'TRUNCATE TABLE [dbo].[logAnalysisMessages]' 
-			 ELSE N'DELETE lam FROM [dbo].[logAnalysisMessages] lam INNER JOIN [dbo].[catalogProjects] cp ON cp.[id] = lam.[project_id] WHERE cp.[code] = ''' + @projectCode + N''''
-		END + N'
 	EXEC [dbo].[usp_refreshProjectCatalogsAndDiscovery] @projectCode	 = ''' + @projectCode + N''',
 														@runDiscovery	 = 0,
 														@enableXPCMDSHELL= 1,

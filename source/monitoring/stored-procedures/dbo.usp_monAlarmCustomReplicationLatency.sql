@@ -99,12 +99,12 @@ RAISERROR('--Get Publications & Subscriptions Information....', 10, 1) WITH NOWA
 SET @runStartTime = GETUTCDATE()
 
 --replication distribution servers
-DECLARE crsReplicationDistributorServers CURSOR FAST_FORWARD READ_ONLY FOR	SELECT [instance_name]
-																			FROM [dbo].[vw_catalogDatabaseNames] 
-																			WHERE [project_id] = @projectID
-																					AND [active] = 1
-																					AND [database_name] = 'distribution'
-																					AND [instance_name] LIKE @sqlServerNameFilter
+DECLARE crsReplicationDistributorServers CURSOR LOCAL FAST_FORWARD  FOR	SELECT [instance_name]
+																		FROM [dbo].[vw_catalogDatabaseNames] 
+																		WHERE [project_id] = @projectID
+																				AND [active] = 1
+																				AND [database_name] = 'distribution'
+																				AND [instance_name] LIKE @sqlServerNameFilter
 OPEN crsReplicationDistributorServers
 FETCH NEXT FROM crsReplicationDistributorServers INTO @sqlServerName
 WHILE @@FETCH_STATUS=0
@@ -169,19 +169,19 @@ DECLARE   @publicationName		[sysname]
 		, @distributorServer	[sysname]
 		, @subscriptionArticles	[int]
 
-DECLARE crsInactiveSubscriptions CURSOR FAST_FORWARD READ_ONLY FOR	SELECT    srl.[publication_name], srl.[publisher_server], srl.[publisher_db]
-																			, srl.[subscriber_server], srl.[subscriber_db], srl.[subscription_articles], srl.[distributor_server]
-																	FROM [monitoring].[statsReplicationLatency] srl
-																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication'
-																												AND asr.[alert_name] IN ('subscription marked inactive')
-																												AND asr.[active] = 1
-																												AND (asr.[skip_value] = ('[' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '](' + srl.[publication_name] + ')'))
-																												AND (    asr.[skip_value2] IS NULL 
-																													 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ('[' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + ']'))
-																													)
-																	WHERE	srl.[subscription_status] = 0 /* inactive subscriptions */
-																			AND asr.[id] IS NULL
-																			AND srl.[publisher_server] LIKE @sqlServerNameFilter
+DECLARE crsInactiveSubscriptions CURSOR LOCAL FAST_FORWARD FOR	SELECT    srl.[publication_name], srl.[publisher_server], srl.[publisher_db]
+																		, srl.[subscriber_server], srl.[subscriber_db], srl.[subscription_articles], srl.[distributor_server]
+																FROM [monitoring].[statsReplicationLatency] srl
+																LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication'
+																											AND asr.[alert_name] IN ('subscription marked inactive')
+																											AND asr.[active] = 1
+																											AND (asr.[skip_value] = ('[' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '](' + srl.[publication_name] + ')'))
+																											AND (    asr.[skip_value2] IS NULL 
+																													OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ('[' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + ']'))
+																												)
+																WHERE	srl.[subscription_status] = 0 /* inactive subscriptions */
+																		AND asr.[id] IS NULL
+																		AND srl.[publisher_server] LIKE @sqlServerNameFilter
 OPEN crsInactiveSubscriptions
 FETCH NEXT FROM crsInactiveSubscriptions INTO @publicationName, @publicationServer, @publisherDB, @subcriptionServer, @subscriptionDB, @subscriptionArticles, @distributorServer
 WHILE @@FETCH_STATUS=0
@@ -223,19 +223,19 @@ DEALLOCATE crsInactiveSubscriptions
 RAISERROR('--Check for subscribed but not active subscriptions....', 10, 1) WITH NOWAIT
 
 
-DECLARE crsInactiveSubscriptions CURSOR FAST_FORWARD READ_ONLY FOR	SELECT    srl.[publication_name], srl.[publisher_server], srl.[publisher_db], srl.[subscriber_server]
-																			, srl.[subscriber_db], srl.[subscription_articles], srl.[distributor_server]
-																	FROM [monitoring].[statsReplicationLatency] srl
-																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication'
-																												AND asr.[alert_name] IN ('subscription not active')
-																												AND asr.[active] = 1
-																												AND (asr.[skip_value] = ('[' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '](' + srl.[publication_name] + ')'))
-																												AND (    asr.[skip_value2] IS NULL 
-																													 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ('[' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + ']'))
-																													)
-																	WHERE	srl.[subscription_status] = 1 /* subscribed subscriptions */
-																			AND asr.[id] IS NULL
-																			AND srl.[publisher_server] LIKE @sqlServerNameFilter
+DECLARE crsInactiveSubscriptions CURSOR LOCAL FAST_FORWARD FOR	SELECT    srl.[publication_name], srl.[publisher_server], srl.[publisher_db], srl.[subscriber_server]
+																		, srl.[subscriber_db], srl.[subscription_articles], srl.[distributor_server]
+																FROM [monitoring].[statsReplicationLatency] srl
+																LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication'
+																											AND asr.[alert_name] IN ('subscription not active')
+																											AND asr.[active] = 1
+																											AND (asr.[skip_value] = ('[' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '](' + srl.[publication_name] + ')'))
+																											AND (    asr.[skip_value2] IS NULL 
+																													OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ('[' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + ']'))
+																												)
+																WHERE	srl.[subscription_status] = 1 /* subscribed subscriptions */
+																		AND asr.[id] IS NULL
+																		AND srl.[publisher_server] LIKE @sqlServerNameFilter
 OPEN crsInactiveSubscriptions
 FETCH NEXT FROM crsInactiveSubscriptions INTO @publicationName, @publicationServer, @publisherDB, @subcriptionServer, @subscriptionDB, @subscriptionArticles, @distributorServer
 WHILE @@FETCH_STATUS=0
@@ -273,21 +273,20 @@ DEALLOCATE crsInactiveSubscriptions
 ------------------------------------------------------------------------------------------------------------------------------------------
 RAISERROR('--Deploy temporary objects for Replication Latency analysis...', 10, 1) WITH NOWAIT
 
-DECLARE crsActivePublications CURSOR FAST_FORWARD READ_ONLY FOR	SELECT DISTINCT srl.[publisher_server]
-																FROM [monitoring].[statsReplicationLatency] srl
-																LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication'
-																											AND asr.[alert_name] IN ('subscription marked inactive', 'subscription not active')
-																											AND asr.[active] = 1
-																											AND (asr.[skip_value] = ('[' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '](' + srl.[publication_name] + ')'))
-																											AND (    asr.[skip_value2] IS NULL 
-																													OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ('[' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + ']'))
-																												)
+DECLARE crsActivePublications CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT srl.[publisher_server]
+															FROM [monitoring].[statsReplicationLatency] srl
+															LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication'
+																										AND asr.[alert_name] IN ('subscription marked inactive', 'subscription not active')
+																										AND asr.[active] = 1
+																										AND (asr.[skip_value] = ('[' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '](' + srl.[publication_name] + ')'))
+																										AND (    asr.[skip_value2] IS NULL 
+																												OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ('[' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + ']'))
+																											)
 
-																WHERE srl.[subscription_status] = 2 /* active subscriptions */
-																		AND srl.[publication_type] = 0 /* only transactional publications */
-																		AND asr.[id] IS NULL
-																		AND srl.[publisher_server] LIKE @sqlServerNameFilter
-
+															WHERE srl.[subscription_status] = 2 /* active subscriptions */
+																	AND srl.[publication_type] = 0 /* only transactional publications */
+																	AND asr.[id] IS NULL
+																	AND srl.[publisher_server] LIKE @sqlServerNameFilter
 OPEN crsActivePublications
 FETCH NEXT FROM crsActivePublications INTO @publicationServer
 WHILE @@FETCH_STATUS=0
@@ -476,14 +475,14 @@ WHERE [project_id] = @projectID
 		AND [module] = 'monitoring'
 		AND [descriptor] = 'usp_monAlarmCustomReplicationLatency'
 
-DECLARE crsActivePublishers	CURSOR FAST_FORWARD READ_ONLY FOR	SELECT DISTINCT cin.[id], [publisher_server]
-																FROM	[monitoring].[statsReplicationLatency] srl
-																INNER JOIN [dbo].[catalogInstanceNames] cin ON srl.[publisher_server] = cin.[name]
-																WHERE	[subscription_status] = 2 /* active subscriptions */
-																		AND [publication_type] = 0 /* only transactional publications */
-																		AND cin.[active] = 1
-																		AND cin.[project_id] = @projectID
-																		AND srl.[publisher_server] LIKE @sqlServerNameFilter
+DECLARE crsActivePublishers	CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT cin.[id], [publisher_server]
+															FROM	[monitoring].[statsReplicationLatency] srl
+															INNER JOIN [dbo].[catalogInstanceNames] cin ON srl.[publisher_server] = cin.[name]
+															WHERE	[subscription_status] = 2 /* active subscriptions */
+																	AND [publication_type] = 0 /* only transactional publications */
+																	AND cin.[active] = 1
+																	AND cin.[project_id] = @projectID
+																	AND srl.[publisher_server] LIKE @sqlServerNameFilter
 OPEN crsActivePublishers
 FETCH NEXT FROM crsActivePublishers INTO @publisherInstanceID, @publicationServer
 WHILE @@FETCH_STATUS=0
@@ -491,12 +490,12 @@ WHILE @@FETCH_STATUS=0
 		SET @strMessage='--	Analyzing server: ' + @publicationServer
 		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
 
-		DECLARE crsActivePublications CURSOR FAST_FORWARD READ_ONLY FOR	SELECT DISTINCT [publication_name], [publisher_db]
-																		FROM	[monitoring].[statsReplicationLatency] srl																		
-																		WHERE	[subscription_status] = 2 /* active subscriptions */
-																				AND srl.[publisher_server] = @publicationServer
-																				AND [publication_type] = 0 /* only transactional publications */
-																				AND srl.[publisher_server] LIKE @sqlServerNameFilter
+		DECLARE crsActivePublications CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [publication_name], [publisher_db]
+																	FROM	[monitoring].[statsReplicationLatency] srl																		
+																	WHERE	[subscription_status] = 2 /* active subscriptions */
+																			AND srl.[publisher_server] = @publicationServer
+																			AND [publication_type] = 0 /* only transactional publications */
+																			AND srl.[publisher_server] LIKE @sqlServerNameFilter
 																			
 		OPEN crsActivePublications
 		FETCH NEXT FROM crsActivePublications INTO @publicationName, @publisherDB
@@ -545,14 +544,14 @@ WHERE	jeq.[module] = 'monitoring'
 RAISERROR('--Generate Replication Latency getdata internal jobs..', 10, 1) WITH NOWAIT
 ------------------------------------------------------------------------------------------------------------------------------------------
 
-DECLARE crsActivePublishers	CURSOR FAST_FORWARD READ_ONLY FOR	SELECT DISTINCT cin.[id], [publisher_server]
-																FROM	[monitoring].[statsReplicationLatency] srl
-																INNER JOIN [dbo].[catalogInstanceNames] cin ON srl.[publisher_server] = cin.[name]
-																WHERE	[subscription_status] = 2 /* active subscriptions */
-																		AND [publication_type] = 0 /* only transactional publications */
-																		AND cin.[active] = 1
-																		AND cin.[project_id] = @projectID
-																		AND srl.[publisher_server] LIKE @sqlServerNameFilter
+DECLARE crsActivePublishers	CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT cin.[id], [publisher_server]
+															FROM	[monitoring].[statsReplicationLatency] srl
+															INNER JOIN [dbo].[catalogInstanceNames] cin ON srl.[publisher_server] = cin.[name]
+															WHERE	[subscription_status] = 2 /* active subscriptions */
+																	AND [publication_type] = 0 /* only transactional publications */
+																	AND cin.[active] = 1
+																	AND cin.[project_id] = @projectID
+																	AND srl.[publisher_server] LIKE @sqlServerNameFilter
 OPEN crsActivePublishers
 FETCH NEXT FROM crsActivePublishers INTO @publisherInstanceID, @publicationServer
 WHILE @@FETCH_STATUS=0
@@ -560,12 +559,12 @@ WHILE @@FETCH_STATUS=0
 		SET @strMessage='--	Analyzing server: ' + @publicationServer
 		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
 		
-		DECLARE crsActivePublications CURSOR FAST_FORWARD READ_ONLY FOR	SELECT DISTINCT [publication_name], [publisher_db]
-																		FROM	[monitoring].[statsReplicationLatency] srl																		
-																		WHERE	[subscription_status] = 2 /* active subscriptions */
-																				AND srl.[publisher_server] = @publicationServer
-																				AND [publication_type] = 0 /* only transactional publications */
-																				AND srl.[publisher_server] LIKE @sqlServerNameFilter
+		DECLARE crsActivePublications CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [publication_name], [publisher_db]
+																	FROM	[monitoring].[statsReplicationLatency] srl																		
+																	WHERE	[subscription_status] = 2 /* active subscriptions */
+																			AND srl.[publisher_server] = @publicationServer
+																			AND [publication_type] = 0 /* only transactional publications */
+																			AND srl.[publisher_server] LIKE @sqlServerNameFilter
 		OPEN crsActivePublications
 		FETCH NEXT FROM crsActivePublications INTO @publicationName, @publisherDB
 		WHILE @@FETCH_STATUS=0
@@ -640,20 +639,20 @@ WHERE	jeq.[module] = 'monitoring'
 ------------------------------------------------------------------------------------------------------------------------------------------
 RAISERROR('--Perform cleanup...', 10, 1) WITH NOWAIT
 
-DECLARE crsActivePublications CURSOR FAST_FORWARD READ_ONLY FOR	SELECT DISTINCT srl.[publisher_server], srl.[publication_name], srl.[publisher_db]
-																FROM [monitoring].[statsReplicationLatency] srl
-																LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication'
-																											AND asr.[alert_name] IN ('subscription marked inactive', 'subscription not active')
-																											AND asr.[active] = 1
-																											AND (asr.[skip_value] = ('[' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '](' + srl.[publication_name] + ')'))
-																											AND (    asr.[skip_value2] IS NULL 
-																													OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ('[' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + ']'))
-																												)
+DECLARE crsActivePublications CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT srl.[publisher_server], srl.[publication_name], srl.[publisher_db]
+															FROM [monitoring].[statsReplicationLatency] srl
+															LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication'
+																										AND asr.[alert_name] IN ('subscription marked inactive', 'subscription not active')
+																										AND asr.[active] = 1
+																										AND (asr.[skip_value] = ('[' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '](' + srl.[publication_name] + ')'))
+																										AND (    asr.[skip_value2] IS NULL 
+																												OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ('[' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + ']'))
+																											)
 
-																WHERE srl.[subscription_status] = 2 /* active subscriptions */
-																		AND srl.[publication_type] = 0 /* only transactional publications */
-																		AND asr.[id] IS NULL
-																		AND srl.[publisher_server] LIKE @sqlServerNameFilter
+															WHERE srl.[subscription_status] = 2 /* active subscriptions */
+																	AND srl.[publication_type] = 0 /* only transactional publications */
+																	AND asr.[id] IS NULL
+																	AND srl.[publisher_server] LIKE @sqlServerNameFilter
 OPEN crsActivePublications
 FETCH NEXT FROM crsActivePublications INTO @publicationServer, @publicationName, @publisherDB
 WHILE @@FETCH_STATUS=0
@@ -708,38 +707,38 @@ DECLARE   @instanceName		[sysname]
 		, @eventMessage		[nvarchar](max)
 
 
-DECLARE crsReplicationAlarms CURSOR FOR	SELECT  DISTINCT
-												  srl.[publisher_server] AS [instance_name]
-												, 'Publication: ' + srl.[publication_name] + ' - Subscriber:' + srl.[subscriber_server] + '.' + srl.[subscriber_db] AS [object_name]
-												, 'critical'			AS [severity]
-												, 'replication latency'	AS [event_name]
-												, '<alert><detail>' + 
-													'<severity>critical</severity>' + 
-													'<machine_name>' + cin.[machine_name] + '</machine_name>' + 
-													'<counter_name>replication latency</counter_name>
-													<target_name>Publication: ' + srl.[publication_name] + ' / Subscriber: [' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + '] / Publisher: [' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '] / Distributor: [' + srl.[distributor_server] + ']</target_name>' + 
-													'<measure_unit>sec</measure_unit>' + 
-													'<current_value>' + ISNULL(CAST(srl.[overall_latency] AS [nvarchar]), '-1') +'</current_value>' + 
-													'<threshold_value>' + CAST(@alertThresholdCriticalReplicationLatencySec AS [varchar]) + '</threshold_value>' + 
-													'<event_date_utc>' + CONVERT([varchar](20), srl.[event_date_utc], 120) + '</event_date_utc>' + 
-													'</detail></alert>' AS [event_message]
-										FROM [dbo].[vw_catalogInstanceNames]  cin
-										INNER JOIN [monitoring].[statsReplicationLatency] srl ON srl.[project_id] = cin.[project_id] AND srl.[publisher_server] = cin.[instance_name]
-										LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication'
-																						AND asr.[alert_name] IN ('replication latency')
-																						AND asr.[active] = 1
-																						AND (asr.[skip_value] = ('[' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '](' + srl.[publication_name] + ')'))
-																						AND (    asr.[skip_value2] IS NULL 
-																								OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ('[' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + ']'))
-																							)
-										WHERE cin.[instance_active]=1
-												AND cin.[project_id] = @projectID
-												AND cin.[instance_name] LIKE @sqlServerNameFilter
-												AND (srl.[overall_latency] IS NULL OR srl.[overall_latency]>=@alertThresholdCriticalReplicationLatencySec)									
-												AND srl.[subscription_status] = 2 /* active subscriptions */
-												AND srl.[state] = 2 /* run analysis and get data jobs completed successfully */
-												AND asr.[id] IS NULL
-										ORDER BY [instance_name], [object_name]
+DECLARE crsReplicationAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINCT
+																	  srl.[publisher_server] AS [instance_name]
+																	, 'Publication: ' + srl.[publication_name] + ' - Subscriber:' + srl.[subscriber_server] + '.' + srl.[subscriber_db] AS [object_name]
+																	, 'critical'			AS [severity]
+																	, 'replication latency'	AS [event_name]
+																	, '<alert><detail>' + 
+																		'<severity>critical</severity>' + 
+																		'<machine_name>' + cin.[machine_name] + '</machine_name>' + 
+																		'<counter_name>replication latency</counter_name>
+																		<target_name>Publication: ' + srl.[publication_name] + ' / Subscriber: [' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + '] / Publisher: [' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '] / Distributor: [' + srl.[distributor_server] + ']</target_name>' + 
+																		'<measure_unit>sec</measure_unit>' + 
+																		'<current_value>' + ISNULL(CAST(srl.[overall_latency] AS [nvarchar]), '-1') +'</current_value>' + 
+																		'<threshold_value>' + CAST(@alertThresholdCriticalReplicationLatencySec AS [varchar]) + '</threshold_value>' + 
+																		'<event_date_utc>' + CONVERT([varchar](20), srl.[event_date_utc], 120) + '</event_date_utc>' + 
+																		'</detail></alert>' AS [event_message]
+															FROM [dbo].[vw_catalogInstanceNames]  cin
+															INNER JOIN [monitoring].[statsReplicationLatency] srl ON srl.[project_id] = cin.[project_id] AND srl.[publisher_server] = cin.[instance_name]
+															LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'replication'
+																											AND asr.[alert_name] IN ('replication latency')
+																											AND asr.[active] = 1
+																											AND (asr.[skip_value] = ('[' + srl.[publisher_server] + '].[' + srl.[publisher_db] + '](' + srl.[publication_name] + ')'))
+																											AND (    asr.[skip_value2] IS NULL 
+																													OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = ('[' + srl.[subscriber_server] + '].[' + srl.[subscriber_db] + ']'))
+																												)
+															WHERE cin.[instance_active]=1
+																	AND cin.[project_id] = @projectID
+																	AND cin.[instance_name] LIKE @sqlServerNameFilter
+																	AND (srl.[overall_latency] IS NULL OR srl.[overall_latency]>=@alertThresholdCriticalReplicationLatencySec)									
+																	AND srl.[subscription_status] = 2 /* active subscriptions */
+																	AND srl.[state] = 2 /* run analysis and get data jobs completed successfully */
+																	AND asr.[id] IS NULL
+															ORDER BY [instance_name], [object_name]
 OPEN crsReplicationAlarms
 FETCH NEXT FROM crsReplicationAlarms INTO @instanceName, @objectName, @severity, @eventName, @eventMessage
 WHILE @@FETCH_STATUS=0

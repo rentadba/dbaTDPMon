@@ -107,11 +107,11 @@ WHERE cin.[project_id] = @projectID
 RAISERROR('--Step 2: Get Jobs Status Information....', 10, 1) WITH NOWAIT
 
 		
-DECLARE crsActiveInstances CURSOR LOCAL FOR 	SELECT	cin.[instance_id], cin.[instance_name]
-												FROM	[dbo].[vw_catalogInstanceNames] cin
-												WHERE 	cin.[project_id] = @projectID
-														AND cin.[instance_active]=1
-														AND cin.[instance_name] LIKE @sqlServerNameFilter
+DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name]
+															FROM	[dbo].[vw_catalogInstanceNames] cin
+															WHERE 	cin.[project_id] = @projectID
+																	AND cin.[instance_active]=1
+																	AND cin.[instance_name] LIKE @sqlServerNameFilter
 OPEN crsActiveInstances
 FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName
 WHILE @@FETCH_STATUS=0
@@ -137,8 +137,8 @@ WHILE @@FETCH_STATUS=0
 		END CATCH				
 
 
-		DECLARE crsJobs CURSOR FOR	SELECT REPLACE([name] , '''', '''''')
-									FROM #msdbSysJobs
+		DECLARE crsJobs CURSOR LOCAL FAST_FORWARD FOR	SELECT REPLACE([name] , '''', '''''')
+														FROM #msdbSysJobs
 		OPEN crsJobs
 		FETCH NEXT FROM crsJobs INTO @jobName
 		WHILE @@FETCH_STATUS=0

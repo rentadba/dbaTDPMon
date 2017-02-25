@@ -80,15 +80,15 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 		/* check running job status and make updates */
 		SET @runningJobs = 0
 
-		DECLARE crsRunningJobs CURSOR FOR	SELECT  [id], [instance_name], [job_name]
-											FROM [dbo].[vw_jobExecutionQueue]
-											WHERE  [project_id] = @projectID 
-													AND [module] LIKE @moduleFilter
-													AND (    [descriptor] LIKE @descriptorFilter
-														  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
-														)			
-													AND [status]=4
-											ORDER BY [id]
+		DECLARE crsRunningJobs CURSOR LOCAL FAST_FORWARD FOR	SELECT  [id], [instance_name], [job_name]
+																FROM [dbo].[vw_jobExecutionQueue]
+																WHERE  [project_id] = @projectID 
+																		AND [module] LIKE @moduleFilter
+																		AND (    [descriptor] LIKE @descriptorFilter
+																			  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
+																			)			
+																		AND [status]=4
+																ORDER BY [id]
 		OPEN crsRunningJobs
 		FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName
 		WHILE @@FETCH_STATUS=0
@@ -197,16 +197,16 @@ IF @minJobToRunBeforeExit=0
 				EXEC (@queryToRun)
 
 		SET @runningJobs = 0
-		DECLARE crsRunningJobs CURSOR FOR	SELECT  jeq.[id], jeq.[instance_name], jeq.[job_name]
-											FROM [dbo].[vw_jobExecutionQueue] jeq
-											INNER JOIN #existingSQLAgentJobs esaj ON esaj.[job_name] = jeq.[job_name]
-											WHERE  jeq.[project_id] = @projectID 
-													AND jeq.[module] LIKE @moduleFilter
-													AND (    [descriptor] LIKE @descriptorFilter
-														  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
-														)			
-													AND jeq.[status]<>-1
-											ORDER BY jeq.[id]
+		DECLARE crsRunningJobs CURSOR LOCAL FAST_FORWARD FOR	SELECT  jeq.[id], jeq.[instance_name], jeq.[job_name]
+																FROM [dbo].[vw_jobExecutionQueue] jeq
+																INNER JOIN #existingSQLAgentJobs esaj ON esaj.[job_name] = jeq.[job_name]
+																WHERE  jeq.[project_id] = @projectID 
+																		AND jeq.[module] LIKE @moduleFilter
+																		AND (    [descriptor] LIKE @descriptorFilter
+																			  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
+																			)			
+																		AND jeq.[status]<>-1
+																ORDER BY jeq.[id]
 		OPEN crsRunningJobs
 		FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName
 		WHILE @@FETCH_STATUS=0

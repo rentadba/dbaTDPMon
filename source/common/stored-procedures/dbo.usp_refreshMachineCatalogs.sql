@@ -343,26 +343,39 @@ BEGIN TRY
 
 				IF @optionXPValue=1 OR @SQLMajorVersion=8
 					begin
-						--run wmi to get the domain name
-						SET @queryToRun = N''
-						SET @queryToRun = @queryToRun + N'DECLARE @cmdQuery [varchar](102); SET @cmdQuery=''wmic computersystem get Domain''; EXEC xp_cmdshell @cmdQuery;'
+						BEGIN TRY
+							--run wmi to get the domain name
+							SET @queryToRun = N''
+							SET @queryToRun = @queryToRun + N'DECLARE @cmdQuery [varchar](102); SET @cmdQuery=''wmic computersystem get Domain''; EXEC xp_cmdshell @cmdQuery;'
 			
-						IF @sqlServerName<>@@SERVERNAME
-							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
-						IF @debugMode = 1 PRINT @queryToRun
+							IF @sqlServerName<>@@SERVERNAME
+								SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+							IF @debugMode = 1 PRINT @queryToRun
 
-						INSERT	INTO #xpCMDShellOutput([output])
-								EXEC (@queryToRun)
+							INSERT	INTO #xpCMDShellOutput([output])
+									EXEC (@queryToRun)
 									
-						UPDATE #xpCMDShellOutput SET [output]=REPLACE(REPLACE(REPLACE(LTRIM(RTRIM([output])), ' ', ''), CHAR(10), ''), CHAR(13), '')
+							UPDATE #xpCMDShellOutput SET [output]=REPLACE(REPLACE(REPLACE(LTRIM(RTRIM([output])), ' ', ''), CHAR(10), ''), CHAR(13), '')
 			
-						DELETE FROM #xpCMDShellOutput WHERE LEN([output])<=3 OR [output] IS NULL
-						DELETE FROM #xpCMDShellOutput WHERE [output] LIKE '%not recognized as an internal or external command%'
-						DELETE FROM #xpCMDShellOutput WHERE [output] LIKE '%operable program or batch file%'
-						DELETE TOP (1) FROM #xpCMDShellOutput WHERE SUBSTRING([output], 1, 8)='Domain'
+							DELETE FROM #xpCMDShellOutput WHERE LEN([output])<=3 OR [output] IS NULL
+							DELETE FROM #xpCMDShellOutput WHERE [output] LIKE '%not recognized as an internal or external command%'
+							DELETE FROM #xpCMDShellOutput WHERE [output] LIKE '%operable program or batch file%'
+							DELETE TOP (1) FROM #xpCMDShellOutput WHERE SUBSTRING([output], 1, 8)='Domain'
 			
-						SELECT TOP 1 @domainName = LOWER([output])
-						FROM #xpCMDShellOutput
+							SELECT TOP 1 @domainName = LOWER([output])
+							FROM #xpCMDShellOutput
+						END TRY
+						BEGIN CATCH
+							SET @queryToRun = N''
+							SET @queryToRun = @queryToRun + N'SELECT DEFAULT_DOMAIN()';
+							IF @sqlServerName<>@@SERVERNAME
+							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+							IF @debugMode = 1 PRINT @queryToRun
+							INSERT	INTO #xpCMDShellOutput([output])
+									EXEC (@queryToRun)
+							SELECT TOP 1 @domainName = LOWER([output])
+								FROM #xpCMDShellOutput
+						END CATCH
 
 						UPDATE #catalogMachineNames SET [domain] = @domainName
 					end

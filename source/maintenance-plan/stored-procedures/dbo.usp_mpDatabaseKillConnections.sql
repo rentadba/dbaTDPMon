@@ -250,7 +250,7 @@ BEGIN TRY
 								SET @queryToRun= 'Kill connections for database: [' + @databaseName + ']'
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 								
-								DECLARE crsSPIDList CURSOR FOR SELECT DISTINCT [spid] FROM @SessionDetails WHERE [spid] IS NOT NULL
+								DECLARE crsSPIDList CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT [spid] FROM @SessionDetails WHERE [spid] IS NOT NULL
 								OPEN crsSPIDList
 								FETCH NEXT FROM crsSPIDList INTO @spid
 								WHILE @@FETCH_STATUS=0
@@ -281,7 +281,7 @@ BEGIN TRY
 								SET @queryToRun= 'Kill orphan connections for database: [' + @databaseName + ']'
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 								
-								DECLARE crsUOWList CURSOR FOR SELECT DISTINCT [uow] FROM @SessionDetails WHERE [uow] IS NOT NULL
+								DECLARE crsUOWList CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT [uow] FROM @SessionDetails WHERE [uow] IS NOT NULL
 								OPEN crsUOWList
 								FETCH NEXT FROM crsUOWList INTO @uow
 								WHILE @@FETCH_STATUS=0

@@ -206,7 +206,7 @@ BEGIN TRY
 
 
 
-				DECLARE crsTableToAlterIndexes CURSOR	LOCAL FAST_FORWARD FOR	SELECT DISTINCT [index_id], [index_name], [index_type], [allow_page_locks], [is_disabled], [is_primary_xml], [has_dependent_fk], [is_replicated]
+				DECLARE crsTableToAlterIndexes CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [index_id], [index_name], [index_type], [allow_page_locks], [is_disabled], [is_primary_xml], [has_dependent_fk], [is_replicated]
 																				FROM @tmpTableToAlterIndexes
 																				ORDER BY [index_id], [index_name]						
 				OPEN crsTableToAlterIndexes

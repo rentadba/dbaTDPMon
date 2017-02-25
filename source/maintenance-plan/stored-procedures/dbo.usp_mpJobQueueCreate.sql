@@ -84,11 +84,11 @@ WHERE [project_id] = @projectID
 		AND [name] = @@SERVERNAME
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-DECLARE crsActiveInstances CURSOR FOR	SELECT	cin.[instance_id], cin.[instance_name]
-										FROM	[dbo].[vw_catalogInstanceNames] cin
-										WHERE 	cin.[project_id] = @projectID
-												AND cin.[instance_active]=1
-												AND cin.[instance_name] LIKE @sqlServerNameFilter
+DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR	SELECT	cin.[instance_id], cin.[instance_name]
+															FROM	[dbo].[vw_catalogInstanceNames] cin
+															WHERE 	cin.[project_id] = @projectID
+																	AND cin.[instance_active]=1
+																	AND cin.[instance_name] LIKE @sqlServerNameFilter
 OPEN crsActiveInstances
 FETCH NEXT FROM crsActiveInstances INTO @forInstanceID, @forSQLServerName
 WHILE @@FETCH_STATUS=0
@@ -108,18 +108,18 @@ WHILE @@FETCH_STATUS=0
 		WHERE	[project_id] = @projectID
 				AND [id] = @instanceID				
 
-		DECLARE crsCollectorDescriptor CURSOR READ_ONLY FAST_FORWARD FOR	SELECT [descriptor]
-																			FROM
-																				(
-																					SELECT 'dbo.usp_mpDatabaseConsistencyCheck' AS [descriptor] UNION ALL
-																					SELECT 'dbo.usp_mpDatabaseOptimize' AS [descriptor] UNION ALL
-																					SELECT 'dbo.usp_mpDatabaseShrink' AS [descriptor] UNION ALL
-																					SELECT 'dbo.usp_mpDatabaseBackup(Data)' AS [descriptor] UNION ALL
-																					SELECT 'dbo.usp_mpDatabaseBackup(Log)' AS [descriptor]
-																				)X
-																			WHERE (    [descriptor] LIKE @jobDescriptor
-																					OR ISNULL(CHARINDEX([descriptor], @jobDescriptor), 0) <> 0
-																				  )			
+		DECLARE crsCollectorDescriptor CURSOR LOCAL FAST_FORWARD FOR	SELECT [descriptor]
+																		FROM
+																			(
+																				SELECT 'dbo.usp_mpDatabaseConsistencyCheck' AS [descriptor] UNION ALL
+																				SELECT 'dbo.usp_mpDatabaseOptimize' AS [descriptor] UNION ALL
+																				SELECT 'dbo.usp_mpDatabaseShrink' AS [descriptor] UNION ALL
+																				SELECT 'dbo.usp_mpDatabaseBackup(Data)' AS [descriptor] UNION ALL
+																				SELECT 'dbo.usp_mpDatabaseBackup(Log)' AS [descriptor]
+																			)X
+																		WHERE (    [descriptor] LIKE @jobDescriptor
+																				OR ISNULL(CHARINDEX([descriptor], @jobDescriptor), 0) <> 0
+																				)			
 
 		OPEN crsCollectorDescriptor
 		FETCH NEXT FROM crsCollectorDescriptor INTO @codeDescriptor
@@ -146,7 +146,7 @@ WHILE @@FETCH_STATUS=0
 																   , [job_command])
 									SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 											@forInstanceID AS [for_instance_id], 
-											DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseConsistencyCheck' + ' - Database Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']' AS [job_name],
+											SUBSTRING(DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseConsistencyCheck' + ' - Database Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 											'Run'		AS [job_step_name],
 											DB_NAME()	AS [job_database_name],
 											'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName	= ''' + @forSQLServerName + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 1, @flgOptions = 3, @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -175,7 +175,7 @@ WHILE @@FETCH_STATUS=0
 																	   , [job_command])
 										SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 												@forInstanceID AS [for_instance_id], 
-												DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseConsistencyCheck' + ' - Allocation Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']' AS [job_name],
+												SUBSTRING(DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseConsistencyCheck' + ' - Allocation Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 												'Run'		AS [job_step_name],
 												DB_NAME()	AS [job_database_name],
 												'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = ' + CAST(@featureflgActions AS [nvarchar]) + N', @flgOptions = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -199,7 +199,7 @@ WHILE @@FETCH_STATUS=0
 																   , [job_command])
 									SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 											@forInstanceID AS [for_instance_id], 
-											DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseConsistencyCheck' + ' - Tables Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']' AS [job_name],
+											SUBSTRING(DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseConsistencyCheck' + ' - Tables Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 											'Run'		AS [job_step_name],
 											DB_NAME()	AS [job_database_name],
 											'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 2, @flgOptions = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -222,7 +222,7 @@ WHILE @@FETCH_STATUS=0
 																   , [job_command])
 									SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 											@forInstanceID AS [for_instance_id], 
-											DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseConsistencyCheck' + ' - Reference Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']' AS [job_name],
+											SUBSTRING(DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseConsistencyCheck' + ' - Reference Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 											'Run'		AS [job_step_name],
 											DB_NAME()	AS [job_database_name],
 											'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 16, @flgOptions = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -245,7 +245,7 @@ WHILE @@FETCH_STATUS=0
 																   , [job_command])
 									SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 											@forInstanceID AS [for_instance_id], 
-											DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseConsistencyCheck' + ' - Perform Correction to Space Usage' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']' AS [job_name],
+											SUBSTRING(DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseConsistencyCheck' + ' - Perform Correction to Space Usage' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 											'Run'		AS [job_step_name],
 											DB_NAME()	AS [job_database_name],
 											'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 64, @flgOptions = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -273,10 +273,10 @@ WHILE @@FETCH_STATUS=0
 																   , [job_command])
 									SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 											@forInstanceID AS [for_instance_id], 
-											DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseOptimize' + ' - Rebuild Heap Tables' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']' AS [job_name],
+											SUBSTRING(DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseOptimize' + ' - Rebuild Heap Tables' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 											'Run'		AS [job_step_name],
 											DB_NAME()	AS [job_database_name],
-											'EXEC [dbo].[usp_mpDatabaseOptimize] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @TableSchema = ''%'', @TableName = ''%'', @flgActions = 16, @flgOptions = DEFAULT, @DefragIndexThreshold = DEFAULT, @RebuildIndexThreshold = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+											'EXEC [dbo].[usp_mpDatabaseOptimize] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @TableSchema = ''%'', @TableName = ''%'', @flgActions = 16, @flgOptions = DEFAULT, @DefragIndexThreshold = DEFAULT, @RebuildIndexThreshold = DEFAULT, @DebugMode = ' + CAST(@debugMode AS [varchar])
 									FROM
 										(
 											SELECT [name] AS [database_name]
@@ -303,10 +303,10 @@ WHILE @@FETCH_STATUS=0
 																		, [job_command])
 										SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 												@forInstanceID AS [for_instance_id], 
-												DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseOptimize' + ' - Rebuild or Reorganize Indexes' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']' AS [job_name],
+												SUBSTRING(DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseOptimize' + ' - Rebuild or Reorganize Indexes' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 												'Run'		AS [job_step_name],
 												DB_NAME()	AS [job_database_name],
-												'EXEC [dbo].[usp_mpDatabaseOptimize] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @TableSchema = ''%'', @TableName = ''%'', @flgActions = ' + CAST(@featureflgActions AS [varchar]) + ', @flgOptions = DEFAULT, @DefragIndexThreshold = DEFAULT, @RebuildIndexThreshold = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+												'EXEC [dbo].[usp_mpDatabaseOptimize] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @TableSchema = ''%'', @TableName = ''%'', @flgActions = ' + CAST(@featureflgActions AS [varchar]) + ', @flgOptions = DEFAULT, @DefragIndexThreshold = DEFAULT, @RebuildIndexThreshold = DEFAULT, @DebugMode = ' + CAST(@debugMode AS [varchar])
 										FROM
 											(
 												SELECT [name] AS [database_name]
@@ -326,10 +326,10 @@ WHILE @@FETCH_STATUS=0
 																	, [job_command])
 									SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 											@forInstanceID AS [for_instance_id], 
-											DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseOptimize' + ' - Update Statistics' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']' AS [job_name],
+											SUBSTRING(DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseOptimize' + ' - Update Statistics' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 											'Run'		AS [job_step_name],
 											DB_NAME()	AS [job_database_name],
-											'EXEC [dbo].[usp_mpDatabaseOptimize] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @TableSchema = ''%'', @TableName = ''%'', @flgActions = 8, @flgOptions = DEFAULT, @DefragIndexThreshold = DEFAULT, @RebuildIndexThreshold = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+											'EXEC [dbo].[usp_mpDatabaseOptimize] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @TableSchema = ''%'', @TableName = ''%'', @flgActions = 8, @flgOptions = DEFAULT, @DefragIndexThreshold = DEFAULT, @RebuildIndexThreshold = DEFAULT, @DebugMode = ' + CAST(@debugMode AS [varchar])
 									FROM
 										(
 											SELECT [name] AS [database_name]
@@ -353,10 +353,10 @@ WHILE @@FETCH_STATUS=0
 																   , [job_command])
 									SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 											@forInstanceID AS [for_instance_id], 
-											DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseOptimize' + ' - Shrink Database (TRUNCATEONLY)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']' AS [job_name],
+											SUBSTRING(DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseOptimize' + ' - Shrink Database (TRUNCATEONLY)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 											'Run'		AS [job_step_name],
 											DB_NAME()	AS [job_database_name],
-											'EXEC [dbo].[usp_mpDatabaseShrink] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @flgActions = 2, @flgOptions = 1, @executionLevel = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+											'EXEC [dbo].[usp_mpDatabaseShrink] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @flgActions = 2, @flgOptions = 1, @executionLevel = DEFAULT, @DebugMode = ' + CAST(@debugMode AS [varchar])
 									FROM
 										(
 											SELECT [name] AS [database_name]
@@ -376,10 +376,10 @@ WHILE @@FETCH_STATUS=0
 																   , [job_command])
 									SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 											@forInstanceID AS [for_instance_id], 
-											DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseOptimize' + ' - Shrink Log File' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']' AS [job_name],
+											SUBSTRING(DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseOptimize' + ' - Shrink Log File' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 											'Run'		AS [job_step_name],
 											DB_NAME()	AS [job_database_name],
-											'EXEC [dbo].[usp_mpDatabaseShrink] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @flgActions = 1, @flgOptions = 0, @executionLevel = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+											'EXEC [dbo].[usp_mpDatabaseShrink] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @flgActions = 1, @flgOptions = 0, @executionLevel = DEFAULT, @DebugMode = ' + CAST(@debugMode AS [varchar])
 									FROM
 										(
 											SELECT [name] AS [database_name]
@@ -399,12 +399,13 @@ WHILE @@FETCH_STATUS=0
 						/*-------------------------------------------------------------------*/
 						/* Daily: Backup User Databases (diff) */
 						IF @flgActions & 1024 = 1024 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseBackup', 'User Databases (diff)', GETDATE()) = 1
+							AND NOT (@flgActions & 2048 = 2048 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseBackup', 'User Databases (full)', GETDATE()) = 1)
 							INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 																	, [for_instance_id], [job_name], [job_step_name], [job_database_name]
 																	, [job_command])
 									SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 											@forInstanceID AS [for_instance_id], 
-											DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseBackup' + ' - Backup User Databases (diff)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']' AS [job_name],
+											SUBSTRING(DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseBackup' + ' - Backup User Databases (diff)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 											'Run'		AS [job_step_name],
 											DB_NAME()	AS [job_database_name],
 											'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 2, @flgOptions = DEFAULT,	@retentionDays = DEFAULT, @executionLevel = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -426,7 +427,7 @@ WHILE @@FETCH_STATUS=0
 																	, [job_command])
 									SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 											@forInstanceID AS [for_instance_id], 
-											DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseBackup' + ' - Backup User Databases (full)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']' AS [job_name],
+											SUBSTRING(DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseBackup' + ' - Backup User Databases (full)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 											'Run'		AS [job_step_name],
 											DB_NAME()	AS [job_database_name],
 											'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 1, @flgOptions = DEFAULT,	@retentionDays = DEFAULT, @executionLevel = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -448,7 +449,7 @@ WHILE @@FETCH_STATUS=0
 																	, [job_command])
 									SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 											@forInstanceID AS [for_instance_id], 
-											DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseBackup' + ' - Backup System Databases (full)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']' AS [job_name],
+											SUBSTRING(DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseBackup' + ' - Backup System Databases (full)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 											'Run'		AS [job_step_name],
 											DB_NAME()	AS [job_database_name],
 											'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 1, @flgOptions = DEFAULT,	@retentionDays = DEFAULT, @executionLevel = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -459,7 +460,7 @@ WHILE @@FETCH_STATUS=0
 											WHERE	[project_id] = @projectID
 													AND [instance_id] = @forInstanceID
 													AND [active] = 1
-													AND [name] IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
+													AND [name] IN ('master', 'model', 'msdb', 'distribution')														
 										)X
 					end
 
@@ -474,7 +475,7 @@ WHILE @@FETCH_STATUS=0
 																	, [job_command])
 									SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 											@forInstanceID AS [for_instance_id], 
-											DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseBackup' + ' - Backup User Databases (log)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']' AS [job_name],
+											SUBSTRING(DB_NAME() + ' - ' + 'dbo.usp_mpDatabaseBackup' + ' - Backup User Databases (log)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 											'Run'		AS [job_step_name],
 											DB_NAME()	AS [job_database_name],
 											'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 4, @flgOptions = DEFAULT,	@retentionDays = DEFAULT, @executionLevel = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])

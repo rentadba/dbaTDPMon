@@ -94,12 +94,12 @@ WHERE cin.[project_id] = @projectID
 SET @strMessage='--Step 2: Get Instance Details Information...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 		
-DECLARE crsActiveInstances CURSOR LOCAL FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
-												FROM	[dbo].[vw_catalogInstanceNames] cin
-												WHERE 	cin.[project_id] = @projectID
-														AND cin.[instance_active]=1
-														AND cin.[instance_name] LIKE @sqlServerNameFilter
-												ORDER BY cin.[instance_name]
+DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
+															FROM	[dbo].[vw_catalogInstanceNames] cin
+															WHERE 	cin.[project_id] = @projectID
+																	AND cin.[instance_active]=1
+																	AND cin.[instance_name] LIKE @sqlServerNameFilter
+															ORDER BY cin.[instance_name]
 OPEN crsActiveInstances
 FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
 WHILE @@FETCH_STATUS=0
@@ -180,13 +180,13 @@ WHILE @@FETCH_STATUS=0
 				END CATCH
 
 
-				DECLARE crsFailedJobs CURSOR READ_ONLY FOR	SELECT j.[job_name]
-															FROM #statsSQLAgentJobs j
-															LEFT JOIN [monitoring].[statsSQLAgentJobs] saj ON	saj.[project_id] = @projectID
-																												AND saj.[instance_id] = @instanceID
-																												AND saj.[job_name] = j.[job_name]
-																												AND saj.[last_completion_time] = j.[last_completion_time]
-															WHERE saj.[job_name] IS NULL
+				DECLARE crsFailedJobs CURSOR LOCAL FAST_FORWARD  FOR	SELECT j.[job_name]
+																		FROM #statsSQLAgentJobs j
+																		LEFT JOIN [monitoring].[statsSQLAgentJobs] saj ON	saj.[project_id] = @projectID
+																															AND saj.[instance_id] = @instanceID
+																															AND saj.[job_name] = j.[job_name]
+																															AND saj.[last_completion_time] = j.[last_completion_time]
+																		WHERE saj.[job_name] IS NULL
 				OPEN crsFailedJobs
 				FETCH NEXT FROM crsFailedJobs INTO @jobName
 				WHILE @@FETCH_STATUS=0

@@ -261,7 +261,7 @@ ELSE
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
-				INSERT	INTO #backupSET([backup_set_id])
+				INSERT	INTO #backupSET([backup_set_id], [backup_start_date])
 						EXEC (@queryToRun)
 			end
 
@@ -467,9 +467,9 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 
 
 		/* remove the backup files, one by one */
-		DECLARE crsCleanupBackupFiles CURSOR FOR	SELECT [physical_device_name]
-													FROM #backupDevice														
-													ORDER BY [backup_set_id] ASC
+		DECLARE crsCleanupBackupFiles CURSOR LOCAL FAST_FORWARD FOR	SELECT [physical_device_name]
+																	FROM #backupDevice														
+																	ORDER BY [backup_set_id] ASC
 		OPEN crsCleanupBackupFiles
 		FETCH NEXT FROM crsCleanupBackupFiles INTO @backupFileName
 		WHILE @@FETCH_STATUS=0

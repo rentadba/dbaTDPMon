@@ -74,14 +74,14 @@ WHERE	[name] = N'Analyze Index Maintenance Operation'
 SET @queryToRun=N'Analyzing event messages for frequently fragmented indexes...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-DECLARE crsFrequentlyFragmentedIndexes CURSOR READ_ONLY FAST_FORWARD FOR	SELECT    [instance_name], [database_name]
-																					, REPLACE(REPLACE(SUBSTRING([object_name], 1, CHARINDEX('].[', [object_name])), ']', ''), '[', '')						AS [schema_name]
-																					, REPLACE(REPLACE(SUBSTRING([object_name], CHARINDEX('].[', [object_name])+2, LEN([object_name])), ']', ''), '[', '')	AS [table_name]
-																					, REPLACE(REPLACE([index_name], ']', ''), '[', '') AS [index_name]
-																					, CASE WHEN [fill_factor]=0 THEN 100 ELSE [fill_factor] END AS [fill_factor]
-																					, [index_type]
-																			FROM	[dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectCode, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, @analyzeIndexMaintenanceOperation)
-																			ORDER BY [instance_name], [database_name], [schema_name], [table_name], [index_name]
+DECLARE crsFrequentlyFragmentedIndexes CURSOR LOCAL FAST_FORWARD FOR	SELECT    [instance_name], [database_name]
+																				, REPLACE(REPLACE(SUBSTRING([object_name], 1, CHARINDEX('].[', [object_name])), ']', ''), '[', '')						AS [schema_name]
+																				, REPLACE(REPLACE(SUBSTRING([object_name], CHARINDEX('].[', [object_name])+2, LEN([object_name])), ']', ''), '[', '')	AS [table_name]
+																				, REPLACE(REPLACE([index_name], ']', ''), '[', '') AS [index_name]
+																				, CASE WHEN [fill_factor]=0 THEN 100 ELSE [fill_factor] END AS [fill_factor]
+																				, [index_type]
+																		FROM	[dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectCode, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, @analyzeIndexMaintenanceOperation)
+																		ORDER BY [instance_name], [database_name], [schema_name], [table_name], [index_name]
 OPEN crsFrequentlyFragmentedIndexes
 FETCH NEXT FROM crsFrequentlyFragmentedIndexes INTO @instanceName, @databaseName, @tableSchema, @tableName, @indexName, @fillFactor, @indexType
 WHILE @@FETCH_STATUS=0

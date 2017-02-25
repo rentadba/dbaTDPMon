@@ -221,6 +221,7 @@ BEGIN TRY
 														 END 
 				SET @sqlIndexCreate = @sqlIndexCreate +	 ' INDEX [' + @crtIndexName + '] ON [' + @TableSchema + '].[' + @TableName + '] ('
 				--index key columns
+				/*
 				DECLARE crsIndexKey CURSOR LOCAL FAST_FORWARD FOR	SELECT [ColumnName], [IsDescendingKey]
 																	FROM @IndexColumnDetails
 																	WHERE [IsIncludedColumn] = 0
@@ -236,11 +237,21 @@ BEGIN TRY
 					end
 				CLOSE  crsIndexKey
 				DEALLOCATE crsIndexKey
+				*/
+
+				SELECT @sqlIndexCreate = @sqlIndexCreate + '[' + [ColumnName] + ']' + 
+										CASE WHEN [IsDescendingKey]=1	THEN ' DESC'
+																		ELSE '' END + ', '
+				FROM @IndexColumnDetails
+				WHERE [IsIncludedColumn] = 0
+				ORDER BY [KeyOrdinal]
+
 				IF LEN(@sqlIndexCreate)<>0
 					SET @sqlIndexCreate = SUBSTRING(@sqlIndexCreate, 1, LEN(@sqlIndexCreate)-1) + ')'
 
 				--index include columns
 				SET @sqlIndexInclude = N''
+				/*
 				DECLARE crsIndexInclude CURSOR LOCAL FAST_FORWARD FOR	SELECT [ColumnName]
 																		FROM @IndexColumnDetails
 																		WHERE [IsIncludedColumn] = 1
@@ -254,6 +265,12 @@ BEGIN TRY
 					end
 				CLOSE  crsIndexInclude
 				DEALLOCATE crsIndexInclude
+				*/
+				SELECT @sqlIndexInclude = @sqlIndexInclude + '[' + [ColumnName] + '], '
+				FROM @IndexColumnDetails
+				WHERE [IsIncludedColumn] = 1
+				ORDER BY [IndexColumnID]
+
 				IF LEN(@sqlIndexInclude)<>0
 					SET @sqlIndexInclude = SUBSTRING(@sqlIndexInclude, 1, LEN(@sqlIndexInclude)-1)
 

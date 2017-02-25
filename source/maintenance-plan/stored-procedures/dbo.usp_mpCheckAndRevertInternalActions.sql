@@ -76,10 +76,10 @@ SET @queryToRun=N'Rebuilding previously disabled indexes...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 SET @nestExecutionLevel = @executionLevel + 1
-DECLARE crslogInternalAction CURSOR FOR SELECT	[database_name], [schema_name], [object_name], [child_object_name]
-													FROM	[maintenance-plan].[logInternalAction]
-													WHERE	[name] = 'index-made-disable'
-															AND [server_name] = @sqlServerName
+DECLARE crslogInternalAction CURSOR LOCAL FAST_FORWARD FOR	SELECT	[database_name], [schema_name], [object_name], [child_object_name]
+															FROM	[maintenance-plan].[logInternalAction]
+															WHERE	[name] = 'index-made-disable'
+																	AND [server_name] = @sqlServerName
 OPEN crslogInternalAction
 FETCH NEXT FROM crslogInternalAction INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
 WHILE @@FETCH_STATUS=0
@@ -108,10 +108,10 @@ DEALLOCATE crslogInternalAction
 SET @queryToRun=N'Rebuilding previously disabled foreign key constraints...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-DECLARE crslogInternalAction CURSOR FOR SELECT	[database_name], [schema_name], [object_name], [child_object_name]
-													FROM	[maintenance-plan].[logInternalAction]
-													WHERE	[name] = 'foreign-key-made-disable'
-															AND [server_name] = @sqlServerName
+DECLARE crslogInternalAction CURSOR LOCAL FAST_FORWARD FOR	SELECT	[database_name], [schema_name], [object_name], [child_object_name]
+															FROM	[maintenance-plan].[logInternalAction]
+															WHERE	[name] = 'foreign-key-made-disable'
+																	AND [server_name] = @sqlServerName
 OPEN crslogInternalAction
 FETCH NEXT FROM crslogInternalAction INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
 WHILE @@FETCH_STATUS=0

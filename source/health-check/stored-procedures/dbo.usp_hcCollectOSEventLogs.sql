@@ -92,6 +92,21 @@ IF @psFileLocation IS NULL
 SET @psFileLocation = ISNULL(@psFileLocation, N'C:\')
 IF RIGHT(@psFileLocation, 1)<>'\' SET @psFileLocation = @psFileLocation + '\'
 
+------------------------------------------------------------------------------------------------------------------------------------------
+--create folder on disk
+SET @queryToRun = N'EXEC [' + DB_NAME() + '].[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @@SERVERNAME + N''',
+																			@folderName		= ''' + @psFileLocation + N''',
+																			@executionLevel	= 1,
+																			@debugMode		= ' + CAST(@debugMode AS [nvarchar]) 
+
+EXEC  [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @@SERVERNAME,
+									@dbName			= NULL,
+									@module			= 'dbo.usp_hcCollectOSEventLogs',
+									@eventName		= 'create folder on disk',
+									@queryToRun  	= @queryToRun,
+									@flgOptions		= 32,
+									@executionLevel	= 1,
+									@debugMode		= @debugMode
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default project code
@@ -256,7 +271,7 @@ IF @getInformationEvent=1
 
 SET @eventDescriptor = 'dbo.usp_hcCollectOSEventLogs-Powershell'
 
-DECLARE crsMachineList CURSOR READ_ONLY FAST_FORWARD FOR SELECT cin.[id] AS [instance_id], cin.[name] AS [instance_name], cmn.[id] AS [machine_id], cmn.[name] AS [machine_name]
+DECLARE crsMachineList CURSOR LOCAL FAST_FORWARD FOR	SELECT cin.[id] AS [instance_id], cin.[name] AS [instance_name], cmn.[id] AS [machine_id], cmn.[name] AS [machine_name]
 														FROM	[dbo].[catalogInstanceNames] cin
 														INNER JOIN [dbo].[catalogMachineNames] cmn ON cmn.[project_id]=cin.[project_id] AND cmn.[id]=cin.[machine_id]
 														WHERE 	cin.[project_id] = @projectID
@@ -287,13 +302,13 @@ WHILE @@FETCH_STATUS=0
 
 
 		-------------------------------------------------------------------------------------------------------------------------
-		DECLARE crsLogName CURSOR READ_ONLY FOR SELECT [log_type_name], [log_type_id]
-												FROM (
-														SELECT 'Application' AS [log_type_name], 1 AS [log_type_id] UNION ALL
-														SELECT 'System'		 AS [log_type_name], 2 AS [log_type_id] UNION ALL
-														SELECT 'Setup'		 AS [log_type_name], 3 AS [log_type_id] 
-													)l
-												WHERE [log_type_name] LIKE @logNameFilter
+		DECLARE crsLogName CURSOR LOCAL FAST_FORWARD FOR	SELECT [log_type_name], [log_type_id]
+															FROM (
+																	SELECT 'Application' AS [log_type_name], 1 AS [log_type_id] UNION ALL
+																	SELECT 'System'		 AS [log_type_name], 2 AS [log_type_id] UNION ALL
+																	SELECT 'Setup'		 AS [log_type_name], 3 AS [log_type_id] 
+																)l
+															WHERE [log_type_name] LIKE @logNameFilter
 
 		OPEN crsLogName
 		FETCH NEXT FROM crsLogName INTO @psLogTypeName, @psLogTypeID

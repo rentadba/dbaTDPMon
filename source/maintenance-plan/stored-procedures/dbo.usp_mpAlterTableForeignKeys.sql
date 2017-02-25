@@ -155,7 +155,7 @@ BEGIN TRY
 										EXEC (@queryToRun)
 							end
 
-						DECLARE crsTableToAlterConstraints CURSOR	LOCAL FAST_FORWARD FOR	SELECT DISTINCT [TableSchema], [TableName], [ConstraintName]
+						DECLARE crsTableToAlterConstraints CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [TableSchema], [TableName], [ConstraintName]
 																							FROM #tmpTableToAlterConstraints
 																							ORDER BY [TableName]						
 						OPEN crsTableToAlterConstraints

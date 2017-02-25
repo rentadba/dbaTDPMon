@@ -1123,23 +1123,23 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsInstancesOffline CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																			, cin.[is_clustered], cin.[cluster_node_machine_name]
-																			, MAX(lsam.[event_date_utc]) [event_date_utc]
-																			, lsam.[message]
-																	FROM [dbo].[vw_catalogInstanceNames]  cin
-																	INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
-																	LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																												AND rsr.[rule_id] = 1
-																												AND rsr.[active] = 1
-																												AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																	WHERE	cin.[instance_active]=0
-																			AND cin.[project_id] = @projectID
-																			AND lsam.[descriptor] IN (N'dbo.usp_refreshMachineCatalogs - Offline')
-																			AND rsr.[id] IS NULL
+			DECLARE crsInstancesOffline CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																				, cin.[is_clustered], cin.[cluster_node_machine_name]
+																				, MAX(lsam.[event_date_utc]) [event_date_utc]
+																				, lsam.[message]
+																		FROM [dbo].[vw_catalogInstanceNames]  cin
+																		INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+																		LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																													AND rsr.[rule_id] = 1
+																													AND rsr.[active] = 1
+																													AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																		WHERE	cin.[instance_active]=0
+																				AND cin.[project_id] = @projectID
+																				AND lsam.[descriptor] IN (N'dbo.usp_refreshMachineCatalogs - Offline')
+																				AND rsr.[id] IS NULL
 
-																	GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
-																	ORDER BY cin.[instance_name], cin.[machine_name], [event_date_utc]
+																		GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
+																		ORDER BY cin.[instance_name], cin.[machine_name], [event_date_utc]
 			OPEN crsInstancesOffline
 			FETCH NEXT FROM crsInstancesOffline INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @eventDate, @message
 			WHILE @@FETCH_STATUS=0
@@ -1207,27 +1207,27 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsInstancesOffline CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																			, cin.[is_clustered], cin.[cluster_node_machine_name]
-																			, cin.[version], cin.[edition], cin.[last_refresh_date_utc]	
-																			, shcdd.[size_mb]
-																	FROM [dbo].[vw_catalogInstanceNames]  cin
-																	LEFT JOIN 
-																		(
-																			SELECT    [project_id], [instance_id]
-																					, SUM(ISNULL([size_mb], 0)) [size_mb]
-																			FROM [health-check].[vw_statsDatabaseDetails]
-																			WHERE [project_id] = @projectID
-																			GROUP BY [project_id], [instance_id]
-																		) shcdd ON shcdd.[instance_id] = cin.[instance_id] AND shcdd.[project_id] = cin.[project_id]
-																	LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																												AND rsr.[rule_id] = 2
-																												AND rsr.[active] = 1
-																												AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																	WHERE cin.[instance_active]=1
-																			AND cin.[project_id] = @projectID
-																			AND rsr.[id] IS NULL
-																	ORDER BY cin.[instance_name], cin.[machine_name]
+			DECLARE crsInstancesOffline CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																				, cin.[is_clustered], cin.[cluster_node_machine_name]
+																				, cin.[version], cin.[edition], cin.[last_refresh_date_utc]	
+																				, shcdd.[size_mb]
+																		FROM [dbo].[vw_catalogInstanceNames]  cin
+																		LEFT JOIN 
+																			(
+																				SELECT    [project_id], [instance_id]
+																						, SUM(ISNULL([size_mb], 0)) [size_mb]
+																				FROM [health-check].[vw_statsDatabaseDetails]
+																				WHERE [project_id] = @projectID
+																				GROUP BY [project_id], [instance_id]
+																			) shcdd ON shcdd.[instance_id] = cin.[instance_id] AND shcdd.[project_id] = cin.[project_id]
+																		LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																													AND rsr.[rule_id] = 2
+																													AND rsr.[active] = 1
+																													AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																		WHERE cin.[instance_active]=1
+																				AND cin.[project_id] = @projectID
+																				AND rsr.[id] IS NULL
+																		ORDER BY cin.[instance_name], cin.[machine_name]
 			OPEN crsInstancesOffline
 			FETCH NEXT FROM crsInstancesOffline INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @version, @edition, @lastRefreshDate, @dbSize
 			WHILE @@FETCH_STATUS=0
@@ -1331,21 +1331,21 @@ BEGIN TRY
 
 			SET @idx=1		
 			
-			DECLARE crsDatabasesStatusPermissionErrors CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																							, cin.[is_clustered], cin.[cluster_node_machine_name]
-																							, COUNT(DISTINCT lsam.[message]) AS [message_count]
-																					FROM [dbo].[vw_catalogInstanceNames]  cin
-																					INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
-																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																AND rsr.[rule_id] = 256
-																																AND rsr.[active] = 1
-																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																					WHERE	cin.[instance_active]=1
-																							AND cin.[project_id] = @projectID
-																							AND lsam.descriptor IN (N'dbo.usp_hcCollectDatabaseDetails')
-																							AND rsr.[id] IS NULL
-																					GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name]
-																					ORDER BY cin.[instance_name], cin.[machine_name]
+			DECLARE crsDatabasesStatusPermissionErrors CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																								, cin.[is_clustered], cin.[cluster_node_machine_name]
+																								, COUNT(DISTINCT lsam.[message]) AS [message_count]
+																						FROM [dbo].[vw_catalogInstanceNames]  cin
+																						INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 256
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																						WHERE	cin.[instance_active]=1
+																								AND cin.[project_id] = @projectID
+																								AND lsam.descriptor IN (N'dbo.usp_hcCollectDatabaseDetails')
+																								AND rsr.[id] IS NULL
+																						GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name]
+																						ORDER BY cin.[instance_name], cin.[machine_name]
 			OPEN crsDatabasesStatusPermissionErrors
 			FETCH NEXT FROM crsDatabasesStatusPermissionErrors INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @messageCount
 			WHILE @@FETCH_STATUS=0
@@ -1450,22 +1450,22 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsDatabasesStatusIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																						, cin.[is_clustered], cin.[cluster_node_machine_name]
-																						, cdn.[database_name]
-																						, cdn.[state_desc]
-																				FROM [dbo].[vw_catalogInstanceNames]  cin
-																				INNER JOIN [dbo].[vw_catalogDatabaseNames] cdn ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																				LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																															AND rsr.[rule_id] = 4
-																															AND rsr.[active] = 1
-																															AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																				WHERE cin.[instance_active]=1
-																						AND cdn.[active]=1
-																						AND cin.[project_id] = @projectID	
-																						AND CHARINDEX(cdn.[state_desc], @configAdmittedState)=0
-																						AND rsr.[id] IS NULL
-																				ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
+			DECLARE crsDatabasesStatusIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																							, cin.[is_clustered], cin.[cluster_node_machine_name]
+																							, cdn.[database_name]
+																							, cdn.[state_desc]
+																					FROM [dbo].[vw_catalogInstanceNames]  cin
+																					INNER JOIN [dbo].[vw_catalogDatabaseNames] cdn ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																AND rsr.[rule_id] = 4
+																																AND rsr.[active] = 1
+																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																					WHERE cin.[instance_active]=1
+																							AND cdn.[active]=1
+																							AND cin.[project_id] = @projectID	
+																							AND CHARINDEX(cdn.[state_desc], @configAdmittedState)=0
+																							AND rsr.[id] IS NULL
+																					ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
 			OPEN crsDatabasesStatusIssuesDetected
 			FETCH NEXT FROM crsDatabasesStatusIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @stateDesc
 			WHILE @@FETCH_STATUS=0
@@ -1520,22 +1520,22 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsSQLServerAgentJobsStatusPermissionErrors CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																									, cin.[is_clustered], cin.[cluster_node_machine_name]
-																									, MAX(lsam.[event_date_utc]) [event_date_utc]
-																									, lsam.[message]
-																							FROM [dbo].[vw_catalogInstanceNames]  cin
-																							INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
-																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																		AND rsr.[rule_id] = 64
-																																		AND rsr.[active] = 1
-																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																							WHERE	cin.[instance_active]=1
-																									AND cin.[project_id] = @projectID
-																									AND lsam.descriptor IN (N'dbo.usp_hcCollectSQLServerAgentJobsStatus')
-																									AND rsr.[id] IS NULL
-																							GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
-																							ORDER BY cin.[instance_name], cin.[machine_name], [event_date_utc]
+			DECLARE crsSQLServerAgentJobsStatusPermissionErrors CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																										, cin.[is_clustered], cin.[cluster_node_machine_name]
+																										, MAX(lsam.[event_date_utc]) [event_date_utc]
+																										, lsam.[message]
+																								FROM [dbo].[vw_catalogInstanceNames]  cin
+																								INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+																								LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																			AND rsr.[rule_id] = 64
+																																			AND rsr.[active] = 1
+																																			AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																								WHERE	cin.[instance_active]=1
+																										AND cin.[project_id] = @projectID
+																										AND lsam.descriptor IN (N'dbo.usp_hcCollectSQLServerAgentJobsStatus')
+																										AND rsr.[id] IS NULL
+																								GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
+																								ORDER BY cin.[instance_name], cin.[machine_name], [event_date_utc]
 			OPEN crsSQLServerAgentJobsStatusPermissionErrors
 			FETCH NEXT FROM crsSQLServerAgentJobsStatusPermissionErrors INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @eventDate, @message
 			WHILE @@FETCH_STATUS=0
@@ -1601,17 +1601,17 @@ BEGIN TRY
 					, @lastExecTime		[varchar](8)
 			
 			SET @dateTimeLowerLimit = DATEADD(hh, -@configFailuresInLastHours, GETDATE())
-			DECLARE crsSQLServerAgentJobsStatusIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT	ssajh.[instance_name], ssajh.[job_name], ssajh.[last_execution_status], ssajh.[last_execution_date], ssajh.[last_execution_time], ssajh.[message]
-																							FROM	[health-check].[vw_statsSQLServerAgentJobsHistory] ssajh
-																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																		AND rsr.[rule_id] = 16
-																																		AND rsr.[active] = 1
-																																		AND (rsr.[skip_value]=ssajh.[instance_name])
-																							WHERE	ssajh.[project_id]=@projectID
-																									AND ssajh.[last_execution_status] IN (0, 2, 3) /* 0 = Failed; 2 = Retry; 3 = Canceled */
-																									AND CONVERT([datetime], ssajh.[last_execution_date] + ' ' + ssajh.[last_execution_time], 120) >= @dateTimeLowerLimit
-																									AND rsr.[id] IS NULL
-																							ORDER BY ssajh.[instance_name], ssajh.[job_name], ssajh.[last_execution_date], ssajh.[last_execution_time]
+			DECLARE crsSQLServerAgentJobsStatusIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT	ssajh.[instance_name], ssajh.[job_name], ssajh.[last_execution_status], ssajh.[last_execution_date], ssajh.[last_execution_time], ssajh.[message]
+																								FROM	[health-check].[vw_statsSQLServerAgentJobsHistory] ssajh
+																								LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																			AND rsr.[rule_id] = 16
+																																			AND rsr.[active] = 1
+																																			AND (rsr.[skip_value]=ssajh.[instance_name])
+																								WHERE	ssajh.[project_id]=@projectID
+																										AND ssajh.[last_execution_status] IN (0, 2, 3) /* 0 = Failed; 2 = Retry; 3 = Canceled */
+																										AND CONVERT([datetime], ssajh.[last_execution_date] + ' ' + ssajh.[last_execution_time], 120) >= @dateTimeLowerLimit
+																										AND rsr.[id] IS NULL
+																								ORDER BY ssajh.[instance_name], ssajh.[job_name], ssajh.[last_execution_date], ssajh.[last_execution_time]
 			OPEN crsSQLServerAgentJobsStatusIssuesDetected
 			FETCH NEXT FROM crsSQLServerAgentJobsStatusIssuesDetected INTO @instanceName, @jobName, @lastExecStatus, @lastExecDate, @lastExecTime, @message
 			WHILE @@FETCH_STATUS=0
@@ -1688,24 +1688,24 @@ BEGIN TRY
 			DECLARE   @runningTime		[varchar](32)
 			
 			SET @dateTimeLowerLimit = DATEADD(hh, -@configFailuresInLastHours, GETDATE())
-			DECLARE crsLongRunningSQLAgentJobsIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT	  ssajh.[instance_name], ssajh.[job_name]
-																								, ssajh.[last_execution_date] AS [start_date], ssajh.[last_execution_time] AS [start_time]
-																								, [dbo].[ufn_reportHTMLFormatTimeValue](CAST(ssajh.[running_time_sec]*1000 AS [bigint])) AS [running_time]
-																								, ssajh.[message]
-																						FROM [health-check].[vw_statsSQLServerAgentJobsHistory] ssajh
-																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																	AND rsr.[rule_id] = 33554432
-																																	AND rsr.[active] = 1
-																																	AND (    rsr.[skip_value]=ssajh.[instance_name]
-																																		 AND ISNULL(rsr.[skip_value2], '') = ISNULL(ssajh.[job_name], '') 
-																																		)
-																						WHERE	ssajh.[project_id]=@projectID
-																								AND ssajh.[last_execution_status] = 4
-																								AND ssajh.[last_execution_date] IS NOT NULL
-																								AND ssajh.[last_execution_time] IS NOT NULL
-																								AND (ssajh.[running_time_sec]/3600) >= @configMaxJobRunningTimeInHours
-																								AND rsr.[id] IS NULL
-																						ORDER BY [start_date], [start_time]
+			DECLARE crsLongRunningSQLAgentJobsIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT	  ssajh.[instance_name], ssajh.[job_name]
+																									, ssajh.[last_execution_date] AS [start_date], ssajh.[last_execution_time] AS [start_time]
+																									, [dbo].[ufn_reportHTMLFormatTimeValue](CAST(ssajh.[running_time_sec]*1000 AS [bigint])) AS [running_time]
+																									, ssajh.[message]
+																							FROM [health-check].[vw_statsSQLServerAgentJobsHistory] ssajh
+																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																		AND rsr.[rule_id] = 33554432
+																																		AND rsr.[active] = 1
+																																		AND (    rsr.[skip_value]=ssajh.[instance_name]
+																																			 AND ISNULL(rsr.[skip_value2], '') = ISNULL(ssajh.[job_name], '') 
+																																			)
+																							WHERE	ssajh.[project_id]=@projectID
+																									AND ssajh.[last_execution_status] = 4
+																									AND ssajh.[last_execution_date] IS NOT NULL
+																									AND ssajh.[last_execution_time] IS NOT NULL
+																									AND (ssajh.[running_time_sec]/3600) >= @configMaxJobRunningTimeInHours
+																									AND rsr.[id] IS NULL
+																							ORDER BY [start_date], [start_time]
 
 			OPEN crsLongRunningSQLAgentJobsIssuesDetected
 			FETCH NEXT FROM crsLongRunningSQLAgentJobsIssuesDetected INTO @instanceName, @jobName, @lastExecDate, @lastExecTime, @runningTime, @message
@@ -1770,21 +1770,21 @@ BEGIN TRY
 
 			SET @idx=1		
 			
-			DECLARE crsDiskSpaceInformationPermissionErrors CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																								, cin.[is_clustered], cin.[cluster_node_machine_name]
-																								, COUNT(DISTINCT lsam.[message]) AS [message_count]
-																						FROM [dbo].[vw_catalogInstanceNames]  cin
-																						INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
-																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																	AND rsr.[rule_id] = 131072
-																																	AND rsr.[active] = 1
-																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																						WHERE	cin.[instance_active]=1
-																								AND cin.[project_id] = @projectID
-																								AND lsam.descriptor IN (N'dbo.usp_hcCollectDiskSpaceUsage')
-																								AND rsr.[id] IS NULL
-																						GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name]
-																						ORDER BY cin.[instance_name], cin.[machine_name]
+			DECLARE crsDiskSpaceInformationPermissionErrors CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																									, cin.[is_clustered], cin.[cluster_node_machine_name]
+																									, COUNT(DISTINCT lsam.[message]) AS [message_count]
+																							FROM [dbo].[vw_catalogInstanceNames]  cin
+																							INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																		AND rsr.[rule_id] = 131072
+																																		AND rsr.[active] = 1
+																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																							WHERE	cin.[instance_active]=1
+																									AND cin.[project_id] = @projectID
+																									AND lsam.descriptor IN (N'dbo.usp_hcCollectDiskSpaceUsage')
+																									AND rsr.[id] IS NULL
+																							GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name]
+																							ORDER BY cin.[instance_name], cin.[machine_name]
 			OPEN crsDiskSpaceInformationPermissionErrors
 			FETCH NEXT FROM crsDiskSpaceInformationPermissionErrors INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @messageCount
 			WHILE @@FETCH_STATUS=0
@@ -1887,36 +1887,36 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsDiskSpaceInformationIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT  DISTINCT
-																								  cin.[machine_name], cin.[instance_name]
-																								, cin.[is_clustered], cin.[cluster_node_machine_name]
-																								, dsi.[logical_drive], dsi.[volume_mount_point]
-																								, dsi.[total_size_mb], dsi.[available_space_mb], dsi.[percent_available]
-																						FROM [dbo].[vw_catalogInstanceNames]  cin
-																						INNER JOIN [health-check].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
-																						LEFT  JOIN 
-																									(
-																										SELECT DISTINCT [project_id], [instance_id], [physical_drives] 
-																										FROM [health-check].[vw_statsDatabaseDetails]
-																									)   cdd ON cdd.[project_id] = cin.[project_id] AND cdd.[instance_id] = cin.[instance_id]
-																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																	AND rsr.[rule_id] = 262144
-																																	AND rsr.[active] = 1
-																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																						WHERE cin.[instance_active]=1
-																								AND cin.[project_id] = @projectID
-																								AND (    (	  dsi.[percent_available] IS NOT NULL 
-																											AND dsi.[percent_available] < @configFreeDiskMinPercent
+			DECLARE crsDiskSpaceInformationIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT  DISTINCT
+																									  cin.[machine_name], cin.[instance_name]
+																									, cin.[is_clustered], cin.[cluster_node_machine_name]
+																									, dsi.[logical_drive], dsi.[volume_mount_point]
+																									, dsi.[total_size_mb], dsi.[available_space_mb], dsi.[percent_available]
+																							FROM [dbo].[vw_catalogInstanceNames]  cin
+																							INNER JOIN [health-check].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
+																							LEFT  JOIN 
+																										(
+																											SELECT DISTINCT [project_id], [instance_id], [physical_drives] 
+																											FROM [health-check].[vw_statsDatabaseDetails]
+																										)   cdd ON cdd.[project_id] = cin.[project_id] AND cdd.[instance_id] = cin.[instance_id]
+																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																		AND rsr.[rule_id] = 262144
+																																		AND rsr.[active] = 1
+																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																							WHERE cin.[instance_active]=1
+																									AND cin.[project_id] = @projectID
+																									AND (    (	  dsi.[percent_available] IS NOT NULL 
+																												AND dsi.[percent_available] < @configFreeDiskMinPercent
+																												)
+																											OR 
+																											(	   dsi.[percent_available] IS NULL 
+																												AND dsi.[available_space_mb] IS NOT NULL 
+																												AND dsi.[available_space_mb] < @configFreeDiskMinSpace
 																											)
-																										OR 
-																										(	   dsi.[percent_available] IS NULL 
-																											AND dsi.[available_space_mb] IS NOT NULL 
-																											AND dsi.[available_space_mb] < @configFreeDiskMinSpace
 																										)
-																									)
-																								AND (dsi.[logical_drive] IN ('C') OR CHARINDEX(dsi.[logical_drive], cdd.[physical_drives])>0)
-																								AND rsr.[id] IS NULL
-																						ORDER BY cin.[instance_name], cin.[machine_name]
+																									AND (dsi.[logical_drive] IN ('C') OR CHARINDEX(dsi.[logical_drive], cdd.[physical_drives])>0)
+																									AND rsr.[id] IS NULL
+																							ORDER BY cin.[instance_name], cin.[machine_name]
 			OPEN crsDiskSpaceInformationIssuesDetected
 			FETCH NEXT FROM crsDiskSpaceInformationIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @logicalDrive, @volumeMountPoint, @diskTotalSizeMB, @diskAvailableSpaceMB, @diskPercentAvailable
 			WHILE @@FETCH_STATUS=0
@@ -1977,25 +1977,25 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsDatabasesStatusIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																						, cin.[is_clustered], cin.[cluster_node_machine_name]
-																						, cdn.[database_name]
-																						, shcdd.[size_mb]
-																				FROM [dbo].[vw_catalogInstanceNames]  cin
-																				INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																				LEFT  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
-																				LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																															AND rsr.[rule_id] = 128
-																															AND rsr.[active] = 1
-																															AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																				WHERE cin.[instance_active]=1
-																						AND cdn.[active]=1
-																						AND cin.[project_id] = @projectID	
-																						AND (   (cdn.[database_name]='master' AND shcdd.[size_mb] >= @configDBMaxSizeMaster AND @configDBMaxSizeMaster<>0)
-																							 OR (cdn.[database_name]='msdb'   AND shcdd.[size_mb] >= @configDBMaxSizeMSDB   AND @configDBMaxSizeMSDB<>0)
-																							)
-																						AND rsr.[id] IS NULL
-																				ORDER BY shcdd.[size_mb] DESC, cin.[instance_name], cin.[machine_name], cdn.[database_name]
+			DECLARE crsDatabasesStatusIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																							, cin.[is_clustered], cin.[cluster_node_machine_name]
+																							, cdn.[database_name]
+																							, shcdd.[size_mb]
+																					FROM [dbo].[vw_catalogInstanceNames]  cin
+																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																					LEFT  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																AND rsr.[rule_id] = 128
+																																AND rsr.[active] = 1
+																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																					WHERE cin.[instance_active]=1
+																							AND cdn.[active]=1
+																							AND cin.[project_id] = @projectID	
+																							AND (   (cdn.[database_name]='master' AND shcdd.[size_mb] >= @configDBMaxSizeMaster AND @configDBMaxSizeMaster<>0)
+																								 OR (cdn.[database_name]='msdb'   AND shcdd.[size_mb] >= @configDBMaxSizeMSDB   AND @configDBMaxSizeMSDB<>0)
+																								)
+																							AND rsr.[id] IS NULL
+																					ORDER BY shcdd.[size_mb] DESC, cin.[instance_name], cin.[machine_name], cdn.[database_name]
 			OPEN crsDatabasesStatusIssuesDetected
 			FETCH NEXT FROM crsDatabasesStatusIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize
 			WHILE @@FETCH_STATUS=0
@@ -2054,24 +2054,24 @@ BEGIN TRY
 			DECLARE   @isAutoClose		[bit]
 					, @isAutoShrink		[bit]
 
-			DECLARE crsDatabasesStatusIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																						, cin.[is_clustered], cin.[cluster_node_machine_name]
-																						, cdn.[database_name]
-																						, shcdd.[is_auto_close]
-																						, shcdd.[is_auto_shrink]
-																				FROM [dbo].[vw_catalogInstanceNames]  cin
-																				INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																				INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
-																				LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																															AND rsr.[rule_id] = 512
-																															AND rsr.[active] = 1
-																															AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																				WHERE cin.[instance_active]=1
-																						AND cdn.[active]=1
-																						AND cin.[project_id] = @projectID
-																						AND (shcdd.[is_auto_close]=1 OR shcdd.[is_auto_shrink]=1)
-																						AND rsr.[id] IS NULL
-																				ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
+			DECLARE crsDatabasesStatusIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																							, cin.[is_clustered], cin.[cluster_node_machine_name]
+																							, cdn.[database_name]
+																							, shcdd.[is_auto_close]
+																							, shcdd.[is_auto_shrink]
+																					FROM [dbo].[vw_catalogInstanceNames]  cin
+																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																					INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																AND rsr.[rule_id] = 512
+																																AND rsr.[active] = 1
+																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																					WHERE cin.[instance_active]=1
+																							AND cdn.[active]=1
+																							AND cin.[project_id] = @projectID
+																							AND (shcdd.[is_auto_close]=1 OR shcdd.[is_auto_shrink]=1)
+																							AND rsr.[id] IS NULL
+																					ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
 			OPEN crsDatabasesStatusIssuesDetected
 			FETCH NEXT FROM crsDatabasesStatusIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @isAutoClose, @isAutoShrink
 			WHILE @@FETCH_STATUS=0
@@ -2131,24 +2131,24 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsDatabaseMaxLogSizeIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																							, cin.[is_clustered], cin.[cluster_node_machine_name]
-																							, cdn.[database_name]
-																							, shcdd.[log_size_mb]
-																							, shcdd.[log_space_used_percent]
-																					FROM [dbo].[vw_catalogInstanceNames]  cin
-																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																					INNER  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
-																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																AND rsr.[rule_id] = 1024
-																																AND rsr.[active] = 1
-																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																					WHERE cin.[instance_active]=1
-																							AND cdn.[active]=1
-																							AND cin.[project_id] = @projectID	
-																							AND shcdd.[log_size_mb] >= @configLogMaxSize 
-																							AND rsr.[id] IS NULL
-																					ORDER BY shcdd.[log_size_mb] DESC, cin.[instance_name], cin.[machine_name], cdn.[database_name]
+			DECLARE crsDatabaseMaxLogSizeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																								, cin.[is_clustered], cin.[cluster_node_machine_name]
+																								, cdn.[database_name]
+																								, shcdd.[log_size_mb]
+																								, shcdd.[log_space_used_percent]
+																						FROM [dbo].[vw_catalogInstanceNames]  cin
+																						INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																						INNER  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 1024
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																						WHERE cin.[instance_active]=1
+																								AND cdn.[active]=1
+																								AND cin.[project_id] = @projectID	
+																								AND shcdd.[log_size_mb] >= @configLogMaxSize 
+																								AND rsr.[id] IS NULL
+																						ORDER BY shcdd.[log_size_mb] DESC, cin.[instance_name], cin.[machine_name], cdn.[database_name]
 			OPEN crsDatabaseMaxLogSizeIssuesDetected
 			FETCH NEXT FROM crsDatabaseMaxLogSizeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @logSizeMB, @logSpaceUsedPercent
 			WHILE @@FETCH_STATUS=0
@@ -2211,30 +2211,30 @@ BEGIN TRY
 
 			SET @idx=1		
 					
-			DECLARE crsDatabaseMinDataSpaceIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																							, cin.[is_clustered], cin.[cluster_node_machine_name]
-																							, cdn.[database_name]
-																							, shcdd.[size_mb]
-																							, shcdd.[data_size_mb]
-																							, shcdd.[data_space_used_percent]
-																							, ((100.0 - shcdd.[data_space_used_percent]) * shcdd.[data_size_mb]) / 100 AS [reclaimable_space_mb]
-																					FROM [dbo].[vw_catalogInstanceNames]  cin
-																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																					INNER  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
-																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																AND rsr.[rule_id] = 2048
-																																AND rsr.[active] = 1
-																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																					WHERE cin.[instance_active]=1
-																							AND cdn.[active]=1
-																							AND cin.[project_id] = @projectID	
-																							AND shcdd.[size_mb]>=@configDBMinSizeForAnalysis
-																							AND shcdd.[data_space_used_percent] <= @configDataSpaceMinPercent 
-																							AND @configDataSpaceMinPercent<>0
-																							AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb', 'distribution')
-																							AND rsr.[id] IS NULL
-																					ORDER BY --[reclaimable_space_mb] DESC, 
-																							 cin.[instance_name], cin.[machine_name], shcdd.[data_space_used_percent] DESC, cdn.[database_name]
+			DECLARE crsDatabaseMinDataSpaceIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																								, cin.[is_clustered], cin.[cluster_node_machine_name]
+																								, cdn.[database_name]
+																								, shcdd.[size_mb]
+																								, shcdd.[data_size_mb]
+																								, shcdd.[data_space_used_percent]
+																								, ((100.0 - shcdd.[data_space_used_percent]) * shcdd.[data_size_mb]) / 100 AS [reclaimable_space_mb]
+																						FROM [dbo].[vw_catalogInstanceNames]  cin
+																						INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																						INNER  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 2048
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																						WHERE cin.[instance_active]=1
+																								AND cdn.[active]=1
+																								AND cin.[project_id] = @projectID	
+																								AND shcdd.[size_mb]>=@configDBMinSizeForAnalysis
+																								AND shcdd.[data_space_used_percent] <= @configDataSpaceMinPercent 
+																								AND @configDataSpaceMinPercent<>0
+																								AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb', 'distribution')
+																								AND rsr.[id] IS NULL
+																						ORDER BY --[reclaimable_space_mb] DESC, 
+																								 cin.[instance_name], cin.[machine_name], shcdd.[data_space_used_percent] DESC, cdn.[database_name]
 			OPEN crsDatabaseMinDataSpaceIssuesDetected
 			FETCH NEXT FROM crsDatabaseMinDataSpaceIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @dataSizeMB, @dataSpaceUsedPercent, @reclaimableSpaceMB
 			WHILE @@FETCH_STATUS=0
@@ -2299,30 +2299,30 @@ BEGIN TRY
 
 			SET @idx=1		
 					
-			DECLARE crsDatabaseMaxLogSpaceIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																							, cin.[is_clustered], cin.[cluster_node_machine_name]
-																							, cdn.[database_name]
-																							, shcdd.[size_mb]
-																							, shcdd.[log_size_mb]
-																							, shcdd.[log_space_used_percent]
-																							, ((100.0 - shcdd.[log_space_used_percent]) * shcdd.[log_size_mb]) / 100 AS [available_space_mb]
-																					FROM [dbo].[vw_catalogInstanceNames]  cin
-																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																					INNER  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
-																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																AND rsr.[rule_id] = 32768
-																																AND rsr.[active] = 1
-																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																					WHERE cin.[instance_active]=1
-																							AND cdn.[active]=1
-																							AND cin.[project_id] = @projectID	
-																							AND shcdd.[size_mb]>=@configDBMinSizeForAnalysis
-																							AND shcdd.[log_space_used_percent] >= @configLogSpaceMaxPercent 
-																							AND @configLogSpaceMaxPercent<>0
-																							AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb', 'distribution')
-																							AND rsr.[id] IS NULL
-																					ORDER BY --[available_space_mb] DESC, 
-																							 cin.[instance_name], cin.[machine_name], shcdd.[data_space_used_percent] DESC, cdn.[database_name]
+			DECLARE crsDatabaseMaxLogSpaceIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																								, cin.[is_clustered], cin.[cluster_node_machine_name]
+																								, cdn.[database_name]
+																								, shcdd.[size_mb]
+																								, shcdd.[log_size_mb]
+																								, shcdd.[log_space_used_percent]
+																								, ((100.0 - shcdd.[log_space_used_percent]) * shcdd.[log_size_mb]) / 100 AS [available_space_mb]
+																						FROM [dbo].[vw_catalogInstanceNames]  cin
+																						INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																						INNER  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 32768
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																						WHERE cin.[instance_active]=1
+																								AND cdn.[active]=1
+																								AND cin.[project_id] = @projectID	
+																								AND shcdd.[size_mb]>=@configDBMinSizeForAnalysis
+																								AND shcdd.[log_space_used_percent] >= @configLogSpaceMaxPercent 
+																								AND @configLogSpaceMaxPercent<>0
+																								AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb', 'distribution')
+																								AND rsr.[id] IS NULL
+																						ORDER BY --[available_space_mb] DESC, 
+																								 cin.[instance_name], cin.[machine_name], shcdd.[data_space_used_percent] DESC, cdn.[database_name]
 			OPEN crsDatabaseMaxLogSpaceIssuesDetected
 			FETCH NEXT FROM crsDatabaseMaxLogSpaceIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @logSizeMB, @logSpaceUsedPercent, @reclaimableSpaceMB
 			WHILE @@FETCH_STATUS=0
@@ -2386,35 +2386,35 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsDatabaseLogVsDataSizeIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    [machine_name], [instance_name], [is_clustered], [cluster_node_machine_name], [database_name]
-																								, [size_mb], [data_size_mb], [log_size_mb]
-																								, [log_vs_data]
-																						FROM (
-																								SELECT  cin.[machine_name], cin.[instance_name]
-																										, cin.[is_clustered], cin.[cluster_node_machine_name]
-																										, cdn.[database_name]
-																										, shcdd.[size_mb]
-																										, shcdd.[data_size_mb]
-																										, shcdd.[log_size_mb]
-																										, (shcdd.[log_size_mb] / shcdd.[data_size_mb] * 100.) AS [log_vs_data]
-																								FROM [dbo].[vw_catalogInstanceNames]  cin
-																								INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																								INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
-																								LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																			AND rsr.[rule_id] = 4096
-																																			AND rsr.[active] = 1
-																																			AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																								WHERE cin.[instance_active]=1
-																										AND cdn.[active]=1
-																										AND cin.[project_id] = @projectID	
-																										AND shcdd.[data_size_mb] <> 0
-																										AND (shcdd.[log_size_mb] / shcdd.[data_size_mb] * 100.) > @configLogVsDataPercent
-																										AND shcdd.[size_mb]>=@configDBMinSizeForAnalysis
-																										AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb', 'distribution')
-																										AND rsr.[id] IS NULL
-																							)X
-																						WHERE [log_vs_data] >= @configLogVsDataPercent
-																						ORDER BY [instance_name], [machine_name], [log_vs_data] DESC, [database_name]
+			DECLARE crsDatabaseLogVsDataSizeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    [machine_name], [instance_name], [is_clustered], [cluster_node_machine_name], [database_name]
+																									, [size_mb], [data_size_mb], [log_size_mb]
+																									, [log_vs_data]
+																							FROM (
+																									SELECT  cin.[machine_name], cin.[instance_name]
+																											, cin.[is_clustered], cin.[cluster_node_machine_name]
+																											, cdn.[database_name]
+																											, shcdd.[size_mb]
+																											, shcdd.[data_size_mb]
+																											, shcdd.[log_size_mb]
+																											, (shcdd.[log_size_mb] / shcdd.[data_size_mb] * 100.) AS [log_vs_data]
+																									FROM [dbo].[vw_catalogInstanceNames]  cin
+																									INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																									INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																									LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																				AND rsr.[rule_id] = 4096
+																																				AND rsr.[active] = 1
+																																				AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																									WHERE cin.[instance_active]=1
+																											AND cdn.[active]=1
+																											AND cin.[project_id] = @projectID	
+																											AND shcdd.[data_size_mb] <> 0
+																											AND (shcdd.[log_size_mb] / shcdd.[data_size_mb] * 100.) > @configLogVsDataPercent
+																											AND shcdd.[size_mb]>=@configDBMinSizeForAnalysis
+																											AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb', 'distribution')
+																											AND rsr.[id] IS NULL
+																								)X
+																							WHERE [log_vs_data] >= @configLogVsDataPercent
+																							ORDER BY [instance_name], [machine_name], [log_vs_data] DESC, [database_name]
 			OPEN crsDatabaseLogVsDataSizeIssuesDetected
 			FETCH NEXT FROM crsDatabaseLogVsDataSizeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @dataSizeMB, @logSizeMB, @logVSDataPercent
 			WHILE @@FETCH_STATUS=0
@@ -2475,7 +2475,7 @@ BEGIN TRY
 
 			SET @idx=1		
 			
-			DECLARE crsDatabaseFixedFileSizeIssuesDetected CURSOR READ_ONLY LOCAL FOR	
+			DECLARE crsDatabaseFixedFileSizeIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	
 																				SELECT    cin.[instance_name]
 																						, cdn.[database_name], cdn.[state_desc]
 																						, shcdd.[size_mb]
@@ -2556,34 +2556,34 @@ BEGIN TRY
 			DECLARE @pageVerify			[sysname],
 					@compatibilityLevel	[tinyint]
 
-			DECLARE crsDatabasePageVerifyIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																							, cin.[is_clustered], cin.[cluster_node_machine_name]
-																							, cdn.[database_name]
-																							, cin.[version]
-																							, shcdd.[page_verify_option_desc]
-																							, shcdd.[compatibility_level]
-																					FROM [dbo].[vw_catalogInstanceNames]  cin
-																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																					INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
-																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																AND rsr.[rule_id] = 8388608
-																																AND rsr.[active] = 1
-																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																					WHERE cin.[instance_active]=1
-																							AND cdn.[active]=1
-																							AND cin.[project_id] = @projectID
-																							AND cdn.[database_name] NOT IN ('tempdb')
-																							AND (   
-																									(     shcdd.[page_verify_option_desc] <> 'CHECKSUM'
-																									  AND cin.[version] NOT LIKE '8.%'
+			DECLARE crsDatabasePageVerifyIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																								, cin.[is_clustered], cin.[cluster_node_machine_name]
+																								, cdn.[database_name]
+																								, cin.[version]
+																								, shcdd.[page_verify_option_desc]
+																								, shcdd.[compatibility_level]
+																						FROM [dbo].[vw_catalogInstanceNames]  cin
+																						INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																						INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 8388608
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																						WHERE cin.[instance_active]=1
+																								AND cdn.[active]=1
+																								AND cin.[project_id] = @projectID
+																								AND cdn.[database_name] NOT IN ('tempdb')
+																								AND (   
+																										(     shcdd.[page_verify_option_desc] <> 'CHECKSUM'
+																										  AND cin.[version] NOT LIKE '8.%'
+																										)
+																									 OR (     shcdd.[page_verify_option_desc] = 'NONE'
+																										  AND cin.[version] LIKE '8.%'
+																										)
 																									)
-																								 OR (     shcdd.[page_verify_option_desc] = 'NONE'
-																									  AND cin.[version] LIKE '8.%'
-																									)
-																								)
-																							AND CHARINDEX(cdn.[state_desc], @configAdmittedState)<>0
-																							AND rsr.[id] IS NULL
-																					ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
+																								AND CHARINDEX(cdn.[state_desc], @configAdmittedState)<>0
+																								AND rsr.[id] IS NULL
+																						ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
 			OPEN crsDatabasePageVerifyIssuesDetected
 			FETCH NEXT FROM crsDatabasePageVerifyIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @version, @pageVerify, @compatibilityLevel
 			WHILE @@FETCH_STATUS=0
@@ -2707,7 +2707,7 @@ BEGIN TRY
 			-----------------------------------------------------------------------------------------------------
 			SET @indexAnalyzedCount=0
 
-			DECLARE crsFrequentlyFragmentedIndexesMachineNames CURSOR READ_ONLY LOCAL FOR		SELECT    iff.[instance_name]
+			DECLARE crsFrequentlyFragmentedIndexesMachineNames CURSOR LOCAL FAST_FORWARD FOR	SELECT    iff.[instance_name]
 																										, COUNT(*) AS [index_count]
 																								FROM #filteredStatsIndexesFrequentlyFragmented iff
 																								GROUP BY iff.[instance_name]
@@ -2802,37 +2802,37 @@ BEGIN TRY
 											<TH WIDTH="80px" class="details-bold" nowrap>Backup Age (Days)</TH>'
 			SET @idx=1		
 
-			DECLARE crsDatabaseBACKUPAgeIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																							, cin.[is_clustered], cin.[cluster_node_machine_name]
-																							, cdn.[database_name]
-																							, shcdd.[size_mb]
-																							, shcdd.[last_backup_time]
-																							, DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) AS [backup_age_days]
-																					FROM [dbo].[vw_catalogInstanceNames]  cin
-																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																					INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
-																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																AND rsr.[rule_id] = 8192
-																																AND rsr.[active] = 1
-																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																					WHERE cin.[instance_active]=1
-																							AND cdn.[active]=1
-																							AND cin.[project_id] = @projectID	
-																							AND (
-																									(    cdn.[database_name] NOT IN ('master', 'model', 'msdb', 'distribution') 
-																										AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @configUserDatabaseBACKUPAgeDays
+			DECLARE crsDatabaseBACKUPAgeIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																								, cin.[is_clustered], cin.[cluster_node_machine_name]
+																								, cdn.[database_name]
+																								, shcdd.[size_mb]
+																								, shcdd.[last_backup_time]
+																								, DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) AS [backup_age_days]
+																						FROM [dbo].[vw_catalogInstanceNames]  cin
+																						INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																						INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 8192
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																						WHERE cin.[instance_active]=1
+																								AND cdn.[active]=1
+																								AND cin.[project_id] = @projectID	
+																								AND (
+																										(    cdn.[database_name] NOT IN ('master', 'model', 'msdb', 'distribution') 
+																											AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @configUserDatabaseBACKUPAgeDays
+																										)
+																										OR (    cdn.[database_name] IN ('master', 'model', 'msdb', 'distribution') 
+																											AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @configSystemDatabaseBACKUPAgeDays
+																										)
+																										OR (
+																												cdn.[database_name] NOT IN ('tempdb')
+																											AND shcdd.[last_backup_time] IS NULL
+																										)
 																									)
-																								    OR (    cdn.[database_name] IN ('master', 'model', 'msdb', 'distribution') 
-																										AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @configSystemDatabaseBACKUPAgeDays
-																									)
-																									OR (
-																											cdn.[database_name] NOT IN ('tempdb')
-																										AND shcdd.[last_backup_time] IS NULL
-																									)
-																								)
-																							AND CHARINDEX(cdn.[state_desc], @configAdmittedState)<>0
-																							AND rsr.[id] IS NULL
-																					ORDER BY [instance_name], [machine_name], [backup_age_days] DESC, [database_name]
+																								AND CHARINDEX(cdn.[state_desc], @configAdmittedState)<>0
+																								AND rsr.[id] IS NULL
+																						ORDER BY [instance_name], [machine_name], [backup_age_days] DESC, [database_name]
 			OPEN crsDatabaseBACKUPAgeIssuesDetected
 			FETCH NEXT FROM crsDatabaseBACKUPAgeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @lastBackupDate, @lastDatabaseEventAgeDays
 			WHILE @@FETCH_STATUS=0
@@ -2893,41 +2893,41 @@ BEGIN TRY
 											<TH WIDTH="80px" class="details-bold" nowrap>CHECKDB Age (Days)</TH>'
 			SET @idx=1		
 
-			DECLARE crsDatabaseDBCCCHECKDBAgeIssuesDetected CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																								, cin.[is_clustered], cin.[cluster_node_machine_name]
-																								, cdn.[database_name]
-																								, shcdd.[size_mb]
-																								, shcdd.[last_dbcc checkdb_time]
-																								, CASE	 WHEN shcdd.[last_dbcc checkdb_time] IS NOT NULL 
-																										THEN DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) 
-																										ELSE NULL
-																									END AS [dbcc_checkdb_age_days]
-																						FROM [dbo].[vw_catalogInstanceNames]  cin
-																						INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																						INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
-																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																	AND rsr.[rule_id] = 16384
-																																	AND rsr.[active] = 1
-																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																						WHERE cin.[instance_active]=1
-																								AND cdn.[active]=1
-																								AND cin.[project_id] = @projectID	
-																								AND (
-																										(    cdn.[database_name] NOT IN ('master', 'model', 'msdb', 'distribution') 
-																											AND DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) > @configUserDBCCCHECKDBAgeDays
+			DECLARE crsDatabaseDBCCCHECKDBAgeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																									, cin.[is_clustered], cin.[cluster_node_machine_name]
+																									, cdn.[database_name]
+																									, shcdd.[size_mb]
+																									, shcdd.[last_dbcc checkdb_time]
+																									, CASE	 WHEN shcdd.[last_dbcc checkdb_time] IS NOT NULL 
+																											THEN DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) 
+																											ELSE NULL
+																										END AS [dbcc_checkdb_age_days]
+																							FROM [dbo].[vw_catalogInstanceNames]  cin
+																							INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																							INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																		AND rsr.[rule_id] = 16384
+																																		AND rsr.[active] = 1
+																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																							WHERE cin.[instance_active]=1
+																									AND cdn.[active]=1
+																									AND cin.[project_id] = @projectID	
+																									AND (
+																											(    cdn.[database_name] NOT IN ('master', 'model', 'msdb', 'distribution') 
+																												AND DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) > @configUserDBCCCHECKDBAgeDays
+																											)
+																											OR (    cdn.[database_name] IN ('master', 'model', 'msdb', 'distribution') 
+																												AND DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) > @configSystemDBCCCHECKDBAgeDays
+																											)
+																											OR (
+																													cdn.[database_name] NOT IN ('tempdb')
+																												AND shcdd.[last_dbcc checkdb_time] IS NULL
+																											)
 																										)
-																										OR (    cdn.[database_name] IN ('master', 'model', 'msdb', 'distribution') 
-																											AND DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) > @configSystemDBCCCHECKDBAgeDays
-																										)
-																										OR (
-																												cdn.[database_name] NOT IN ('tempdb')
-																											AND shcdd.[last_dbcc checkdb_time] IS NULL
-																										)
-																									)
-																								AND CHARINDEX(cdn.[state_desc], 'ONLINE')<>0
-																								AND cin.[version] NOT LIKE '8.%'
-																								AND rsr.[id] IS NULL
-																						ORDER BY [instance_name], [machine_name], [dbcc_checkdb_age_days] DESC, [database_name]
+																									AND CHARINDEX(cdn.[state_desc], 'ONLINE')<>0
+																									AND cin.[version] NOT LIKE '8.%'
+																									AND rsr.[id] IS NULL
+																							ORDER BY [instance_name], [machine_name], [dbcc_checkdb_age_days] DESC, [database_name]
 			OPEN crsDatabaseDBCCCHECKDBAgeIssuesDetected
 			FETCH NEXT FROM crsDatabaseDBCCCHECKDBAgeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @lastCheckDBDate, @lastDatabaseEventAgeDays
 			WHILE @@FETCH_STATUS=0
@@ -2984,22 +2984,22 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsErrorlogMessagesPermissionErrors CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																							, cin.[is_clustered], cin.[cluster_node_machine_name]
-																							, MAX(lsam.[event_date_utc]) [event_date_utc]
-																							, lsam.[message]
-																					FROM [dbo].[vw_catalogInstanceNames]  cin
-																					INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
-																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																AND rsr.[rule_id] = 524288
-																																AND rsr.[active] = 1
-																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																					WHERE	cin.[instance_active]=1
-																							AND cin.[project_id] = @projectID
-																							AND lsam.descriptor IN (N'dbo.usp_hcCollectErrorlogMessages')
-																							AND rsr.[id] IS NULL
-																					GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
-																					ORDER BY cin.[instance_name], cin.[machine_name], [event_date_utc]
+			DECLARE crsErrorlogMessagesPermissionErrors CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																								, cin.[is_clustered], cin.[cluster_node_machine_name]
+																								, MAX(lsam.[event_date_utc]) [event_date_utc]
+																								, lsam.[message]
+																						FROM [dbo].[vw_catalogInstanceNames]  cin
+																						INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 524288
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																						WHERE	cin.[instance_active]=1
+																								AND cin.[project_id] = @projectID
+																								AND lsam.descriptor IN (N'dbo.usp_hcCollectErrorlogMessages')
+																								AND rsr.[id] IS NULL
+																						GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
+																						ORDER BY cin.[instance_name], cin.[machine_name], [event_date_utc]
 			OPEN crsErrorlogMessagesPermissionErrors
 			FETCH NEXT FROM crsErrorlogMessagesPermissionErrors INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @eventDate, @message
 			WHILE @@FETCH_STATUS=0
@@ -3094,12 +3094,12 @@ BEGIN TRY
 
 			-----------------------------------------------------------------------------------------------------
 			SET @issuesDetectedCount = 0 
-			DECLARE crsErrorlogMessagesInstanceName CURSOR READ_ONLY LOCAL FOR	SELECT DISTINCT
-																						  [instance_name]
-																						, COUNT(*) AS [messages_count]
-																				FROM #filteredStatsSQLServerErrorlogDetail
-																				GROUP BY [instance_name]
-																				ORDER BY [instance_name]
+			DECLARE crsErrorlogMessagesInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT
+																							  [instance_name]
+																							, COUNT(*) AS [messages_count]
+																					FROM #filteredStatsSQLServerErrorlogDetail
+																					GROUP BY [instance_name]
+																					ORDER BY [instance_name]
 			OPEN crsErrorlogMessagesInstanceName
 			FETCH NEXT FROM crsErrorlogMessagesInstanceName INTO @instanceName, @messageCount
 			WHILE @@FETCH_STATUS=0
@@ -3186,7 +3186,7 @@ BEGIN TRY
 
 			SET @idx=1		
 			
-			DECLARE crsDatabasesStatusMachineNames CURSOR READ_ONLY LOCAL FOR		SELECT    cin.[machine_name], cin.[instance_name]
+			DECLARE crsDatabasesStatusMachineNames CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																							, COUNT(*) AS [database_count]
 																					FROM [dbo].[vw_catalogInstanceNames]  cin
 																					INNER JOIN [dbo].[vw_catalogDatabaseNames] cdn ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
@@ -3295,7 +3295,7 @@ BEGIN TRY
 
 			SET @idx=1		
 			
-			DECLARE crsSQLServerAgentJobsInstanceName CURSOR READ_ONLY LOCAL FOR	SELECT	ssajh.[instance_name], COUNT(*) AS [job_count]
+			DECLARE crsSQLServerAgentJobsInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT	ssajh.[instance_name], COUNT(*) AS [job_count]
 																					FROM	[health-check].[vw_statsSQLServerAgentJobsHistory] ssajh
 																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																AND rsr.[rule_id] = 32
@@ -3394,7 +3394,7 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsDiskSpaceInformationMachineNames CURSOR READ_ONLY LOCAL FOR		SELECT DISTINCT
+			DECLARE crsDiskSpaceInformationMachineNames CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT
 																								  cin.[machine_name]/*, cin.[instance_name]*/
 																								, cin.[is_clustered], cin.[cluster_node_machine_name]
 																								, COUNT(*) AS [volume_count]
@@ -3498,21 +3498,21 @@ BEGIN TRY
 
 			SET @dateTimeLowerLimit = DATEADD(hh, -@configErrorlogMessageLastHours, GETDATE())
 			
-			DECLARE crsErrorlogMessagesInstanceName CURSOR READ_ONLY LOCAL FOR	SELECT DISTINCT
-																						  cin.[instance_name]
-																						, COUNT(*) AS [messages_count]
-																				FROM [dbo].[vw_catalogInstanceNames]  cin
-																				INNER JOIN [health-check].[vw_statsSQLServerErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
-																				LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																															AND rsr.[rule_id] = 2097152
-																															AND rsr.[active] = 1
-																															AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																				WHERE cin.[instance_active]=1
-																						AND cin.[project_id] = @projectID	
-																						AND eld.[log_date] >= @dateTimeLowerLimit
-																						AND rsr.[id] IS NULL
-																				GROUP BY cin.[instance_name]
-																				ORDER BY cin.[instance_name]
+			DECLARE crsErrorlogMessagesInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT
+																							  cin.[instance_name]
+																							, COUNT(*) AS [messages_count]
+																					FROM [dbo].[vw_catalogInstanceNames]  cin
+																					INNER JOIN [health-check].[vw_statsSQLServerErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
+																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																AND rsr.[rule_id] = 2097152
+																																AND rsr.[active] = 1
+																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																					WHERE cin.[instance_active]=1
+																							AND cin.[project_id] = @projectID	
+																							AND eld.[log_date] >= @dateTimeLowerLimit
+																							AND rsr.[id] IS NULL
+																					GROUP BY cin.[instance_name]
+																					ORDER BY cin.[instance_name]
 			OPEN crsErrorlogMessagesInstanceName
 			FETCH NEXT FROM crsErrorlogMessagesInstanceName INTO @instanceName, @messageCount
 			WHILE @@FETCH_STATUS=0
@@ -3593,21 +3593,21 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsOSEventMessagesPermissionErrors CURSOR READ_ONLY LOCAL FOR	SELECT    cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name]
-																							, MAX(lsam.[event_date_utc]) [event_date_utc]
-																							, lsam.[message]
-																					FROM [dbo].[vw_catalogInstanceNames]  cin
-																					INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
-																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																AND rsr.[rule_id] = 67108864
-																																AND rsr.[active] = 1
-																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																					WHERE	cin.[instance_active]=1
-																							AND cin.[project_id] = @projectID
-																							AND lsam.descriptor IN (N'dbo.usp_hcCollectOSEventLogs')
-																							AND rsr.[id] IS NULL
-																					GROUP BY cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
-																					ORDER BY cin.[machine_name], [event_date_utc]
+			DECLARE crsOSEventMessagesPermissionErrors CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name]
+																								, MAX(lsam.[event_date_utc]) [event_date_utc]
+																								, lsam.[message]
+																						FROM [dbo].[vw_catalogInstanceNames]  cin
+																						INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 67108864
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																						WHERE	cin.[instance_active]=1
+																								AND cin.[project_id] = @projectID
+																								AND lsam.descriptor IN (N'dbo.usp_hcCollectOSEventLogs')
+																								AND rsr.[id] IS NULL
+																						GROUP BY cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
+																						ORDER BY cin.[machine_name], [event_date_utc]
 			OPEN crsOSEventMessagesPermissionErrors
 			FETCH NEXT FROM crsOSEventMessagesPermissionErrors INTO @machineName, @isClustered, @clusterNodeName, @eventDate, @message
 			WHILE @@FETCH_STATUS=0
@@ -3671,20 +3671,20 @@ BEGIN TRY
 			SET @dateTimeLowerLimit = DATEADD(hh, -@configOSEventMessageLastHours, GETDATE())
 			SET @issuesDetectedCount = 0 
 			
-			DECLARE crsOSEventMessagesInstanceName CURSOR READ_ONLY LOCAL FOR	SELECT DISTINCT
-																						  oel.[machine_name]
-																						, COUNT(*) AS [messages_count]
-																				FROM [dbo].[vw_catalogInstanceNames]	cin
-																				INNER JOIN [health-check].[vw_statsOSEventLogs]	oel	ON oel.[project_id] = cin.[project_id] AND oel.[instance_id] = cin.[instance_id]
-																				LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																															AND rsr.[rule_id] = 134217728
-																															AND rsr.[active] = 1
-																															AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																				WHERE cin.[instance_active]=1
-																						AND cin.[project_id] = @projectID
-																						AND rsr.[id] IS NULL
-																				GROUP BY oel.[machine_name]
-																				ORDER BY oel.[machine_name]
+			DECLARE crsOSEventMessagesInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT
+																							  oel.[machine_name]
+																							, COUNT(*) AS [messages_count]
+																					FROM [dbo].[vw_catalogInstanceNames]	cin
+																					INNER JOIN [health-check].[vw_statsOSEventLogs]	oel	ON oel.[project_id] = cin.[project_id] AND oel.[instance_id] = cin.[instance_id]
+																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																AND rsr.[rule_id] = 134217728
+																																AND rsr.[active] = 1
+																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																					WHERE cin.[instance_active]=1
+																							AND cin.[project_id] = @projectID
+																							AND rsr.[id] IS NULL
+																					GROUP BY oel.[machine_name]
+																					ORDER BY oel.[machine_name]
 			OPEN crsOSEventMessagesInstanceName
 			FETCH NEXT FROM crsOSEventMessagesInstanceName INTO @machineName, @messageCount
 			WHILE @@FETCH_STATUS=0
