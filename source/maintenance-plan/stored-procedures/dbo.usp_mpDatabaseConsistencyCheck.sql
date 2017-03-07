@@ -162,7 +162,8 @@ IF object_id('tempdb..#databaseTableList') IS NOT NULL
 
 CREATE TABLE #databaseTableList(
 								[table_schema]	[sysname]	NULL,
-								[table_name]	[sysname]	NULL
+								[table_name]	[sysname]	NULL,
+								[type]			[sysname]	NULL
 								)
 CREATE INDEX IX_databaseTableList_TableName ON #databaseTableList([table_name])
 
@@ -194,9 +195,9 @@ IF @flgActions & 2 = 2 OR @flgActions & 16 = 16 OR @flgActions & 64 = 64 OR @flg
 		--get table list that will be analyzed including materialized views; will pick only tables with reserved pages
 		SET @queryToRun = N''
 		IF @serverVersionNum >= 9
-			SET @queryToRun = @queryToRun + N'SELECT DISTINCT ob.[table_schema], ob.[table_name]
+			SET @queryToRun = @queryToRun + N'SELECT DISTINCT ob.[table_schema], ob.[table_name], ob.[type]
 FROM (
-		SELECT obj.[object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name]
+		SELECT obj.[object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name], obj.[type]
 		FROM [' + @dbName + N'].sys.objects obj WITH (READPAST)
 		INNER JOIN [' + @dbName + N'].sys.schemas sch WITH (READPAST) ON sch.[schema_id] = obj.[schema_id]
 		WHERE obj.[type] IN (''S'', ''U'')
@@ -210,7 +211,7 @@ FROM (
 		N'
 		UNION ALL
 
-		SELECT DISTINCT obj.[object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name]
+		SELECT DISTINCT obj.[object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name], obj.[type]
 		FROM [' + @dbName + N'].sys.indexes idx WITH (READPAST)
 		INNER JOIN [' + @dbName + N'].sys.objects obj WITH (READPAST) ON obj.[object_id] = idx.[object_id]
 		INNER JOIN [' + @dbName + N'].sys.schemas sch WITH (READPAST) ON sch.[schema_id] = obj.[schema_id]
@@ -238,9 +239,9 @@ INNER JOIN
 			AND ps.[reserved_page_count] > 0
 	)ps ON ob.[object_id] = ps.[object_id]'
 		ELSE
-			SET @queryToRun = @queryToRun + N'SELECT ob.[table_schema], ob.[table_name]
+			SET @queryToRun = @queryToRun + N'SELECT ob.[table_schema], ob.[table_name], ob.[type]
 FROM (
-		SELECT DISTINCT obj.[id] AS [object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name]
+		SELECT DISTINCT obj.[id] AS [object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name], obj.[type]
 		FROM [' + @dbName + N']..sysobjects obj
 		INNER JOIN [' + @dbName + N']..sysusers sch ON sch.[uid] = obj.[uid]
 		WHERE obj.[type] IN (''S'', ''U'')
@@ -253,7 +254,7 @@ FROM (
 		N'
 		UNION ALL			
 
-		SELECT DISTINCT obj.[id] AS [object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name]
+		SELECT DISTINCT obj.[id] AS [object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name], obj.[type]
 		FROM [' + @dbName + N']..sysindexes idx
 		INNER JOIN [' + @dbName + N']..sysobjects obj ON obj.[id] = idx.[id]
 		INNER JOIN [' + @dbName + N']..sysusers sch ON sch.[uid] = obj.[uid]
@@ -275,7 +276,7 @@ INNER JOIN
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		DELETE FROM #databaseTableList
-		INSERT	INTO #databaseTableList([table_schema], [table_name])
+		INSERT	INTO #databaseTableList([table_schema], [table_name], [type])
 				EXEC (@queryToRun)
 	end
 
@@ -303,7 +304,7 @@ IF @flgActions & 1 = 1 AND @serverVersionNum >= 9 AND @flgOptions & 1 = 0
 		IF @sqlServerName <> @@SERVERNAME
 			begin
 				IF @serverVersionNum < 11
-					SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
+					SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
 										FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @dbName + N']) WITH TABLERESULTS'''')'')x
 										WHERE [Field]=''dbi_dbccFlags'''
 				ELSE
@@ -699,6 +700,8 @@ IF @flgActions & 128 = 128
 
 		DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [table_schema], [table_name] 
 															FROM #databaseTableList	
+															WHERE	(@serverVersionNum >= 9)
+																 OR (@serverVersionNum < 9 AND [type] NOT IN ('S'))
 															ORDER BY [table_name]
 		OPEN crsTableList
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName

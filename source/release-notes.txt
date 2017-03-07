@@ -472,4 +472,4 @@
 /* March 2017 new features & fixes
 /*----------------------------------------------------------------------*/
 /* 06.03.2017 */
-	- test against SQL 2000 (default and named instance)
+	- enhance backup: when performing a differential database backup, check database header for existence of a full backup (do not rely solely on msdb.dbo.backupset)

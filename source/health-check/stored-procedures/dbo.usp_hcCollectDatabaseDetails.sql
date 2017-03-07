@@ -240,11 +240,11 @@ WHILE @@FETCH_STATUS=0
 						IF @sqlServerName <> @@SERVERNAME
 							begin
 								IF @SQLMajorVersion < 11
-									SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
+									SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
 														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @databaseName + N']) WITH TABLERESULTS'''')'')x
 														WHERE [Field]=''dbi_dbccLastKnownGood'''
 								ELSE
-									SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
+									SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
 														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @databaseName + N']) WITH TABLERESULTS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
 														WHERE [Field]=''dbi_dbccLastKnownGood'''
 							end

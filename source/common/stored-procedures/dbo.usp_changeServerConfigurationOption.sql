@@ -128,7 +128,7 @@ IF @optionIsAvailable=1 AND ISNULL(@optionCurrentValue, 0) <> @configOptionValue
 		INSERT	INTO #serverPropertyConfig--([name], [minimum], [maximum], [config_value], [run_value])
 				EXEC (@queryToRun)
 
-		SET @queryToRun = N'SELECT @optionCurrentValue = config_value
+		SET @queryToRun = N'SELECT @optionCurrentValue = CONVERT([int], [config_value])
 							FROM #serverPropertyConfig
 							WHERE [config_name] = @configOptionName'
 		SET @queryParameters = N' @optionCurrentValue [int] OUTPUT, @configOptionName [sysname]'
