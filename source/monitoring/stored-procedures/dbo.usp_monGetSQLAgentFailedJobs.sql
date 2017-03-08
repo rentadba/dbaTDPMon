@@ -113,7 +113,7 @@ WHILE @@FETCH_STATUS=0
 		WHERE	[instance_id] = @instanceID
 				AND [project_id] = @projectID
 
-		SET @minJobCompletionTime = ISNULL(@minJobCompletionTime, CAST(GETDATE() AS [date]))
+		SET @minJobCompletionTime = ISNULL(@minJobCompletionTime, CONVERT([datetime], CONVERT([varchar](10), GETDATE(), 120), 120))
 
 		BEGIN TRY
 			SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(@sqlServerVersion, ''), 2), '.', '') 
