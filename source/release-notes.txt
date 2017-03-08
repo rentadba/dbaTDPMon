@@ -476,3 +476,4 @@
 
 /* 07.03.2017 */
 	- enhance performance for health-check collecting OS Event logs
+	- enhance install utility: check for database default locations. if not found, ask for parameters

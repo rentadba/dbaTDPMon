@@ -88,13 +88,21 @@ http://dbaTDPMon.codeplex.com',
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'DECLARE		@strMessage				[varchar](8000)='''',
-			@currentRunning			[int]=0,
-			@lastExecutionStatus	[int]=0,
-			@lastExecutionDate		[varchar](10)='''',
-			@lastExecutionTime 		[varchar](8)='''',
-			@runningTimeSec			[bigint]=0,
+	SET @queryToRun = N'DECLARE		@strMessage				[varchar](8000),
+			@currentRunning			[int],
+			@lastExecutionStatus	[int],
+			@lastExecutionDate		[varchar](10),
+			@lastExecutionTime 		[varchar](8),
+			@runningTimeSec			[bigint],
 			@jobName				[sysname]
+
+SELECT		@strMessage			 = '''',
+			@currentRunning		 = 0,
+			@lastExecutionStatus = 0,
+			@lastExecutionDate	 = '''',
+			@lastExecutionTime 	 = '''',
+			@runningTimeSec		 = 0
+
 
 /* check execution overlapping with Health Check job */
 SELECT TOP 1 @jobName = sj.[name]

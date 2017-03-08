@@ -2626,9 +2626,13 @@ BEGIN TRY
 
 			DECLARE @indexAnalyzedCount						[int],
 					@indexesPerInstance						[int],
-					@minimumIndexMaintenanceFrequencyDays	[tinyint] = 2,
-					@analyzeOnlyMessagesFromTheLastHours	[tinyint] = 24 ,
-					@analyzeIndexMaintenanceOperation		[nvarchar](128) = 'REBUILD'
+					@minimumIndexMaintenanceFrequencyDays	[tinyint],
+					@analyzeOnlyMessagesFromTheLastHours	[tinyint],
+					@analyzeIndexMaintenanceOperation		[nvarchar](128)
+
+			SET @minimumIndexMaintenanceFrequencyDays = 2
+			SET @analyzeOnlyMessagesFromTheLastHours = 24
+			SET @analyzeIndexMaintenanceOperation = 'REBUILD'
 
 		
 			-----------------------------------------------------------------------------------------------------

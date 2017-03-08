@@ -52,8 +52,8 @@ DECLARE   @eventDescriptor				[varchar](256)
 		, @configEventsTimeOutSeconds	[int]
 		, @startTime					[datetime]
 		, @endTime						[datetime]
-		, @getInformationEvent			[bit]=0
-		, @getWarningsEvent				[bit]=0
+		, @getInformationEvent			[bit]
+		, @getWarningsEvent				[bit]
 		
 
 DECLARE @optionXPIsAvailable		[bit],
@@ -142,6 +142,8 @@ SET @configEventsInLastHours = ISNULL(@configEventsInLastHours, 24)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --option to fetch also information OS events
+SET @getInformationEvent = 0
+
 BEGIN TRY
 	SELECT	@getInformationEvent = CASE WHEN LOWER([value])='true' THEN 1 ELSE 0 END
 	FROM	[dbo].[appConfigurations]
@@ -156,6 +158,8 @@ SET @getInformationEvent = ISNULL(@getInformationEvent, 0)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --option to fetch also warnings OS events
+SET @getWarningsEvent = 0
+
 BEGIN TRY
 	SELECT	@getWarningsEvent = CASE WHEN LOWER([value])='true' THEN 1 ELSE 0 END
 	FROM	[dbo].[appConfigurations]

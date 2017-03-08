@@ -27,9 +27,9 @@ AS
 
 SET NOCOUNT ON
 
-DECLARE	@minimumIndexMaintenanceFrequencyDays	[tinyint] = 2,
-		@analyzeOnlyMessagesFromTheLastHours	[tinyint] = 24 ,
-		@analyzeIndexMaintenanceOperation		[nvarchar](128) = 'REBUILD',
+DECLARE	@minimumIndexMaintenanceFrequencyDays	[tinyint],
+		@analyzeOnlyMessagesFromTheLastHours	[tinyint],
+		@analyzeIndexMaintenanceOperation		[nvarchar](128),
 		@affectedDependentObjects				[nvarchar](max),
 		@instanceName							[sysname],
 		@databaseName							[sysname],

@@ -413,7 +413,8 @@ BEGIN TRY
 
 	-----------------------------------------------------------------------------------------------------
 	--upsert catalog tables
-	-----------------------------------------------------------------------------------------------------														
+	-----------------------------------------------------------------------------------------------------
+/*
 	MERGE INTO [dbo].[catalogMachineNames] AS dest
 	USING (	
 			SELECT [name], [domain]
@@ -425,8 +426,27 @@ BEGIN TRY
 		VALUES (@projectID, src.[name], src.[domain]) 
 	WHEN MATCHED THEN
 		UPDATE SET dest.[domain]=src.[domain];
+*/
+	UPDATE dest
+		SET dest.[domain]=src.[domain]
+	FROM [dbo].[catalogMachineNames] AS dest
+	INNER JOIN 
+			(	
+			 SELECT [name], [domain]
+			 FROM #catalogMachineNames
+			) src ON dest.[name] = src.[name] AND dest.[project_id] = @projectID;
 
+	INSERT	INTO [dbo].[catalogMachineNames] ([project_id], [name], [domain]) 
+			SELECT @projectID, src.[name], src.[domain]
+			FROM 
+				(	
+					 SELECT [name], [domain]
+					 FROM #catalogMachineNames
+				) src 
+			LEFT JOIN [dbo].[catalogMachineNames] AS dest ON dest.[name] = src.[name] AND dest.[project_id] = @projectID			
+			WHERE dest.[name] IS NULL;
 
+/*
 	MERGE INTO [dbo].[catalogInstanceNames] AS dest
 	USING (	
 			SELECT  cmn.[id]	  AS [machine_id]
@@ -470,6 +490,70 @@ BEGIN TRY
 					, dest.[edition] = src.[edition]
 					, dest.[cluster_node_machine_id] = src.[cluster_node_machine_id]
 					, dest.[last_refresh_date_utc] = GETUTCDATE();
+*/
+
+	UPDATE dest
+		SET   dest.[is_clustered] = src.[is_clustered]
+			, dest.[version] = src.[version]
+			, dest.[active] = CASE WHEN src.[is_clustered]=1
+									THEN CASE	WHEN src.[active]=1 AND src.[machine_id]=src.[cluster_node_machine_id] 
+												THEN 1 
+												ELSE 0
+										 END
+									ELSE src.[active]
+								END
+			, dest.[edition] = src.[edition]
+			, dest.[cluster_node_machine_id] = src.[cluster_node_machine_id]
+			, dest.[last_refresh_date_utc] = GETUTCDATE()
+	FROM [dbo].[catalogInstanceNames] AS dest
+	INNER JOIN
+		 (	
+			SELECT  cmn.[id]	  AS [machine_id]
+				  , cin.[name]	  AS [name]
+				  , cin.[version]
+				  , cin.[edition]
+				  , @isClustered  AS [is_clustered]
+				  , @isActive	  AS [active]
+				  , cmnA.[id]	  AS [cluster_node_machine_id]
+			FROM #catalogInstanceNames cin
+			INNER JOIN #catalogMachineNames src ON 1=1
+			INNER JOIN [dbo].[catalogMachineNames] cmn ON		cmn.[name] = src.[name] 
+															AND cmn.[project_id]=@projectID
+			LEFT  JOIN [dbo].[catalogMachineNames] cmnA ON		cmnA.[name] = cin.[machine_name] 
+															AND cmnA.[project_id]=@projectID 
+															AND @isClustered=1
+		  ) AS src	ON dest.[machine_id] = src.[machine_id] AND dest.[name] = src.[name] AND dest.[project_id] = @projectID;
+
+	INSERT INTO [dbo].[catalogInstanceNames]([machine_id], [project_id], [name], [version], [edition], [is_clustered], [active], [cluster_node_machine_id], [last_refresh_date_utc]) 
+			SELECT   src.[machine_id], @projectID, src.[name], src.[version], src.[edition], src.[is_clustered]
+					, CASE WHEN src.[is_clustered]=1
+							THEN CASE	WHEN src.[active]=1 AND src.[machine_id]=src.[cluster_node_machine_id] 
+										THEN 1 
+										ELSE 0
+								 END
+							ELSE src.[active]
+					 END
+					, src.[cluster_node_machine_id]
+					, GETUTCDATE()
+			FROM (	
+					SELECT  cmn.[id]	  AS [machine_id]
+						  , cin.[name]	  AS [name]
+						  , cin.[version]
+						  , cin.[edition]
+						  , @isClustered  AS [is_clustered]
+						  , @isActive	  AS [active]
+						  , cmnA.[id]	  AS [cluster_node_machine_id]
+					FROM #catalogInstanceNames cin
+					INNER JOIN #catalogMachineNames src ON 1=1
+					INNER JOIN [dbo].[catalogMachineNames] cmn ON		cmn.[name] = src.[name] 
+																	AND cmn.[project_id]=@projectID
+					LEFT  JOIN [dbo].[catalogMachineNames] cmnA ON		cmnA.[name] = cin.[machine_name] 
+																	AND cmnA.[project_id]=@projectID 
+																	AND @isClustered=1
+				  ) AS src
+			LEFT JOIN [dbo].[catalogInstanceNames] AS dest ON dest.[machine_id] = src.[machine_id] AND dest.[name] = src.[name] AND dest.[project_id] = @projectID
+			WHERE dest.[machine_id] IS NULL;
+
 
 	UPDATE cdn
 		SET cdn.[active] = 0
@@ -478,6 +562,7 @@ BEGIN TRY
 	INNER JOIN #catalogInstanceNames	srcIN ON cin.[name] = srcIN.[name]
 	WHERE cin.[project_id] = @projectID
 
+	/*
 	MERGE INTO [dbo].[catalogDatabaseNames] AS dest
 	USING (	
 			SELECT  cin.[id] AS [instance_id]
@@ -500,6 +585,45 @@ BEGIN TRY
 				  , dest.[state] = src.[state]
 				  , dest.[state_desc] = src.[state_desc]
 				  , dest.[active] = 1;
+	*/
+
+	UPDATE dest
+		SET	dest.[database_id] = src.[database_id]
+					  , dest.[state] = src.[state]
+					  , dest.[state_desc] = src.[state_desc]
+					  , dest.[active] = 1
+	FROM [dbo].[catalogDatabaseNames] AS dest
+	INNER JOIN
+		 (	
+			SELECT  cin.[id] AS [instance_id]
+				  , src.[name]
+				  , src.[database_id]
+				  , src.[state]
+				  , src.[state_desc]
+			FROM  #catalogDatabaseNames src
+			INNER JOIN #catalogMachineNames srcMn ON 1=1
+			INNER JOIN #catalogInstanceNames srcIN ON 1=1
+			INNER JOIN [dbo].[catalogMachineNames] cmn ON cmn.[name] = srcMn.[name] AND cmn.[project_id]=@projectID
+			INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[name] = srcIN.[name] AND cin.[machine_id] = cmn.[id]
+		  ) AS src ON dest.[instance_id] = src.[instance_id] AND dest.[name] = src.[name];
+
+
+	INSERT INTO [dbo].[catalogDatabaseNames]([instance_id], [project_id], [database_id], [name], [state], [state_desc], [active])
+			SELECT src.[instance_id], @projectID, src.[database_id], src.[name], src.[state], src.[state_desc], 1
+			FROM (	
+					SELECT  cin.[id] AS [instance_id]
+						  , src.[name]
+						  , src.[database_id]
+						  , src.[state]
+						  , src.[state_desc]
+					FROM  #catalogDatabaseNames src
+					INNER JOIN #catalogMachineNames srcMn ON 1=1
+					INNER JOIN #catalogInstanceNames srcIN ON 1=1
+					INNER JOIN [dbo].[catalogMachineNames] cmn ON cmn.[name] = srcMn.[name] AND cmn.[project_id]=@projectID
+					INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[name] = srcIN.[name] AND cin.[machine_id] = cmn.[id]
+				  ) AS src
+			LEFT JOIN [dbo].[catalogDatabaseNames] AS dest ON dest.[instance_id] = src.[instance_id] AND dest.[name] = src.[name]
+			WHERE dest.[instance_id] IS NULL;
 
 	SELECT TOP 1 @instanceID = cin.[id]
 	FROM  #catalogMachineNames srcMn
