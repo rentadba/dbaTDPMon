@@ -294,11 +294,17 @@ WHILE @@FETCH_STATUS=0
 															@debugMode				= @debugMode
 		END TRY
 		BEGIN CATCH
-				 DECLARE @ErrorNumber INT = ERROR_NUMBER();
-				DECLARE @ErrorLine INT = ERROR_LINE();
-				DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
-				DECLARE @ErrorSeverity INT = ERROR_SEVERITY();
-				DECLARE @ErrorState INT = ERROR_STATE();
+				DECLARE @ErrorNumber [int]
+				DECLARE @ErrorLine [int]
+				DECLARE @ErrorMessage [nvarchar](4000)
+				DECLARE @ErrorSeverity [int]
+				DECLARE @ErrorState [int]
+
+				SET @ErrorNumber = ERROR_NUMBER();
+				SET @ErrorLine = ERROR_LINE();
+				SET @ErrorMessage = ERROR_MESSAGE();
+				SET @ErrorSeverity = ERROR_SEVERITY();
+				SET @ErrorState = ERROR_STATE();
  
 				PRINT 'Actual error number: ' + CAST(@ErrorNumber AS VARCHAR(10));
 				PRINT 'Actual line number: ' + CAST(@ErrorLine AS VARCHAR(10));

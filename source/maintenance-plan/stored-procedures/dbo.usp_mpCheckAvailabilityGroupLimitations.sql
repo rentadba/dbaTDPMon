@@ -315,7 +315,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 
 					end
 
-				SET @agName = @clusterName + '_' + @agName
+				SET @agName = @clusterName + '$' + @agName
 			end
 		ELSE
 			SET @agName=NULL

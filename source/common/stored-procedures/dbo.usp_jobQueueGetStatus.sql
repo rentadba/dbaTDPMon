@@ -146,7 +146,11 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 								WHERE [id] = @jobQueueID
 
 								/* removing job */
-								PRINT '--Debug info: @lastExecutionStatus = ' + CAST(@lastExecutionStatus AS varchar) + '; @currentRunning=' + CAST(@currentRunning AS varchar)
+								IF @debugMode=1 
+									begin
+										SET @strMessage='--Debug info: @lastExecutionStatus = ' + CAST(@lastExecutionStatus AS varchar) + '; @currentRunning=' + CAST(@currentRunning AS varchar)
+										EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+									end
 
 								EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
 																@jobName		= @jobName,
@@ -233,7 +237,12 @@ IF @minJobToRunBeforeExit=0
 				IF @currentRunning = 0
 					begin
 						/* removing job */
-						PRINT '--Debug info: @lastExecutionStatus = ' + CAST(@lastExecutionStatus AS varchar) + '; @currentRunning=' + CAST(@currentRunning AS varchar)
+						IF @debugMode=1 
+							begin
+								SET @strMessage='--Debug info: @lastExecutionStatus = ' + CAST(@lastExecutionStatus AS varchar) + '; @currentRunning=' + CAST(@currentRunning AS varchar)
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+							end
+		
 
 						EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
 														@jobName		= @jobName,

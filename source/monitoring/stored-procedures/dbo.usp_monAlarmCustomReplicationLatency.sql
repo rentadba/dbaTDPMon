@@ -508,7 +508,7 @@ WHILE @@FETCH_STATUS=0
 				INSERT	INTO [dbo].[jobExecutionQueue](	[instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id],
 														[job_name], [job_step_name], [job_database_name], [job_command])
 						SELECT	@currentInstanceID, @projectID, 'monitoring', 'usp_monAlarmCustomReplicationLatency', @publicationName + ' - ' + @publisherDB, @publisherInstanceID,
-								'dbaTDPMon - usp_monAlarmCustomReplicationLatency(1) - ' + REPLACE(@publicationServer, '\', '_') + ' - ' + @publicationName + ' - ' + @publisherDB, 'Run Analysis', 'tempdb', @queryToRun
+								'dbaTDPMon - usp_monAlarmCustomReplicationLatency(1) - ' + REPLACE(@publicationServer, '\', '$') + ' - ' + @publicationName + ' - ' + @publisherDB, 'Run Analysis', 'tempdb', @queryToRun
 				
 				FETCH NEXT FROM crsActivePublications INTO @publicationName, @publisherDB
 			end
@@ -534,7 +534,7 @@ UPDATE srl
 	SET srl.[state] = 1	/* analysis job executed successfully */
 FROM [monitoring].[statsReplicationLatency] srl
 INNER JOIN [dbo].[jobExecutionQueue] jeq ON jeq.[filter] = srl.[publication_name] + ' - ' + srl.[publisher_db]
-											AND jeq.[job_name] = 'dbaTDPMon - usp_monAlarmCustomReplicationLatency(1) - ' + REPLACE(srl.[publisher_server], '\', '_') + ' - ' + srl.[publication_name] + ' - ' + srl.[publisher_db]
+											AND jeq.[job_name] = 'dbaTDPMon - usp_monAlarmCustomReplicationLatency(1) - ' + REPLACE(srl.[publisher_server], '\', '$') + ' - ' + srl.[publication_name] + ' - ' + srl.[publisher_db]
 											AND jeq.[job_step_name] = 'Run Analysis'
 WHERE	jeq.[module] = 'monitoring'
 		AND jeq.[descriptor] = 'usp_monAlarmCustomReplicationLatency'
@@ -599,7 +599,7 @@ WHILE @@FETCH_STATUS=0
 				INSERT	INTO [dbo].[jobExecutionQueue](	[instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id],
 														[job_name], [job_step_name], [job_database_name], [job_command])
 						SELECT	@currentInstanceID, @projectID, 'monitoring', 'usp_monAlarmCustomReplicationLatency', @publicationName + ' - ' + @publisherDB , @publisherInstanceID,
-								'dbaTDPMon - usp_monAlarmCustomReplicationLatency(2) - ' + REPLACE(@publicationServer, '\', '_') + ' - ' + @publicationName + ' - ' + @publisherDB, 'Get Latency', DB_NAME(), @queryToRun
+								'dbaTDPMon - usp_monAlarmCustomReplicationLatency(2) - ' + REPLACE(@publicationServer, '\', '$') + ' - ' + @publicationName + ' - ' + @publisherDB, 'Get Latency', DB_NAME(), @queryToRun
 
 				FETCH NEXT FROM crsActivePublications INTO @publicationName, @publisherDB
 			end
@@ -629,7 +629,7 @@ UPDATE srl
 	SET srl.[state] = 2	/* getdate job executed successfully */
 FROM [monitoring].[statsReplicationLatency] srl
 INNER JOIN [dbo].[jobExecutionQueue] jeq ON jeq.[filter] = srl.[publication_name] + ' - ' + srl.[publisher_db]
-											AND jeq.[job_name] = 'dbaTDPMon - usp_monAlarmCustomReplicationLatency(2) - ' + REPLACE(srl.[publisher_server], '\', '_') + ' - ' + srl.[publication_name] + ' - ' + srl.[publisher_db]
+											AND jeq.[job_name] = 'dbaTDPMon - usp_monAlarmCustomReplicationLatency(2) - ' + REPLACE(srl.[publisher_server], '\', '$') + ' - ' + srl.[publication_name] + ' - ' + srl.[publisher_db]
 											AND jeq.[job_step_name] = 'Get Latency'
 WHERE	jeq.[module] = 'monitoring'
 		AND jeq.[descriptor] = 'usp_monAlarmCustomReplicationLatency'

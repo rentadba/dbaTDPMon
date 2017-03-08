@@ -170,7 +170,7 @@ BEGIN TRY
 	IF @reportFileName IS NOT NULL AND LEFT(@reportFileName, 1) <> '+'
 		SET @HTMLReportFileName = @reportFileName
 	ELSE
-		SET @HTMLReportFileName = 'Daily_HealthCheck_Report_for_' + REPLACE(@projectName, '\', '_') + '_from_' +
+		SET @HTMLReportFileName = 'Daily_HealthCheck_Report_for_' + REPLACE(@projectName, '\', '$') + '_from_' +
 						CONVERT([varchar](8), @reportBuildStartTime, 112)
 							+ '_' + LEFT(REPLACE(CONVERT([varchar](8),@reportBuildStartTime, 108), ':', ''), 4)
 	

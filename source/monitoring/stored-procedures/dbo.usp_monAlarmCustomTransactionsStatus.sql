@@ -158,7 +158,7 @@ WHERE [project_id] = @projectID
 INSERT	INTO [dbo].[jobExecutionQueue](	[instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id],
 										[job_name], [job_step_name], [job_database_name], [job_command])
 		SELECT	@currentInstanceID, @projectID, 'monitoring', 'usp_monAlarmCustomTransactionsStatus', NULL, cin.[id],
-				'dbaTDPMon - usp_monAlarmCustomTransactionsStatus - ' + REPLACE(cin.[name], '\', '_'), 'Run Analysis', DB_NAME()
+				'dbaTDPMon - usp_monAlarmCustomTransactionsStatus - ' + REPLACE(cin.[name], '\', '$'), 'Run Analysis', DB_NAME()
 				, N'EXEC dbo.usp_monGetTransactionsStatus @projectCode = ''' + @projectCode + N''', @sqlServerNameFilter = ''' + cin.[name] + N''''
 		FROM	[dbo].[catalogInstanceNames] cin
 		WHERE	cin.[active] = 1

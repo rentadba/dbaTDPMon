@@ -395,7 +395,7 @@ WHILE @@FETCH_STATUS=0
 				IF NOT (@optionXPIsAvailable=0 OR @optionXPValue=0)
 					begin
 						-- save powershell script
-						SET @psFileName = 'GetOSSystemEvents_' + REPLACE(@machineName, '\', '_') + '_' + @psLogTypeName + '.ps1'
+						SET @psFileName = 'GetOSSystemEvents_' + REPLACE(@machineName, '\', '$') + '_' + @psLogTypeName + '.ps1'
 						SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [message] FROM [' + DB_NAME() + '].[dbo].[logAnalysisMessages] WHERE [descriptor]=''''' + @eventDescriptor + ''''' AND [instance_id]=' + CAST(@instanceID AS [varchar]) + ' AND [project_id]=' + CAST(@projectID AS [varchar]) + '" queryout "' + @psFileLocation + @psFileName + '" -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'', no_output'
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
 

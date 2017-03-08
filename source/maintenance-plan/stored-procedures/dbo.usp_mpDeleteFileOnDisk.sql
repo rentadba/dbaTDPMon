@@ -72,7 +72,7 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 IF @sqlServerName=@@SERVERNAME
 		SET @queryToRun = N'master.dbo.xp_fileexist ''' + @fileName + ''''
 else
-	IF @serverVersionNum<11
+	IF @serverVersionNum < 11
 		SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC master.dbo.xp_fileexist ''''' + @fileName + ''''';'')x'
 	ELSE
 		SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''master.dbo.xp_fileexist ''''''''' + @fileName + ''''''''' '''') WITH RESULT SETS(([File Exists] [int], [File is a Directory] [int], [Parent Directory Exists] [int])) '')x'

@@ -246,31 +246,39 @@ WHILE @@FETCH_STATUS=0
 				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor], [filter]
 													   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 													   , [job_command])
-						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], L.[log_type_name],
+						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], CASE WHEN L.[log_type_name] <> '%' THEN L.[log_type_name] ELSE NULL END,
 								X.[instance_id] AS [for_instance_id], 
-								DB_NAME() + ' - ' + 'hcCollectOSEventLogs' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END  + ' (' + L.[log_type_name] + ')' + ' - ' + @projectCode AS [job_name],
+								DB_NAME() + ' - ' + 'usp_hcCollectOSEventLogs' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END  + CASE WHEN L.[log_type_name] <> '%' THEN ' (' + L.[log_type_name] + ')' ELSE '' END + ' - ' + @projectCode AS [job_name],
 								'Run Collect'	AS [job_step_name],
 								DB_NAME()		AS [job_database_name],
 								'EXEC [dbo].[usp_hcCollectOSEventLogs] @projectCode = ''' + @projectCode + ''', @sqlServerNameFilter = ''' + X.[instance_name] + ''', @logNameFilter = ''' + L.[log_type_name] + ''', @enableXPCMDSHELL = ' + CAST(@enableXPCMDSHELL AS [varchar]) + ', @debugMode = ' + CAST(@debugMode AS [varchar])
 						FROM
 							(
-								SELECT	DISTINCT cin.[instance_id], cin.[instance_name]
-								FROM	[dbo].[vw_catalogInstanceNames] cin
-								WHERE 	cin.[project_id] = @projectID
-										AND cin.[instance_active]=1
-										AND cin.[instance_name] LIKE @sqlServerNameFilter
-										--AND cin.[instance_name] <> @@SERVERNAME
-										AND @configParallelJobs <> 1
+								SELECT cin.[instance_id], cin.[instance_name]
+								FROM (
+										SELECT	  cin.[instance_id], cin.[instance_name]
+												, ROW_NUMBER() OVER(PARTITION BY cin.[machine_name] ORDER BY cin.[instance_id]) AS [priority]
+										FROM	[dbo].[vw_catalogInstanceNames] cin
+										WHERE 	cin.[project_id] = @projectID
+												AND cin.[instance_active]=1
+												AND cin.[instance_name] LIKE @sqlServerNameFilter
+												--AND cin.[instance_name] <> @@SERVERNAME
+												AND @configParallelJobs <> 1
 								
-								UNION ALL
+										UNION ALL
 
-								SELECT @instanceID AS [instance_id], '%' AS [instance_name]
-								WHERE @configParallelJobs = 1
+										SELECT @instanceID AS [instance_id], '%' AS [instance_name], 1 AS [priority]
+										WHERE @configParallelJobs = 1
+									)cin
+								WHERE [priority] = 1
 							)X,
 							(
+								/*
 								SELECT 'Application' AS [log_type_name], 1 AS [log_type_id] UNION ALL
 								SELECT 'System'		 AS [log_type_name], 2 AS [log_type_id] UNION ALL
 								SELECT 'Setup'		 AS [log_type_name], 3 AS [log_type_id] 
+								*/
+								SELECT '%'		 AS [log_type_name], 3 AS [log_type_id] 
 							)L
 
 				--cleaning machine names with multi-instance; keep only one instance, since machine logs will be fetched

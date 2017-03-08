@@ -244,7 +244,7 @@ WHILE @@FETCH_STATUS=0
 														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @databaseName + N']) WITH TABLERESULTS'''')'')x
 														WHERE [Field]=''dbi_dbccLastKnownGood'''
 								ELSE
-									SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
+									SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
 														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @databaseName + N']) WITH TABLERESULTS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
 														WHERE [Field]=''dbi_dbccLastKnownGood'''
 							end

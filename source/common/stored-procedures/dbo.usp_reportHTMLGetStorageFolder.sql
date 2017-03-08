@@ -86,7 +86,7 @@ BEGIN TRY
 
 	IF @instanceName IS NOT NULL
 		begin
-			SET @instanceName = REPLACE(@instanceName, '\', '_')
+			SET @instanceName = REPLACE(@instanceName, '\', '$')
 			SET @relativeStoragePath = @relativeStoragePath + @instanceName + '\'
 		end
 

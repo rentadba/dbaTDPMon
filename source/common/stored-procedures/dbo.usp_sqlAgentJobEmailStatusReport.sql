@@ -241,7 +241,7 @@ IF @logFileLocation IS NOT NULL
 		IF @sqlServerName=@@SERVERNAME
 				SET @queryToRun = N'master.dbo.xp_fileexist ''' + @logFileLocation + ''''
 		else
-			IF @serverVersionNum<11
+			IF @serverVersionNum < 11
 				SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC master.dbo.xp_fileexist ''''' + @logFileLocation + ''''';'')x'
 			ELSE
 				SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''master.dbo.xp_fileexist ''''''''' + @logFileLocation + ''''''''' '''') WITH RESULT SETS(([File Exists] [int], [File is a Directory] [int], [Parent Directory Exists] [int])) '')x'

@@ -473,3 +473,6 @@
 /*----------------------------------------------------------------------*/
 /* 06.03.2017 */
 	- enhance backup: when performing a differential database backup, check database header for existence of a full backup (do not rely solely on msdb.dbo.backupset)
+
+/* 07.03.2017 */
+	- enhance performance for health-check collecting OS Event logs
