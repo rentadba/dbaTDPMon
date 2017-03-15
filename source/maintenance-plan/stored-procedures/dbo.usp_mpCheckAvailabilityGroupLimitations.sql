@@ -34,10 +34,11 @@ DECLARE		@queryToRun  					[nvarchar](2048),
 SET @nestedExecutionLevel = @executionLevel + 1
 
 --------------------------------------------------------------------------------------------------
-DECLARE @clusterName				[sysname],		
-		@agInstanceRoleDesc			[sysname],
-		@agSynchronizationState		[sysname],
-		@agPreferredBackupReplica	[bit]
+DECLARE @clusterName				 [sysname],		
+		@agInstanceRoleDesc			 [sysname],
+		@agSynchronizationState		 [sysname],
+		@agPreferredBackupReplica	 [bit],
+		@agAutomatedBackupPreference [tinyint]
 
 SET @agName = NULL
 
@@ -58,6 +59,7 @@ EXEC sp_executesql @queryToRun, @queryParameters, @clusterName = @clusterName OU
 SET @queryToRun = N'
 			SELECT    ag.[name]
 					, ars.[role_desc]
+					, ag.[automated_backup_preference]
 			FROM sys.availability_replicas ar
 			INNER JOIN sys.dm_hadr_availability_replica_states ars ON ars.[replica_id]=ar.[replica_id] AND ars.[group_id]=ar.[group_id]
 			INNER JOIN sys.availability_groups ag ON ag.[group_id]=ar.[group_id]
@@ -67,12 +69,14 @@ SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @que
 
 SET @queryToRun = N'SELECT    @agName = [name]
 							, @agInstanceRoleDesc = [role_desc]
+							, @agAutomatedBackupPreference = [automated_backup_preference]
 					FROM (' + @queryToRun + N')inq'
-SET @queryParameters = N'@agName [sysname] OUTPUT, @agInstanceRoleDesc [sysname] OUTPUT'
+SET @queryParameters = N'@agName [sysname] OUTPUT, @agInstanceRoleDesc [sysname] OUTPUT, @agAutomatedBackupPreference [tinyint] OUTPUT'
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 EXEC sp_executesql @queryToRun, @queryParameters, @agName = @agName OUTPUT
 												, @agInstanceRoleDesc = @agInstanceRoleDesc OUTPUT
+												, @agAutomatedBackupPreference = @agAutomatedBackupPreference OUTPUT
 	
 
 IF @agName IS NOT NULL AND @clusterName IS NOT NULL
@@ -125,13 +129,62 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 															@eventMessage	= @eventData,
 															@eventType		= 0 /* info */
 
+						SET @eventData='<alert><detail>' + 
+										'<severity>critical</severity>' + 
+										'<instance_name>' + @sqlServerName + '</instance_name>' + 
+										'<cluster_name>' + @clusterName + '</instance_name>' + 
+										'<availability_group_name>' + @agName + '</instance_name>' + 
+										'<action_name>' + @actionName + '</action_name>' + 
+										'<action_type>' + @actionType + '</action_type>' + 
+										'<message>' + @queryToRun + '</message' + 
+										'<event_date_utc>' + CONVERT([varchar](24), GETUTCDATE(), 121) + '</event_date_utc>' + 
+										'</detail></alert>'
+
+						EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= DEFAULT,
+																		@sqlServerName			= @sqlServerName,
+																		@dbName					= @dbName,
+																		@objectName				= NULL,
+																		@childObjectName		= NULL,
+																		@module					= 'dbo.usp_mpDatabaseBackup',
+																		@eventName				= 'database backup',
+																		@parameters				= NULL,	
+																		@eventMessage			= @eventData,
+																		@dbMailProfileName		= NULL,
+																		@recipientsList			= NULL,
+																		@eventType				= 6,	/* 6 - alert-custom */
+																		@additionalOption		= 0
+
 						RETURN 1
 					end
 
 				/*-------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 				/* database backup - allowed actions on a secondary replica */
 				IF @actionName = 'database backup' AND UPPER(@agInstanceRoleDesc) = 'SECONDARY'
-					begin								
+					begin	
+						/* if automated_backup_preference is 0 (primary), Backups should always occur on the primary replica */
+						IF @agAutomatedBackupPreference = 0
+							begin
+								SET @queryToRun=N'Availability Group: Current setting for Backup Preferences do not permit backups on a seconday replica (0: Primary).'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+								SET @eventData='<skipaction><detail>' + 
+													'<name>' + @actionName + '</name>' + 
+													'<type>' + @actionType + '</type>' + 
+													'<affected_object>' + @dbName + '</affected_object>' + 
+													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+													'<reason>' + @queryToRun + '</reason>' + 
+												'</detail></skipaction>'
+
+								EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+																	@dbName			= @dbName,
+																	@module			= 'dbo.usp_mpCheckAvailabilityGroupLimitations',
+																	@eventName		= @actionName,
+																	@eventMessage	= @eventData,
+																	@eventType		= 0 /* info */
+
+								RETURN 1
+							end
+
 						/* if instance is preferred replica */
 						IF @agPreferredBackupReplica = 0
 							begin
@@ -261,6 +314,84 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 																	@eventType		= 0 /* info */
 
 								RETURN 1
+							end
+					end
+
+				/*-------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+				/* database backup - allowed actions on a primary replica */
+				IF @actionName = 'database backup' AND UPPER(@agInstanceRoleDesc) = 'PRIMARY'
+					begin	
+						/* if automated_backup_preference is 1 (secondary only), backups logs must be performed on secondary */
+						IF @agAutomatedBackupPreference = 1 AND @flgActions & 4 = 4 /* log */
+							begin
+								SET @queryToRun=N'Availability Group: Current setting for Backup Preferences do not permit LOG backups on a primary replica (1: Secondary only).'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+								SET @eventData='<skipaction><detail>' + 
+													'<name>' + @actionName + '</name>' + 
+													'<type>' + @actionType + '</type>' + 
+													'<affected_object>' + @dbName + '</affected_object>' + 
+													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+													'<reason>' + @queryToRun + '</reason>' + 
+												'</detail></skipaction>'
+
+								EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+																	@dbName			= @dbName,
+																	@module			= 'dbo.usp_mpCheckAvailabilityGroupLimitations',
+																	@eventName		= @actionName,
+																	@eventMessage	= @eventData,
+																	@eventType		= 0 /* info */
+
+								RETURN 1
+							end
+
+						/* if automated_backup_preference is 2 (prefered secondary): performing backups on the primary replica is acceptable if no secondary replica is available for backup operations */
+						/* full and differential backups are allowed only on primary / restrictions apply for a secondary replica */
+						IF @agAutomatedBackupPreference = 2 AND @flgActions & 4 = 4 /* log */
+							begin
+								/* check if there are secondary replicas available to perform the log backup */
+								DECLARE @agAvailableSecondaryReplicas [smallint]
+
+								SET @queryToRun = N'SELECT @agAvailableSecondaryReplicas = COUNT(*)
+													FROM sys.dm_hadr_database_replica_states hdrs
+													INNER JOIN sys.availability_replicas ar ON ar.[replica_id]=hdrs.[replica_id]
+													INNER JOIN sys.availability_databases_cluster adc ON adc.[group_id]=hdrs.[group_id] AND adc.[group_database_id]=hdrs.[group_database_id]
+													INNER JOIN sys.dm_hadr_availability_replica_cluster_states rcs ON rcs.[replica_id]=ar.[replica_id] AND rcs.[group_id]=hdrs.[group_id]
+													INNER JOIN sys.dm_hadr_availability_replica_states ars ON ars.[replica_id]=ar.[replica_id] AND ars.[group_id]=ar.[group_id]
+													INNER JOIN sys.databases sd ON sd.name = adc.database_name
+													WHERE	adc.[database_name] = ''' + @dbName + N'''
+															AND hdrs.[synchronization_state_desc] IN (''SYNCHRONIZED'', ''SYNCHRONIZING'')
+															AND ars.[role_desc] = ''SECONDARY'''
+
+								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+
+								SET @queryParameters = N'@agAvailableSecondaryReplicas [smallint] OUTPUT'
+								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+								EXEC sp_executesql @queryToRun, @queryParameters, @agAvailableSecondaryReplicas = @agAvailableSecondaryReplicas OUTPUT
+
+								IF @agAvailableSecondaryReplicas > 0
+									begin
+										SET @queryToRun=N'Availability Group: Current setting for Backup Preferences indicate that LOG backups should be perform on a secondary (current available) replica.'
+										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+										SET @eventData='<skipaction><detail>' + 
+															'<name>' + @actionName + '</name>' + 
+															'<type>' + @actionType + '</type>' + 
+															'<affected_object>' + @dbName + '</affected_object>' + 
+															'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+															'<reason>' + @queryToRun + '</reason>' + 
+														'</detail></skipaction>'
+
+										EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+																			@dbName			= @dbName,
+																			@module			= 'dbo.usp_mpCheckAvailabilityGroupLimitations',
+																			@eventName		= @actionName,
+																			@eventMessage	= @eventData,
+																			@eventType		= 0 /* info */
+
+										RETURN 1
+									end
 							end
 					end
 

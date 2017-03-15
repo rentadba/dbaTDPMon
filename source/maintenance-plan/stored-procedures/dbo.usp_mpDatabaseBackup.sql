@@ -17,7 +17,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseBackup]
 														2 - perform differential database backup
 														4 - perform transaction log backup
 													*/
-		@flgOptions			[int] = 6107,		/*  1 - use CHECKSUM (default)
+		@flgOptions			[int] = 5083,		/*  1 - use CHECKSUM (default)
 													2 - use COMPRESSION, if available (default)
 													4 - use COPY_ONLY
 													8 - force change backup type (default): if log is set, and no database backup is found, a database backup will be first triggered
@@ -376,7 +376,10 @@ IF @flgActions & 4 = 4
 --------------------------------------------------------------------------------------------------
 --create destination path: <@backupLocation>\@sqlServerName\@dbName
 IF RIGHT(@backupLocation, 1)<>'\' SET @backupLocation = @backupLocation + N'\'
-SET @backupLocation = @backupLocation + REPLACE(@sqlServerName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
+IF @agName IS NULL
+	SET @backupLocation = @backupLocation + REPLACE(@sqlServerName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
+ELSE
+	SET @backupLocation = @backupLocation + REPLACE(@agName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
 
 SET @queryToRun = N'EXEC [' + DB_NAME() + '].[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @sqlServerName + N''',
 																			@folderName		= ''' + @backupLocation + N''',
@@ -419,9 +422,9 @@ SET @optionBackupWithCopyOnly=0
 IF @flgOptions & 4 = 4 AND @serverVersionNum >= 9
 	SET @optionBackupWithCopyOnly=1
 
---check if another backup is needed (full)
+--check if another backup is needed (full) / not applicable to AlwaysOn Availability Groups
 SET @optionForceChangeBackupType=0
-IF @flgOptions & 8 = 8
+IF @flgOptions & 8 = 8 AND 	@agName IS NULL 
 	begin
 		--check for any full database backup (when differential should be made) or any full/incremental database backup (when transaction log should be made)
 		IF @flgActions & 2 = 2 OR @flgActions & 4 = 4
@@ -451,7 +454,7 @@ IF @flgOptions & 8 = 8
 						IF object_id('#dbi_differentialBaseLSN') IS NOT NULL DROP TABLE #dbi_differentialBaseLSN
 						CREATE TABLE #dbi_differentialBaseLSN
 						(
-							[Value]					[sysname]			NULL
+							[Value]					[varchar](255)			NULL
 						)
 
 						IF @sqlServerName <> @@SERVERNAME
@@ -463,7 +466,7 @@ IF @flgOptions & 8 = 8
 								ELSE
 									SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
 														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @dbName + N']) WITH TABLERESULTS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [VALUE] [nvarchar](max))) '')x
-														WHERE [Object]=''dbi_differentialBaseLSN'' AND [Field]=''m_blockOffset'''
+														WHERE [Field]=''dbi_differentialBaseLSN'''
 							end
 						ELSE
 							begin	
@@ -483,16 +486,19 @@ IF @flgOptions & 8 = 8
 									begin
 										SET @queryToRun=N'BEGIN TRY 
 															' + @queryToRun + ' 
-														  END TRY 
-														  BEGIN CATCH 
+															END TRY 
+															BEGIN CATCH 
 																PRINT ERROR_MESSAGE() 
-														  END CATCH'
+															END CATCH'
 									end
 								
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 								EXEC sp_executesql @queryToRun
 
-								SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Object]=''dbi_differentialBaseLSN'' AND [Field]=''m_blockOffset'''											
+								IF @serverVersionNum < 11
+									SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Object]=''dbi_differentialBaseLSN'' AND [Field]=''m_blockOffset'''											
+								ELSE
+									SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_differentialBaseLSN'''
 							end
 
 						IF @debugMode = 1 PRINT @queryToRun
@@ -513,7 +519,7 @@ IF @flgOptions & 8 = 8
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 						EXEC sp_executesql @queryToRun
 
-						IF ISNULL((SELECT [Value] FROM #dbi_differentialBaseLSN), '0') = '0'
+						IF ISNULL((SELECT [Value] FROM #dbi_differentialBaseLSN), '0') IN ('0', '0:0:0 (0x00000000:00000000:0000)')
 							begin
 								SET @queryToRun = 'WARNING: Specified backup type cannot be performed since no VALID full database backup exists. A full database backup will be taken before the requested backup type.'
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
