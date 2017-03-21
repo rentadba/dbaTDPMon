@@ -479,4 +479,5 @@
 	- enhance install utility: check for database default locations. if not found, ask for parameters
 	
 /* 21.03.2017 */
-	- save internal job statistics; add job history table and view
+	- save internal job statistics; add job history table and view - [dbo].[vw_jobExecutionHistory]
+	- save health-check database details for later capacity plannig - [monitoring].[vw_statsDatabaseDetails]

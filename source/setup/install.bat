@@ -499,6 +499,12 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\monitoring.statsSQLAgentJobs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\monitoring.statsDatabaseDetails.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\monitoring.vw_statsDatabaseDetails.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 
 echo Monitoring: Creating Functions / Stored Procedures
 
