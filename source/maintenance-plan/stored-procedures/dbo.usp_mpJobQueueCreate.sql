@@ -128,6 +128,21 @@ WHILE @@FETCH_STATUS=0
 				SET @strMessage='Generating queue for : ' + @codeDescriptor
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
 
+				/* save the execution history */
+				INSERT	INTO [dbo].[jobExecutionHistory]([instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id], 
+														 [job_name], [job_step_name], [job_database_name], [job_command], [execution_date], 
+														 [running_time_sec], [log_message], [status], [event_date_utc])
+						SELECT	[instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id], 
+								[job_name], [job_step_name], [job_database_name], [job_command], [execution_date], 
+								[running_time_sec], [log_message], [status], [event_date_utc]
+						FROM [dbo].[jobExecutionQueue]
+						WHERE [project_id] = @projectID
+								AND [instance_id] = @instanceID
+								AND [descriptor] = @codeDescriptor
+								AND [for_instance_id] = @forInstanceID 
+								AND [module] = @module
+								AND [status] <> -1
+
 				DELETE FROM [dbo].[jobExecutionQueue]
 				WHERE [project_id] = @projectID
 						AND [instance_id] = @instanceID

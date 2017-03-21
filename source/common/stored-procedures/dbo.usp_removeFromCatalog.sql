@@ -69,6 +69,20 @@ BEGIN TRY
 	BEGIN TRANSACTION
 		-----------------------------------------------------------------------------------------------------
 		DELETE jeq
+		FROM dbo.jobExecutionHistory jeq
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = jeq.[project_id] AND cin.[id] = jeq.[instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[name] = @sqlServerName
+
+		-----------------------------------------------------------------------------------------------------
+		DELETE jeq
+		FROM dbo.jobExecutionHistory jeq
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = jeq.[project_id] AND cin.[id] = jeq.[for_instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[name] = @sqlServerName
+	
+		-----------------------------------------------------------------------------------------------------
+		DELETE jeq
 		FROM dbo.jobExecutionQueue jeq
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = jeq.[project_id] AND cin.[id] = jeq.[instance_id]
 		WHERE cin.[project_id] = @projectID

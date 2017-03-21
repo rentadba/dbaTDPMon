@@ -148,6 +148,20 @@ WHERE	cin.[active] = 1
 		AND cin.[project_id] = @projectID
 		AND cin.[name] = @@SERVERNAME
 
+/* save the execution history */
+INSERT	INTO [dbo].[jobExecutionHistory]([instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id], 
+										 [job_name], [job_step_name], [job_database_name], [job_command], [execution_date], 
+										 [running_time_sec], [log_message], [status], [event_date_utc])
+		SELECT	[instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id], 
+				[job_name], [job_step_name], [job_database_name], [job_command], [execution_date], 
+				[running_time_sec], [log_message], [status], [event_date_utc]
+		FROM [dbo].[jobExecutionQueue]
+		WHERE [project_id] = @projectID
+				AND [instance_id] = @currentInstanceID
+				AND [module] = 'monitoring'
+				AND [descriptor] = 'usp_monAlarmCustomTransactionsStatus'
+				AND [status] <> -1
+				
 DELETE FROM [dbo].[jobExecutionQueue]
 WHERE [project_id] = @projectID
 		AND [instance_id] = @currentInstanceID
