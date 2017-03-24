@@ -91,7 +91,7 @@ EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsP
 -----------------------------------------------------------------------------------------
 --History data retention (days)
 -----------------------------------------------------------------------------------------
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[health-check].[historyDatabaseDetails]') AND type in (N'U'))
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[health-check].[statsDatabaseUsageHistory]') AND type in (N'U'))
 	begin
 		DECLARE @queryToRun [varchar](1024)
 
@@ -106,7 +106,7 @@ IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[health-chec
 		SET @retentionDays = ISNULL(@retentionDays, 0)
 		IF @retentionDays<>0
 			begin
-				SET @queryToRun = 'DELETE FROM [health-check].[historyDatabaseDetails]
+				SET @queryToRun = 'DELETE FROM [health-check].[statsDatabaseUsageHistory]
 									WHERE [event_date_utc] < DATEADD(dd, -' + CAST(@retentionDays AS [varchar]) + ', GETUTCDATE())'
 				SET ROWCOUNT 4096
 				WHILE 1=1

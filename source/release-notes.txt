@@ -480,7 +480,7 @@
 	
 /* 21.03.2017 */
 	- save internal job statistics; add job history table and view - [dbo].[vw_jobExecutionHistory]
-	- save health-check database details for later capacity planning - [health-check].[vw_historyDatabaseDetails]
+	- save health-check database details for later capacity planning - [health-check].[vw_statsDatabaseUsageHistory]
 
 /* 22.03.2017 */
 	- add procedure for purging old info (events, internal job logs and capacity planning raw data)
