@@ -12,8 +12,6 @@
 -------------------------------------------------------------------------------
 RAISERROR('Create job: Database Maintenance - User DBs', 10, 1) WITH NOWAIT
 GO
-USE [msdb]
-GO
 
 DECLARE   @job_name			[sysname]
 		, @logFileLocation	[nvarchar](512)
@@ -59,26 +57,6 @@ IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = @job_name)
 	ELSE
 		EXEC msdb.dbo.sp_delete_job @job_name=@job_name
 
-DECLARE @failedJobStep		[int],
-		@failedJobAction	[int],
-		@successJobStep		[int],
-		@successJobAction	[int]
-
-IF @SQLMajorVersion > 8
-	begin
-		SET @failedJobStep   = 12
-		SET @failedJobAction = 4
-		SET @successJobStep  = 0
-		SET @successJobAction= 3
-	end
-ELSE
-	begin
-		SET @failedJobStep   = 0
-		SET @failedJobAction = 2
-		SET @successJobStep  = 0
-		SET @successJobAction= 3
-	end
-
 ---------------------------------------------------------------------------------------------------
 /* creating the job */
 ---------------------------------------------------------------------------------------------------
@@ -118,20 +96,14 @@ http://dbaTDPMon.codeplex.com',
 						@flgOptions		= DEFAULT,
 						@DebugMode		= DEFAULT'
 
-	IF @SQLMajorVersion > 8
-		begin
-			SET @failedJobStep   = 2
-			SET @failedJobAction = 4
-		end
-
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Daily: Kill Orphan Connections', 
 												@step_id=1, 
 												@cmdexec_success_code=0, 
-												@on_success_action=@successJobAction, 
-												@on_success_step_id=@successJobStep, 
-												@on_fail_action=@failedJobAction, 
-												@on_fail_step_id=@failedJobStep, 
+												@on_success_action=3, 
+												@on_success_step_id=0, 
+												@on_fail_action=2, 
+												@on_fail_step_id=0, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
 												@os_run_priority=0, 
@@ -182,20 +154,14 @@ IF DATENAME(weekday, GETDATE()) = ''Saturday''
 		DEALLOCATE crsDatabases
 	end'
 
-	IF @SQLMajorVersion > 8
-		begin
-			SET @failedJobStep   = 12
-			SET @failedJobAction = 4
-		end
-
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Weekly: Database Consistency Check', 
 												@step_id=2, 
 												@cmdexec_success_code=0, 
-												@on_success_action=@successJobAction, 
-												@on_success_step_id=@successJobStep, 
-												@on_fail_action=@failedJobAction, 
-												@on_fail_step_id=@failedJobStep, 
+												@on_success_action=3, 
+												@on_success_step_id=0, 
+												@on_fail_action=2, 
+												@on_fail_step_id=0, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
 												@os_run_priority=0, 
@@ -252,20 +218,14 @@ IF DATENAME(weekday, GETDATE()) = ''Saturday''
 		DEALLOCATE crsDatabases
 	end'
 
-	IF @SQLMajorVersion > 8
-		begin
-			SET @failedJobStep   = 12
-			SET @failedJobAction = 4
-		end
-
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Daily: Allocation Consistency Check', 
 												@step_id=3, 
 												@cmdexec_success_code=0, 
-												@on_success_action=@successJobAction, 
-												@on_success_step_id=@successJobStep, 
-												@on_fail_action=@failedJobAction, 
-												@on_fail_step_id=@failedJobStep, 
+												@on_success_action=3, 
+												@on_success_step_id=0, 
+												@on_fail_action=2, 
+												@on_fail_step_id=0, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
 												@os_run_priority=0, 
@@ -316,20 +276,14 @@ IF DATENAME(weekday, GETDATE()) = ''Sunday''
 		DEALLOCATE crsDatabases
 	end'
 
-	IF @SQLMajorVersion > 8
-		begin
-			SET @failedJobStep   = 12
-			SET @failedJobAction = 4
-		end
-
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Weekly: Tables Consistency Check', 
 												@step_id=4, 
 												@cmdexec_success_code=0, 
-												@on_success_action=@successJobAction, 
-												@on_success_step_id=@successJobStep, 
-												@on_fail_action=@failedJobAction, 
-												@on_fail_step_id=@failedJobStep, 
+												@on_success_action=3, 
+												@on_success_step_id=0, 
+												@on_fail_action=2, 
+												@on_fail_step_id=0, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
 												@os_run_priority=0, 
@@ -380,20 +334,14 @@ IF DATENAME(weekday, GETDATE()) = ''Sunday''
 		DEALLOCATE crsDatabases
 	end'
 
-	IF @SQLMajorVersion > 8
-		begin
-			SET @failedJobStep   = 12
-			SET @failedJobAction = 4
-		end
-
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Weekly: Reference Consistency Check', 
 												@step_id=5, 
 												@cmdexec_success_code=0, 
-												@on_success_action=@successJobAction, 
-												@on_success_step_id=@successJobStep, 
-												@on_fail_action=@failedJobAction, 
-												@on_fail_step_id=@failedJobStep, 
+												@on_success_action=3, 
+												@on_success_step_id=0, 
+												@on_fail_action=2, 
+												@on_fail_step_id=0, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
 												@os_run_priority=0, 
@@ -445,20 +393,14 @@ IF DATENAME(weekday, GETDATE()) = ''Monday''
 		DEALLOCATE crsDatabases
 	end'
 
-	IF @SQLMajorVersion > 8
-		begin
-			SET @failedJobStep   = 7
-			SET @failedJobAction = 4
-		end
-
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Weekly: Perform Correction to Space Usage', 
 												@step_id=6, 
 												@cmdexec_success_code=0, 
-												@on_success_action=@successJobAction, 
-												@on_success_step_id=@successJobStep, 
-												@on_fail_action=@failedJobAction, 
-												@on_fail_step_id=@failedJobStep, 
+												@on_success_action=3, 
+												@on_success_step_id=0, 
+												@on_fail_action=2, 
+												@on_fail_step_id=0, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
 												@os_run_priority=0, 
@@ -511,20 +453,14 @@ IF DATENAME(weekday, GETDATE()) = ''Monday''
 		DEALLOCATE crsDatabases
 	end'
 
-	IF @SQLMajorVersion > 8
-		begin
-			SET @failedJobStep   = 8
-			SET @failedJobAction = 4
-		end
-
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Daily: Rebuild Heap Tables', 
 												@step_id=7, 
 												@cmdexec_success_code=0, 
-												@on_success_action=@successJobAction, 
-												@on_success_step_id=@successJobStep, 
-												@on_fail_action=@failedJobAction, 
-												@on_fail_step_id=@failedJobStep, 
+												@on_success_action=3, 
+												@on_success_step_id=0, 
+												@on_fail_action=2, 
+												@on_fail_step_id=0, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
 												@os_run_priority=0, 
@@ -575,20 +511,14 @@ IF DATENAME(weekday, GETDATE()) = ''Monday''
 		DEALLOCATE crsDatabases
 	end'
 
-	IF @SQLMajorVersion > 8
-		begin
-			SET @failedJobStep   = 9
-			SET @failedJobAction = 4
-		end
-
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Daily: Rebuild or Reorganize Indexes', 
 												@step_id=8, 
 												@cmdexec_success_code=0, 
-												@on_success_action=@successJobAction, 
-												@on_success_step_id=@successJobStep, 
-												@on_fail_action=@failedJobAction, 
-												@on_fail_step_id=@failedJobStep, 
+												@on_success_action=3, 
+												@on_success_step_id=0, 
+												@on_fail_action=2, 
+												@on_fail_step_id=0, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
 												@os_run_priority=0, 
@@ -641,20 +571,14 @@ IF DATENAME(weekday, GETDATE()) = ''Monday''
 		DEALLOCATE crsDatabases
 	end'
 
-	IF @SQLMajorVersion > 8
-		begin
-			SET @failedJobStep   = 10
-			SET @failedJobAction = 4
-		end
-
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Daily: Update Statistics', 
 												@step_id=9, 
 												@cmdexec_success_code=0, 
-												@on_success_action=@successJobAction, 
-												@on_success_step_id=@successJobStep, 
-												@on_fail_action=@failedJobAction, 
-												@on_fail_step_id=@failedJobStep, 
+												@on_success_action=3, 
+												@on_success_step_id=0, 
+												@on_fail_action=2, 
+												@on_fail_step_id=0, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
 												@os_run_priority=0, 
@@ -704,20 +628,14 @@ IF DATENAME(weekday, GETDATE()) = ''Monday''
 		DEALLOCATE crsDatabases
 	end'
 
-	IF @SQLMajorVersion > 8
-		begin
-			SET @failedJobStep   = 11
-			SET @failedJobAction = 4
-		end
-
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Weekly: Shrink Database (TRUNCATEONLY)', 
 												@step_id=10, 
 												@cmdexec_success_code=0, 
-												@on_success_action=@successJobAction, 
-												@on_success_step_id=@successJobStep, 
-												@on_fail_action=@failedJobAction, 
-												@on_fail_step_id=@failedJobStep, 
+												@on_success_action=3, 
+												@on_success_step_id=0, 
+												@on_fail_action=2, 
+												@on_fail_step_id=0, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
 												@os_run_priority=0, 
@@ -768,27 +686,21 @@ IF DATENAME(weekday, GETDATE()) = ''Saturday'' AND DATEPART(dd, GETDATE())<=7
 	end
 	'
 
+	DECLARE @successJobAction [tinyint]
+
 	IF @SQLMajorVersion > 8
-		begin
-			SET @failedJobStep   = 12
-			SET @failedJobAction = 4
-		end
+		SET @successJobAction = 3
 	ELSE
-		begin
-			SET @successJobAction = 1
-			SET @successJobStep = 0
-			SET @failedJobStep   = 0
-			SET @failedJobAction = 2
-		end
+		SET @successJobAction = 1
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Monthly: Shrink Log File', 
 												@step_id=11, 
 												@cmdexec_success_code=0, 
 												@on_success_action=@successJobAction, 
-												@on_success_step_id=@successJobStep, 
-												@on_fail_action=@failedJobAction, 
-												@on_fail_step_id=@failedJobStep, 
+												@on_success_step_id=0, 
+												@on_fail_action=2, 
+												@on_fail_step_id=0, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
 												@os_run_priority=0, 
@@ -802,30 +714,89 @@ IF DATENAME(weekday, GETDATE()) = ''Saturday'' AND DATEPART(dd, GETDATE())<=7
 	---------------------------------------------------------------------------------------------------
 	IF @SQLMajorVersion > 8
 		begin
-	SET @queryToRun=N'
+			SET @queryToRun=N'
 EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
 												@logFileLocation=''' + @logFileLocation + ''',
 												@module			=''maintenance-plan'',
 												@sendLogAsAttachment = 1,
 												@eventType		= 2'
 
-		EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
-													@step_name=N'Send email', 
-													@step_id=12, 
-													@cmdexec_success_code=0, 
-													@on_success_action=1, 
-													@on_success_step_id=0, 
-													@on_fail_action=2, 
-													@on_fail_step_id=0, 
-													@retry_attempts=0, 
-													@retry_interval=0, 
-													@os_run_priority=0, 
-													@subsystem=N'TSQL', 
-													@command=@queryToRun, 
-													@database_name=@databaseName, 
-													@flags=0
-		IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
-	end
+			EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
+														@step_name=N'Send email', 
+														@step_id=12, 
+														@cmdexec_success_code=0, 
+														@on_success_action=1, 
+														@on_success_step_id=0, 
+														@on_fail_action=2, 
+														@on_fail_step_id=0, 
+														@retry_attempts=0, 
+														@retry_interval=0, 
+														@os_run_priority=0, 
+														@subsystem=N'TSQL', 
+														@command=@queryToRun, 
+														@database_name=@databaseName, 
+														@flags=0
+			IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+		end
+
+	---------------------------------------------------------------------------------------------------
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=1, 
+									@on_fail_action=4, 
+									@on_fail_step_id=2
+
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=2, 
+									@on_fail_action=4, 
+									@on_fail_step_id=12
+
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=3, 
+									@on_fail_action=4, 
+									@on_fail_step_id=12
+
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=4, 
+									@on_fail_action=4, 
+									@on_fail_step_id=12
+
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=5, 
+									@on_fail_action=4, 
+									@on_fail_step_id=12
+
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=6, 
+									@on_fail_action=4, 
+									@on_fail_step_id=7
+
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=7, 
+									@on_fail_action=4, 
+									@on_fail_step_id=8
+
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=8, 
+									@on_fail_action=4, 
+									@on_fail_step_id=9
+
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=9, 
+									@on_fail_action=4, 
+									@on_fail_step_id=10
+
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=10, 
+									@on_fail_action=4, 
+									@on_fail_step_id=11
+
+	IF @SQLMajorVersion > 8
+		begin
+			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId,
+											@step_id=11, 
+											@on_fail_action=4, 
+											@on_fail_step_id=12
+		end
 
 	---------------------------------------------------------------------------------------------------
 	EXEC @ReturnCode = msdb.dbo.sp_update_job @job_id = @jobId, @start_step_id = 1

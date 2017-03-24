@@ -41,61 +41,61 @@ GO
 SET NOCOUNT ON
 GO
 INSERT	INTO [report].[hardcodedFilters] ([module], [object_name], [filter_pattern], [active])
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Attempting to cycle errorlog%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%error%log has been reinitialized%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%without errors%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%found 0 errors and repaired 0 errors%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Log was backed up%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Log backed up%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Log was restored%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Database was backed up%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Database backed up%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Database differential changes backed up%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Database differential changes were backed up.%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%BACKUP DATABASE WITH DIFFERENTIAL successfully%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%BACKUP % successfully processed % pages%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%This is an informational message%user action is required%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Analysis of database%complete (approximately%more seconds)%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Microsoft Corporation%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', 'Microsoft SQL Server%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%All rights reserved.%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Server process ID is%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%System Manufacturer:%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Authentication mode is%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Logging SQL Server messages in file%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Registry startup parameters:%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Command Line Startup Parameters:%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%SQL Server is%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%FILESTREAM: effective level = %, configured level = %, file system access share name = %', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Server name is %', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Clearing tempdb database.%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%A self-generated certificate was successfully loaded for encryption.%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%SQL server listening %', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Server is listening %', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Server % provider is ready to accept connection%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Dedicated admin connection support was established for listening%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%The SQL Server Network Interface library successfully registered%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Resource governor reconfiguration succeeded.%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%The % protocol transport is disabled or not configured%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%The % endpoint is in disabled or stopped state.%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Service Broker manager has started.%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Using conventional memory in the memory manager.%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Software Usage Metrics is disabled.%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Using % version %', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%CLR version % loaded%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Address Windowing Extensions enabled.%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%SQL Trace ID 1 was started by login "sa".%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%A new instance of the full-text filter daemon host process has been successfully started.%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Attempting to initialize Distributed Transaction Coordinator.%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Informational: No full-text supported languages found.%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Starting up database%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%The database % is marked RESTORING and is in a state that does not allow recovery to be run.%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Setting database option % to % for database %', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Configuration option % changed from % to %. Run the RECONFIGURE statement to install.%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%SQL Server blocked access to procedure ''sys.xp_cmdshell'' of component ''xp_cmdshell''%', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Error: 18456, Severity: 14, State: %', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Login failed for user %', 1 UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%SQL Trace%', 1  UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%UTC adjustment%', 1  UNION ALL
-		SELECT 'health-check', 'statsSQLServerErrorlogDetails', '%Default collation:%', 1 
+		SELECT 'health-check', 'statsErrorlogDetails', '%Attempting to cycle errorlog%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%error%log has been reinitialized%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%without errors%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%found 0 errors and repaired 0 errors%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Log was backed up%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Log backed up%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Log was restored%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Database was backed up%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Database backed up%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Database differential changes backed up%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Database differential changes were backed up.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%BACKUP DATABASE WITH DIFFERENTIAL successfully%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%BACKUP % successfully processed % pages%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%This is an informational message%user action is required%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Analysis of database%complete (approximately%more seconds)%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Microsoft Corporation%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', 'Microsoft SQL Server%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%All rights reserved.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Server process ID is%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%System Manufacturer:%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Authentication mode is%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Logging SQL Server messages in file%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Registry startup parameters:%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Command Line Startup Parameters:%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%SQL Server is%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%FILESTREAM: effective level = %, configured level = %, file system access share name = %', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Server name is %', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Clearing tempdb database.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%A self-generated certificate was successfully loaded for encryption.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%SQL server listening %', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Server is listening %', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Server % provider is ready to accept connection%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Dedicated admin connection support was established for listening%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%The SQL Server Network Interface library successfully registered%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Resource governor reconfiguration succeeded.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%The % protocol transport is disabled or not configured%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%The % endpoint is in disabled or stopped state.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Service Broker manager has started.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Using conventional memory in the memory manager.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Software Usage Metrics is disabled.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Using % version %', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%CLR version % loaded%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Address Windowing Extensions enabled.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%SQL Trace ID 1 was started by login "sa".%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%A new instance of the full-text filter daemon host process has been successfully started.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Attempting to initialize Distributed Transaction Coordinator.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Informational: No full-text supported languages found.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Starting up database%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%The database % is marked RESTORING and is in a state that does not allow recovery to be run.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Setting database option % to % for database %', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Configuration option % changed from % to %. Run the RECONFIGURE statement to install.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%SQL Server blocked access to procedure ''sys.xp_cmdshell'' of component ''xp_cmdshell''%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Error: 18456, Severity: 14, State: %', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Login failed for user %', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%SQL Trace%', 1  UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%UTC adjustment%', 1  UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Default collation:%', 1 
 GO

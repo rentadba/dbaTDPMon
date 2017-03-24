@@ -118,14 +118,14 @@ BEGIN TRY
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE sseld
-		FROM [health-check].statsSQLServerErrorlogDetails sseld
+		FROM [health-check].statsErrorlogDetails sseld
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = sseld.[project_id] AND cin.[id] = sseld.[instance_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[name] = @sqlServerName
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE ssajh
-		FROM [health-check].statsSQLServerAgentJobsHistory ssajh
+		FROM [health-check].statsSQLAgentJobsHistory ssajh
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = ssajh.[project_id] AND cin.[id] = ssajh.[instance_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[name] = @sqlServerName

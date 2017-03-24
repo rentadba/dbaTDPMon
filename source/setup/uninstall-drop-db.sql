@@ -6,13 +6,9 @@
 -- Module			 : SQL Server 2000/2005/2008/2008R2/2012+
 -- Description		 : 
 -------------------------------------------------------------------------------
-
-USE [master]
-GO
-
 IF EXISTS(SELECT 1 FROM sysdatabases WHERE [name]='$(dbName)')
 	begin
-		PRINT 'Killing all open connections...'
+		PRINT 'Killing database connections...'
 		DECLARE @queryToRun [nvarchar](4000)
 
 		SET @queryToRun=N''
@@ -24,5 +20,6 @@ IF EXISTS(SELECT 1 FROM sysdatabases WHERE [name]='$(dbName)')
 		EXEC (@queryToRun)
 
 		DROP DATABASE [$(dbName)]
+		PRINT '"$(dbName)" database dropped.'
 	end
 GO	

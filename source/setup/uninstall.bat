@@ -5,8 +5,8 @@ if "%1" =="-help" goto help
 if "%1" == "help" goto help
 if "%1" == "/?" goto help
 
-if  !%1==! goto error
-if  !%2==! goto error
+if  !%1==! goto help
+if  !%2==! goto help
 
 set server=%1
 set dbname=%2
@@ -32,7 +32,7 @@ echo Ok
 echo *-----------------------------------------------------------------------------*
 echo Performing cleanup...
 echo *-----------------------------------------------------------------------------*
-sqlcmd.exe -S%server% %autentif% -i "uninstall-stop-agent-jobs.sql" -d %dbname% -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "uninstall-stop-agent-jobs.sql" -d msdb -b -r 1
 if errorlevel 1 goto install_err
 
 echo *-----------------------------------------------------------------------------*
@@ -54,11 +54,10 @@ goto end
 echo One of the scripts had errors or does not exists in current path %cd%..\db.
 goto end
 
-:error
-echo Incorrect Usage
 :help
 echo *-----------------------------------------------------------------------------*
-echo Drop database used by Troubleshoot Database Performance / Monitoring
+echo * dbaTDPMon (Troubleshoot Database Performance / Monitoring)                  *
+echo * http://dbatdpmon.codeplex.com, under GNU (GPLv3) licence model              *
 echo *-----------------------------------------------------------------------------*
 echo USAGE : SQL Server Authentication
 echo uninstall.bat "server_name" "db_name" "login_id" "login_password"

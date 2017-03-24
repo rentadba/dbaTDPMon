@@ -119,9 +119,9 @@ IF @projectID IS NULL
 -------------------------------------------------------------------------------------------------------------------------
 RAISERROR('--Step 1: Delete existing information....', 10, 1) WITH NOWAIT
 
-INSERT	INTO [monitoring].[statsDatabaseDetails]([catalog_database_id], [instance_id], [recovery_model], [page_verify_option], [compatibility_level], 
-												 [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], [is_auto_close], [is_auto_shrink], 
-												 [physical_drives], [last_backup_time], [last_dbcc checkdb_time], [is_growth_limited], [event_date_utc])
+INSERT	INTO [health-check].[historyDatabaseDetails]([catalog_database_id], [instance_id], [recovery_model], [page_verify_option], [compatibility_level], 
+									  				 [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], [is_auto_close], [is_auto_shrink], 
+													 [physical_drives], [last_backup_time], [last_dbcc checkdb_time], [is_growth_limited], [event_date_utc])
 		SELECT	shcdd.[catalog_database_id], shcdd.[instance_id], shcdd.[recovery_model], shcdd.[page_verify_option], shcdd.[compatibility_level], 
 				shcdd.[data_size_mb], shcdd.[data_space_used_percent], shcdd.[log_size_mb], shcdd.[log_space_used_percent], shcdd.[is_auto_close], shcdd.[is_auto_shrink], 
 				shcdd.[physical_drives], shcdd.[last_backup_time], shcdd.[last_dbcc checkdb_time], shcdd.[is_growth_limited], shcdd.[event_date_utc]

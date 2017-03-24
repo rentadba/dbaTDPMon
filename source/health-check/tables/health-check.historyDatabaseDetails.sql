@@ -3,18 +3,18 @@
 -- ============================================================================
 -- Author			 : Dan Andrei STEFAN
 -- Create date		 : 21.03.2017
--- Module			 : Database Analysis & Performance Monitoring
+-- Module			 : Database Analysis & Performance health-check
 -- ============================================================================
 
 -----------------------------------------------------------------------------------------------------
 --Health Check: database statistics & details
 -----------------------------------------------------------------------------------------------------
-RAISERROR('Create table: [monitoring].[statsDatabaseDetails]', 10, 1) WITH NOWAIT
+RAISERROR('Create table: [health-check].[historyDatabaseDetails]', 10, 1) WITH NOWAIT
 GO
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[monitoring].[statsDatabaseDetails]') AND type in (N'U'))
-DROP TABLE [monitoring].[statsDatabaseDetails]
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[health-check].[historyDatabaseDetails]') AND type in (N'U'))
+DROP TABLE [health-check].[historyDatabaseDetails]
 GO
-CREATE TABLE [monitoring].[statsDatabaseDetails]
+CREATE TABLE [health-check].[historyDatabaseDetails]
 (
 	[id]						[int]	 IDENTITY (1, 1)	NOT NULL,
 	[catalog_database_id]		[smallint]		NOT NULL,
@@ -33,12 +33,12 @@ CREATE TABLE [monitoring].[statsDatabaseDetails]
 	[last_dbcc checkdb_time]	[datetime]		NULL,
 	[is_growth_limited]			[bit]			NULL,
 	[event_date_utc]			[datetime]		NOT NULL,
-	CONSTRAINT [PK_statsDatabaseDetails] PRIMARY KEY  CLUSTERED 
+	CONSTRAINT [PK_historyDatabaseDetails] PRIMARY KEY  CLUSTERED 
 	(
 		[id],
 		[catalog_database_id]
 	) ON [FG_Statistics_Data],
-	CONSTRAINT [FK_statsDatabaseDetails_catalogDatabaseNames] FOREIGN KEY 
+	CONSTRAINT [FK_historyDatabaseDetails_catalogDatabaseNames] FOREIGN KEY 
 	(
 		  [catalog_database_id]
 		, [instance_id]
@@ -51,7 +51,7 @@ CREATE TABLE [monitoring].[statsDatabaseDetails]
 )ON [FG_Statistics_Data]
 GO
 
-CREATE INDEX [IX_statsDatabaseDetails_CatalogDatabaseID] ON [monitoring].[statsDatabaseDetails]( [catalog_database_id], [instance_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_historyDatabaseDetails_CatalogDatabaseID] ON [health-check].[historyDatabaseDetails]( [catalog_database_id], [instance_id]) ON [FG_Statistics_Index]
 GO
-CREATE INDEX [IX_statsDatabaseDetails_InstanceID] ON [monitoring].[statsDatabaseDetails] ([instance_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_historyDatabaseDetails_InstanceID] ON [health-check].[historyDatabaseDetails] ([instance_id]) ON [FG_Statistics_Index]
 GO

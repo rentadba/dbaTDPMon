@@ -12,8 +12,6 @@
 -------------------------------------------------------------------------------
 RAISERROR('Create job: Database Maintenance - User DBs - Parallel', 10, 1) WITH NOWAIT
 GO
-USE [msdb]
-GO
 
 DECLARE   @job_name			[sysname]
 		, @logFileLocation	[nvarchar](512)
@@ -108,8 +106,8 @@ http://dbaTDPMon.codeplex.com',
 												@cmdexec_success_code=0, 
 												@on_success_action=3, 
 												@on_success_step_id=0, 
-												@on_fail_action=4, 
-												@on_fail_step_id=3, 
+												@on_fail_action=2, 
+												@on_fail_step_id=0,
 												@retry_attempts=0,
 												@retry_interval=0, 
 												@os_run_priority=0, 
@@ -133,8 +131,8 @@ http://dbaTDPMon.codeplex.com',
 												@cmdexec_success_code=0, 
 												@on_success_action=3, 
 												@on_success_step_id=0, 
-												@on_fail_action=4, 
-												@on_fail_step_id=3, 
+												@on_fail_action=2, 
+												@on_fail_step_id=0, 
 												@retry_attempts=0, 
 												@retry_interval=0, 
 												@os_run_priority=0, 
@@ -154,22 +152,33 @@ EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
 												@sendLogAsAttachment = 1,
 												@eventType		= 5'
 
-		EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
-													@step_name=N'Send email', 
-													@step_id=3, 
-													@cmdexec_success_code=0, 
-													@on_success_action=1, 
-													@on_success_step_id=0, 
-													@on_fail_action=2, 
-													@on_fail_step_id=0, 
-													@retry_attempts=0, 
-													@retry_interval=0, 
-													@os_run_priority=0, 
-													@subsystem=N'TSQL', 
-													@command=@queryToRun, 
-													@database_name=@databaseName, 
-													@flags=0
-		IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
+												@step_name=N'Send email', 
+												@step_id=3, 
+												@cmdexec_success_code=0, 
+												@on_success_action=1, 
+												@on_success_step_id=0, 
+												@on_fail_action=2, 
+												@on_fail_step_id=0, 
+												@retry_attempts=0, 
+												@retry_interval=0, 
+												@os_run_priority=0, 
+												@subsystem=N'TSQL', 
+												@command=@queryToRun, 
+												@database_name=@databaseName, 
+												@flags=0
+	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+
+	---------------------------------------------------------------------------------------------------
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=1, 
+									@on_fail_action=4, 
+									@on_fail_step_id=3
+
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=2, 
+									@on_fail_action=4, 
+									@on_fail_step_id=3
 
 	---------------------------------------------------------------------------------------------------
 	EXEC @ReturnCode = msdb.dbo.sp_update_job @job_id = @jobId, @start_step_id = 1

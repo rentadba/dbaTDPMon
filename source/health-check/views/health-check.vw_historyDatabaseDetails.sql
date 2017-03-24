@@ -1,10 +1,10 @@
-RAISERROR('Create view : [monitoring].[vw_statsDatabaseDetails]', 10, 1) WITH NOWAIT
+RAISERROR('Create view : [health-check].[vw_historyDatabaseDetails]', 10, 1) WITH NOWAIT
 GO
-IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[monitoring].[vw_statsDatabaseDetails]'))
-DROP VIEW [monitoring].[vw_statsDatabaseDetails]
+IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[health-check].[vw_historyDatabaseDetails]'))
+DROP VIEW [health-check].[vw_historyDatabaseDetails]
 GO
 
-CREATE VIEW [monitoring].[vw_statsDatabaseDetails]
+CREATE VIEW [health-check].[vw_historyDatabaseDetails]
 /* WITH ENCRYPTION */
 AS
 
@@ -13,7 +13,7 @@ AS
 -- ============================================================================
 -- Author			 : Dan Andrei STEFAN
 -- Create date		 : 21.03.2017
--- Module			 : Database Analysis & Performance Monitoring
+-- Module			 : Database Analysis & Performance health-check
 -- ============================================================================
 
 SELECT 	  cin.[project_id]		AS [project_id]
@@ -42,5 +42,5 @@ SELECT 	  cin.[project_id]		AS [project_id]
 		, shcdd.[event_date_utc]
 FROM [dbo].[catalogInstanceNames]	cin	
 INNER JOIN [dbo].[catalogDatabaseNames] cdn ON cin.[id] = cdn.[instance_id] AND cin.[project_id] = cdn.[project_id]
-INNER JOIN [monitoring].[statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[id] AND shcdd.[instance_id] = cdn.[instance_id]
+INNER JOIN [health-check].[historyDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[id] AND shcdd.[instance_id] = cdn.[instance_id]
 GO

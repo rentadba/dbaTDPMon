@@ -1,13 +1,19 @@
 @echo off
 cls
+
+echo *-----------------------------------------------------------------------------*
+echo * dbaTDPMon (Troubleshoot Database Performance / Monitoring)                  *
+echo * http://dbatdpmon.codeplex.com, under GNU (GPLv3) licence model              *
+echo *-----------------------------------------------------------------------------*
+
 if "%1" =="-help" goto help
  
 if "%1" == "help" goto help
 if "%1" == "/?" goto help
 
-if  !%1==! goto error
-if  !%2==! goto error
-if  !%3==! goto error
+if  !%1==! goto help
+if  !%2==! goto help
+if  !%3==! goto help
 
 set server=%1
 set dbname=%2
@@ -250,8 +256,12 @@ if errorlevel 1 goto install_err
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_reportHTMLGetStorageFolder.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_purgeHistoryData.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "EXEC dbo.usp_refreshMachineCatalogs DEFAULT, @@SERVERNAME;" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
+
 
 if %module%=="all" goto mp
 if %module%=="health-check" goto hc
@@ -352,30 +362,29 @@ if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-pl
 if errorlevel 1 goto install_err
 
 
-
 echo *-----------------------------------------------------------------------------*
 echo Maintenance Plan: Creating SQL Server Agent Jobs
 echo *-----------------------------------------------------------------------------*
 
-sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Maintenance - System DBs.sql" -d %dbname% -v dbName=%dbname% -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Maintenance - System DBs.sql" -d msdb -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Maintenance - User DBs.sql" -d %dbname% -v dbName=%dbname% -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Maintenance - User DBs.sql" -d msdb -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Maintenance - User DBs - Parallel.sql" -d %dbname% -v dbName=%dbname% -b -r 1
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Maintenance - User DBs - Parallel.sql" -d msdb -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Full and Diff.sql" -d %dbname% -v dbName=%dbname% -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Full and Diff.sql" -d msdb -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Full and Diff - Parallel.sql" -d %dbname% -v dbName=%dbname% -b -r 1
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Full and Diff - Parallel.sql" -d msdb -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Log.sql" -d %dbname% -v dbName=%dbname% -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Log.sql" -d msdb -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Log - Parallel.sql" -d %dbname% -v dbName=%dbname% -b -r 1
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Log - Parallel.sql" -d msdb -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
 if %module%=="all" goto hc
@@ -395,13 +404,22 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsSQLServerAgentJobsHistory.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsSQLAgentJobsHistory.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsDiskSpaceInfo.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsSQLServerErrorlogDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsErrorlogDetails.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsOSEventLogs.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.historyDatabaseDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsDatabaseDetails.sql" -d %dbname%  -b -r 1
@@ -410,13 +428,22 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsSQLServerAgentJobsHistory.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsSQLAgentJobsHistory.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsDiskSpaceInfo.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsSQLServerErrorlogDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsErrorlogDetails.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsOSEventLogs.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_historyDatabaseDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 
@@ -469,7 +496,7 @@ echo *--------------------------------------------------------------------------
 echo Health Check: Creating SQL Server Agent Jobs
 echo *-----------------------------------------------------------------------------*
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\job-scripts\job-script-dbaTDPMon - Discovery & Health Check.sql" -d %dbname% -v dbName=%dbname% projectCode=%project% -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\job-scripts\job-script-dbaTDPMon - Discovery & Health Check.sql" -d msdb -v dbName=%dbname% projectCode=%project% -b -r 1
 if errorlevel 1 goto install_err
 
 if %module%=="all" goto mon
@@ -499,12 +526,6 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\monitoring.statsSQLAgentJobs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\monitoring.statsDatabaseDetails.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\monitoring.vw_statsDatabaseDetails.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
 
 echo Monitoring: Creating Functions / Stored Procedures
 
@@ -531,16 +552,16 @@ echo *--------------------------------------------------------------------------
 echo Monitoring: Creating SQL Server Agent Jobs
 echo *-----------------------------------------------------------------------------*
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - Disk Space.sql" -d %dbname% -v dbName=%dbname% projectCode=%project% -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - Disk Space.sql" -d msdb -v dbName=%dbname% projectCode=%project% -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - Replication.sql" -d %dbname% -v dbName=%dbname% projectCode=%project% -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - Replication.sql" -d msdb -v dbName=%dbname% projectCode=%project% -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - TransactionStatus.sql" -d %dbname% -v dbName=%dbname% projectCode=%project% -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - TransactionStatus.sql" -d msdb -v dbName=%dbname% projectCode=%project% -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - SQLAgentFailedJobs.sql" -d %dbname% -v dbName=%dbname% projectCode=%project% -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDPMon - Monitoring - SQLAgentFailedJobs.sql" -d msdb -v dbName=%dbname% projectCode=%project% -b -r 1
 if errorlevel 1 goto install_err
 
 
@@ -566,12 +587,7 @@ echo *--------------------------------------------------------------------------
 echo An error occured while running installation script(s).
 goto end
 
-:error
-echo Incorrect Usage
 :help
-echo *-----------------------------------------------------------------------------*
-echo Install dbaTDPMon (Troubleshoot Database Performance / Monitoring)
-echo *-----------------------------------------------------------------------------*
 echo USAGE : SQL Server Authentication
 echo install.bat "server_name" "db_name" "module" "project_code" "data_files_path" "log_files_path" "login_id" "login_password"
 echo .

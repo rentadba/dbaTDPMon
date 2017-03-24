@@ -97,7 +97,7 @@ SET @strMessage= 'Step 1: Delete existing information...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 
 DELETE eld
-FROM [health-check].[statsSQLServerErrorlogDetails]	eld
+FROM [health-check].[statsErrorlogDetails]	eld
 INNER JOIN [dbo].[catalogInstanceNames]		cin ON cin.[id] = eld.[instance_id] AND cin.[project_id] = eld.[project_id]
 WHERE cin.[project_id] = @projectID
 		AND cin.[name] LIKE @sqlServerNameFilter
@@ -235,7 +235,7 @@ WHILE @@FETCH_STATUS=0
 			end
 
 		/* save results to stats table */
-		INSERT	INTO [health-check].[statsSQLServerErrorlogDetails]([instance_id], [project_id], [event_date_utc], [log_date], [process_info], [text])
+		INSERT	INTO [health-check].[statsErrorlogDetails]([instance_id], [project_id], [event_date_utc], [log_date], [process_info], [text])
 				SELECT @instanceID, @projectID, GETUTCDATE(), [log_date], [process_info], [text]
 				FROM #xpReadErrorLog
 				WHERE [log_date] IS NOT NULL

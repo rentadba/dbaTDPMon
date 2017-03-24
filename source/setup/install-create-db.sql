@@ -1,8 +1,6 @@
 -- ============================================================================
 -- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
 -- ============================================================================
-USE [master]
-GO
 SET QUOTED_IDENTIFIER ON
 GO
 
@@ -144,4 +142,6 @@ IF @SQLMajorVersion > 8
 		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET DB_CHAINING OFF'
 		EXEC (@queryToRun)
 	end
+
+PRINT '"$(dbName)" database created.'
 GO

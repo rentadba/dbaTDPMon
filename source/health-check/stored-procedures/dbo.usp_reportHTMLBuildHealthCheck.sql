@@ -1238,7 +1238,7 @@ BEGIN TRY
 							AND [instance_name] = @instanceName
 
 					SELECT	@hasSQLagentJob = COUNT(*)
-					FROM	[health-check].[vw_statsSQLServerAgentJobsHistory]
+					FROM	[health-check].[vw_statsSQLAgentJobsHistory]
 					WHERE	[project_id]=@projectID
 							AND [instance_name] = @instanceName
 
@@ -1248,7 +1248,7 @@ BEGIN TRY
 							AND [instance_name] = @instanceName
 					
 					SELECT	@hasErrorlogMessages = COUNT(*)
-					FROM	[health-check].[vw_statsSQLServerErrorlogDetails]
+					FROM	[health-check].[vw_statsErrorlogDetails]
 					WHERE	[project_id]=@projectID
 							AND [instance_name] = @instanceName
 
@@ -1602,7 +1602,7 @@ BEGIN TRY
 			
 			SET @dateTimeLowerLimit = DATEADD(hh, -@configFailuresInLastHours, GETDATE())
 			DECLARE crsSQLServerAgentJobsStatusIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT	ssajh.[instance_name], ssajh.[job_name], ssajh.[last_execution_status], ssajh.[last_execution_date], ssajh.[last_execution_time], ssajh.[message]
-																								FROM	[health-check].[vw_statsSQLServerAgentJobsHistory] ssajh
+																								FROM	[health-check].[vw_statsSQLAgentJobsHistory] ssajh
 																								LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																			AND rsr.[rule_id] = 16
 																																			AND rsr.[active] = 1
@@ -1692,7 +1692,7 @@ BEGIN TRY
 																									, ssajh.[last_execution_date] AS [start_date], ssajh.[last_execution_time] AS [start_time]
 																									, [dbo].[ufn_reportHTMLFormatTimeValue](CAST(ssajh.[running_time_sec]*1000 AS [bigint])) AS [running_time]
 																									, ssajh.[message]
-																							FROM [health-check].[vw_statsSQLServerAgentJobsHistory] ssajh
+																							FROM [health-check].[vw_statsSQLAgentJobsHistory] ssajh
 																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																		AND rsr.[rule_id] = 33554432
 																																		AND rsr.[active] = 1
@@ -3074,7 +3074,7 @@ BEGIN TRY
 					eld.[process_info], eld.[text]
 			INTO #filteredStatsSQLServerErrorlogDetail
 			FROM [dbo].[vw_catalogInstanceNames]  cin
-			INNER JOIN [health-check].[vw_statsSQLServerErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
+			INNER JOIN [health-check].[vw_statsErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
 			LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 														AND rsr.[rule_id] = 1048576
 														AND rsr.[active] = 1
@@ -3086,7 +3086,7 @@ BEGIN TRY
 										SELECT 1
 										FROM	[report].[hardcodedFilters] chf 
 										WHERE	chf.[module] = 'health-check'
-												AND chf.[object_name] = 'statsSQLServerErrorlogDetails'
+												AND chf.[object_name] = 'statsErrorlogDetails'
 												AND chf.[active] = 1
 												AND PATINDEX(chf.[filter_pattern], eld.[text]) > 0
 									)
@@ -3300,7 +3300,7 @@ BEGIN TRY
 			SET @idx=1		
 			
 			DECLARE crsSQLServerAgentJobsInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT	ssajh.[instance_name], COUNT(*) AS [job_count]
-																					FROM	[health-check].[vw_statsSQLServerAgentJobsHistory] ssajh
+																					FROM	[health-check].[vw_statsSQLAgentJobsHistory] ssajh
 																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																AND rsr.[rule_id] = 32
 																																AND rsr.[active] = 1
@@ -3341,7 +3341,7 @@ BEGIN TRY
 													SELECT	[job_name], [last_execution_status], [last_execution_date], [last_execution_time], [message]
 															, ROW_NUMBER() OVER(ORDER BY [job_name]) [row_no]
 															, SUM(1) OVER() AS [row_count]
-													FROM	[health-check].[vw_statsSQLServerAgentJobsHistory]
+													FROM	[health-check].[vw_statsSQLAgentJobsHistory]
 													WHERE	[project_id]=@projectID
 															AND [instance_name] = @instanceName
 												)X
@@ -3506,7 +3506,7 @@ BEGIN TRY
 																							  cin.[instance_name]
 																							, COUNT(*) AS [messages_count]
 																					FROM [dbo].[vw_catalogInstanceNames]  cin
-																					INNER JOIN [health-check].[vw_statsSQLServerErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
+																					INNER JOIN [health-check].[vw_statsErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
 																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																AND rsr.[rule_id] = 2097152
 																																AND rsr.[active] = 1
@@ -3540,7 +3540,7 @@ BEGIN TRY
 													SELECT	eld.[log_date], eld.[id], eld.[process_info], eld.[text]
 															, ROW_NUMBER() OVER(ORDER BY eld.[log_date], eld.[id]) [row_no]
 															, SUM(1) OVER() AS [row_count]
-													FROM	[health-check].[vw_statsSQLServerErrorlogDetails] eld
+													FROM	[health-check].[vw_statsErrorlogDetails] eld
 													WHERE	eld.[project_id]=@projectID
 															AND eld.[instance_name] = @instanceName
 															AND eld.[log_date] >= @dateTimeLowerLimit

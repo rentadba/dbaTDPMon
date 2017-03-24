@@ -28,7 +28,7 @@ AS
 -- ============================================================================
 -- Author			 : Dan Andrei STEFAN
 -- Create date		 : 20.11.2014
--- Module			 : Database Analysis & Performance Monitoring
+-- Module			 : Database Analysis & Performance health-check
 -- Description		 : read OS event logs: Application, System, Setup
 -- ============================================================================
 SET NOCOUNT ON
@@ -357,7 +357,7 @@ WHILE @@FETCH_STATUS=0
 						#-- ============================================================================
 						#-- Author			 : Dan Andrei STEFAN
 						#-- Create date		 : 20.11.2014
-						#-- Module			 : Database Analysis & Performance Monitoring
+						#-- Module			 : Database Analysis & Performance health-check
 						#-- Description		 : read OS event logs: Application, System, Setup
 						#-- ============================================================================
 

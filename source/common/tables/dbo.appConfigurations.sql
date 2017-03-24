@@ -54,6 +54,7 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 		  SELECT 'common'			AS [module], 'Default lock timeout (ms)'													AS [name], '5000'		AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Default folder for logs'														AS [name], NULL			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Parallel Execution Jobs'														AS [name], '16'			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Internal jobs log retention (days)'											AS [name], '30'			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Maximum number of retries at failed job'										AS [name], '3'			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Fail master job if any queued job fails'										AS [name], 'false'		AS [value]		UNION ALL
 
@@ -68,7 +69,8 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 		  SELECT 'health-check'		AS [module], 'Collect Warning OS Events'													AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'health-check'		AS [module], 'Collect Information OS Events'												AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'health-check'		AS [module], 'Collect OS Events timeout (seconds)'											AS [name], '600'		AS [value]		UNION ALL
-		  SELECT 'health-check'		AS [module], 'Collect OS Events from last hours'											AS [name], '24'			AS [value]
+		  SELECT 'health-check'		AS [module], 'Collect OS Events from last hours'											AS [name], '24'			AS [value]		UNION ALL
+		  SELECT 'health-check'		AS [module], 'History data retention (days)'												AS [name], '367'		AS [value]
 GO
 
 ---------------------------------------------------------------------------------------------
