@@ -696,3 +696,4 @@ DECLARE
 END CATCH
 
 RETURN @returnValue
+GO

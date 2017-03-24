@@ -24,7 +24,8 @@ AS
 SET NOCOUNT ON
 
 DECLARE @retentionDays	[int],
-		@customMessage	[varchar](256)
+		@customMessage	[varchar](256),
+		@queryToRun		[varchar](1024)
 
 SET NOCOUNT ON
 
@@ -61,40 +62,40 @@ EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsP
 -----------------------------------------------------------------------------------------
 --Internal jobs log retention (days)
 -----------------------------------------------------------------------------------------
-SELECT @retentionDays = [value]
-FROM [dbo].[appConfigurations]
-WHERE [name] = 'Internal jobs log retention (days)'
-	AND [module] = 'common'
-
-SET @customMessage = 'Cleaning internal jobs logs - keeping last ' + CAST(@retentionDays AS [varchar](32)) + ' days.'
-EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
-
-SET @retentionDays = ISNULL(@retentionDays, 0)
-IF @retentionDays<>0
+IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[jobExecutionHistory]') AND type in (N'U'))
 	begin
-		SET ROWCOUNT 4096
-		WHILE 1=1
+		SELECT @retentionDays = [value]
+		FROM [dbo].[appConfigurations]
+		WHERE [name] = 'Internal jobs log retention (days)'
+			AND [module] = 'common'
+
+		SET @customMessage = 'Cleaning internal jobs logs - keeping last ' + CAST(@retentionDays AS [varchar](32)) + ' days.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
+
+		SET @retentionDays = ISNULL(@retentionDays, 0)
+		IF @retentionDays<>0
 			begin
-				DELETE FROM [dbo].[jobExecutionHistory]
-				WHERE [event_date_utc] < DATEADD(dd, -@retentionDays, GETUTCDATE())
-
-				IF @@ROWCOUNT=0
-					BREAK
+				SET @queryToRun = 'DELETE FROM [dbo].[jobExecutionHistory]
+									WHERE [event_date_utc] < DATEADD(dd, -' + CAST(@retentionDays AS [varchar]) + ', GETUTCDATE())'
+				SET ROWCOUNT 4096
+				WHILE 1=1
+					begin
+						EXEC (@queryToRun)
+						
+						IF @@ROWCOUNT=0
+							BREAK
+					end
+				SET ROWCOUNT 0
 			end
-		SET ROWCOUNT 0
-
+		SET @customMessage = 'Done.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 	end
-SET @customMessage = 'Done.'
-EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
-
 
 -----------------------------------------------------------------------------------------
 --History data retention (days)
 -----------------------------------------------------------------------------------------
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[health-check].[statsDatabaseUsageHistory]') AND type in (N'U'))
+IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[health-check].[statsDatabaseUsageHistory]') AND type in (N'U'))
 	begin
-		DECLARE @queryToRun [varchar](1024)
-
 		SELECT @retentionDays = [value]
 		FROM [dbo].[appConfigurations]
 		WHERE [name] = 'History data retention (days)'
@@ -117,7 +118,6 @@ IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[health-chec
 							BREAK
 					end
 				SET ROWCOUNT 0
-
 			end
 		SET @customMessage = 'Done.'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0

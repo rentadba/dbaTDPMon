@@ -740,58 +740,58 @@ EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
 		end
 
 	---------------------------------------------------------------------------------------------------
-	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-									@step_id=1, 
-									@on_fail_action=4, 
-									@on_fail_step_id=2
-
-	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-									@step_id=2, 
-									@on_fail_action=4, 
-									@on_fail_step_id=12
-
-	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-									@step_id=3, 
-									@on_fail_action=4, 
-									@on_fail_step_id=12
-
-	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-									@step_id=4, 
-									@on_fail_action=4, 
-									@on_fail_step_id=12
-
-	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-									@step_id=5, 
-									@on_fail_action=4, 
-									@on_fail_step_id=12
-
-	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-									@step_id=6, 
-									@on_fail_action=4, 
-									@on_fail_step_id=7
-
-	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-									@step_id=7, 
-									@on_fail_action=4, 
-									@on_fail_step_id=8
-
-	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-									@step_id=8, 
-									@on_fail_action=4, 
-									@on_fail_step_id=9
-
-	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-									@step_id=9, 
-									@on_fail_action=4, 
-									@on_fail_step_id=10
-
-	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-									@step_id=10, 
-									@on_fail_action=4, 
-									@on_fail_step_id=11
-
 	IF @SQLMajorVersion > 8
 		begin
+			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+											@step_id=1, 
+											@on_fail_action=4, 
+											@on_fail_step_id=2
+
+			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+											@step_id=2, 
+											@on_fail_action=4, 
+											@on_fail_step_id=12
+
+			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+											@step_id=3, 
+											@on_fail_action=4, 
+											@on_fail_step_id=12
+
+			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+											@step_id=4, 
+											@on_fail_action=4, 
+											@on_fail_step_id=12
+
+			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+											@step_id=5, 
+											@on_fail_action=4, 
+											@on_fail_step_id=12
+
+			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+											@step_id=6, 
+											@on_fail_action=4, 
+											@on_fail_step_id=7
+
+			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+											@step_id=7, 
+											@on_fail_action=4, 
+											@on_fail_step_id=8
+
+			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+											@step_id=8, 
+											@on_fail_action=4, 
+											@on_fail_step_id=9
+
+			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+											@step_id=9, 
+											@on_fail_action=4, 
+											@on_fail_step_id=10
+
+			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+											@step_id=10, 
+											@on_fail_action=4, 
+											@on_fail_step_id=11
+
 			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId,
 											@step_id=11, 
 											@on_fail_action=4, 
