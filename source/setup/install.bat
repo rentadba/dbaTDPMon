@@ -447,7 +447,9 @@ sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_stats
 if errorlevel 1 goto install_err
 
 
+echo *-----------------------------------------------------------------------------*
 echo Health Check: Creating Functions / Stored Procedures
+echo *-----------------------------------------------------------------------------*
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\functions\dbo.ufn_hcGetIndexesFrequentlyFragmented.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
@@ -527,7 +529,9 @@ sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\monitoring.statsSQLAge
 if errorlevel 1 goto install_err
 
 
+echo *-----------------------------------------------------------------------------*
 echo Monitoring: Creating Functions / Stored Procedures
+echo *-----------------------------------------------------------------------------*
 
 sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\dbo.usp_monAlarmCustomFreeDiskSpace.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err

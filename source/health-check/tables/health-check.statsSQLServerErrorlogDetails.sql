@@ -9,8 +9,9 @@
 -----------------------------------------------------------------------------------------------------
 --log for SQL Server Agent job statuses
 -----------------------------------------------------------------------------------------------------
-RAISERROR('Drop table: [health-check].[statsSQLServerErrorlogDetails]', 10, 1) WITH NOWAIT
-GO
 IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[health-check].[statsSQLServerErrorlogDetails]') AND type in (N'U'))
-DROP TABLE [health-check].[statsSQLServerErrorlogDetails]
+	begin
+		RAISERROR('Drop table: [health-check].[statsSQLServerErrorlogDetails]', 10, 1) WITH NOWAIT
+		DROP TABLE [health-check].[statsSQLServerErrorlogDetails]
+	end
 GO
