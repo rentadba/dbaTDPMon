@@ -100,7 +100,8 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 /* AlwaysOn Availability Groups */
 DECLARE @agName			[sysname],
 		@agStopLimit	[int],
-		@actionType		[sysname]
+		@actionType		[sysname],
+		@actionName		[sysname]
 
 SET @agStopLimit = 0
 SET @actionType = NULL
@@ -108,17 +109,25 @@ SET @actionType = NULL
 IF @flgActions &  64 = 64	SET @actionType = 'update space usage'
 IF @flgActions & 128 = 128	SET @actionType = 'clean wasted space - table'
 
-IF @serverVersionNum >= 11 AND @flgActions IS NOT NULL
-	EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @sqlServerName,
-																		@dbName				= @dbName,
-																		@actionName			= 'database maintenance',
-																		@actionType			= @actionType,
-																		@flgActions			= @flgActions,
-																		@flgOptions			= @flgOptions OUTPUT,
-																		@agName				= @agName OUTPUT,
-																		@executionLevel		= @executionLevel,
-																		@debugMode			= @debugMode
+SET @actionName	= 'database maintenance'
+IF @flgActions &  1 =  1	SET @actionName = 'database consistency check'
+IF @flgActions &  2 =  2	SET @actionName = 'database consistency check'
+IF @flgActions &  4 =  4	SET @actionName = 'database consistency check'
+IF @flgActions &  8 =  8	SET @actionName = 'database consistency check'
+IF @flgActions & 16 = 16	SET @actionName = 'database consistency check'
 
+IF @serverVersionNum >= 11 AND @flgActions IS NOT NULL
+	begin
+		EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @sqlServerName,
+																			@dbName				= @dbName,
+																			@actionName			= @actionName,
+																			@actionType			= @actionType,
+																			@flgActions			= @flgActions,
+																			@flgOptions			= @flgOptions OUTPUT,
+																			@agName				= @agName OUTPUT,
+																			@executionLevel		= @executionLevel,
+																			@debugMode			= @debugMode
+	end
 IF @agStopLimit <> 0
 	RETURN 0
 	

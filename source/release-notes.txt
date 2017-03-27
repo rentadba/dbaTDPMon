@@ -1,5 +1,5 @@
 -- =======================================================================
--- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- Copyright (c) 2004-2017 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
 -- =======================================================================
 -- Author	 	: Andrei STEFAN
 -- Module	 	: dbaTDPMon (Troubleshoot Database Performance / Monitoring)
@@ -487,3 +487,6 @@
 
 /* 24.03.2017 */
 	- make install / uninstall smooth; remove warning messages
+
+/* 26.03.2017 */
+	- allow dbcc checks to be made on secondary replicas / AlwaysOn
