@@ -4,7 +4,7 @@ Utility consists in plain T-SQL code. A database is needed in order to store obj
 Task automation is performed using SQL Agent jobs, pre-scheduled.
 Maintenance-plan, health-check and monitoring modules can be used as “agentless” management system.
 
-**Why dbaTDPMon**
+**Why dbaTDPMon?**
 * implement database maintenance best practices (including system databases)
 * support for parallel database maintenance (multiple databases at once)
 * automate daily health checks / HTML reporting
@@ -36,11 +36,11 @@ Maintenance-plan, health-check and monitoring modules can be used as “agentles
 	* Always On Availability Groups “aware”
 	
 **_Daily Health Checks & Monitoring_**
-	* online/offline instances and databases health state
-	* report failed SQL Agent jobs / disk space issues / replication issues / long or blocked transactions, etc.
-	* report outdated backups and checkdb
-	* analyze errorlogs and OS Event logs
-	* collect data from multiple servers in parallel
-	* and many more...
+* online/offline instances and databases health state
+* report failed SQL Agent jobs / disk space issues / replication issues / long or blocked transactions, etc.
+* report outdated backups and checkdb
+* analyze errorlogs and OS Event logs
+* collect data from multiple servers in parallel
+* and many more...
 
 Author webpage: [http://www.rentadba.eu](http://www.rentadba.eu)
