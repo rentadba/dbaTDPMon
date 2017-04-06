@@ -304,8 +304,7 @@ WHILE @@FETCH_STATUS=0
 										)X
 
 						/*-------------------------------------------------------------------*/
-						/* Daily: Rebuild or Reorganize Indexes*/
-					
+						/* Daily: Rebuild or Reorganize Indexes*/			
 						IF @flgActions & 64 = 64 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseOptimize', 'Rebuild or Reorganize Indexes', GETDATE()) = 1
 							begin
 								SET @featureflgActions = 3
