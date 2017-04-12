@@ -316,8 +316,9 @@ IF @flgOptions & 512 = 512
 
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
-DECLARE @agName			[sysname],
-		@agStopLimit	[int]
+DECLARE @agName				[sysname],
+		@agInstanceRoleDesc	[sysname],
+		@agStopLimit		[int]
 
 SET @agStopLimit = 0
 IF @serverVersionNum >= 11
@@ -328,6 +329,7 @@ IF @serverVersionNum >= 11
 																		@flgActions			= @flgActions,
 																		@flgOptions			= @flgOptions OUTPUT,
 																		@agName				= @agName OUTPUT,
+																		@agInstanceRoleDesc = @agInstanceRoleDesc OUTPUT,
 																		@executionLevel		= @executionLevel,
 																		@debugMode			= @debugMode
 
@@ -422,18 +424,15 @@ SET @optionBackupWithCopyOnly=0
 IF @flgOptions & 4 = 4 AND @serverVersionNum >= 9
 	SET @optionBackupWithCopyOnly=1
 
---check if another backup is needed (full) / not applicable to AlwaysOn Availability Groups
+--check if another backup is needed (full) / partially applicable to AlwaysOn Availability Groups
 SET @optionForceChangeBackupType=0
-IF @flgOptions & 8 = 8 AND 	@agName IS NULL 
+IF @flgOptions & 8 = 8 AND 	(@agName IS NULL OR (@agName IS NOT NULL AND @agInstanceRoleDesc = 'PRIMARY'))
 	begin
 		--check for any full database backup (when differential should be made) or any full/incremental database backup (when transaction log should be made)
 		IF @flgActions & 2 = 2 OR @flgActions & 4 = 4
 			begin
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + 'SELECT COUNT(*) FROM msdb.dbo.backupset WHERE [server_name] = N''' + @sqlServerName + ''' AND [database_name]=''' + @dbName + N''' AND [type] IN (''D''' + CASE WHEN @flgActions & 4 = 4 THEN N', ''I''' ELSE N'' END + N')'
-
-				IF @serverVersionNum >= 9
-					SET @queryToRun = @queryToRun + N' AND [is_copy_only]=0'
+				SET @queryToRun = @queryToRun + 'SELECT	[differential_base_lsn] FROM sys.master_files WHERE [database_id] = DB_ID(''' + @dbName + N''') AND [type] = 0 AND [file_id] = 1'
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -441,48 +440,101 @@ IF @flgOptions & 8 = 8 AND 	@agName IS NULL
 				INSERT	INTO #serverPropertyConfig([value])
 						EXEC (@queryToRun)
 
-				IF (SELECT [value] FROM #serverPropertyConfig) = 0
+				DECLARE @differentialBaseLSN	[numeric](25,0)
+
+				SELECT @differentialBaseLSN = [value] FROM #serverPropertyConfig
+				
+				IF @differentialBaseLSN IS NULL
 					begin
+						SET @optionForceChangeBackupType=1 
 						SET @queryToRun = 'WARNING: Specified backup type cannot be performed since no full database backup exists. A full database backup will be taken before the requested backup type.'
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-						SET @optionForceChangeBackupType=1 
 					end
-				ELSE
+				ELSE	
 					begin
-						--check database differentialBaseLSN in its header (if not set, the existing full backup is not usefull)
-						IF object_id('#dbi_differentialBaseLSN') IS NOT NULL DROP TABLE #dbi_differentialBaseLSN
-						CREATE TABLE #dbi_differentialBaseLSN
-						(
-							[Value]					[varchar](255)			NULL
-						)
+						SET @queryToRun = N''
+						SET @queryToRun = @queryToRun + 'SELECT COUNT(*) FROM msdb.dbo.backupset 
+														WHERE [server_name] = N''' + @sqlServerName + ''' 
+															AND [database_name]=''' + @dbName + N''' 
+															AND [type] IN (''D''' + CASE WHEN @flgActions & 4 = 4 THEN N', ''I''' ELSE N'' END + N')
+															AND ' + CAST(@differentialBaseLSN AS [nvarchar]) + N' BETWEEN [first_lsn] AND [last_lsn]'
 
-						IF @sqlServerName <> @@SERVERNAME
+						IF @serverVersionNum >= 9
+							SET @queryToRun = @queryToRun + N' AND [is_copy_only]=0'
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+						DELETE FROM #serverPropertyConfig
+						INSERT	INTO #serverPropertyConfig([value])
+								EXEC (@queryToRun)
+
+						IF (SELECT [value] FROM #serverPropertyConfig) = 0
 							begin
-								IF @serverVersionNum < 11
-									SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
-														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @dbName + N']) WITH TABLERESULTS'''')'')x
-														WHERE [Object]=''dbi_differentialBaseLSN'' AND [Field]=''m_blockOffset'''
-								ELSE
-									SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
-														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @dbName + N']) WITH TABLERESULTS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [VALUE] [nvarchar](max))) '')x
-														WHERE [Field]=''dbi_differentialBaseLSN'''
+								SET @queryToRun = 'WARNING: Specified backup type cannot be performed since no full database backup exists. A full database backup will be taken before the requested backup type.'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+								SET @optionForceChangeBackupType=1 
 							end
+						/*
 						ELSE
-							begin	
-								IF object_id('#dbccDBINFO') IS NOT NULL DROP TABLE #dbccDBINFO
-								CREATE TABLE #dbccDBINFO
-									(
-										[id]				[int] IDENTITY(1,1),
-										[ParentObject]		[varchar](255),
-										[Object]			[varchar](255),
-										[Field]				[varchar](255),
-										[Value]				[varchar](255)
-									)
+							begin
+								--check database differentialBaseLSN in its header (if not set, the existing full backup is not usefull)
+								IF object_id('#differentialBaseLSN') IS NOT NULL DROP TABLE #differentialBaseLSN
+								CREATE TABLE #differentialBaseLSN
+								(
+									[Value]					[varchar](255)			NULL
+								)
 
-								SET @queryToRun=N'INSERT INTO #dbccDBINFO EXEC (''DBCC DBINFO (''''' + @dbName + N''''') WITH TABLERESULTS'')'
+								IF @sqlServerName <> @@SERVERNAME
+									begin
+										IF @serverVersionNum < 11
+											SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
+																FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @dbName + N']) WITH TABLERESULTS'''')'')x
+																WHERE [Object]=''differentialBaseLSN'' AND [Field]=''m_blockOffset'''
+										ELSE
+											SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
+																FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @dbName + N']) WITH TABLERESULTS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [VALUE] [nvarchar](max))) '')x
+																WHERE [Field]=''differentialBaseLSN'''
+									end
+								ELSE
+									begin	
+										IF object_id('#dbccDBINFO') IS NOT NULL DROP TABLE #dbccDBINFO
+										CREATE TABLE #dbccDBINFO
+											(
+												[id]				[int] IDENTITY(1,1),
+												[ParentObject]		[varchar](255),
+												[Object]			[varchar](255),
+												[Field]				[varchar](255),
+												[Value]				[varchar](255)
+											)
 
-								IF @serverVersionNum >= 9
+										SET @queryToRun=N'INSERT INTO #dbccDBINFO EXEC (''DBCC DBINFO (''''' + @dbName + N''''') WITH TABLERESULTS'')'
+
+										IF @serverVersionNum >= 9
+											begin
+												SET @queryToRun=N'BEGIN TRY 
+																	' + @queryToRun + ' 
+																	END TRY 
+																	BEGIN CATCH 
+																		PRINT ERROR_MESSAGE() 
+																	END CATCH'
+											end
+								
+										IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+										EXEC sp_executesql @queryToRun
+
+										IF @serverVersionNum < 11
+											SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Object]=''dbi_differentialBaseLSN'' AND [Field]=''m_blockOffset'''											
+										ELSE
+											SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_differentialBaseLSN'''
+									end
+
+								IF @debugMode = 1 PRINT @queryToRun
+				
+								TRUNCATE TABLE #differentialBaseLSN
+								SET @queryToRun=N'INSERT INTO #differentialBaseLSN([Value]) EXEC (''' + REPLACE(@queryToRun, '''', '''''') + ''')'
+
+								IF @serverVersionNum >=9
 									begin
 										SET @queryToRun=N'BEGIN TRY 
 															' + @queryToRun + ' 
@@ -491,41 +543,19 @@ IF @flgOptions & 8 = 8 AND 	@agName IS NULL
 																PRINT ERROR_MESSAGE() 
 															END CATCH'
 									end
-								
+
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 								EXEC sp_executesql @queryToRun
 
-								IF @serverVersionNum < 11
-									SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Object]=''dbi_differentialBaseLSN'' AND [Field]=''m_blockOffset'''											
-								ELSE
-									SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_differentialBaseLSN'''
+								IF ISNULL((SELECT [Value] FROM #differentialBaseLSN), '0') IN ('0', '0:0:0 (0x00000000:00000000:0000)')
+									begin
+										SET @queryToRun = 'WARNING: Specified backup type cannot be performed since no VALID full database backup exists. A full database backup will be taken before the requested backup type.'
+										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+										SET @optionForceChangeBackupType=1 
+									end
 							end
-
-						IF @debugMode = 1 PRINT @queryToRun
-				
-						TRUNCATE TABLE #dbi_differentialBaseLSN
-						SET @queryToRun=N'INSERT INTO #dbi_differentialBaseLSN([Value]) EXEC (''' + REPLACE(@queryToRun, '''', '''''') + ''')'
-
-						IF @serverVersionNum >=9
-							begin
-								SET @queryToRun=N'BEGIN TRY 
-													' + @queryToRun + ' 
-													END TRY 
-													BEGIN CATCH 
-														PRINT ERROR_MESSAGE() 
-													END CATCH'
-							end
-
-						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-						EXEC sp_executesql @queryToRun
-
-						IF ISNULL((SELECT [Value] FROM #dbi_differentialBaseLSN), '0') IN ('0', '0:0:0 (0x00000000:00000000:0000)')
-							begin
-								SET @queryToRun = 'WARNING: Specified backup type cannot be performed since no VALID full database backup exists. A full database backup will be taken before the requested backup type.'
-								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-								SET @optionForceChangeBackupType=1 
-							end
+						*/
 					end
 			end			
 	end

@@ -17,6 +17,7 @@ CREATE PROCEDURE [dbo].[usp_mpCheckAvailabilityGroupLimitations]
 		@flgActions			[smallint]	= 0,
 		@flgOptions			[int]	  OUTPUT,
 		@agName				[sysname] OUTPUT,
+		@agInstanceRoleDesc	[sysname] OUTPUT,
 		@executionLevel		[tinyint]	= 0,
 		@debugMode			[bit]		= 0
 /* WITH ENCRYPTION */
@@ -35,7 +36,6 @@ SET @nestedExecutionLevel = @executionLevel + 1
 
 --------------------------------------------------------------------------------------------------
 DECLARE @clusterName				 [sysname],		
-		@agInstanceRoleDesc			 [sysname],
 		@agSynchronizationState		 [sysname],
 		@agPreferredBackupReplica	 [bit],
 		@agAutomatedBackupPreference [tinyint]

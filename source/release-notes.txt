@@ -490,3 +490,9 @@
 
 /* 26.03.2017 */
 	- allow dbcc checks to be made on secondary replicas / AlwaysOn
+
+/*----------------------------------------------------------------------*/
+/* April 2017 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 19.04.2017 */
+	- fix "change backup type check" from differential to full when running on AlwaysOn AvaulabilityGroups
