@@ -496,3 +496,6 @@
 /*----------------------------------------------------------------------*/
 /* 19.04.2017 */
 	- fix "change backup type check" from differential to full when running on AlwaysOn AvaulabilityGroups
+
+/* 28.04.2017 */
+	- add support for ignoring error code 15281: SQL Server blocked access to procedure
