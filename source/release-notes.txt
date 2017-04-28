@@ -499,3 +499,4 @@
 
 /* 28.04.2017 */
 	- add support for ignoring error code 15281: SQL Server blocked access to procedure
+	- fix update statistics error when index name contains brackets (reported by Razvan Puscasu)
