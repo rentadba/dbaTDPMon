@@ -403,7 +403,7 @@ IF @flgActions & 2 = 2
 				IF @serverVersionNum >= 9 AND @dbi_dbccFlags <> 2
 					SET @queryToRun = @queryToRun + ', DATA_PURITY'
 				
-				IF @compatibilityLevel >= 10 AND @flgOptions & 2 = 0
+				IF @compatibilityLevel >= 100 AND @flgOptions & 2 = 0
 					SET @queryToRun = @queryToRun + ', EXTENDED_LOGICAL_CHECKS'
 
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
