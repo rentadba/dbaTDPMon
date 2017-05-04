@@ -123,15 +123,24 @@ SET @queryToRun = N''
 	Msg 3023, Level 16, State 2, Line 1
 	Backup and file manipulation operations (such as ALTER DATABASE ADD FILE) on a database must be serialized. Reissue the statement after the current backup or file manipulation operation is completed.
 */
-SET @queryToRun = @queryToRun + N'SELECT DISTINCT sdb.[name] 
-									FROM master..sysdatabases sdb
-									WHERE sdb.[name] LIKE ''' + CASE WHEN @DBName IS NULL THEN '%' ELSE @DBName END + '''
-										AND NOT EXISTS (
-														 SELECT 1
-														 FROM  master.dbo.sysprocesses sp
-														 WHERE sp.[cmd] LIKE ''BACKUP %''
-																AND sp.[dbid]=sdb.[dbid]
-														)'
+IF @DBName IS NULL
+	SET @queryToRun = @queryToRun + N'SELECT DISTINCT sdb.[name] 
+										FROM master..sysdatabases sdb
+										WHERE sdb.[name] LIKE ''' + CASE WHEN @DBName IS NULL THEN '%' ELSE @DBName END + '''
+											AND NOT EXISTS (
+															 SELECT 1
+															 FROM  master.dbo.sysprocesses sp
+															 WHERE sp.[cmd] LIKE ''BACKUP %''
+																	AND sp.[dbid]=sdb.[dbid]
+															)'
+ELSE
+	SET @queryToRun = @queryToRun + N'SELECT ''' + @DBName + ''' AS [name]
+										WHERE NOT EXISTS (
+															 SELECT 1
+															 FROM  master.dbo.sysprocesses sp
+															 WHERE sp.[cmd] LIKE ''BACKUP %''
+																	AND sp.[dbid]= DB_ID(''' + @DBName + ''')
+															)'
 
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
 IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
