@@ -507,3 +507,6 @@
 /* 04.05.2017 */
 	- fix database shrink error & alert when another database is in a middle of a restore (reported by Razvan Puscasu)
 	- fix minor bugs on maintenance-plan module
+
+/* 08.05.2017 */
+	- fix bugs on maintenance-plan module when running on an AlwaysOn configuration with multiple groups (mix primary/secondary) (reported by Stefan Iancu)
