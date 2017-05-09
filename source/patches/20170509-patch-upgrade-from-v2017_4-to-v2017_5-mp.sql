@@ -1,3 +1,28 @@
+USE [dbaTDPMon]
+GO
+
+RAISERROR('*-----------------------------------------------------------------------------*', 10, 1) WITH NOWAIT
+RAISERROR('* dbaTDPMon (Troubleshoot Database Performance / Monitoring)                  *', 10, 1) WITH NOWAIT
+RAISERROR('* http://dbatdpmon.codeplex.com, under GNU (GPLv3) licence model              *', 10, 1) WITH NOWAIT
+RAISERROR('*-----------------------------------------------------------------------------*', 10, 1) WITH NOWAIT
+RAISERROR('* Patch script: from version 2017.4 to 2017.5 (2017.05.09)				  *', 10, 1) WITH NOWAIT
+RAISERROR('*-----------------------------------------------------------------------------*', 10, 1) WITH NOWAIT
+
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+UPDATE [dbo].[appConfigurations] SET [value] = N'2017.05.09' WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+
+/*---------------------------------------------------------------------------------------------------------------------*/
+/* patch module: commons																							   */
+/*---------------------------------------------------------------------------------------------------------------------*/
+RAISERROR('Patching module: COMMONS', 10, 1) WITH NOWAIT
+
+IF NOT EXISTS(SELECT * FROM [dbo].[appConfigurations] WHERE [name] = 'Flood control: maximum alerts in 5 minutes' and [module] = 'common')
+	INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
+		  SELECT 'common' AS [module], 'Flood control: maximum alerts in 5 minutes' AS [name], '50' AS [value]
+GO
+
 RAISERROR('Create procedure: [dbo].[usp_logEventMessageAndSendEmail]', 10, 1) WITH NOWAIT
 GO---
 IF  EXISTS (
@@ -649,3 +674,14 @@ EXEC [dbo].[usp_logEventMessage]	@projectCode			= @projectCode,
 
 RETURN @ReturnValue
 GO
+
+
+
+/*---------------------------------------------------------------------------------------------------------------------*/
+USE [dbaTDPMon]
+GO
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+
+RAISERROR('* Done *', 10, 1) WITH NOWAIT
+

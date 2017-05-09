@@ -38,7 +38,7 @@ GO
 SET NOCOUNT ON
 GO
 INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
-		  SELECT 'common'			AS [module], 'Application Version'															AS [name], N'2017.05.08'AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Application Version'															AS [name], N'2017.05.09'AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Default project code'															AS [name], '$(projectCode)'	AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Database Mail profile name to use for sending emails'							AS [name], NULL			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Default recipients list - Reports (semicolon separated)'						AS [name], NULL			AS [value]		UNION ALL
@@ -47,6 +47,7 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 		  SELECT 'common'			AS [module], 'Local storage path for HTML reports'											AS [name], NULL			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'HTTP address for report files'												AS [name], NULL			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Alert repeat interval (minutes)'												AS [name], '60'			AS [value]		UNION ALL
+  		  SELECT 'common'			AS [module], 'Flood control: maximum alerts in 5 minutes'									AS [name], '50'			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Notify job status only for Failed jobs'										AS [name], 'true'		AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Ignore alerts for: Error 1222 - Lock request time out period exceeded'		AS [name], 'true'		AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Log action events'															AS [name], 'true'		AS [value]		UNION ALL

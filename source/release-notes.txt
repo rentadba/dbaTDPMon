@@ -510,3 +510,6 @@
 
 /* 08.05.2017 */
 	- fix bugs on maintenance-plan module when running on an AlwaysOn configuration with multiple groups (mix primary/secondary) (reported by Stefan Iancu)
+
+/* 09.05.2017 */
+	- add email alerting flood control: allowing maximum 50 messages (default) in a 5 minutes time-frame
