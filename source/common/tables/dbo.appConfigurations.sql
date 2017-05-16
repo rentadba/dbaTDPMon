@@ -38,7 +38,7 @@ GO
 SET NOCOUNT ON
 GO
 INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
-		  SELECT 'common'			AS [module], 'Application Version'															AS [name], N'2017.05.09'AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Application Version'															AS [name], N'2017.05.16'AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Default project code'															AS [name], '$(projectCode)'	AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Database Mail profile name to use for sending emails'							AS [name], NULL			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Default recipients list - Reports (semicolon separated)'						AS [name], NULL			AS [value]		UNION ALL
@@ -65,6 +65,7 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 		  SELECT 'maintenance-plan' AS [module], 'Force cleanup of ghost records'												AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'maintenance-plan' AS [module], 'Ghost records cleanup threshold'												AS [name], '131072'		AS [value]		UNION ALL
 		  SELECT 'maintenance-plan'	AS [module], 'Ignore alerts for: Error 15281 - SQL Server blocked access to procedure'		AS [name], 'true'		AS [value]		UNION ALL
+		  SELECT 'maintenance-plan'	AS [module], 'WAIT_AT_LOW_PRIORITY max duration (min)'										AS [name], '1'			AS [value]		UNION ALL
 
 		  SELECT 'health-check'		AS [module], 'Collect SQL Agent jobs step details'											AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'health-check'		AS [module], 'Collect SQL Errorlog last files'												AS [name], '1'			AS [value]		UNION ALL

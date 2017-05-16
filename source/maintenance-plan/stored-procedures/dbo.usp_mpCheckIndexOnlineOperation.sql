@@ -89,6 +89,8 @@ IF (@partitionNumber <> 1)
 	end
 
 -----------------------------------------------------------------------------------------
+/* disabled indexes / XML, spatial indexes, columnstore, hash */
+-----------------------------------------------------------------------------------------
 SET @queryToRun = N''
 SET @queryToRun = @queryToRun + N'SELECT DISTINCT idx.[name]
 						FROM [' + @dbName + '].[sys].[indexes] idx
@@ -101,7 +103,7 @@ SET @queryToRun = @queryToRun + N'SELECT DISTINCT idx.[name]
 										ELSE ' AND idx.[index_id] = ' + CAST(@indexID AS [nvarchar])
 								END + N'
 								AND (   idx.[is_disabled] = 1
-										OR idx.[type] IN (3, 4, 5, 6)
+										OR idx.[type] IN (3, 4, 5, 6, 7)
 									)'
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -119,72 +121,25 @@ IF (SELECT COUNT(*) FROM @onlineConstraintCheck) > 0
 -----------------------------------------------------------------------------------------
 /* check if index definition contains a LOB data type */
 -----------------------------------------------------------------------------------------
-SET @queryToRun = N''
-SET @queryToRun = @queryToRun + N'SELECT DISTINCT idx.[name]
-						FROM [' + @dbName + '].[sys].[indexes] idx
-						INNER JOIN [' + @dbName + '].[sys].[index_columns] idxCol ON	idx.[object_id] = idxCol.[object_id]
-																						AND idx.[index_id] = idxCol.[index_id]
-						INNER JOIN [' + @dbName + '].[sys].[columns]		 col	ON	idxCol.[object_id] = col.[object_id]
-																						AND idxCol.[column_id] = col.[column_id]
-						INNER JOIN [' + @dbName + '].[sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
-						INNER JOIN [' + @dbName + '].[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
-						INNER JOIN [' + @dbName + '].[sys].[types]			 st		ON  col.[system_type_id] = st.[system_type_id]
-						WHERE	obj.[name] = ''' + @tableName + '''
-								AND sch.[name] = ''' + @tableSchema + '''' + 
-								CASE	WHEN @indexName IS NOT NULL 
-										THEN ' AND idx.[name] = ''' + @indexName + ''''
-										ELSE ' AND idx.[index_id] = ' + CAST(@indexID AS [nvarchar])
-								END + N'
-								AND (    st.[name] IN (''text'', ''ntext'', ''image''' + CASE WHEN @serverVersionNum < 11 THEN N', ''filestream'', ''xml''' ELSE N'' END + N')
-										OR (st.[name] IN (''varchar'', ''nvarchar'', ''varbinary'') AND col.[max_length]=-1)
-									)'
-SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-
-DELETE FROM @onlineConstraintCheck
-INSERT	INTO @onlineConstraintCheck([value])
-		EXEC (@queryToRun)
-
-IF (SELECT COUNT(*) FROM @onlineConstraintCheck) > 0
-	begin
-		SET @sqlScriptOnline = N'ONLINE = OFF'
-		RETURN
-	end
-
------------------------------------------------------------------------------------------
-/* check if table definition contains a LOB data type */
------------------------------------------------------------------------------------------
-IF @indexID IS NULL
+IF @serverVersionNum < 11
 	begin
 		SET @queryToRun = N''
-		SET @queryToRun = @queryToRun + N'SELECT DISTINCT idx.[index_id]
+		SET @queryToRun = @queryToRun + N'SELECT DISTINCT idx.[name]
 								FROM [' + @dbName + '].[sys].[indexes] idx
+								INNER JOIN [' + @dbName + '].[sys].[index_columns] idxCol ON	idx.[object_id] = idxCol.[object_id]
+																								AND idx.[index_id] = idxCol.[index_id]
+								INNER JOIN [' + @dbName + '].[sys].[columns]		 col	ON	idxCol.[object_id] = col.[object_id]
+																								AND idxCol.[column_id] = col.[column_id]
 								INNER JOIN [' + @dbName + '].[sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
-								INNER JOIN [' + @dbName + '].[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
-								WHERE	obj.[name] = ''' + @tableName + '''
-										AND sch.[name] = ''' + @tableSchema + '''
-										AND idx.[name] = ''' + @indexName + ''''
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-
-		DELETE FROM @onlineConstraintCheck
-		INSERT	INTO @onlineConstraintCheck([value])
-				EXEC (@queryToRun)
-
-		SELECT TOP 1 @indexID = [value] FROM @onlineConstraintCheck
-	end
-
-IF @indexID=1
-	begin
-		SET @queryToRun = N''
-		SET @queryToRun = @queryToRun + N'SELECT DISTINCT obj.[name]
-								FROM  [' + @dbName + '].[sys].[objects]				 obj
-								INNER JOIN [' + @dbName + '].[sys].[columns]		 col	ON  col.[object_id] = obj.[object_id]
 								INNER JOIN [' + @dbName + '].[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
 								INNER JOIN [' + @dbName + '].[sys].[types]			 st		ON  col.[system_type_id] = st.[system_type_id]
 								WHERE	obj.[name] = ''' + @tableName + '''
-										AND sch.[name] = ''' + @tableSchema + '''
-										AND (    st.[name] IN (''text'', ''ntext'', ''image'', ''filestream'', ''xml'')
+										AND sch.[name] = ''' + @tableSchema + '''' + 
+										CASE	WHEN @indexName IS NOT NULL 
+												THEN ' AND idx.[name] = ''' + @indexName + ''''
+												ELSE ' AND idx.[index_id] = ' + CAST(@indexID AS [nvarchar])
+										END + N'
+										AND (    st.[name] IN (''text'', ''ntext'', ''image''' + CASE WHEN @serverVersionNum < 11 THEN N', ''filestream'', ''xml''' ELSE N'' END + N')
 												OR (st.[name] IN (''varchar'', ''nvarchar'', ''varbinary'') AND col.[max_length]=-1)
 											)'
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
@@ -201,10 +156,81 @@ IF @indexID=1
 			end
 	end
 
+-----------------------------------------------------------------------------------------
+/* check if table definition contains a LOB data type */
+-----------------------------------------------------------------------------------------
+IF @serverVersionNum < 11
+	begin
+
+		IF @indexID IS NULL
+			begin
+				SET @queryToRun = N''
+				SET @queryToRun = @queryToRun + N'SELECT DISTINCT idx.[index_id]
+										FROM [' + @dbName + '].[sys].[indexes] idx
+										INNER JOIN [' + @dbName + '].[sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
+										INNER JOIN [' + @dbName + '].[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
+										WHERE	obj.[name] = ''' + @tableName + '''
+												AND sch.[name] = ''' + @tableSchema + '''
+												AND idx.[name] = ''' + @indexName + ''''
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				DELETE FROM @onlineConstraintCheck
+				INSERT	INTO @onlineConstraintCheck([value])
+						EXEC (@queryToRun)
+
+				SELECT TOP 1 @indexID = [value] FROM @onlineConstraintCheck
+			end
+
+		IF @indexID=1
+			begin
+				SET @queryToRun = N''
+				SET @queryToRun = @queryToRun + N'SELECT DISTINCT obj.[name]
+										FROM  [' + @dbName + '].[sys].[objects]				 obj
+										INNER JOIN [' + @dbName + '].[sys].[columns]		 col	ON  col.[object_id] = obj.[object_id]
+										INNER JOIN [' + @dbName + '].[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
+										INNER JOIN [' + @dbName + '].[sys].[types]			 st		ON  col.[system_type_id] = st.[system_type_id]
+										WHERE	obj.[name] = ''' + @tableName + '''
+												AND sch.[name] = ''' + @tableSchema + '''
+												AND (    st.[name] IN (''text'', ''ntext'', ''image'', ''filestream'', ''xml'')
+														OR (st.[name] IN (''varchar'', ''nvarchar'', ''varbinary'') AND col.[max_length]=-1)
+													)'
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				DELETE FROM @onlineConstraintCheck
+				INSERT	INTO @onlineConstraintCheck([value])
+						EXEC (@queryToRun)
+
+				IF (SELECT COUNT(*) FROM @onlineConstraintCheck) > 0
+					begin
+						SET @sqlScriptOnline = N'ONLINE = OFF'
+						RETURN
+					end
+			end
+	end
+
 SET @sqlScriptOnline = N'ONLINE = ON'
+
+/* https://docs.microsoft.com/en-us/sql/t-sql/statements/alter-index-transact-sql */
+/* rebuild online with low priority, starting with version 2014 */
+IF @serverVersionNum > 12
+	begin
+		---------------------------------------------------------------------------------------------
+		--get configuration values
+		DECLARE @waitMaxDuration [int]
+		
+		SELECT	@waitMaxDuration = [value] 
+		FROM	[dbo].[appConfigurations] 
+		WHERE	[name] = 'WAIT_AT_LOW_PRIORITY max duration (min)'
+				AND [module] = 'maintenance-plan'
+
+		SET @waitMaxDuration = ISNULL(@waitMaxDuration, 1)
+		---------------------------------------------------------------------------------------------
+
+		SET @sqlScriptOnline = @sqlScriptOnline + ' (WAIT_AT_LOW_PRIORITY (MAX_DURATION = ' + CAST(@waitMaxDuration AS [nvarchar]) + ' MINUTES, ABORT_AFTER_WAIT = SELF ))'
+	end
+
 RETURN
 
 GO
-
-
-
