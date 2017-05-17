@@ -517,3 +517,6 @@
 /* 16.05.2017 */
 	- update check/limitations when doing online index rebuild based on version/edition 
 	- starting with SQL Server 2014, when doing online index rebuild, use WAIT_AT_LOW_PRIORITY(MAX_DURATION = [..] MINUTES, ABORT_AFTER_WAIT=SELF) option
+
+/* 17.05.2017 */
+	- perform online table/heap rebuild using WAIT_AT_LOW_PRIORITY (SQL Server 2014 onwards)

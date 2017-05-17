@@ -1,3 +1,356 @@
+USE [dbaTDPMon]
+GO
+
+RAISERROR('*-----------------------------------------------------------------------------*', 10, 1) WITH NOWAIT
+RAISERROR('* dbaTDPMon (Troubleshoot Database Performance / Monitoring)                  *', 10, 1) WITH NOWAIT
+RAISERROR('* http://dbatdpmon.codeplex.com, under GNU (GPLv3) licence model              *', 10, 1) WITH NOWAIT
+RAISERROR('*-----------------------------------------------------------------------------*', 10, 1) WITH NOWAIT
+RAISERROR('* Patch script: from version 2017.4 to 2017.6 (2017.05.17)				  *', 10, 1) WITH NOWAIT
+RAISERROR('*-----------------------------------------------------------------------------*', 10, 1) WITH NOWAIT
+
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+UPDATE [dbo].[appConfigurations] SET [value] = N'2017.05.17' WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+
+/*---------------------------------------------------------------------------------------------------------------------*/
+/* patch module: commons																							   */
+/*---------------------------------------------------------------------------------------------------------------------*/
+RAISERROR('Patching module: COMMONS', 10, 1) WITH NOWAIT
+
+-----------------------------------------------------------------------------------------------------
+--
+-----------------------------------------------------------------------------------------------------
+RAISERROR('Create view : [dbo].[vw_jobExecutionHistory]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[dbo].[vw_jobExecutionHistory]'))
+DROP VIEW [dbo].[vw_jobExecutionHistory]
+GO
+
+CREATE VIEW [dbo].[vw_jobExecutionHistory]
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 21.09.2015
+-- Module			 : Database Analysis & Performance Monitoring
+-- ============================================================================
+
+/* previous / history executions */
+SELECT    jeq.[id]
+		, jeq.[project_id]
+		, cp.[code]		AS [project_code]
+		, jeq.[instance_id]
+		, cin.[name]	AS [instance_name]
+		, jeq.[for_instance_id]
+		, cinF.[name]	AS [for_instance_name]
+		, jeq.[module]
+		, jeq.[descriptor]
+		, jeq.[filter]
+		, jeq.[job_name]
+		, jeq.[job_step_name]
+		, jeq.[job_database_name]
+		, jeq.[job_command]
+		, jeq.[execution_date]
+		, jeq.[running_time_sec]
+		, jeq.[status]
+		, CASE jeq.[status] WHEN '-1' THEN 'Not executed'
+							WHEN '0' THEN 'Failed'
+							WHEN '1' THEN 'Succeded'				
+							WHEN '2' THEN 'Retry'
+							WHEN '3' THEN 'Canceled'
+							WHEN '4' THEN 'In progress'
+							ELSE 'Unknown'
+			END AS [status_desc]
+		, jeq.[log_message]
+		, jeq.[event_date_utc]
+FROM [dbo].[jobExecutionHistory]		 jeq
+INNER JOIN [dbo].[catalogInstanceNames]	 cin	ON cin.[id] = jeq.[instance_id] AND cin.[project_id] = jeq.[project_id]
+INNER JOIN [dbo].[catalogInstanceNames]	 cinF	ON cinF.[id] = jeq.[for_instance_id] AND cinF.[project_id] = jeq.[project_id]
+INNER JOIN [dbo].[catalogProjects]		 cp		ON cp.[id] = jeq.[project_id]
+
+UNION ALL
+
+/* currernt / last executions */
+SELECT    jeq.[id]
+		, jeq.[project_id]
+		, cp.[code]		AS [project_code]
+		, jeq.[instance_id]
+		, cin.[name]	AS [instance_name]
+		, jeq.[for_instance_id]
+		, cinF.[name]	AS [for_instance_name]
+		, jeq.[module]
+		, jeq.[descriptor]
+		, jeq.[filter]
+		, jeq.[job_name]
+		, jeq.[job_step_name]
+		, jeq.[job_database_name]
+		, jeq.[job_command]
+		, jeq.[execution_date]
+		, jeq.[running_time_sec]
+		, jeq.[status]
+		, CASE jeq.[status] WHEN '-1' THEN 'Not executed'
+							WHEN '0' THEN 'Failed'
+							WHEN '1' THEN 'Succeded'				
+							WHEN '2' THEN 'Retry'
+							WHEN '3' THEN 'Canceled'
+							WHEN '4' THEN 'In progress'
+							ELSE 'Unknown'
+			END AS [status_desc]
+		, jeq.[log_message]
+		, jeq.[event_date_utc]
+FROM [dbo].[jobExecutionQueue]		jeq
+INNER JOIN [dbo].[catalogInstanceNames]	 cin	ON cin.[id] = jeq.[instance_id] AND cin.[project_id] = jeq.[project_id]
+INNER JOIN [dbo].[catalogInstanceNames]	 cinF	ON cinF.[id] = jeq.[for_instance_id] AND cinF.[project_id] = jeq.[project_id]
+INNER JOIN [dbo].[catalogProjects]		 cp		ON cp.[id] = jeq.[project_id]
+GO
+
+
+
+/*---------------------------------------------------------------------------------------------------------------------*/
+/* patch module: maintenance-plan																							   */
+/*---------------------------------------------------------------------------------------------------------------------*/
+RAISERROR('Patching module: MAINTENANCE-PLAN', 10, 1) WITH NOWAIT
+
+RAISERROR('Create procedure: [dbo].[usp_mpCheckIndexOnlineOperation]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sys.objects 
+	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_mpCheckIndexOnlineOperation]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_mpCheckIndexOnlineOperation]
+GO
+
+-----------------------------------------------------------------------------------------
+CREATE PROCEDURE [dbo].[usp_mpCheckIndexOnlineOperation]
+		@sqlServerName		[sysname],
+		@dbName				[sysname],
+		@tableSchema		[sysname]= 'dbo',
+		@tableName			[sysname],
+		@indexName			[sysname],
+		@indexID			[int],
+		@partitionNumber	[int] = 1,
+		@sqlScriptOnline	[nvarchar](512) OUTPUT,
+		@flgOptions			[int] = 0,
+		@executionLevel		[tinyint] = 0,
+		@debugMode			[bit] = 0
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 24.01.2015
+-- Module			 : Database Maintenance Scripts
+--					 : SQL Server 2005/2008/2008R2/2012+
+-- ============================================================================
+
+-----------------------------------------------------------------------------------------
+-- Input Parameters:
+--		@flgOptions		 4096  - rebuild/reorganize indexes using ONLINE=ON, if applicable (default)
+-----------------------------------------------------------------------------------------
+
+SET NOCOUNT ON
+
+DECLARE	  @queryToRun    			[nvarchar](max)
+
+DECLARE	  @serverEdition			[sysname]
+		, @serverVersionStr			[sysname]
+		, @serverVersionNum			[numeric](9,6)
+
+DECLARE @onlineConstraintCheck TABLE	
+	(
+		[value]			[sysname]	NULL
+	)
+
+
+SET @sqlScriptOnline = N''
+
+-----------------------------------------------------------------------------------------
+IF @flgOptions & 4096 = 0
+	begin
+		SET @sqlScriptOnline = N'ONLINE = OFF'
+		RETURN
+	end
+
+-----------------------------------------------------------------------------------------
+/* check if SQL Server Edition is either Enterprise of Developer */
+-----------------------------------------------------------------------------------------
+--get destination server running version/edition
+EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
+										@serverEdition			= @serverEdition OUT,
+										@serverVersionStr		= @serverVersionStr OUT,
+										@serverVersionNum		= @serverVersionNum OUT,
+										@executionLevel			= 1,
+										@debugMode				= @debugMode
+
+IF NOT (CHARINDEX('Enterprise', @serverEdition) > 0 OR CHARINDEX('Developer', @serverEdition) > 0)
+	begin
+		SET @sqlScriptOnline = N'ONLINE = OFF'
+		RETURN
+	end
+
+-----------------------------------------------------------------------------------------
+/* check if index can be rebuild online (exceptions listed under https://msdn.microsoft.com/en-us/library/ms188388(v=sql.90).aspx) */
+-----------------------------------------------------------------------------------------
+IF (@partitionNumber <> 1)
+	begin
+		SET @sqlScriptOnline = N'ONLINE = OFF'
+		RETURN
+	end
+
+-----------------------------------------------------------------------------------------
+/* disabled indexes / XML, spatial indexes, columnstore, hash */
+-----------------------------------------------------------------------------------------
+SET @queryToRun = N''
+SET @queryToRun = @queryToRun + N'SELECT DISTINCT idx.[name]
+						FROM [' + @dbName + '].[sys].[indexes] idx
+						INNER JOIN [' + @dbName + '].[sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
+						INNER JOIN [' + @dbName + '].[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
+						WHERE	obj.[name] = ''' + @tableName + '''
+								AND sch.[name] = ''' + @tableSchema + '''' + 
+								CASE	WHEN @indexName IS NOT NULL 
+										THEN ' AND idx.[name] = ''' + @indexName	 + ''''
+										ELSE ' AND idx.[index_id] = ' + CAST(@indexID AS [nvarchar])
+								END + N'
+								AND (   idx.[is_disabled] = 1
+										OR idx.[type] IN (3, 4, 5, 6, 7)
+									)'
+
+SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+DELETE FROM @onlineConstraintCheck
+INSERT	INTO @onlineConstraintCheck([value])
+		EXEC (@queryToRun)
+
+IF (SELECT COUNT(*) FROM @onlineConstraintCheck) > 0
+	begin
+		SET @sqlScriptOnline = N'ONLINE = OFF'
+		RETURN
+	end
+
+-----------------------------------------------------------------------------------------
+/* check if index definition contains a LOB data type */
+-----------------------------------------------------------------------------------------
+IF @serverVersionNum < 11
+	begin
+		SET @queryToRun = N''
+		SET @queryToRun = @queryToRun + N'SELECT DISTINCT idx.[name]
+								FROM [' + @dbName + '].[sys].[indexes] idx
+								INNER JOIN [' + @dbName + '].[sys].[index_columns] idxCol ON	idx.[object_id] = idxCol.[object_id]
+																								AND idx.[index_id] = idxCol.[index_id]
+								INNER JOIN [' + @dbName + '].[sys].[columns]		 col	ON	idxCol.[object_id] = col.[object_id]
+																								AND idxCol.[column_id] = col.[column_id]
+								INNER JOIN [' + @dbName + '].[sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
+								INNER JOIN [' + @dbName + '].[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
+								INNER JOIN [' + @dbName + '].[sys].[types]			 st		ON  col.[system_type_id] = st.[system_type_id]
+								WHERE	obj.[name] = ''' + @tableName + '''
+										AND sch.[name] = ''' + @tableSchema + '''' + 
+										CASE	WHEN @indexName IS NOT NULL 
+												THEN ' AND idx.[name] = ''' + @indexName + ''''
+												ELSE ' AND idx.[index_id] = ' + CAST(@indexID AS [nvarchar])
+										END + N'
+										AND (    st.[name] IN (''text'', ''ntext'', ''image''' + CASE WHEN @serverVersionNum < 11 THEN N', ''filestream'', ''xml''' ELSE N'' END + N')
+												OR (st.[name] IN (''varchar'', ''nvarchar'', ''varbinary'') AND col.[max_length]=-1)
+											)'
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+		DELETE FROM @onlineConstraintCheck
+		INSERT	INTO @onlineConstraintCheck([value])
+				EXEC (@queryToRun)
+
+		IF (SELECT COUNT(*) FROM @onlineConstraintCheck) > 0
+			begin
+				SET @sqlScriptOnline = N'ONLINE = OFF'
+				RETURN
+			end
+	end
+
+-----------------------------------------------------------------------------------------
+/* check if table definition contains a LOB data type */
+-----------------------------------------------------------------------------------------
+IF @serverVersionNum < 11
+	begin
+		IF @indexID IS NULL
+			begin
+				SET @queryToRun = N''
+				SET @queryToRun = @queryToRun + N'SELECT DISTINCT idx.[index_id]
+										FROM [' + @dbName + '].[sys].[indexes] idx
+										INNER JOIN [' + @dbName + '].[sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
+										INNER JOIN [' + @dbName + '].[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
+										WHERE	obj.[name] = ''' + @tableName + '''
+												AND sch.[name] = ''' + @tableSchema + '''
+												AND idx.[name] = ''' + @indexName + ''''
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				DELETE FROM @onlineConstraintCheck
+				INSERT	INTO @onlineConstraintCheck([value])
+						EXEC (@queryToRun)
+
+				SELECT TOP 1 @indexID = [value] FROM @onlineConstraintCheck
+			end
+
+		IF @indexID=1
+			begin
+				SET @queryToRun = N''
+				SET @queryToRun = @queryToRun + N'SELECT DISTINCT obj.[name]
+										FROM  [' + @dbName + '].[sys].[objects]				 obj
+										INNER JOIN [' + @dbName + '].[sys].[columns]		 col	ON  col.[object_id] = obj.[object_id]
+										INNER JOIN [' + @dbName + '].[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
+										INNER JOIN [' + @dbName + '].[sys].[types]			 st		ON  col.[system_type_id] = st.[system_type_id]
+										WHERE	obj.[name] = ''' + @tableName + '''
+												AND sch.[name] = ''' + @tableSchema + '''
+												AND (    st.[name] IN (''text'', ''ntext'', ''image'', ''filestream'', ''xml'')
+														OR (st.[name] IN (''varchar'', ''nvarchar'', ''varbinary'') AND col.[max_length]=-1)
+													)'
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				DELETE FROM @onlineConstraintCheck
+				INSERT	INTO @onlineConstraintCheck([value])
+						EXEC (@queryToRun)
+
+				IF (SELECT COUNT(*) FROM @onlineConstraintCheck) > 0
+					begin
+						SET @sqlScriptOnline = N'ONLINE = OFF'
+						RETURN
+					end
+			end
+	end
+
+SET @sqlScriptOnline = N'ONLINE = ON'
+
+/* rebuild index online with low priority, starting with version 2014: https://docs.microsoft.com/en-us/sql/t-sql/statements/alter-index-transact-sql */
+/* rebuild table online with low priority, starting with version 2014: https://docs.microsoft.com/en-us/sql/t-sql/statements/alter-table-transact-sql */
+IF (@serverVersionNum > 12)
+	begin
+		---------------------------------------------------------------------------------------------
+		--get configuration values
+		DECLARE @waitMaxDuration [int]
+		
+		SELECT	@waitMaxDuration = [value] 
+		FROM	[dbo].[appConfigurations] 
+		WHERE	[name] = 'WAIT_AT_LOW_PRIORITY max duration (min)'
+				AND [module] = 'maintenance-plan'
+
+		SET @waitMaxDuration = ISNULL(@waitMaxDuration, 1)
+		---------------------------------------------------------------------------------------------
+
+		SET @sqlScriptOnline = @sqlScriptOnline + ' (WAIT_AT_LOW_PRIORITY (MAX_DURATION = ' + CAST(@waitMaxDuration AS [nvarchar]) + ' MINUTES, ABORT_AFTER_WAIT = SELF ))'
+	end
+
+RETURN
+GO
+
+
 RAISERROR('Create procedure: [dbo].[usp_mpDatabaseOptimize]', 10, 1) WITH NOWAIT
 GO
 IF  EXISTS (
@@ -1613,3 +1966,602 @@ IF object_id('tempdb..#databaseObjectsWithIndexList') IS NOT NULL 	DROP TABLE #d
 
 RETURN @errorCode
 GO
+
+
+RAISERROR('Create procedure: [dbo].[usp_mpAlterTableRebuildHeap]', 10, 1) WITH NOWAIT
+GO
+IF  EXISTS (
+	    SELECT * 
+	      FROM sys.objects 
+	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_mpAlterTableRebuildHeap]') 
+	       AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[usp_mpAlterTableRebuildHeap]
+GO
+
+-----------------------------------------------------------------------------------------
+CREATE PROCEDURE [dbo].[usp_mpAlterTableRebuildHeap]
+		@SQLServerName		[sysname],
+		@DBName				[sysname],
+		@TableSchema		[sysname],
+		@TableName			[sysname],
+		@flgActions			[smallint] = 1,
+		@flgOptions			[int] = 14360, --8192 + 4096 + 2048 + 16 + 8
+		@executionLevel		[tinyint] = 0,
+		@DebugMode			[bit] = 0
+/* WITH ENCRYPTION */
+AS
+
+-- ============================================================================
+-- Copyright (c) 2004-2015 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+-- ============================================================================
+-- Author			 : Dan Andrei STEFAN
+-- Create date		 : 2004-2015
+-- Module			 : Database Maintenance Scripts
+-- ============================================================================
+-- Change Date: 2015.03.04 / Andrei STEFAN
+-- Description: heap tables with disabled unique indexes won't be rebuild
+-----------------------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------------------
+-- Input Parameters:
+--		@SQLServerName	- name of SQL Server instance to analyze
+--		@DBName			- database to be analyzed
+--		@TableSchema	- schema that current table belongs to
+--		@TableName		- specify table name to be analyzed.
+--		@flgActions		- 1 - ALTER TABLE REBUILD (2k8+). If lower version is detected or error catched, will run CREATE CLUSTERED INDEX / DROP INDEX
+--						- 2 - Rebuild table: copy records to a temp table, delete records from source, insert back records from source, rebuild non-clustered indexes
+--		@flgOptions		 8  - Disable non-clustered index before rebuild (save space) (default)
+--						16  - Disable all foreign key constraints that reffered current table before rebuilding indexes (default)
+--						64  - When enabling foreign key constraints, do no check values. Default behaviour is to enabled foreign key constraint with check option
+--					  2048  - send email when a error occurs (default)
+--					  4096  - rebuild/reorganize indexes/tables using ONLINE=ON, if applicable (default)
+--					  8192  - when rebuilding heaps, disable/enable table triggers (default)
+--					 16384  - for versions below 2008, do heap rebuild using temporary clustered index
+--		@DebugMode:		 1 - print dynamic SQL statements 
+--						 0 - no statements will be displayed (default)
+-----------------------------------------------------------------------------------------
+-- Return : 
+-- 1 : Succes  -1 : Fail 
+-----------------------------------------------------------------------------------------
+
+SET NOCOUNT ON
+
+DECLARE		@queryToRun					[nvarchar](max),
+			@objectName					[nvarchar](512),
+			@sqlScriptOnline			[nvarchar](512),
+			@CopyTableName				[sysname],
+			@crtSchemaName				[sysname], 
+			@crtTableName				[sysname], 
+			@crtRecordCount				[int],
+			@flgCopyMade				[bit],
+			@flgErrorsOccured			[bit], 
+			@nestExecutionLevel			[tinyint],
+			@guid						[nvarchar](40),
+			@affectedDependentObjects	[nvarchar](max),
+			@flgOptionsNested			[int]
+
+
+DECLARE		@flgRaiseErrorAndStop		[bit]
+		  , @errorCode					[int]
+		  
+
+-----------------------------------------------------------------------------------------
+DECLARE @tableGetRowCount TABLE	
+		(
+			[record_count]			[bigint]	NULL
+		)
+
+IF object_id('tempdb..#heapTableList') IS NOT NULL 
+	DROP TABLE #heapTableList
+
+CREATE TABLE #heapTableList		(
+									[schema_name]			[sysname]	NULL,
+									[table_name]			[sysname]	NULL,
+									[record_count]			[bigint]	NULL
+								)
+
+
+SET NOCOUNT ON
+
+-- { sql_statement | statement_block }
+BEGIN TRY
+		SET @errorCode	 = 1
+
+		---------------------------------------------------------------------------------------------
+		--get configuration values
+		---------------------------------------------------------------------------------------------
+		DECLARE @queryLockTimeOut [int]
+		SELECT	@queryLockTimeOut=[value] 
+		FROM	[dbo].[appConfigurations] 
+		WHERE	[name]='Default lock timeout (ms)'
+				AND [module] = 'common'
+		
+		---------------------------------------------------------------------------------------------
+		--get destination server running version/edition
+		DECLARE		@serverEdition					[sysname],
+					@serverVersionStr				[sysname],
+					@serverVersionNum				[numeric](9,6),
+					@nestedExecutionLevel			[tinyint]
+
+		SET @nestedExecutionLevel = @executionLevel + 1
+		EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @SQLServerName,
+												@serverEdition			= @serverEdition OUT,
+												@serverVersionStr		= @serverVersionStr OUT,
+												@serverVersionNum		= @serverVersionNum OUT,
+												@executionLevel			= @nestedExecutionLevel,
+												@debugMode				= @DebugMode
+
+		---------------------------------------------------------------------------------------------
+		--get current index/heap properties, filtering only the ones not empty
+		--heap tables with disabled unique indexes will be excluded: rebuild means also index rebuild, and unique indexes may enable unwanted constraints
+		SET @TableName = REPLACE(@TableName, '''', '''''')
+		SET @queryToRun = N''
+		SET @queryToRun = @queryToRun + N'	SELECT    sch.[name] AS [schema_name]
+													, so.[name]  AS [table_name]
+													, rc.[record_count]
+											FROM [' + @DBName + '].[sys].[objects] so WITH (READPAST)
+											INNER JOIN [' + @DBName + '].[sys].[schemas] sch WITH (READPAST) ON sch.[schema_id] = so.[schema_id] 
+											INNER JOIN [' + @DBName + '].[sys].[indexes] si WITH (READPAST) ON si.[object_id] = so.[object_id] 
+											INNER  JOIN 
+													(
+														SELECT ps.object_id,
+																SUM(CASE WHEN (ps.index_id < 2) THEN row_count ELSE 0 END) AS [record_count]
+														FROM [' + @DBName + '].[sys].[dm_db_partition_stats] ps WITH (READPAST)
+														GROUP BY ps.object_id		
+													)rc ON rc.[object_id] = so.[object_id] 
+											WHERE   so.[name] LIKE ''' + @TableName + '''
+												AND sch.[name] LIKE ''' + @TableSchema + '''
+												AND so.[is_ms_shipped] = 0
+												AND si.[index_id] = 0
+												AND rc.[record_count]<>0
+												AND NOT EXISTS(
+																SELECT *
+																FROM [' + @DBName + '].sys.indexes si_unq
+																WHERE si_unq.[object_id] = so.[object_id] 
+																		AND si_unq.[is_disabled]=1
+																		AND si_unq.[is_unique]=1
+															  )'
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		DELETE FROM #heapTableList
+		INSERT INTO #heapTableList ([schema_name], [table_name], [record_count])
+			EXEC (@queryToRun)
+
+
+		---------------------------------------------------------------------------------------------
+		DECLARE crsTableListToRebuild CURSOR LOCAL FAST_FORWARD FOR	SELECT [schema_name], [table_name], [record_count] 
+																	FROM #heapTableList
+																	ORDER BY [schema_name], [table_name]
+ 		OPEN crsTableListToRebuild
+		FETCH NEXT FROM crsTableListToRebuild INTO @crtSchemaName, @crtTableName, @crtRecordCount
+		WHILE @@FETCH_STATUS=0
+			begin
+				SET @objectName = '[' + @crtSchemaName + '].[' + @crtTableName + ']'
+				SET @queryToRun=N'Rebuilding heap ON ' + @objectName
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+			
+				SET @flgErrorsOccured=0
+				
+				IF @flgActions=1
+					begin
+						IF @serverVersionNum >= 10
+							begin
+								SET @queryToRun= 'Running ALTER TABLE REBUILD...'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+								SET @sqlScriptOnline=N''
+
+								-- check for online operation mode	
+								IF @flgOptions & 4096 = 4096
+									begin
+										SET @nestedExecutionLevel = @executionLevel + 3
+										EXEC [dbo].[usp_mpCheckIndexOnlineOperation]	@sqlServerName		= @SQLServerName,
+																						@dbName				= @DBName,
+																						@tableSchema		= @crtSchemaName,
+																						@tableName			= @crtTableName,
+																						@indexName			= NULL,
+																						@indexID			= 0,
+																						@partitionNumber	= 1,
+																						@sqlScriptOnline	= @sqlScriptOnline OUT,
+																						@flgOptions			= @flgOptions,
+																						@executionLevel		= @nestedExecutionLevel,
+																						@debugMode			= @DebugMode
+									end
+
+								IF (@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')
+									begin
+										SET @queryToRun=N'performing online table rebuild'
+										SET @nestedExecutionLevel = @executionLevel + 2
+										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
+
+										SET @queryToRun = N'IF OBJECT_ID(''' + @objectName + ''') IS NOT NULL ALTER TABLE ' + @objectName + N' REBUILD'
+										SET @queryToRun = @queryToRun + N' WITH (' + @sqlScriptOnline + N')'
+									end
+								ELSE
+									begin
+										SET @queryToRun = N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; ';
+										SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + @objectName + ''') IS NOT NULL ALTER TABLE ' + @objectName + N' REBUILD'
+									end
+
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
+
+								SET @nestedExecutionLevel = @executionLevel + 3
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																				@dbName			= @DBName,
+																				@objectName		= @objectName,
+																				@module			= 'dbo.usp_mpAlterTableRebuildHeap',
+																				@eventName		= 'database maintenance - rebuilding heap',
+																				@queryToRun  	= @queryToRun,
+																				@flgOptions		= @flgOptions,
+																				@executionLevel	= @nestedExecutionLevel,
+																				@debugMode		= @DebugMode
+								IF @errorCode<>0 SET @flgErrorsOccured=1								
+							end
+
+						IF (@flgOptions & 16384 = 16384) AND (@serverVersionNum < 10 OR @flgErrorsOccured=1)
+							begin
+								------------------------------------------------------------------------------------------------------------------------
+								--disable table non-clustered indexes
+								IF @flgOptions & 8 = 8
+									begin
+										SET @nestExecutionLevel = @executionLevel + 1
+										EXEC [dbo].[usp_mpAlterTableIndexes]	@SQLServerName				= @SQLServerName,
+																				@DBName						= @DBName,
+																				@TableSchema				= @crtSchemaName,
+																				@TableName					= @crtTableName,
+																				@IndexName					= '%',
+																				@IndexID					= NULL,
+																				@PartitionNumber			= 1,
+																				@flgAction					= 4,
+																				@flgOptions					= DEFAULT,
+																				@MaxDOP						= 1,
+																				@executionLevel				= @nestExecutionLevel,
+																				@affectedDependentObjects	= @affectedDependentObjects OUT,
+																				@debugMode					= @DebugMode
+									end
+
+								------------------------------------------------------------------------------------------------------------------------
+								--disable table constraints
+								IF @flgOptions & 16 = 16
+									begin
+										SET @nestExecutionLevel = @executionLevel + 1
+										SET @flgOptionsNested = 3 + (@flgOptions & 2048)
+										EXEC [dbo].[usp_mpAlterTableForeignKeys]	@SQLServerName		= @SQLServerName ,
+																					@DBName				= @DBName,
+																					@TableSchema		= @crtSchemaName, 
+																					@TableName			= @crtTableName,
+																					@ConstraintName		= '%',
+																					@flgAction			= 0,
+																					@flgOptions			= @flgOptionsNested,
+																					@executionLevel		= @nestExecutionLevel,
+																					@debugMode			= @DebugMode
+									end
+
+								SET @guid = CAST(NEWID() AS [nvarchar](38))
+
+								--------------------------------------------------------------------------------------------------------
+								SET @queryToRun= 'Add a new temporary column [bigint]'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+								SET @queryToRun = N'ALTER TABLE [' + @DBName + N'].' + @objectName + N' ADD [' + @guid + N'] [bigint] IDENTITY'
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
+
+								SET @nestedExecutionLevel = @executionLevel + 3
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																				@dbName			= @DBName,
+																				@objectName		= @objectName,
+																				@module			= 'dbo.usp_mpAlterTableRebuildHeap',
+																				@eventName		= 'database maintenance - rebuilding heap',
+																				@queryToRun  	= @queryToRun,
+																				@flgOptions		= @flgOptions,
+																				@executionLevel	= @nestedExecutionLevel,
+																				@debugMode		= @DebugMode
+								IF @errorCode<>0 SET @flgErrorsOccured=1								
+
+								--------------------------------------------------------------------------------------------------------
+								SET @queryToRun= 'Create a temporary clustered index'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+								SET @queryToRun = N' CREATE CLUSTERED INDEX [PK_' + @guid + N'] ON [' + @DBName + N'].' + @objectName + N' ([' + @guid + N'])'
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
+
+								SET @nestedExecutionLevel = @executionLevel + 3
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																				@dbName			= @DBName,
+																				@objectName		= @objectName,
+																				@module			= 'dbo.usp_mpAlterTableRebuildHeap',
+																				@eventName		= 'database maintenance - rebuilding heap',
+																				@queryToRun  	= @queryToRun,
+																				@flgOptions		= @flgOptions,
+																				@executionLevel	= @nestedExecutionLevel,
+																				@debugMode		= @DebugMode
+								IF @errorCode<>0 SET @flgErrorsOccured=1								
+
+								--------------------------------------------------------------------------------------------------------
+								SET @queryToRun= 'Drop the temporary clustered index'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+								SET @queryToRun = N'DROP INDEX [PK_' + @guid + N'] ON [' + @DBName + N'].' + @objectName 
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
+
+								SET @nestedExecutionLevel = @executionLevel + 3
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																				@dbName			= @DBName,
+																				@objectName		= @objectName,
+																				@module			= 'dbo.usp_mpAlterTableRebuildHeap',
+																				@eventName		= 'database maintenance - rebuilding heap',
+																				@queryToRun  	= @queryToRun,
+																				@flgOptions		= @flgOptions,
+																				@executionLevel	= @nestedExecutionLevel,
+																				@debugMode		= @DebugMode
+								IF @errorCode<>0 SET @flgErrorsOccured=1
+
+								--------------------------------------------------------------------------------------------------------
+								SET @queryToRun= 'Drop the temporary column'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+								SET @queryToRun = N'ALTER TABLE [' + @DBName + N'].' + @objectName + N' DROP COLUMN [' + @guid + N']'
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
+
+								SET @nestedExecutionLevel = @executionLevel + 3
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																				@dbName			= @DBName,
+																				@objectName		= @objectName,
+																				@module			= 'dbo.usp_mpAlterTableRebuildHeap',
+																				@eventName		= 'database maintenance - rebuilding heap',
+																				@queryToRun  	= @queryToRun,
+																				@flgOptions		= @flgOptions,
+																				@executionLevel	= @nestedExecutionLevel,
+																				@debugMode		= @DebugMode
+								IF @errorCode<>0 SET @flgErrorsOccured=1								
+
+								---------------------------------------------------------------------------------------------------------
+								--rebuild table non-clustered indexes
+								IF @flgOptions & 8 = 8
+									begin
+										SET @nestExecutionLevel = @executionLevel + 1
+
+										EXEC [dbo].[usp_mpAlterTableIndexes]	@SQLServerName				= @SQLServerName,
+																				@DBName						= @DBName,
+																				@TableSchema				= @crtSchemaName,
+																				@TableName					= @crtTableName,
+																				@IndexName					= '%',
+																				@IndexID					= NULL,
+																				@PartitionNumber			= 1,
+																				@flgAction					= 1,
+																				@flgOptions					= 6165,
+																				@MaxDOP						= 1,
+																				@executionLevel				= @nestExecutionLevel, 
+																				@affectedDependentObjects	= @affectedDependentObjects OUT,
+																				@debugMode					= @DebugMode
+									end
+
+								---------------------------------------------------------------------------------------------------------
+								--enable table constraints
+								IF @flgOptions & 16 = 16
+									begin
+										SET @nestExecutionLevel = @executionLevel + 1
+										SET @flgOptionsNested = 3 + (@flgOptions & 2048)
+	
+										--64  - When enabling foreign key constraints, do no check values. Default behaviour is to enabled foreign key constraint with check option
+										IF @flgOptions & 64 = 64
+											SET @flgOptionsNested = @flgOptionsNested + 4		-- Enable constraints with NOCHECK. Default is to enable constraints using CHECK option
+
+										EXEC [dbo].[usp_mpAlterTableForeignKeys]	@SQLServerName		= @SQLServerName ,
+																					@DBName				= @DBName,
+																					@TableSchema		= @crtSchemaName, 
+																					@TableName			= @crtTableName,
+																					@ConstraintName		= '%',
+																					@flgAction			= 1,
+																					@flgOptions			= @flgOptionsNested,
+																					@executionLevel		= @nestExecutionLevel, 
+																					@debugMode			= @DebugMode
+									end
+							end
+					end
+
+				-- 2 - Rebuild table: copy records to a temp table, delete records from source, insert back records from source, rebuild non-clustered indexes
+				IF @flgActions=2
+					begin
+						SET @CopyTableName=@crtTableName + 'RebuildCopy'
+
+						SET @queryToRun= 'Total Rows In Table To Be Exported To Temporary Storage: ' + CAST(@crtRecordCount AS [varchar](20))
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+						SET @flgCopyMade=0
+						--------------------------------------------------------------------------------------------------------
+						--dropping copy table, if exists
+						--------------------------------------------------------------------------------------------------------
+						SET @queryToRun = 'IF EXISTS (	SELECT * 
+														FROM [' + @DBName + '].[sys].[objects] so
+														INNER JOIN [' + @DBName + '].[sys].[schemas] sch ON so.[schema_id] = sch.[schema_id]
+														WHERE	sch.[name] = ''' + @crtSchemaName + ''' 
+																AND so.[name] = ''' + @CopyTableName + '''
+													) 
+											DROP TABLE [' + @DBName + '].[' + @crtSchemaName + '].[' + @CopyTableName + ']'
+						IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+						SET @nestedExecutionLevel = @executionLevel + 1
+						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																		@dbName			= @DBName,
+																		@objectName		= @objectName,
+																		@module			= 'dbo.usp_mpAlterTableRebuildHeap',
+																		@eventName		= 'database maintenance - rebuilding heap',
+																		@queryToRun  	= @queryToRun,
+																		@flgOptions		= @flgOptions,
+																		@executionLevel	= @nestedExecutionLevel,
+																		@debugMode		= @DebugMode
+				
+						--------------------------------------------------------------------------------------------------------
+						--create a copy of the source table
+						--------------------------------------------------------------------------------------------------------
+						SET @queryToRun = 'SELECT * INTO [' + @DBName + '].[' + @crtSchemaName + '].[' + @CopyTableName + '] FROM [' + @DBName + '].' + @objectName 
+						IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+						SET @nestedExecutionLevel = @executionLevel + 1
+						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																		@dbName			= @DBName,
+																		@objectName		= @objectName,
+																		@module			= 'dbo.usp_mpAlterTableRebuildHeap',
+																		@eventName		= 'database maintenance - rebuilding heap',
+																		@queryToRun  	= @queryToRun,
+																		@flgOptions		= @flgOptions,
+																		@executionLevel	= @nestedExecutionLevel,
+																		@debugMode		= @DebugMode
+
+						IF @errorCode = 0
+							SET @flgCopyMade=1
+				
+						IF @flgCopyMade=1
+							begin
+								--------------------------------------------------------------------------------------------------------
+								SET @queryToRun = N''
+								SET @queryToRun = @queryToRun + N'	SELECT    rc.[record_count]
+																	FROM [' + @DBName + '].[sys].[objects] so WITH (READPAST)
+																	INNER JOIN [' + @DBName + '].[sys].[schemas] sch WITH (READPAST) ON sch.[schema_id] = so.[schema_id] 
+																	INNER JOIN [' + @DBName + '].[sys].[indexes] si WITH (READPAST) ON si.[object_id] = so.[object_id] 
+																	INNER  JOIN 
+																			(
+																				SELECT ps.object_id,
+																						SUM(CASE WHEN (ps.index_id < 2) THEN row_count ELSE 0 END) AS [record_count]
+																				FROM [' + @DBName + '].[sys].[dm_db_partition_stats] ps WITH (READPAST)
+																				GROUP BY ps.object_id		
+																			)rc ON rc.[object_id] = so.[object_id] 
+																	WHERE   so.[name] LIKE ''' + @CopyTableName + '''
+																		AND sch.[name] LIKE ''' + @crtSchemaName + '''
+																		AND si.[index_id] = 0'
+								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+								DELETE FROM @tableGetRowCount
+								INSERT INTO @tableGetRowCount([record_count])
+									EXEC (@queryToRun)
+							
+								SELECT TOP 1 @crtRecordCount=[record_count] FROM @tableGetRowCount
+								SET @queryToRun= '--	Total Rows In Temporary Storage Table After Export: ' + CAST(@crtRecordCount AS varchar(20))
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+
+								--------------------------------------------------------------------------------------------------------
+								--rebuild source table
+								SET @nestExecutionLevel=@executionLevel + 2
+								EXEC @flgErrorsOccured = [dbo].[usp_mpTableDataSynchronizeInsert]	@sourceServerName		= @SQLServerName,
+																									@sourceDB				= @DBName,			
+																									@sourceTableSchema		= @crtSchemaName,
+																									@sourceTableName		= @CopyTableName,
+																									@destinationServerName	= @SQLServerName,
+																									@destinationDB			= @DBName,			
+																									@destinationTableSchema	= @crtSchemaName,		
+																									@destinationTableName	= @crtTableName,		
+																									@flgActions				= 3,
+																									@flgOptions				= @flgOptions,
+																									@allowDataLoss			= 0,
+																									@executionLevel			= @nestExecutionLevel,
+																									@DebugMode				= @DebugMode
+						
+								--------------------------------------------------------------------------------------------------------
+								--dropping copy table
+								--------------------------------------------------------------------------------------------------------
+								IF @flgErrorsOccured=0
+									begin
+										SET @queryToRun = 'IF EXISTS (	SELECT * 
+																		FROM [' + @DBName + '].[sys].[objects] so
+																		INNER JOIN [' + @DBName + '].[sys].[schemas] sch ON so.[schema_id] = sch.[schema_id]
+																		WHERE	sch.[name] = ''' + @crtSchemaName + ''' 
+																				AND so.[name] = ''' + @CopyTableName + '''
+																	) 
+															DROP TABLE [' + @DBName + '].[' + @crtSchemaName + '].[' + @CopyTableName + ']'
+										IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+										SET @nestedExecutionLevel = @executionLevel + 1
+										EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
+																						@dbName			= @DBName,
+																						@objectName		= @objectName,
+																						@module			= 'dbo.usp_mpAlterTableRebuildHeap',
+																						@eventName		= 'database maintenance - rebuilding heap',
+																						@queryToRun  	= @queryToRun,
+																						@flgOptions		= @flgOptions,
+																						@executionLevel	= @nestedExecutionLevel,
+																						@debugMode		= @DebugMode
+									end
+							end
+					end
+
+				FETCH NEXT FROM crsTableListToRebuild INTO @crtSchemaName, @crtTableName, @crtRecordCount
+			end
+		CLOSE crsTableListToRebuild
+		DEALLOCATE crsTableListToRebuild
+	
+		----------------------------------------------------------------------------------
+		IF object_id('#tmpRebuildTableList') IS NOT NULL DROP TABLE #tmpRebuildTableList
+		IF OBJECT_ID('#heapTableIndexList') IS NOT NULL DROP TABLE #heapTableIndexList
+END TRY
+
+BEGIN CATCH
+DECLARE 
+        @ErrorMessage    NVARCHAR(4000),
+        @ErrorNumber     INT,
+        @ErrorSeverity   INT,
+        @ErrorState      INT,
+        @ErrorLine       INT,
+        @ErrorProcedure  NVARCHAR(200);
+    -- Assign variables to error-handling functions that 
+    -- capture information for RAISERROR.
+	SET @errorCode = -1
+
+    SELECT 
+        @ErrorNumber = ERROR_NUMBER(),
+        @ErrorSeverity = ERROR_SEVERITY(),
+        @ErrorState = CASE WHEN ERROR_STATE() BETWEEN 1 AND 127 THEN ERROR_STATE() ELSE 1 END ,
+        @ErrorLine = ERROR_LINE(),
+        @ErrorProcedure = ISNULL(ERROR_PROCEDURE(), '-');
+	-- Building the message string that will contain original
+    -- error information.
+    SELECT @ErrorMessage = 
+        N'Error %d, Level %d, State %d, Procedure %s, Line %d, ' + 
+            'Message: '+ ERROR_MESSAGE();
+    -- Raise an error: msg_str parameter of RAISERROR will contain
+    -- the original error information.
+    RAISERROR 
+        (
+        @ErrorMessage, 
+        @ErrorSeverity, 
+        @ErrorState,               
+        @ErrorNumber,    -- parameter: original error number.
+        @ErrorSeverity,  -- parameter: original error severity.
+        @ErrorState,     -- parameter: original error state.
+        @ErrorProcedure, -- parameter: original error procedure name.
+        @ErrorLine       -- parameter: original error line number.
+        );
+
+        -- Test XACT_STATE:
+        -- If 1, the transaction is committable.
+        -- If -1, the transaction is uncommittable and should 
+        --     be rolled back.
+        -- XACT_STATE = 0 means that there is no transaction and
+        --     a COMMIT or ROLLBACK would generate an error.
+
+    -- Test if the transaction is uncommittable.
+    IF (XACT_STATE()) = -1
+    BEGIN
+        PRINT
+            N'The transaction is in an uncommittable state.' +
+            'Rolling back transaction.'
+        ROLLBACK TRANSACTION 
+   END;
+
+END CATCH
+
+RETURN @errorCode
+GO
+
+
+/*---------------------------------------------------------------------------------------------------------------------*/
+USE [dbaTDPMon]
+GO
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+
+RAISERROR('* Done *', 10, 1) WITH NOWAIT
+

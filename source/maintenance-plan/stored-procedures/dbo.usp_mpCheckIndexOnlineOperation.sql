@@ -78,7 +78,6 @@ IF NOT (CHARINDEX('Enterprise', @serverEdition) > 0 OR CHARINDEX('Developer', @s
 		RETURN
 	end
 
-
 -----------------------------------------------------------------------------------------
 /* check if index can be rebuild online (exceptions listed under https://msdn.microsoft.com/en-us/library/ms188388(v=sql.90).aspx) */
 -----------------------------------------------------------------------------------------
@@ -105,6 +104,7 @@ SET @queryToRun = @queryToRun + N'SELECT DISTINCT idx.[name]
 								AND (   idx.[is_disabled] = 1
 										OR idx.[type] IN (3, 4, 5, 6, 7)
 									)'
+
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
@@ -161,7 +161,6 @@ IF @serverVersionNum < 11
 -----------------------------------------------------------------------------------------
 IF @serverVersionNum < 11
 	begin
-
 		IF @indexID IS NULL
 			begin
 				SET @queryToRun = N''
@@ -212,9 +211,9 @@ IF @serverVersionNum < 11
 
 SET @sqlScriptOnline = N'ONLINE = ON'
 
-/* https://docs.microsoft.com/en-us/sql/t-sql/statements/alter-index-transact-sql */
-/* rebuild online with low priority, starting with version 2014 */
-IF @serverVersionNum > 12
+/* rebuild index online with low priority, starting with version 2014: https://docs.microsoft.com/en-us/sql/t-sql/statements/alter-index-transact-sql */
+/* rebuild table online with low priority, starting with version 2014: https://docs.microsoft.com/en-us/sql/t-sql/statements/alter-table-transact-sql */
+IF (@serverVersionNum > 12)
 	begin
 		---------------------------------------------------------------------------------------------
 		--get configuration values
@@ -232,5 +231,4 @@ IF @serverVersionNum > 12
 	end
 
 RETURN
-
 GO
