@@ -97,6 +97,7 @@ http://dbaTDPMon.codeplex.com',
 														@sqlServerNameFilter = @@SERVERNAME,
 														@jobDescriptor		=''dbo.usp_mpDatabaseConsistencyCheck;dbo.usp_mpDatabaseOptimize;dbo.usp_mpDatabaseShrink'',
 														@flgActions			= DEFAULT,
+														@recreateMode		= DEFAULT,
 														@debugMode			= DEFAULT'
 
 

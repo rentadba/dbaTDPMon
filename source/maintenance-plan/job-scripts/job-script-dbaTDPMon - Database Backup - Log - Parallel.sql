@@ -97,6 +97,7 @@ http://dbaTDPMon.codeplex.com',
 														@sqlServerNameFilter= @@SERVERNAME,
 														@jobDescriptor		=''dbo.usp_mpDatabaseBackup(Log)'',
 														@flgActions			= DEFAULT,
+														@recreateMode		= DEFAULT,
 														@debugMode			= DEFAULT'
 
 
