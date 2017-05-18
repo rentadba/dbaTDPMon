@@ -25,6 +25,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseOptimize]
 		@StatsChangePercent			[smallint]	=     1,
 		@MaxDOP						[smallint]	=	  1,
 		@MaxRunningTimeInMinutes	[smallint]	=     0,
+		@skipObjectsList			[nvarchar](1024) = NULL,
 		@executionLevel				[tinyint]	=     0,
 		@DebugMode					[bit]		=     0
 /* WITH ENCRYPTION */
@@ -80,6 +81,7 @@ AS
 --		@StatsChangePercent			- for more recent statistics, if percent of changes is greater of equal, perform update
 --		@MaxDOP						- when applicable, use this MAXDOP value (ex. index rebuild)
 --		@MaxRunningTimeInMinutes	- the number of minutes the optimization job will run. after time exceeds, it will exist. 0 or null means no limit
+--		@skipObjectsList			- comma separated list of the objects (tables, index name or stats name) to be excluded from maintenance.
 --		@DebugMode					- 1 - print dynamic SQL statements / 0 - no statements will be displayed
 -----------------------------------------------------------------------------------------
 
@@ -388,7 +390,10 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 							WHERE	ob.[name] LIKE ''' + @TableName + '''
 									AND sc.[name] LIKE ''' + @TableSchema + '''
 									AND si.[type] IN (' + @analyzeIndexType + N')
-									AND ob.[type] IN (''U'', ''V'')'
+									AND ob.[type] IN (''U'', ''V'')' + 
+									CASE WHEN @skipObjectsList IS NOT NULL  THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))
+																					AND (si.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) OR si.[name] IS NULL)'  
+																			ELSE N'' END
 
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
 		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -521,6 +526,7 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 															@TableName			= @CurrentTableName,
 															@flgActions			= 1,
 															@flgOptions			= @flgOptions,
+															@MaxDOP				= @MaxDOP,
 															@executionLevel		= @nestExecutionLevel,
 															@DebugMode			= @DebugMode
 
@@ -581,7 +587,10 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 										AND sc.[name] LIKE ''' + @TableSchema + '''
 										AND si.[type] IN (' + @analyzeIndexType + N')
 										AND si.[is_disabled]=0
-										AND ob.[type] IN (''U'', ''V'')'
+										AND ob.[type] IN (''U'', ''V'')' + 
+										CASE WHEN @skipObjectsList IS NOT NULL	THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
+																						AND si.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
+																				ELSE N'' END
 		ELSE
 			SET @queryToRun = @queryToRun + 
 								N'SELECT DISTINCT 
@@ -603,7 +612,10 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 										AND si.[status] & 16777216 = 0 
 										AND si.[indid] > 0
 										AND si.[reserved] <> 0
-										AND ob.[xtype] IN (''U'', ''V'')'
+										AND ob.[xtype] IN (''U'', ''V'')'+
+										CASE WHEN @skipObjectsList IS NOT NULL	THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
+																						AND si.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
+																				ELSE N'' END
 
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
 		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -664,7 +676,10 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 														  AND sp.[modification_counter] <> 0 
 														  AND (ABS(sp.[modification_counter]) * 100. / CAST(sp.[rows] AS [float])) >= ' + CAST(@StatsChangePercent AS [nvarchar](32)) + N'
 														 )
-													)'
+													)'+
+												CASE WHEN @skipObjectsList IS NOT NULL	THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
+																								AND ss.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
+																						ELSE N'' END
 				ELSE
 					/* SQL Server 2005 up to SQL Server 2008 R2 SP 2*/
 					SET @queryToRun = @queryToRun + 
@@ -697,7 +712,11 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 														  AND si.[rowmodctr] <> 0 
 														  AND (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) >= ' + CAST(@StatsChangePercent AS [nvarchar](32)) + N'
 														)
-												)'
+												)' +
+												CASE WHEN @skipObjectsList IS NOT NULL THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
+																								AND ss.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))
+																								AND si.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
+																					   ELSE N'' END
 			end
 		ELSE
 			/* SQL Server 2000 */
@@ -732,7 +751,10 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 													  AND si.[rowmodctr] <> 0 
 													  AND (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) >= ' + CAST(@StatsChangePercent AS [nvarchar](32)) + N'
 													)
-											)'
+											)' + 
+											CASE WHEN @skipObjectsList IS NOT NULL THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
+																							AND si.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
+																				   ELSE N'' END
 
 		IF @SQLServerName<>@@SERVERNAME
 			SET @queryToRun = N'SELECT x.* FROM OPENQUERY([' + @SQLServerName + N'], ''EXEC [' + @DBName + N']..sp_executesql N''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''''')x'
@@ -752,7 +774,7 @@ UPDATE #databaseObjectsWithStatisticsList
 IF @flgOptions & 32768 = 32768
 	SET @flgOptions = @flgOptions - 32768
 
-
+	
 --------------------------------------------------------------------------------------------------
 --1/2	- Analyzing tables fragmentation
 --		fragmentation information for the data and indexes of the specified table or view

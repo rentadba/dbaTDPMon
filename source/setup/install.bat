@@ -173,6 +173,9 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_formatSQLQueryForLinkedServer.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_getTableFromStringList.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_getMilisecondsBetweenDates.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
