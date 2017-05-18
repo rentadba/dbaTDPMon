@@ -520,3 +520,8 @@
 
 /* 17.05.2017 */
 	- perform online table/heap rebuild using WAIT_AT_LOW_PRIORITY (SQL Server 2014 onwards)
+
+/* 18.05.2017 */
+	- add new parameter to dbo.usp_mpDatabaseOptimize stored procedure: @skipObjectsList - comma separated list of the objects (tables, index name or stats name) to be excluded from maintenance.
+	- add @recreateMode option when generating parallel maintenance SQL Server agent jobs. Old/custom job definitions may be kept
+	- add MaxDOP option when rebuilding heap tables, default 1 (dbo.usp_mpAlterTableRebuildHeap)
