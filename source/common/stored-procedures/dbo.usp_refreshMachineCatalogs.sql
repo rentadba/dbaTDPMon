@@ -446,52 +446,6 @@ BEGIN TRY
 			LEFT JOIN [dbo].[catalogMachineNames] AS dest ON dest.[name] = src.[name] AND dest.[project_id] = @projectID			
 			WHERE dest.[name] IS NULL;
 
-/*
-	MERGE INTO [dbo].[catalogInstanceNames] AS dest
-	USING (	
-			SELECT  cmn.[id]	  AS [machine_id]
-				  , cin.[name]	  AS [name]
-				  , cin.[version]
-				  , cin.[edition]
-				  , @isClustered  AS [is_clustered]
-				  , @isActive	  AS [active]
-				  , cmnA.[id]	  AS [cluster_node_machine_id]
-			FROM #catalogInstanceNames cin
-			INNER JOIN #catalogMachineNames src ON 1=1
-			INNER JOIN [dbo].[catalogMachineNames] cmn ON		cmn.[name] = src.[name] 
-															AND cmn.[project_id]=@projectID
-			LEFT  JOIN [dbo].[catalogMachineNames] cmnA ON		cmnA.[name] = cin.[machine_name] 
-															AND cmnA.[project_id]=@projectID 
-															AND @isClustered=1
-		  ) AS src([machine_id], [name], [version], [edition], [is_clustered], [active], [cluster_node_machine_id])
-		ON dest.[machine_id] = src.[machine_id] AND dest.[name] = src.[name] AND dest.[project_id] = @projectID
-	WHEN NOT MATCHED BY TARGET THEN
-		INSERT ([machine_id], [project_id], [name], [version], [edition], [is_clustered], [active], [cluster_node_machine_id], [last_refresh_date_utc]) 
-		VALUES (src.[machine_id], @projectID, src.[name], src.[version], src.[edition], src.[is_clustered]
-				, CASE WHEN src.[is_clustered]=1
-						THEN CASE	WHEN src.[active]=1 AND src.[machine_id]=src.[cluster_node_machine_id] 
-									THEN 1 
-									ELSE 0
-							 END
-						ELSE src.[active]
-				 END
-				, src.[cluster_node_machine_id]
-				, GETUTCDATE())
-	WHEN MATCHED THEN
-		UPDATE SET    dest.[is_clustered] = src.[is_clustered]
-					, dest.[version] = src.[version]
-					, dest.[active] = CASE WHEN src.[is_clustered]=1
-											THEN CASE	WHEN src.[active]=1 AND src.[machine_id]=src.[cluster_node_machine_id] 
-														THEN 1 
-														ELSE 0
-												 END
-											ELSE src.[active]
-										END
-					, dest.[edition] = src.[edition]
-					, dest.[cluster_node_machine_id] = src.[cluster_node_machine_id]
-					, dest.[last_refresh_date_utc] = GETUTCDATE();
-*/
-
 	UPDATE dest
 		SET   dest.[is_clustered] = src.[is_clustered]
 			, dest.[version] = src.[version]
