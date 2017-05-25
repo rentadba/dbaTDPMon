@@ -1013,8 +1013,7 @@ DECLARE   @codeDescriptor		[varchar](260)
 
 DECLARE		@serverEdition					[sysname],
 			@serverVersionStr				[sysname],
-			@serverVersionNum				[numeric](9,6),
-			@nestedExecutionLevel			[tinyint]
+			@serverVersionNum				[numeric](9,6)
 
 DECLARE @jobExecutionQueue TABLE
 		(
@@ -1157,7 +1156,7 @@ WHILE @@FETCH_STATUS=0
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Database Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName	= ''' + @forSQLServerName + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 1, @flgOptions = 3, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName	= ''' + @forSQLServerName + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 1, @flgOptions = 3, @maxDOP	= DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
 										SELECT [name] AS [database_name]
@@ -1186,7 +1185,7 @@ WHILE @@FETCH_STATUS=0
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Allocation Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = ' + CAST(@featureflgActions AS [nvarchar]) + N', @flgOptions = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = ' + CAST(@featureflgActions AS [nvarchar]) + N', @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
 										SELECT [name] AS [database_name]
@@ -1209,7 +1208,7 @@ WHILE @@FETCH_STATUS=0
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Tables Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 2, @flgOptions = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 2, @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
 										SELECT [name] AS [database_name]
@@ -1232,7 +1231,7 @@ WHILE @@FETCH_STATUS=0
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Reference Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 16, @flgOptions = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 16, @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
 										SELECT [name] AS [database_name]
@@ -1255,7 +1254,7 @@ WHILE @@FETCH_STATUS=0
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Perform Correction to Space Usage' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 64, @flgOptions = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 64, @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
 										SELECT [name] AS [database_name]
@@ -1283,7 +1282,7 @@ WHILE @@FETCH_STATUS=0
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Rebuild Heap Tables' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseOptimize] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @TableSchema = ''%'', @TableName = ''%'', @flgActions = 16, @flgOptions = DEFAULT, @DefragIndexThreshold = DEFAULT, @RebuildIndexThreshold = DEFAULT, @MaxDOP = DEFAULT, @skipObjectsList = DEFAULT, @DebugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseOptimize] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @TableSchema = ''%'', @TableName = ''%'', @flgActions = 16, @flgOptions = DEFAULT, @DefragIndexThreshold = DEFAULT, @RebuildIndexThreshold = DEFAULT, @PageThreshold = DEFAULT, @RebuildIndexPageCountLimit = DEFAULT, @MaxDOP = DEFAULT, @MaxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @DebugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
 										SELECT [name] AS [database_name]
@@ -1312,7 +1311,7 @@ WHILE @@FETCH_STATUS=0
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Rebuild or Reorganize Indexes' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseOptimize] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @TableSchema = ''%'', @TableName = ''%'', @flgActions = ' + CAST(@featureflgActions AS [varchar]) + ', @flgOptions = DEFAULT, @DefragIndexThreshold = DEFAULT, @RebuildIndexThreshold = DEFAULT, @MaxDOP = DEFAULT, @skipObjectsList = DEFAULT, @DebugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseOptimize] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @TableSchema = ''%'', @TableName = ''%'', @flgActions = ' + CAST(@featureflgActions AS [varchar]) + ', @flgOptions = DEFAULT, @DefragIndexThreshold = DEFAULT, @RebuildIndexThreshold = DEFAULT, @PageThreshold = DEFAULT, @RebuildIndexPageCountLimit = DEFAULT, @StatsSamplePercent = DEFAULT, @StatsAgeDays = DEFAULT, @StatsChangePercent = DEFAULT, @MaxDOP = DEFAULT, @MaxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @DebugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
 										SELECT [name] AS [database_name]
@@ -1336,7 +1335,7 @@ WHILE @@FETCH_STATUS=0
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Update Statistics' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseOptimize] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @TableSchema = ''%'', @TableName = ''%'', @flgActions = 8, @flgOptions = DEFAULT, @DefragIndexThreshold = DEFAULT, @RebuildIndexThreshold = DEFAULT, @MaxDOP = DEFAULT, @skipObjectsList = DEFAULT, @DebugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseOptimize] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @TableSchema = ''%'', @TableName = ''%'', @flgActions = 8, @flgOptions = DEFAULT, @StatsSamplePercent = DEFAULT, @StatsAgeDays = DEFAULT, @StatsChangePercent = DEFAULT, @MaxDOP = DEFAULT, @MaxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @DebugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
 										SELECT [name] AS [database_name]
@@ -1363,7 +1362,7 @@ WHILE @@FETCH_STATUS=0
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Shrink Database (TRUNCATEONLY)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseShrink] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @flgActions = 2, @flgOptions = 1, @executionLevel = DEFAULT, @DebugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseShrink] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @flgActions = 2, @flgOptions = 1, @DebugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
 										SELECT [name] AS [database_name]
@@ -1386,7 +1385,7 @@ WHILE @@FETCH_STATUS=0
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Shrink Log File' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseShrink] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @flgActions = 1, @flgOptions = 0, @executionLevel = DEFAULT, @DebugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseShrink] @SQLServerName = ''' + @forSQLServerName + N''', @DBName = ''' + X.[database_name] + N''', @flgActions = 1, @flgOptions = 0, @DebugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
 										SELECT [name] AS [database_name]
@@ -1415,7 +1414,7 @@ WHILE @@FETCH_STATUS=0
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Backup User Databases (diff)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 2, @flgOptions = DEFAULT,	@retentionDays = DEFAULT, @executionLevel = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 2, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
 										SELECT [name] AS [database_name]
@@ -1437,7 +1436,7 @@ WHILE @@FETCH_STATUS=0
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Backup User Databases (full)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 1, @flgOptions = DEFAULT,	@retentionDays = DEFAULT, @executionLevel = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 1, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
 										SELECT [name] AS [database_name]
@@ -1459,7 +1458,7 @@ WHILE @@FETCH_STATUS=0
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Backup System Databases (full)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 1, @flgOptions = DEFAULT,	@retentionDays = DEFAULT, @executionLevel = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 1, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
 										SELECT [name] AS [database_name]
@@ -1485,7 +1484,7 @@ WHILE @@FETCH_STATUS=0
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Backup User Databases (log)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '[' + X.[database_name] + ']', 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 4, @flgOptions = DEFAULT,	@retentionDays = DEFAULT, @executionLevel = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 4, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
 										SELECT [name] AS [database_name]
@@ -1561,6 +1560,8 @@ WHILE @@FETCH_STATUS=0
 CLOSE crsActiveInstances
 DEALLOCATE crsActiveInstances
 GO
+
+
 
 
 /*---------------------------------------------------------------------------------------------------------------------*/
