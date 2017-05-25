@@ -67,6 +67,27 @@ WHERE	[name] = @sqlServerName
 -----------------------------------------------------------------------------------------------------
 --xml corrections
 SET @eventMessage = REPLACE(@eventMessage, CHAR(38), CHAR(38) + 'amp;')
+IF @objectName IS NOT NULL
+	begin
+		IF CHARINDEX('<', @objectName) <> 0 AND CHARINDEX('>', @objectName) <> 0
+			SET @eventMessage = REPLACE(@eventMessage, @objectName, REPLACE(REPLACE(@objectName, '<', '&lt;'), '>', '&gt;'))
+		ELSE
+			IF CHARINDEX('<', @objectName) <> 0 AND CHARINDEX('>', @objectName) <> 0
+				SET @eventMessage = REPLACE(@eventMessage, @objectName, REPLACE(@objectName, '<', '&lt;'))
+			IF CHARINDEX('>', @objectName) <> 0
+				SET @eventMessage = REPLACE(@eventMessage, @objectName, REPLACE(@objectName, '>', '&gt;'))
+	end
+
+IF @childObjectName IS NOT NULL
+	begin
+		IF CHARINDEX('<', @childObjectName) <> 0 AND CHARINDEX('>', @childObjectName) <> 0
+			SET @eventMessage = REPLACE(@eventMessage, @childObjectName, REPLACE(REPLACE(@childObjectName, '<', '&lt;'), '>', '&gt;'))
+		ELSE
+			IF CHARINDEX('<', @childObjectName) <> 0 AND CHARINDEX('>', @childObjectName) <> 0
+				SET @eventMessage = REPLACE(@eventMessage, @childObjectName, REPLACE(@childObjectName, '<', '&lt;'))
+			IF CHARINDEX('>', @childObjectName) <> 0
+				SET @eventMessage = REPLACE(@eventMessage, @childObjectName, REPLACE(@childObjectName, '>', '&gt;'))
+	end
 
 -----------------------------------------------------------------------------------------------------
 INSERT	INTO [dbo].[logEventMessages]([project_id], [instance_id], [event_date_utc], [module], [parameters], [event_name], [database_name], [object_name], [child_object_name], [message], [send_email_to], [event_type], [is_email_sent], [flood_control])
