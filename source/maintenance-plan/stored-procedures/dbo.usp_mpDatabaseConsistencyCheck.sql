@@ -16,6 +16,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseConsistencyCheck]
 		@tableName				[sysname]   =  '%',
 		@flgActions				[smallint]	=   12,
 		@flgOptions				[int]		=    0,
+		@maxDOP					[smallint]	=	 1,
 		@executionLevel			[tinyint]	=    0,
 		@debugMode				[bit]		=    0
 /* WITH ENCRYPTION */
@@ -363,6 +364,9 @@ IF @flgActions & 1 = 1
 		IF @compatibilityLevel >= 100 AND @flgOptions & 1 = 0
 			SET @queryToRun = @queryToRun + ', EXTENDED_LOGICAL_CHECKS'
 
+		IF @serverVersionNum > = 12.05000 /* MAXDOP: applies to: SQL Server 2014 SP2 onwards */
+			SET @queryToRun = @queryToRun + ', MAXDOP=' + CAST(@maxDOP AS [nvarchar])
+
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 		
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
@@ -405,6 +409,9 @@ IF @flgActions & 2 = 2
 				
 				IF @compatibilityLevel >= 100 AND @flgOptions & 2 = 0
 					SET @queryToRun = @queryToRun + ', EXTENDED_LOGICAL_CHECKS'
+
+				IF @serverVersionNum > = 12.05000 /* MAXDOP: applies to: SQL Server 2014 SP2 onwards */
+					SET @queryToRun = @queryToRun + ', MAXDOP=' + CAST(@maxDOP AS [nvarchar])
 
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 				

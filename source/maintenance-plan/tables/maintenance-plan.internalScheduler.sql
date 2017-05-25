@@ -70,9 +70,9 @@ GO
 INSERT	INTO[maintenance-plan].[internalScheduler] ([project_id], [task_id], [scheduled_weekday], [active])
 		SELECT NULL,    1, 'Saturday', 1 UNION ALL
 		SELECT NULL,    2, 'Daily', 1 UNION ALL
-		SELECT NULL,    4, 'Sunday', 1 UNION ALL
+		SELECT NULL,    4, 'N/A', 0 UNION ALL
 		SELECT NULL,    8, 'Sunday', 1 UNION ALL
-		SELECT NULL,   16, 'N/A', 1 UNION ALL
+		SELECT NULL,   16, 'N/A', 0 UNION ALL
 		SELECT NULL,   32, 'Daily', 1 UNION ALL
 		SELECT NULL,   64, 'Daily', 1 UNION ALL
 		SELECT NULL,  128, 'Daily', 1 UNION ALL

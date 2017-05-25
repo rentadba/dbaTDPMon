@@ -35,7 +35,7 @@ begin
 		WHERE CHARINDEX(@valueDelimiter, @listWithValues, EndPos + 1) > 0
 	)
 	INSERT @result ([id], [value])
-	SELECT [id], SUBSTRING(@listWithValues, StartPos, EndPos - StartPos)
+	SELECT [id], LTRIM(RTRIM(SUBSTRING(@listWithValues, StartPos, EndPos - StartPos)))
 	FROM lst
 	--OPTION (MAXRECURSION 0)
 
