@@ -95,6 +95,21 @@ CREATE TABLE #statsDatabaseDetails
 	[is_growth_limited]			[bit]			NULL
 )
 
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF object_id('#statsDatabaseAlwaysOnDetails') IS NOT NULL DROP TABLE #statsDatabaseAlwaysOnDetails
+CREATE TABLE #statsDatabaseAlwaysOnDetails
+(
+	[cluster_name]					[sysname]		NOT NULL,
+	[ag_name]						[sysname]		NOT NULL,
+	[host_name]						[sysname]		NOT NULL,
+	[instance_name]					[sysname]		NOT NULL,
+	[database_name]					[sysname]		NOT NULL,
+	[role_desc]						[nvarchar](60)	NULL,
+	[synchronization_health_desc]	[nvarchar](60)	NULL,
+	[synchronization_state_desc]	[nvarchar](60)	NULL,
+	[data_loss_sec]					[int]			NULL
+)
+
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default project code
 IF @projectCode IS NULL
@@ -147,6 +162,14 @@ WHERE cin.[project_id] = @projectID
 		AND cin.[name] LIKE @sqlServerNameFilter
 		AND lsam.[descriptor]='dbo.usp_hcCollectDatabaseDetails'
 
+
+DELETE sdaod
+FROM [health-check].[statsDatabaseAlwaysOnDetails] sdaod
+INNER JOIN [dbo].[catalogDatabaseNames]			cdb ON cdb.[id] = sdaod.[catalog_database_id] AND cdb.[instance_id] = sdaod.[instance_id]
+INNER JOIN [dbo].[catalogInstanceNames]			cin ON cin.[id] = cdb.[instance_id] AND cin.[project_id] = cdb.[project_id]
+WHERE cin.[project_id] = @projectID
+		AND cin.[name] LIKE @sqlServerNameFilter
+		AND cdb.[name] LIKE @databaseNameFilter
 
 -------------------------------------------------------------------------------------------------------------------------
 RAISERROR('--Step 2: Get Database Details Information....', 10, 1) WITH NOWAIT
@@ -404,6 +427,57 @@ WHILE @@FETCH_STATUS=0
 							, @strMessage
 		END CATCH
 
+		/* check for AlwaysOn Availability Groups configuration */
+		IF @SQLMajorVersion >= 12
+			begin
+				SET @queryToRun = N'WITH agDatabaseDetails AS
+									(
+										SELECT    hc.[cluster_name]
+												, ag.[name] AS [ag_name]
+												, hinm.[node_name] as [host_name]
+												, arcn.[replica_server_name] AS [instance_name]
+												, adc.[database_name]
+												, ars.[role_desc]
+												, ars.[synchronization_health_desc]
+												, hdrs.[synchronization_state_desc]
+												, hdrs.[last_commit_time]
+										FROM sys.availability_replicas ar
+										INNER JOIN sys.dm_hadr_availability_replica_states ars ON ars.[replica_id]=ar.[replica_id] AND ars.[group_id]=ar.[group_id]
+										INNER JOIN sys.availability_groups ag ON ag.[group_id]=ar.[group_id]
+										INNER JOIN sys.dm_hadr_availability_replica_cluster_nodes arcn ON arcn.[group_name]=ag.[name] AND arcn.[replica_server_name]=ar.[replica_server_name]
+										INNER JOIN sys.dm_hadr_database_replica_states hdrs ON ar.[replica_id]=hdrs.[replica_id]
+										INNER JOIN sys.availability_databases_cluster adc ON adc.[group_id]=hdrs.[group_id] AND adc.[group_database_id]=hdrs.[group_database_id]
+										INNER JOIN sys.dm_hadr_instance_node_map hinm ON hinm.[ag_resource_id] = ag.[resource_id] AND hinm.[instance_name] = arcn.[replica_server_name]
+										INNER JOIN sys.dm_hadr_cluster_members hcm ON hcm.[member_name] = hinm.[node_name]
+										INNER JOIN sys.dm_hadr_cluster hc ON 1=1
+									)
+									SELECT    a.[cluster_name], a.[ag_name], a.[host_name], a.[instance_name], a.[database_name]
+											, a.[role_desc], a.[synchronization_health_desc], a.[synchronization_state_desc]
+											, DATEDIFF(ss, a.[last_commit_time], b.[last_commit_time]) AS [data_loss_sec]
+									FROM agDatabaseDetails a
+									INNER JOIN agDatabaseDetails b ON	a.[cluster_name]=b.[cluster_name] AND a.[ag_name]=b.[ag_name] 
+																		AND a.[database_name]=b.[database_name] AND b.[role_desc]=''PRIMARY'''
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode = 1 PRINT @queryToRun
+		
+				BEGIN TRY
+					INSERT	INTO #statsDatabaseAlwaysOnDetails([cluster_name], [ag_name], [host_name], [instance_name], [database_name], [role_desc], [synchronization_health_desc], [synchronization_state_desc], [data_loss_sec])
+							EXEC (@queryToRun)
+				END TRY
+				BEGIN CATCH
+					SET @strMessage = ERROR_MESSAGE()
+					PRINT @strMessage
+
+					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+							SELECT  @instanceID
+									, @projectID
+									, GETUTCDATE()
+									, 'dbo.usp_hcCollectDatabaseDetails'
+									, @strMessage
+				END CATCH
+			end
+
+
 		/* save results to stats table */
 		INSERT	INTO [health-check].[statsDatabaseDetails]([catalog_database_id], [instance_id], 
 				 											 [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], 
@@ -456,7 +530,27 @@ WHILE @@FETCH_STATUS=0
 				INNER JOIN [dbo].[catalogDatabaseNames] cdn ON	cdn.[database_id] = qt.[database_id] 
 															AND cdn.[instance_id] = @instanceID 
 															AND cdn.[project_id] = @projectID
-	
+
+		INSERT	INTO [health-check].[statsDatabaseAlwaysOnDetails]([catalog_database_id], [instance_id], [cluster_name], [ag_name]
+																	, [role_desc], [synchronization_health_desc], [synchronization_state_desc], [data_loss_sec], [event_date_utc])
+				SELECT    cdn.[id] AS [catalog_database_id]
+						, cin.[id] AS [instance_id]
+						, X.[cluster_name]
+						, X.[ag_name]
+						, X.[role_desc]
+						, X.[synchronization_health_desc]
+						, X.[synchronization_state_desc]
+						, X.[data_loss_sec]
+						, GETUTCDATE()
+				FROM #statsDatabaseAlwaysOnDetails X
+				INNER JOIN dbo.catalogMachineNames cmn ON cmn.[name] = X.[host_name]
+				INNER JOIN dbo.catalogInstanceNames cin ON cin.[name] = X.[instance_name] AND cin.[project_id] = cmn.[project_id]  AND cin.[machine_id] = cmn.[id]
+				INNER JOIN dbo.catalogDatabaseNames cdn ON cdn.[name] = X.[database_name] AND cdn.[project_id] = cmn.[project_id]  AND cdn.[instance_id] = cin.[id]
+				LEFT JOIN [health-check].[statsDatabaseAlwaysOnDetails] sdaod ON sdaod.[catalog_database_id] = cdn.[id] AND sdaod.[instance_id] = cin.[id] 
+																				AND sdaod.[cluster_name] = X.[cluster_name] AND sdaod.[ag_name] = X.[ag_name]
+				WHERE cin.[project_id] = @projectID
+						AND sdaod.[id] IS NULL
+		
 		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
 	end
 CLOSE crsActiveInstances

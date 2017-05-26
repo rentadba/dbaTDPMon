@@ -532,3 +532,7 @@
 /* 25.05.2017 */
 	- add MaxDOP option when performing dbcc checkdb/table, default 1 (dbo.usp_mpDatabaseConsistencyCheck) (SQL Server 2014 SP2 onwards)
 	- fix event message XML formatting bug, when object name constain reserved chars (dbo.vw_logEventMessages)
+
+/* 26.05.2017 */
+	- collect AlwaysOn Availability Groups details when gathering health-check databases info (includes data loss in seconds)
+	- fix health-check false reporting of outdated backups in AlwaysOn Availability Group configuration
