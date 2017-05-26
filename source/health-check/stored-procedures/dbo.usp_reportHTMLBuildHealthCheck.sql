@@ -2806,37 +2806,60 @@ BEGIN TRY
 											<TH WIDTH="80px" class="details-bold" nowrap>Backup Age (Days)</TH>'
 			SET @idx=1		
 
-			DECLARE crsDatabaseBACKUPAgeIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																								, cin.[is_clustered], cin.[cluster_node_machine_name]
-																								, cdn.[database_name]
-																								, shcdd.[size_mb]
-																								, shcdd.[last_backup_time]
-																								, DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) AS [backup_age_days]
-																						FROM [dbo].[vw_catalogInstanceNames]  cin
-																						INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																						INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
-																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																	AND rsr.[rule_id] = 8192
-																																	AND rsr.[active] = 1
-																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																						WHERE cin.[instance_active]=1
-																								AND cdn.[active]=1
-																								AND cin.[project_id] = @projectID	
-																								AND (
-																										(    cdn.[database_name] NOT IN ('master', 'model', 'msdb', 'distribution') 
-																											AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @configUserDatabaseBACKUPAgeDays
-																										)
-																										OR (    cdn.[database_name] IN ('master', 'model', 'msdb', 'distribution') 
-																											AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @configSystemDatabaseBACKUPAgeDays
-																										)
-																										OR (
-																												cdn.[database_name] NOT IN ('tempdb')
-																											AND shcdd.[last_backup_time] IS NULL
-																										)
-																									)
-																								AND CHARINDEX(cdn.[state_desc], @configAdmittedState)<>0
-																								AND rsr.[id] IS NULL
+			DECLARE crsDatabaseBACKUPAgeIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	WITH databaseBackupAgeDetails AS
+																						(
+																							SELECT    cin.[machine_name], cin.[instance_name]
+																									, cin.[is_clustered], cin.[cluster_node_machine_name]
+																									, cdn.[database_name]
+																									, shcdd.[size_mb]
+																									, shcdd.[last_backup_time]
+																									, DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) AS [backup_age_days]
+																									, CASE WHEN (    cdn.[database_name] NOT IN ('master', 'model', 'msdb', 'distribution') 
+																												AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @configUserDatabaseBACKUPAgeDays
+																												)
+																												OR (    cdn.[database_name] IN ('master', 'model', 'msdb', 'distribution') 
+																													AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @configSystemDatabaseBACKUPAgeDays
+																												)
+																												OR (
+																														cdn.[database_name] NOT IN ('tempdb')
+																													AND shcdd.[last_backup_time] IS NULL
+																												) THEN 1 ELSE 0 
+																										END AS [outdated_backup]
+																									, cdn.[catalog_database_id] 
+																									, cdn.[instance_id] 
+																									, sdaod.[cluster_name]
+																									, sdaod.[ag_name]
+																							FROM [dbo].[vw_catalogInstanceNames]  cin
+																							INNER JOIN [dbo].[vw_catalogDatabaseNames]					cdn   ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																							INNER JOIN [health-check].[vw_statsDatabaseDetails]			shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id] 
+																							LEFT JOIN [health-check].[vw_statsDatabaseAlwaysOnDetails]	sdaod ON sdaod.[catalog_database_id] = cdn.[catalog_database_id] AND sdaod.[instance_id] = cdn.[instance_id] 
+																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																		AND rsr.[rule_id] = 8192
+																																		AND rsr.[active] = 1
+																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																							WHERE cin.[instance_active]=1
+																									AND cdn.[active]=1
+																									AND cin.[project_id] = @projectID
+																									AND CHARINDEX(cdn.[state_desc], @configAdmittedState) <> 0
+																									AND rsr.[id] IS NULL
+																						)
+																						SELECT   dbad.[machine_name], dbad.[instance_name], dbad.[is_clustered], dbad.[cluster_node_machine_name]
+																							   , dbad.[database_name], dbad.[size_mb], dbad.[last_backup_time], dbad.[backup_age_days]
+																						FROM databaseBackupAgeDetails dbad
+																						WHERE [outdated_backup]=1
+																							 AND NOT EXISTS (	
+																												SELECT *
+																												FROM databaseBackupAgeDetails dbad2
+																												INNER JOIN [health-check].[vw_statsDatabaseAlwaysOnDetails] sdaod ON sdaod.[catalog_database_id] = dbad2.[catalog_database_id] AND sdaod.[instance_id] = dbad2.[instance_id] 
+																												WHERE sdaod.[synchronization_health_desc] = 'HEALTHY'
+																													  AND dbad2.[outdated_backup] = 0
+																													  AND dbad2.[cluster_name] = dbad.[cluster_name]
+																													  AND dbad2.[ag_name] = dbad.[ag_name]
+																													  AND dbad2.[database_name] = dbad.[database_name]
+																											)
+
 																						ORDER BY [instance_name], [machine_name], [backup_age_days] DESC, [database_name]
+
 			OPEN crsDatabaseBACKUPAgeIssuesDetected
 			FETCH NEXT FROM crsDatabaseBACKUPAgeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @lastBackupDate, @lastDatabaseEventAgeDays
 			WHILE @@FETCH_STATUS=0
