@@ -290,7 +290,13 @@ if errorlevel 1 goto install_err
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.internalScheduler.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.objectSkipList.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\views\maintenance-plan.vw_internalScheduler.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\views\maintenance-plan.vw_objectsSkipList.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 

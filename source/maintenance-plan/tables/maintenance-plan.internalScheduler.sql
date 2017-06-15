@@ -21,7 +21,7 @@ CREATE TABLE [maintenance-plan].[internalScheduler]
 (
 	[id]					[bigint] IDENTITY (1, 1)NOT NULL,
 	[project_id]			[smallint]		NULL,
-	[task_id]				[bigint]		NOT NULL,
+	[task_id]				[smallint]		NOT NULL,
 	[scheduled_weekday]		[varchar](16)	NOT NULL,
 	[active]				[bit]			NOT NULL CONSTRAINT [DF_internalScheduler_Active] DEFAULT (1),
 	CONSTRAINT [PK_internalScheduler] PRIMARY KEY  CLUSTERED 
