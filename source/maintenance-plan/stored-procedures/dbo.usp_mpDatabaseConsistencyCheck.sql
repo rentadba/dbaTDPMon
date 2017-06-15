@@ -17,6 +17,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseConsistencyCheck]
 		@flgActions				[smallint]	=   12,
 		@flgOptions				[int]		=    0,
 		@maxDOP					[smallint]	=	 1,
+		@skipObjectsList		[nvarchar](1024) = NULL,
 		@executionLevel			[tinyint]	=    0,
 		@debugMode				[bit]		=    0
 /* WITH ENCRYPTION */
@@ -57,7 +58,7 @@ AS
 --							  by default DBCC CHECKDB is doing all consistency checks and for a VLDB it may take a very long time
 --					    2  - use NOINDEX when running DBCC CHECKTABLE. Index consistency errors are not critical
 --					   32  - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
-
+--		@skipObjectsList	- comma separated list of the objects (tables) to be excluded from maintenance.
 --		@debugMode			- 1 - print dynamic SQL statements / 0 - no statements will be displayed
 -----------------------------------------------------------------------------------------
 /*
@@ -284,12 +285,24 @@ INNER JOIN
 		WHERE si.[reserved]<>0
 	)ps ON ob.[object_id] = ps.[object_id]'
 
+		SET @queryToRun = @queryToRun + CASE WHEN @skipObjectsList IS NOT NULL  
+											 THEN N'	WHERE ob.[table_name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
+											 ELSE N'' 
+										END
+
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		DELETE FROM #databaseTableList
 		INSERT	INTO #databaseTableList([table_schema], [table_name], [type])
 				EXEC (@queryToRun)
+
+		--delete entries which should be excluded from current maintenance actions, as they are part of [maintenance-plan].[vw_objectSkipList]
+		DELETE dtl
+		FROM #databaseTableList dtl
+		INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
+																AND dtl.[table_name] = osl.[object_name]
+		WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]
 	end
 
 --------------------------------------------------------------------------------------------------
@@ -591,6 +604,11 @@ IF @flgActions & 32 = 32
 																		)
 														AND obj.[name] LIKE ''' + @tableName + '''
 														AND sch.[name] LIKE ''' + @tableSchema + ''''			
+
+				SET @queryToRun = @queryToRun + CASE WHEN @skipObjectsList IS NOT NULL  
+													 THEN N'	AND obj.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
+													 ELSE N'' 
+												END
 				
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -598,6 +616,13 @@ IF @flgActions & 32 = 32
 				DELETE FROM #databaseTableListIdent
 				INSERT	INTO #databaseTableListIdent([table_schema], [table_name])
 						EXEC (@queryToRun)
+
+				--delete entries which should be excluded from current maintenance actions, as they are part of [maintenance-plan].[vw_objectSkipList]
+				DELETE dtl
+				FROM #databaseTableListIdent dtl
+				INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
+																		AND dtl.[table_name] = osl.[object_name]
+				WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]
 
 				DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [table_schema], [table_name] 
 																	FROM #databaseTableListIdent	
