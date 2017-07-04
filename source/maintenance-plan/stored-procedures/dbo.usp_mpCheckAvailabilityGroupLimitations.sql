@@ -38,7 +38,8 @@ SET @nestedExecutionLevel = @executionLevel + 1
 DECLARE @clusterName				 [sysname],		
 		@agSynchronizationState		 [sysname],
 		@agPreferredBackupReplica	 [bit],
-		@agAutomatedBackupPreference [tinyint]
+		@agAutomatedBackupPreference [tinyint],
+		@agReadableSecondary		 [sysname]
 
 SET @agName = NULL
 
@@ -60,6 +61,7 @@ SET @queryToRun = N'
 			SELECT    ag.[name]
 					, ars.[role_desc]
 					, ag.[automated_backup_preference]
+					, ar.[secondary_role_allow_connections_desc]
 			FROM sys.availability_replicas ar
 			INNER JOIN sys.dm_hadr_availability_replica_states ars ON ars.[replica_id]=ar.[replica_id] AND ars.[group_id]=ar.[group_id]
 			INNER JOIN sys.availability_groups ag ON ag.[group_id]=ar.[group_id]
@@ -73,15 +75,16 @@ SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @que
 SET @queryToRun = N'SELECT    @agName = [name]
 							, @agInstanceRoleDesc = [role_desc]
 							, @agAutomatedBackupPreference = [automated_backup_preference]
+							, @agReadableSecondary = [secondary_role_allow_connections_desc]
 					FROM (' + @queryToRun + N')inq'
-SET @queryParameters = N'@agName [sysname] OUTPUT, @agInstanceRoleDesc [sysname] OUTPUT, @agAutomatedBackupPreference [tinyint] OUTPUT'
+SET @queryParameters = N'@agName [sysname] OUTPUT, @agInstanceRoleDesc [sysname] OUTPUT, @agAutomatedBackupPreference [tinyint] OUTPUT, @agReadableSecondary [sysname] OUTPUT'
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 EXEC sp_executesql @queryToRun, @queryParameters, @agName = @agName OUTPUT
 												, @agInstanceRoleDesc = @agInstanceRoleDesc OUTPUT
 												, @agAutomatedBackupPreference = @agAutomatedBackupPreference OUTPUT
+												, @agReadableSecondary = @agReadableSecondary OUTPUT
 	
-
 IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 	begin
 		/* availability group synchronization status */
@@ -403,6 +406,31 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 				IF @actionName = 'database maintenance' AND UPPER(@agInstanceRoleDesc) = 'SECONDARY'
 					begin								
 						SET @queryToRun=N'Availability Group: Operation is not supported on a secondary replica.'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+						SET @eventData='<skipaction><detail>' + 
+											'<name>' + @actionName + '</name>' + 
+											'<type>' + @actionType + '</type>' + 
+											'<affected_object>' + @dbName + '</affected_object>' + 
+											'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+											'<reason>' + @queryToRun + '</reason>' + 
+										'</detail></skipaction>'
+
+						EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+															@dbName			= @dbName,
+															@module			= 'dbo.usp_mpCheckAvailabilityGroupLimitations',
+															@eventName		= @actionName,
+															@eventMessage	= @eventData,
+															@eventType		= 0 /* info */
+
+						RETURN 1
+					end
+
+				/*-------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+				/* database consistency check - allowed actions on a secondary replica */
+				IF @actionName = 'database consistency check' AND UPPER(@agInstanceRoleDesc) = 'SECONDARY' AND @agReadableSecondary='NO' AND (@flgActions & 2 = 2 OR @flgActions & 16 = 16)
+					begin								
+						SET @queryToRun=N'Availability Group: Operation is not supported on a non-readable secondary replica.'
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 						SET @eventData='<skipaction><detail>' + 

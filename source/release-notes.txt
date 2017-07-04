@@ -545,3 +545,9 @@
 
 /* 15.06.2017 */
 	- add [maintenance-plan].[objectSkipList] table, to be used the same as @skipObjectsList or @skipDatabasesList - objects to be excluded from the maintenance / per task (reported by Razvan Puscasu)
+
+/*----------------------------------------------------------------------*/
+/* July 2017 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 04.07.2017 */
+	- allow database consistency checks for non-readable secondary replicas in an AlwaysOn environment (reported by Mihail Grebencio)
