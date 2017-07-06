@@ -236,7 +236,6 @@ WHILE @@FETCH_STATUS=0
 					begin
 						BEGIN TRY
 								SET @queryToRun = N''
-								--SET @queryToRun = @queryToRun + N'DECLARE @cmdQuery [varchar](102); SET @cmdQuery=''wmic logicaldisk get Caption, FreeSpace, Size''; EXEC xp_cmdshell @cmdQuery;'
 								SET @queryToRun = @queryToRun + N'DECLARE @cmdQuery [varchar](102); SET @cmdQuery=''wmic volume get Name, Capacity, FreeSpace, BlockSize, DriveType''; EXEC xp_cmdshell @cmdQuery;'
 			
 								IF @sqlServerName<>@@SERVERNAME

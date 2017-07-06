@@ -91,10 +91,10 @@ http://dbaTDPMon.codeplex.com',
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'/* only for SQL versions +2K5 */'	 
 	IF @SQLMajorVersion > 8
-		SET @queryToRun=N'EXEC [dbo].[usp_mpDatabaseKillConnections]	@SQLServerName		= @@SERVERNAME,
-						@DBName		= DEFAULT,
+		SET @queryToRun=N'EXEC [dbo].[usp_mpDatabaseKillConnections]	@sqlServerName		= @@SERVERNAME,
+						@dbName		= DEFAULT,
 						@flgOptions		= DEFAULT,
-						@DebugMode		= DEFAULT'
+						@debugMode		= DEFAULT'
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Daily: Kill Orphan Connections', 
@@ -437,15 +437,15 @@ IF DATENAME(weekday, GETDATE()) = ''Monday''
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseOptimize]			@SQLServerName			= @@SERVERNAME,
-															@DBName					= @databaseName,
-															@TableSchema			= ''%'',
-															@TableName				= ''%'',
+				EXEC [dbo].[usp_mpDatabaseOptimize]			@sqlServerName			= @@SERVERNAME,
+															@dbName					= @databaseName,
+															@tableSchema			= ''%'',
+															@tableName				= ''%'',
 															@flgActions				= 16,
 															@flgOptions				= DEFAULT,
-															@DefragIndexThreshold	= DEFAULT,
-															@RebuildIndexThreshold	= DEFAULT,
-															@DebugMode				= DEFAULT
+															@defragIndexThreshold	= DEFAULT,
+															@rebuildIndexThreshold	= DEFAULT,
+															@debugMode				= DEFAULT
 				
 				FETCH NEXT FROM crsDatabases INTO @databaseName
 			end
@@ -495,15 +495,15 @@ IF DATENAME(weekday, GETDATE()) = ''Monday''
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseOptimize]			@SQLServerName			= @@SERVERNAME,
-															@DBName					= @databaseName,
-															@TableSchema			= ''%'',
-															@TableName				= ''%'',
+				EXEC [dbo].[usp_mpDatabaseOptimize]			@sqlServerName			= @@SERVERNAME,
+															@dbName					= @databaseName,
+															@tableSchema			= ''%'',
+															@tableName				= ''%'',
 															@flgActions				= 3,
 															@flgOptions				= DEFAULT,
-															@DefragIndexThreshold	= DEFAULT,
-															@RebuildIndexThreshold	= DEFAULT,
-															@DebugMode				= DEFAULT
+															@defragIndexThreshold	= DEFAULT,
+															@rebuildIndexThreshold	= DEFAULT,
+															@debugMode				= DEFAULT
 				
 				FETCH NEXT FROM crsDatabases INTO @databaseName
 			end
@@ -554,16 +554,16 @@ IF DATENAME(weekday, GETDATE()) = ''Monday''
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseOptimize]			@SQLServerName			= @@SERVERNAME,
-															@DBName					= @databaseName,
-															@TableSchema			= ''%'',
-															@TableName				= ''%'',
+				EXEC [dbo].[usp_mpDatabaseOptimize]			@sqlServerName			= @@SERVERNAME,
+															@dbName					= @databaseName,
+															@tableSchema			= ''%'',
+															@tableName				= ''%'',
 															@flgActions				= 8,
 															@flgOptions				= DEFAULT,
-															@StatsSamplePercent		= DEFAULT,
-															@StatsAgeDays			= DEFAULT,
-															@StatsChangePercent		= DEFAULT,
-															@DebugMode				= DEFAULT
+															@statsSamplePercent		= DEFAULT,
+															@statsAgeDays			= DEFAULT,
+															@statsChangePercent		= DEFAULT,
+															@debugMode				= DEFAULT
 				
 				FETCH NEXT FROM crsDatabases INTO @databaseName
 			end
@@ -615,12 +615,12 @@ IF DATENAME(weekday, GETDATE()) = ''Monday''
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseShrink]	@SQLServerName		= @@SERVERNAME,
-													@DBName				= @databaseName,
+				EXEC [dbo].[usp_mpDatabaseShrink]	@sqlServerName		= @@SERVERNAME,
+													@dbName				= @databaseName,
 													@flgActions			= 2,	
 													@flgOptions			= 1,
 													@executionLevel		= DEFAULT,
-													@DebugMode			= DEFAULT
+													@debugMode			= DEFAULT
 				
 				FETCH NEXT FROM crsDatabases INTO @databaseName
 			end
@@ -672,12 +672,12 @@ IF DATENAME(weekday, GETDATE()) = ''Saturday'' AND DATEPART(dd, GETDATE())<=7
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseShrink]	@SQLServerName		= @@SERVERNAME,
-													@DBName				= @databaseName,
+				EXEC [dbo].[usp_mpDatabaseShrink]	@sqlServerName		= @@SERVERNAME,
+													@dbName				= @databaseName,
 													@flgActions			= 1,	
 													@flgOptions			= 0,
 													@executionLevel		= DEFAULT,
-													@DebugMode			= DEFAULT
+													@debugMode			= DEFAULT
 				
 				FETCH NEXT FROM crsDatabases INTO @databaseName
 			end

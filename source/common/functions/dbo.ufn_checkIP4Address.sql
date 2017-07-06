@@ -9,7 +9,7 @@ GO
 
 CREATE FUNCTION dbo.ufn_checkIP4Address
 (
-	@IPAddress [varchar](15)
+	@ipAddress [varchar](15)
 )
 RETURNS bit
 /* WITH ENCRYPTION */
@@ -30,7 +30,7 @@ begin
 	
 	SET @tmpIdxOld=0
 	---------------------------------------------------------------------------------------------------------
-	SET @tmpIdx=CHARINDEX('.', @IPAddress, @tmpIdxOld+1)
+	SET @tmpIdx=CHARINDEX('.', @ipAddress, @tmpIdxOld+1)
 	IF @tmpIdx=0
 		begin
 			--The specified IP address is not valid'
@@ -38,7 +38,7 @@ begin
 		end
 	---------------------------------------------------------------------------------------------------------
 	SET @tmpStr=null
-	SET @tmpStr=SUBSTRING(@IPAddress, @tmpIdxOld+1, @tmpIdx-@tmpIdxOld-1)
+	SET @tmpStr=SUBSTRING(@ipAddress, @tmpIdxOld+1, @tmpIdx-@tmpIdxOld-1)
 	SET @tmpIdxOld=@tmpIdx
 	IF LEN(ISNULL(@tmpStr, ''))=0
 		begin
@@ -61,7 +61,7 @@ begin
 		end
 	
 	---------------------------------------------------------------------------------------------------------
-	SET @tmpIdx=CHARINDEX('.', @IPAddress, @tmpIdxOld+1)
+	SET @tmpIdx=CHARINDEX('.', @ipAddress, @tmpIdxOld+1)
 	IF @tmpIdx=0
 		begin
 			--The specified IP address is not valid'
@@ -69,7 +69,7 @@ begin
 		end
 	---------------------------------------------------------------------------------------------------------
 	SET @tmpStr=null
-	SET @tmpStr=SUBSTRING(@IPAddress, @tmpIdxOld+1, @tmpIdx-@tmpIdxOld-1)
+	SET @tmpStr=SUBSTRING(@ipAddress, @tmpIdxOld+1, @tmpIdx-@tmpIdxOld-1)
 	SET @tmpIdxOld=@tmpIdx
 	IF LEN(ISNULL(@tmpStr, ''))=0
 		begin
@@ -93,7 +93,7 @@ begin
 		end
 	
 	---------------------------------------------------------------------------------------------------------
-	SET @tmpIdx=CHARINDEX('.', @IPAddress, @tmpIdxOld+1)
+	SET @tmpIdx=CHARINDEX('.', @ipAddress, @tmpIdxOld+1)
 	IF @tmpIdx=0
 		begin
 			--The specified IP address is not valid'
@@ -101,7 +101,7 @@ begin
 		end
 	---------------------------------------------------------------------------------------------------------
 	SET @tmpStr=null
-	SET @tmpStr=SUBSTRING(@IPAddress, @tmpIdxOld+1, @tmpIdx-@tmpIdxOld-1)
+	SET @tmpStr=SUBSTRING(@ipAddress, @tmpIdxOld+1, @tmpIdx-@tmpIdxOld-1)
 	SET @tmpIdxOld=@tmpIdx
 	IF LEN(ISNULL(@tmpStr, ''))=0
 		begin
@@ -124,10 +124,10 @@ begin
 		end
 	
 	---------------------------------------------------------------------------------------------------------
-	SET @tmpIdx=CHARINDEX('.', @IPAddress, @tmpIdxOld+1)
+	SET @tmpIdx=CHARINDEX('.', @ipAddress, @tmpIdxOld+1)
 	---------------------------------------------------------------------------------------------------------
 	SET @tmpStr=null
-	SET @tmpStr=SUBSTRING(@IPAddress, @tmpIdxOld+1, 255)
+	SET @tmpStr=SUBSTRING(@ipAddress, @tmpIdxOld+1, 255)
 	SET @tmpIdxOld=@tmpIdx
 	IF LEN(ISNULL(@tmpStr, ''))=0
 		begin

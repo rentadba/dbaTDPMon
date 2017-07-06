@@ -10,24 +10,24 @@ GO
 
 -----------------------------------------------------------------------------------------
 CREATE PROCEDURE [dbo].[usp_mpDatabaseOptimize]
-		@SQLServerName				[sysname]=@@SERVERNAME,
-		@DBName						[sysname],
-		@TableSchema				[sysname]	=   '%',
-		@TableName					[sysname]   =   '%',
+		@sqlServerName				[sysname]=@@SERVERNAME,
+		@dbName						[sysname],
+		@tableSchema				[sysname]	=   '%',
+		@tableName					[sysname]   =   '%',
 		@flgActions					[smallint]	=    27,
 		@flgOptions					[int]		= 45185,--32768 + 8192 + 4096 + 128 + 1
-		@DefragIndexThreshold		[smallint]	=     5,
-		@RebuildIndexThreshold		[smallint]	=    30,
-		@PageThreshold				[int]		=  1000,
-		@RebuildIndexPageCountLimit	[int]		= 2147483647,	--16TB/no limit
-		@StatsSamplePercent			[smallint]	=   100,
-		@StatsAgeDays				[smallint]	=   365,
-		@StatsChangePercent			[smallint]	=     1,
-		@MaxDOP						[smallint]	=	  1,
-		@MaxRunningTimeInMinutes	[smallint]	=     0,
+		@defragIndexThreshold		[smallint]	=     5,
+		@rebuildIndexThreshold		[smallint]	=    30,
+		@pageThreshold				[int]		=  1000,
+		@rebuildIndexPageCountLimit	[int]		= 2147483647,	--16TB/no limit
+		@statsSamplePercent			[smallint]	=   100,
+		@statsAgeDays				[smallint]	=   365,
+		@statsChangePercent			[smallint]	=     1,
+		@maxDOP						[smallint]	=	  1,
+		@maxRunningTimeInMinutes	[smallint]	=     0,
 		@skipObjectsList			[nvarchar](1024) = NULL,
 		@executionLevel				[tinyint]	=     0,
-		@DebugMode					[bit]		=     0
+		@debugMode					[bit]		=     0
 /* WITH ENCRYPTION */
 AS
 
@@ -41,10 +41,10 @@ AS
 -- ============================================================================
 -----------------------------------------------------------------------------------------
 -- Input Parameters:
---		@SQLServerName	- name of SQL Server instance to analyze
---		@DBName			- database to be analyzed
---		@TableSchema	- schema that current table belongs to
---		@TableName		- specify % for all tables or a table name to be analyzed
+--		@sqlServerName	- name of SQL Server instance to analyze
+--		@dbName			- database to be analyzed
+--		@tableSchema	- schema that current table belongs to
+--		@tableName		- specify % for all tables or a table name to be analyzed
 --		@flgActions		 1	- Defragmenting database tables indexes (ALTER INDEX REORGANIZE)				(default)
 --							  should be performed daily
 --						 2	- Rebuild heavy fragmented indexes (ALTER INDEX REBUILD)						(default)
@@ -68,21 +68,21 @@ AS
 --					  4096  - rebuild/reorganize indexes/tables using ONLINE=ON, if applicable (default)
 --					  8192  - when rebuilding heaps, disable/enable table triggers (default)
 --					 16384  - for versions below 2008, do heap rebuild using temporary clustered index
---					 32768  - analyze only tables with at least @PageThreshold pages reserved (+2k5 only)
+--					 32768  - analyze only tables with at least @pageThreshold pages reserved (+2k5 only)
 --					 65536  - cleanup of ghost records (sp_clean_db_free_space)
 --							- this may be forced by setting to true property 'Force cleanup of ghost records'
 
---		@DefragIndexThreshold		- min value for fragmentation level when to start reorganize it
---		@@RebuildIndexThreshold		- min value for fragmentation level when to start rebuild it
---		@PageThreshold				- the minimum number of pages for an index to be reorganized/rebuild
---		@RebuildIndexPageCountLimit	- the maximum number of page for an index to be rebuild. if index has more pages than @RebuildIndexPageCountLimit, it will be reorganized
---		@StatsSamplePercent			- value for sample percent when update statistics. if 100 is present, then fullscan will be used
---		@StatsAgeDays				- when statistics were last updated (stats ages); don't update statistics more recent then @StatsAgeDays days
---		@StatsChangePercent			- for more recent statistics, if percent of changes is greater of equal, perform update
---		@MaxDOP						- when applicable, use this MAXDOP value (ex. index rebuild)
---		@MaxRunningTimeInMinutes	- the number of minutes the optimization job will run. after time exceeds, it will exist. 0 or null means no limit
+--		@defragIndexThreshold		- min value for fragmentation level when to start reorganize it
+--		@@rebuildIndexThreshold		- min value for fragmentation level when to start rebuild it
+--		@pageThreshold				- the minimum number of pages for an index to be reorganized/rebuild
+--		@rebuildIndexPageCountLimit	- the maximum number of page for an index to be rebuild. if index has more pages than @rebuildIndexPageCountLimit, it will be reorganized
+--		@statsSamplePercent			- value for sample percent when update statistics. if 100 is present, then fullscan will be used
+--		@statsAgeDays				- when statistics were last updated (stats ages); don't update statistics more recent then @statsAgeDays days
+--		@statsChangePercent			- for more recent statistics, if percent of changes is greater of equal, perform update
+--		@maxDOP						- when applicable, use this MAXDOP value (ex. index rebuild)
+--		@maxRunningTimeInMinutes	- the number of minutes the optimization job will run. after time exceeds, it will exist. 0 or null means no limit
 --		@skipObjectsList			- comma separated list of the objects (tables, index name or stats name) to be excluded from maintenance.
---		@DebugMode					- 1 - print dynamic SQL statements / 0 - no statements will be displayed
+--		@debugMode					- 1 - print dynamic SQL statements / 0 - no statements will be displayed
 -----------------------------------------------------------------------------------------
 
 DECLARE		@queryToRun    					[nvarchar](4000),
@@ -115,12 +115,12 @@ DECLARE		@queryToRun    					[nvarchar](4000),
 SET NOCOUNT ON
 
 ---------------------------------------------------------------------------------------------
---determine when to stop current optimization task, based on @MaxRunningTimeInMinutes value
+--determine when to stop current optimization task, based on @maxRunningTimeInMinutes value
 ---------------------------------------------------------------------------------------------
-IF ISNULL(@MaxRunningTimeInMinutes, 0)=0
+IF ISNULL(@maxRunningTimeInMinutes, 0)=0
 	SET @stopTimeLimit = CONVERT([datetime], '9999-12-31 23:23:59', 120)
 ELSE
-	SET @stopTimeLimit = DATEADD(minute, @MaxRunningTimeInMinutes, GETDATE())
+	SET @stopTimeLimit = DATEADD(minute, @maxRunningTimeInMinutes, GETDATE())
 
 
 ---------------------------------------------------------------------------------------------
@@ -173,12 +173,12 @@ DECLARE		@serverEdition					[sysname],
 			@nestedExecutionLevel			[tinyint]
 
 SET @nestedExecutionLevel = @executionLevel + 1
-EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @SQLServerName,
+EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@serverEdition			= @serverEdition OUT,
 										@serverVersionStr		= @serverVersionStr OUT,
 										@serverVersionNum		= @serverVersionNum OUT,
 										@executionLevel			= @nestedExecutionLevel,
-										@debugMode				= @DebugMode
+										@debugMode				= @debugMode
 ---------------------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------------------------
@@ -197,8 +197,8 @@ IF @flgActions &  8 =  8	SET @actionType = 'update statistics'
 IF @flgActions & 16 = 16	SET @actionType = 'rebuilding heap'
 
 IF @serverVersionNum >= 11
-	EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @SQLServerName,
-																		@dbName				= @DBName,
+	EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @sqlServerName,
+																		@dbName				= @dbName,
 																		@actionName			= 'database maintenance',
 																		@actionType			= @actionType,
 																		@flgActions			= @flgActions,
@@ -206,7 +206,7 @@ IF @serverVersionNum >= 11
 																		@agName				= @agName OUTPUT,
 																		@agInstanceRoleDesc = @agInstanceRoleDesc OUTPUT,
 																		@executionLevel		= @executionLevel,
-																		@debugMode			= @DebugMode
+																		@debugMode			= @debugMode
 
 IF @agStopLimit <> 0
 	RETURN 0
@@ -224,12 +224,12 @@ CREATE TABLE #databaseCompatibility
 
 SET @queryToRun = N''
 IF @serverVersionNum >= 9
-	SET @queryToRun = @queryToRun + N'SELECT [compatibility_level] FROM sys.databases WHERE [name] = ''' + @DBName + N''''
+	SET @queryToRun = @queryToRun + N'SELECT [compatibility_level] FROM sys.databases WHERE [name] = ''' + @dbName + N''''
 ELSE
-	SET @queryToRun = @queryToRun + N'SELECT [cmptlevel] FROM master.dbo.sysdatabases WHERE [name] = ''' + @DBName + N''''
+	SET @queryToRun = @queryToRun + N'SELECT [cmptlevel] FROM master.dbo.sysdatabases WHERE [name] = ''' + @dbName + N''''
 
-SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 INSERT	INTO #databaseCompatibility([compatibility_level])
 		EXEC (@queryToRun)
@@ -242,30 +242,30 @@ IF @serverVersionNum >= 9 AND @compatibilityLevel<=80
 ---------------------------------------------------------------------------------------------
 
 SET @errorCode				 = 0
-SET @CurrentTableSchema		 = @TableSchema
+SET @CurrentTableSchema		 = @tableSchema
 
-IF ISNULL(@DefragIndexThreshold, 0)=0 
+IF ISNULL(@defragIndexThreshold, 0)=0 
 	begin
 		SET @queryToRun=N'ERROR: Threshold value for defragmenting indexes should be greater than 0.'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=1
 		RETURN 1
 	end
 
-IF ISNULL(@RebuildIndexThreshold, 0)=0 
+IF ISNULL(@rebuildIndexThreshold, 0)=0 
 	begin
 		SET @queryToRun=N'ERROR: Threshold value for rebuilding indexes should be greater than 0.'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=1
 		RETURN 1
 	end
 
-IF ISNULL(@StatsSamplePercent, 0)=0 
+IF ISNULL(@statsSamplePercent, 0)=0 
 	begin
 		SET @queryToRun=N'ERROR: Sample percent value for update statistics sample should be greater than 0.'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=1
 		RETURN 1
 	end
 
-IF @DefragIndexThreshold > @RebuildIndexThreshold
+IF @defragIndexThreshold > @rebuildIndexThreshold
 	begin
 		SET @queryToRun=N'ERROR: Threshold value for defragmenting indexes should be smalller or equal to threshold value for rebuilding indexes.'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=1
@@ -357,14 +357,14 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 	begin
 		SET @analyzeIndexType=N'0'
 
-		SET @queryToRun=N'Create list of heap tables to be analyzed...' + @DBName
+		SET @queryToRun=N'Create list of heap tables to be analyzed...' + @dbName
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		SET @queryToRun = N''				
 
 		SET @queryToRun = @queryToRun + 
 							N'SELECT DISTINCT 
-										DB_ID(''' + @DBName + ''') AS [database_id]
+										DB_ID(''' + @dbName + ''') AS [database_id]
 									, si.[object_id]
 									, sc.[name] AS [table_schema]
 									, ob.[name] AS [table_name]
@@ -372,31 +372,31 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 									, si.[name] AS [index_name]
 									, si.[type] AS [index_type]
 									, CASE WHEN si.[fill_factor] = 0 THEN 100 ELSE si.[fill_factor] END AS [fill_factor]
-							FROM [' + @DBName + '].[sys].[indexes]				si
-							INNER JOIN [' + @DBName + '].[sys].[objects]		ob	ON ob.[object_id] = si.[object_id]
-							INNER JOIN [' + @DBName + '].[sys].[schemas]		sc	ON sc.[schema_id] = ob.[schema_id]' +
+							FROM [' + @dbName + '].[sys].[indexes]				si
+							INNER JOIN [' + @dbName + '].[sys].[objects]		ob	ON ob.[object_id] = si.[object_id]
+							INNER JOIN [' + @dbName + '].[sys].[schemas]		sc	ON sc.[schema_id] = ob.[schema_id]' +
 							CASE WHEN @flgOptions & 32768 = 32768 
 								THEN N'
 							INNER JOIN
 									(
 											SELECT   [object_id]
 												, SUM([reserved_page_count]) as [reserved_page_count]
-											FROM [' + @DBName + '].sys.dm_db_partition_stats
+											FROM [' + @dbName + '].sys.dm_db_partition_stats
 											GROUP BY [object_id]
-											HAVING SUM([reserved_page_count]) >=' + CAST(@PageThreshold AS [nvarchar](32)) + N'
+											HAVING SUM([reserved_page_count]) >=' + CAST(@pageThreshold AS [nvarchar](32)) + N'
 									) ps ON ps.[object_id] = ob.[object_id]'
 								ELSE N''
 								END + N'
-							WHERE	ob.[name] LIKE ''' + @TableName + '''
-									AND sc.[name] LIKE ''' + @TableSchema + '''
+							WHERE	ob.[name] LIKE ''' + @tableName + '''
+									AND sc.[name] LIKE ''' + @tableSchema + '''
 									AND si.[type] IN (' + @analyzeIndexType + N')
 									AND ob.[type] IN (''U'', ''V'')' + 
 									CASE WHEN @skipObjectsList IS NOT NULL  THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))
 																					AND (si.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) OR si.[name] IS NULL)'  
 																			ELSE N'' END
 
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		INSERT	INTO #databaseObjectsWithIndexList([database_id], [object_id], [table_schema], [table_name], [index_id], [index_name], [index_type], [fill_factor])
 				EXEC (@queryToRun)
@@ -451,13 +451,13 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 											, ips.[avg_record_size_in_bytes]
 											, ips.[avg_page_space_used_in_percent]
 											, ips.[ghost_record_count]
-									FROM [' + @DBName + '].sys.dm_db_index_physical_stats (' + CAST(@DatabaseID AS [nvarchar](4000)) + N', ' + CAST(@ObjectID AS [nvarchar](4000)) + N', ' + CAST(@IndexID AS [nvarchar](4000)) + N' , NULL, ''' + 
+									FROM [' + @dbName + '].sys.dm_db_index_physical_stats (' + CAST(@DatabaseID AS [nvarchar](4000)) + N', ' + CAST(@ObjectID AS [nvarchar](4000)) + N', ' + CAST(@IndexID AS [nvarchar](4000)) + N' , NULL, ''' + 
 													'DETAILED'
 											+ ''') ips
-									INNER JOIN [' + @DBName + '].sys.indexes si ON ips.[object_id]=si.[object_id] AND ips.[index_id]=si.[index_id]
+									INNER JOIN [' + @dbName + '].sys.indexes si ON ips.[object_id]=si.[object_id] AND ips.[index_id]=si.[index_id]
 									WHERE	si.[type] IN (' + @analyzeIndexType + N')'
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-				IF @DebugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 						
 				INSERT	INTO #CurrentIndexFragmentationStats([ObjectName], [ObjectId], [IndexName], [IndexId], [LogicalFragmentation], [Pages], [Rows], [ForwardedRecords], [AverageRecordSize], [AveragePageDensity], [ghost_record_count])  
 						EXEC (@queryToRun)
@@ -496,9 +496,9 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 
 		DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR 	SELECT	DISTINCT doil.[table_schema], doil.[table_name], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[page_density_deviation], doil.[forwarded_records_percentage]
 		   													FROM	#databaseObjectsWithIndexList doil
-															WHERE	(    doil.[avg_fragmentation_in_percent] >= @RebuildIndexThreshold
-																	  OR doil.[forwarded_records_percentage] >= @DefragIndexThreshold
-																	  OR doil.[page_density_deviation] >= @RebuildIndexThreshold
+															WHERE	(    doil.[avg_fragmentation_in_percent] >= @rebuildIndexThreshold
+																	  OR doil.[forwarded_records_percentage] >= @defragIndexThreshold
+																	  OR doil.[page_density_deviation] >= @rebuildIndexThreshold
 																	)
 																	AND doil.[index_type] IN (0)
 															ORDER BY doil.[table_schema], doil.[table_name]
@@ -515,7 +515,7 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 				--------------------------------------------------------------------------------------------------
 				--log heap fragmentation information
 				SET @eventData='<heap-fragmentation><detail>' + 
-									'<database_name>' + @DBName + '</database_name>' + 
+									'<database_name>' + @dbName + '</database_name>' + 
 									'<object_name>' + @objectName + '</object_name>'+ 
 									'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
 									'<page_count>' + CAST(@CurrentPageCount AS [varchar](32)) + '</page_count>' + 
@@ -523,8 +523,8 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 									'<forwarded_records_percentage>' + CAST(@CurrentForwardedRecordsPercent AS [varchar](32)) + '</forwarded_records_percentage>' + 
 								'</detail></heap-fragmentation>'
 
-				EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @SQLServerName,
-													@dbName			= @DBName,
+				EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+													@dbName			= @dbName,
 													@objectName		= @objectName,
 													@module			= 'dbo.usp_mpDatabaseOptimize',
 													@eventName		= 'database maintenance - rebuilding heap',
@@ -533,15 +533,15 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 
 				--------------------------------------------------------------------------------------------------
 				SET @nestExecutionLevel = @executionLevel + 3
-				EXEC [dbo].[usp_mpAlterTableRebuildHeap]	@SQLServerName		= @SQLServerName,
-															@DBName				= @DBName,
-															@TableSchema		= @CurrentTableSchema,
-															@TableName			= @CurrentTableName,
+				EXEC [dbo].[usp_mpAlterTableRebuildHeap]	@sqlServerName		= @sqlServerName,
+															@dbName				= @dbName,
+															@tableSchema		= @CurrentTableSchema,
+															@tableName			= @CurrentTableName,
 															@flgActions			= 1,
 															@flgOptions			= @flgOptions,
-															@MaxDOP				= @MaxDOP,
+															@maxDOP				= @maxDOP,
 															@executionLevel		= @nestExecutionLevel,
-															@DebugMode			= @DebugMode
+															@debugMode			= @debugMode
 
 				--mark heap as being rebuilt
 				UPDATE doil
@@ -565,7 +565,7 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 	begin
 		SET @analyzeIndexType=N'1,2,3,4'		
 
-		SET @queryToRun=N'Create list of indexes to be analyzed...' + @DBName
+		SET @queryToRun=N'Create list of indexes to be analyzed...' + @dbName
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		SET @queryToRun = N''				
@@ -573,7 +573,7 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 		IF @serverVersionNum >= 9
 			SET @queryToRun = @queryToRun + 
 								N'SELECT DISTINCT 
-										  DB_ID(''' + @DBName + ''') AS [database_id]
+										  DB_ID(''' + @dbName + ''') AS [database_id]
 										, si.[object_id]
 										, sc.[name] AS [table_schema]
 										, ob.[name] AS [table_name]
@@ -581,23 +581,23 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 										, si.[name] AS [index_name]
 										, si.[type] AS [index_type]
 										, CASE WHEN si.[fill_factor] = 0 THEN 100 ELSE si.[fill_factor] END AS [fill_factor]
-								FROM [' + @DBName + '].[sys].[indexes]				si
-								INNER JOIN [' + @DBName + '].[sys].[objects]		ob	ON ob.[object_id] = si.[object_id]
-								INNER JOIN [' + @DBName + '].[sys].[schemas]		sc	ON sc.[schema_id] = ob.[schema_id]' +
+								FROM [' + @dbName + '].[sys].[indexes]				si
+								INNER JOIN [' + @dbName + '].[sys].[objects]		ob	ON ob.[object_id] = si.[object_id]
+								INNER JOIN [' + @dbName + '].[sys].[schemas]		sc	ON sc.[schema_id] = ob.[schema_id]' +
 								CASE WHEN @flgOptions & 32768 = 32768 
 									THEN N'
 								INNER JOIN
 										(
 											 SELECT   [object_id]
 													, SUM([reserved_page_count]) as [reserved_page_count]
-											 FROM [' + @DBName + '].sys.dm_db_partition_stats
+											 FROM [' + @dbName + '].sys.dm_db_partition_stats
 											 GROUP BY [object_id]
-											 HAVING SUM([reserved_page_count]) >=' + CAST(@PageThreshold AS [nvarchar](32)) + N'
+											 HAVING SUM([reserved_page_count]) >=' + CAST(@pageThreshold AS [nvarchar](32)) + N'
 										) ps ON ps.[object_id] = ob.[object_id]'
 									ELSE N''
 									END + N'
-								WHERE	ob.[name] LIKE ''' + @TableName + '''
-										AND sc.[name] LIKE ''' + @TableSchema + '''
+								WHERE	ob.[name] LIKE ''' + @tableName + '''
+										AND sc.[name] LIKE ''' + @tableSchema + '''
 										AND si.[type] IN (' + @analyzeIndexType + N')
 										AND si.[is_disabled]=0
 										AND ob.[type] IN (''U'', ''V'')' + 
@@ -607,7 +607,7 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 		ELSE
 			SET @queryToRun = @queryToRun + 
 								N'SELECT DISTINCT 
-									  DB_ID(''' + @DBName + ''') AS [database_id]
+									  DB_ID(''' + @dbName + ''') AS [database_id]
 									, si.[id] AS [object_id]
 									, sc.[name] AS [table_schema]
 									, ob.[name] AS [table_name]
@@ -615,11 +615,11 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 									, si.[name] AS [index_name]
 									, CASE WHEN si.[indid]=1 THEN 1 ELSE 2 END AS [index_type]
 									, CASE WHEN ISNULL(si.[OrigFillFactor], 0) = 0 THEN 100 ELSE si.[OrigFillFactor] END AS [fill_factor]
-								FROM [' + @DBName + ']..sysindexes si
-								INNER JOIN [' + @DBName + ']..sysobjects ob	ON ob.[id] = si.[id]
-								INNER JOIN [' + @DBName + ']..sysusers sc	ON sc.[uid] = ob.[uid]
-								WHERE	ob.[name] LIKE ''' + @TableName + '''
-										AND sc.[name] LIKE ''' + @TableSchema + '''
+								FROM [' + @dbName + ']..sysindexes si
+								INNER JOIN [' + @dbName + ']..sysobjects ob	ON ob.[id] = si.[id]
+								INNER JOIN [' + @dbName + ']..sysusers sc	ON sc.[uid] = ob.[uid]
+								WHERE	ob.[name] LIKE ''' + @tableName + '''
+										AND sc.[name] LIKE ''' + @tableSchema + '''
 										AND si.[status] & 64 = 0 
 										AND si.[status] & 8388608 = 0 
 										AND si.[status] & 16777216 = 0 
@@ -630,8 +630,8 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 																						AND si.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
 																				ELSE N'' END
 
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		INSERT	INTO #databaseObjectsWithIndexList([database_id], [object_id], [table_schema], [table_name], [index_id], [index_name], [index_type], [fill_factor])
 				EXEC (@queryToRun)
@@ -663,7 +663,7 @@ UPDATE #databaseObjectsWithIndexList
 --------------------------------------------------------------------------------------------------
 IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 	begin
-		SET @queryToRun=N'Create list of statistics to be analyzed...' + @DBName
+		SET @queryToRun=N'Create list of statistics to be analyzed...' + @dbName
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		SET @queryToRun = N''				
@@ -673,8 +673,8 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				IF (@serverVersionNum >= 10.504000 AND @serverVersionNum < 11) OR @serverVersionNum >= 11.03000
 					/* starting with SQL Server 2008 R2 SP2 / SQL Server 2012 SP1 */
 					SET @queryToRun = @queryToRun + 
-										N'USE [' + @DBName + ']; SELECT DISTINCT 
-												  DB_ID(''' + @DBName + ''') AS [database_id]
+										N'USE [' + @dbName + ']; SELECT DISTINCT 
+												  DB_ID(''' + @dbName + ''') AS [database_id]
 												, ss.[object_id]
 												, sc.[name] AS [table_schema]
 												, ob.[name] AS [table_name]
@@ -685,22 +685,22 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 												, sp.[rows]
 												, ABS(sp.[modification_counter]) AS [modification_counter]
 												, (ABS(sp.[modification_counter]) * 100. / CAST(sp.[rows] AS [float])) AS [percent_changes]
-										FROM [' + @DBName + '].sys.stats ss
-										INNER JOIN [' + @DBName + '].sys.objects ob	ON ob.[object_id] = ss.[object_id]
-										INNER JOIN [' + @DBName + '].sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]' + N'
-										CROSS APPLY [' + @DBName + '].sys.dm_db_stats_properties(ss.object_id, ss.stats_id) AS sp
-										WHERE	ob.[name] LIKE ''' + @TableName + '''
-												AND sc.[name] LIKE ''' + @TableSchema + '''
+										FROM [' + @dbName + '].sys.stats ss
+										INNER JOIN [' + @dbName + '].sys.objects ob	ON ob.[object_id] = ss.[object_id]
+										INNER JOIN [' + @dbName + '].sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]' + N'
+										CROSS APPLY [' + @dbName + '].sys.dm_db_stats_properties(ss.object_id, ss.stats_id) AS sp
+										WHERE	ob.[name] LIKE ''' + @tableName + '''
+												AND sc.[name] LIKE ''' + @tableSchema + '''
 												AND ob.[type] <> ''S''
 												AND sp.[rows] > 0
-												AND (    (    DATEDIFF(dd, sp.[last_updated], GETDATE()) >= ' + CAST(@StatsAgeDays AS [nvarchar](32)) + N' 
+												AND (    (    DATEDIFF(dd, sp.[last_updated], GETDATE()) >= ' + CAST(@statsAgeDays AS [nvarchar](32)) + N' 
 														  AND sp.[modification_counter] <> 0
 														 )
 													 OR  
 														 ( 
-															  DATEDIFF(dd, sp.[last_updated], GETDATE()) < ' + CAST(@StatsAgeDays AS [nvarchar](32)) + N' 
+															  DATEDIFF(dd, sp.[last_updated], GETDATE()) < ' + CAST(@statsAgeDays AS [nvarchar](32)) + N' 
 														  AND sp.[modification_counter] <> 0 
-														  AND (ABS(sp.[modification_counter]) * 100. / CAST(sp.[rows] AS [float])) >= ' + CAST(@StatsChangePercent AS [nvarchar](32)) + N'
+														  AND (ABS(sp.[modification_counter]) * 100. / CAST(sp.[rows] AS [float])) >= ' + CAST(@statsChangePercent AS [nvarchar](32)) + N'
 														 )
 													)'+
 												CASE WHEN @skipObjectsList IS NOT NULL	THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
@@ -709,8 +709,8 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				ELSE
 					/* SQL Server 2005 up to SQL Server 2008 R2 SP 2*/
 					SET @queryToRun = @queryToRun + 
-										N'USE [' + @DBName + ']; SELECT DISTINCT 
-												  DB_ID(''' + @DBName + ''') AS [database_id]
+										N'USE [' + @dbName + ']; SELECT DISTINCT 
+												  DB_ID(''' + @dbName + ''') AS [database_id]
 												, ss.[object_id]
 												, sc.[name] AS [table_schema]
 												, ob.[name] AS [table_name]
@@ -721,22 +721,22 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 												, si.[rowcnt] AS [rows]
 												, ABS(si.[rowmodctr]) AS [modification_counter]
 												, (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) AS [percent_changes]
-										FROM [' + @DBName + '].sys.stats ss
-										INNER JOIN [' + @DBName + '].sys.objects ob	ON ob.[object_id] = ss.[object_id]
-										INNER JOIN [' + @DBName + '].sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]
-										INNER JOIN [' + @DBName + ']..sysindexes si ON si.[id] = ob.[object_id] AND si.[name] = ss.[name]' + N'
-										WHERE	ob.[name] LIKE ''' + @TableName + '''
-												AND sc.[name] LIKE ''' + @TableSchema + '''
+										FROM [' + @dbName + '].sys.stats ss
+										INNER JOIN [' + @dbName + '].sys.objects ob	ON ob.[object_id] = ss.[object_id]
+										INNER JOIN [' + @dbName + '].sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]
+										INNER JOIN [' + @dbName + ']..sysindexes si ON si.[id] = ob.[object_id] AND si.[name] = ss.[name]' + N'
+										WHERE	ob.[name] LIKE ''' + @tableName + '''
+												AND sc.[name] LIKE ''' + @tableSchema + '''
 												AND ob.[type] <> ''S''
 												AND si.[rowcnt] > 0
-												AND (    (    DATEDIFF(dd, STATS_DATE(si.[id], si.[indid]), GETDATE()) >= ' + CAST(@StatsAgeDays AS [nvarchar](32)) + N'
+												AND (    (    DATEDIFF(dd, STATS_DATE(si.[id], si.[indid]), GETDATE()) >= ' + CAST(@statsAgeDays AS [nvarchar](32)) + N'
 														  AND si.[rowmodctr] <> 0
 														 )
 													 OR  
 														( 
-													 		  DATEDIFF(dd, STATS_DATE(si.[id], si.[indid]), GETDATE()) < ' + CAST(@StatsAgeDays AS [nvarchar](32)) + N'
+													 		  DATEDIFF(dd, STATS_DATE(si.[id], si.[indid]), GETDATE()) < ' + CAST(@statsAgeDays AS [nvarchar](32)) + N'
 														  AND si.[rowmodctr] <> 0 
-														  AND (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) >= ' + CAST(@StatsChangePercent AS [nvarchar](32)) + N'
+														  AND (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) >= ' + CAST(@statsChangePercent AS [nvarchar](32)) + N'
 														)
 												)' +
 												CASE WHEN @skipObjectsList IS NOT NULL THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
@@ -747,8 +747,8 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 		ELSE
 			/* SQL Server 2000 */
 			SET @queryToRun = @queryToRun + 
-								N'USE [' + @DBName + ']; SELECT DISTINCT 
-										  DB_ID(''' + @DBName + ''') AS [database_id]
+								N'USE [' + @dbName + ']; SELECT DISTINCT 
+										  DB_ID(''' + @dbName + ''') AS [database_id]
 										, si.[id] AS [object_id]
 										, sc.[name] AS [table_schema]
 										, ob.[name] AS [table_name]
@@ -759,34 +759,34 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 										, si.[rowcnt] AS [rows]
 										, ABS(si.[rowmodctr]) AS [modification_counter]
 										, (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) AS [percent_changes]
-									FROM [' + @DBName + ']..sysindexes si
-									INNER JOIN [' + @DBName + ']..sysobjects ob	ON ob.[id] = si.[id]
-									INNER JOIN [' + @DBName + ']..sysusers sc	ON sc.[uid] = ob.[uid]
-									WHERE	ob.[name] LIKE ''' + @TableName + '''
-											AND sc.[name] LIKE ''' + @TableSchema + '''
+									FROM [' + @dbName + ']..sysindexes si
+									INNER JOIN [' + @dbName + ']..sysobjects ob	ON ob.[id] = si.[id]
+									INNER JOIN [' + @dbName + ']..sysusers sc	ON sc.[uid] = ob.[uid]
+									WHERE	ob.[name] LIKE ''' + @tableName + '''
+											AND sc.[name] LIKE ''' + @tableSchema + '''
 											AND si.[indid] > 0 
 											AND si.[indid] < 255
 											AND ob.[xtype] <> ''S''
 											AND si.[rowcnt] > 0
-											AND (    (    DATEDIFF(dd, STATS_DATE(si.[id], si.[indid]), GETDATE()) >= ' + CAST(@StatsAgeDays AS [nvarchar](32)) + N'
+											AND (    (    DATEDIFF(dd, STATS_DATE(si.[id], si.[indid]), GETDATE()) >= ' + CAST(@statsAgeDays AS [nvarchar](32)) + N'
 													  AND si.[rowmodctr] <> 0
 													 )
 												 OR  
 													( 
-													 	  DATEDIFF(dd, STATS_DATE(si.[id], si.[indid]), GETDATE()) < ' + CAST(@StatsAgeDays AS [nvarchar](32)) + N'
+													 	  DATEDIFF(dd, STATS_DATE(si.[id], si.[indid]), GETDATE()) < ' + CAST(@statsAgeDays AS [nvarchar](32)) + N'
 													  AND si.[rowmodctr] <> 0 
-													  AND (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) >= ' + CAST(@StatsChangePercent AS [nvarchar](32)) + N'
+													  AND (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) >= ' + CAST(@statsChangePercent AS [nvarchar](32)) + N'
 													)
 											)' + 
 											CASE WHEN @skipObjectsList IS NOT NULL THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
 																							AND si.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
 																				   ELSE N'' END
 
-		IF @SQLServerName<>@@SERVERNAME
-			SET @queryToRun = N'SELECT x.* FROM OPENQUERY([' + @SQLServerName + N'], ''EXEC [' + @DBName + N']..sp_executesql N''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''''')x'
+		IF @sqlServerName<>@@SERVERNAME
+			SET @queryToRun = N'SELECT x.* FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC [' + @dbName + N']..sp_executesql N''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''''')x'
 
 
-		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		INSERT	INTO #databaseObjectsWithStatisticsList([database_id], [object_id], [table_schema], [table_name], [stats_id], [stats_name], [auto_created], [last_updated], [rows], [modification_counter], [percent_changes])
 				EXEC (@queryToRun)
@@ -837,12 +837,12 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AN
 
 				IF @serverVersionNum < 9	/* SQL 2000 */
 					begin
-						IF @SQLServerName=@@SERVERNAME
-							SET @queryToRun='USE [' + @DBName + N']; IF OBJECT_ID(''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'') IS NOT NULL DBCC SHOWCONTIG (''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'', ''' + @IndexName + ''' ) WITH ' + CASE WHEN @flgOptions & 1024 = 1024 THEN '' ELSE 'FAST,' END + ' TABLERESULTS, NO_INFOMSGS'
+						IF @sqlServerName=@@SERVERNAME
+							SET @queryToRun='USE [' + @dbName + N']; IF OBJECT_ID(''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'') IS NOT NULL DBCC SHOWCONTIG (''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'', ''' + @IndexName + ''' ) WITH ' + CASE WHEN @flgOptions & 1024 = 1024 THEN '' ELSE 'FAST,' END + ' TABLERESULTS, NO_INFOMSGS'
 						ELSE
-							SET @queryToRun='SELECT * FROM OPENQUERY([' + @SQLServerName + N'], ''SET FMTONLY OFF; EXEC [' + @DBName + N'].dbo.sp_executesql N''''IF OBJECT_ID(''''''''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'''''''') IS NOT NULL DBCC SHOWCONTIG (''''''''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'''''''', ''''''''' + @IndexName + ''''''''' ) WITH ' + CASE WHEN @flgOptions & 1024 = 1024 THEN '' ELSE 'FAST,' END + ' TABLERESULTS, NO_INFOMSGS'''''')x'
+							SET @queryToRun='SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC [' + @dbName + N'].dbo.sp_executesql N''''IF OBJECT_ID(''''''''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'''''''') IS NOT NULL DBCC SHOWCONTIG (''''''''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'''''''', ''''''''' + @IndexName + ''''''''' ) WITH ' + CASE WHEN @flgOptions & 1024 = 1024 THEN '' ELSE 'FAST,' END + ' TABLERESULTS, NO_INFOMSGS'''''')x'
 
-						IF @DebugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+						IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 						INSERT	INTO #CurrentIndexFragmentationStats([ObjectName], [ObjectId], [IndexName], [IndexId], [Level], [Pages], [Rows], [MinimumRecordSize], [MaximumRecordSize], [AverageRecordSize], [ForwardedRecords], [Extents], [ExtentSwitches], [AverageFreeBytes], [AveragePageDensity], [ScanDensity], [BestCount], [ActualCount], [LogicalFragmentation], [ExtentFragmentation])
 								EXEC (@queryToRun)
 					end
@@ -859,14 +859,14 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AN
 													, ips.[avg_record_size_in_bytes]
 													, ips.[avg_page_space_used_in_percent]
 													, ips.[ghost_record_count]
-											FROM [' + @DBName + '].sys.dm_db_index_physical_stats (' + CAST(@DatabaseID AS [nvarchar](4000)) + N', ' + CAST(@ObjectID AS [nvarchar](4000)) + N', ' + CAST(@IndexID AS [nvarchar](4000)) + N' , NULL, ''' + 
+											FROM [' + @dbName + '].sys.dm_db_index_physical_stats (' + CAST(@DatabaseID AS [nvarchar](4000)) + N', ' + CAST(@ObjectID AS [nvarchar](4000)) + N', ' + CAST(@IndexID AS [nvarchar](4000)) + N' , NULL, ''' + 
 															CASE WHEN @flgOptions & 1024 = 1024 THEN 'DETAILED' ELSE 'LIMITED' END 
 													+ ''') ips
-											INNER JOIN [' + @DBName + '].sys.indexes si ON ips.[object_id]=si.[object_id] AND ips.[index_id]=si.[index_id]
+											INNER JOIN [' + @dbName + '].sys.indexes si ON ips.[object_id]=si.[object_id] AND ips.[index_id]=si.[index_id]
 											WHERE	si.[type] IN (' + @analyzeIndexType + N')
 													AND si.[is_disabled]=0'
-						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-						IF @DebugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+						IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 						
 						INSERT	INTO #CurrentIndexFragmentationStats([ObjectName], [ObjectId], [IndexName], [IndexId], [LogicalFragmentation], [Pages], [Rows], [ForwardedRecords], [AverageRecordSize], [AveragePageDensity], [ghost_record_count])  
 								EXEC (@queryToRun)
@@ -900,33 +900,33 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AN
 --------------------------------------------------------------------------------------------------		
 IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTimeLimit)
 	begin
-		SET @queryToRun=N'Defragmenting database tables indexes (fragmentation between ' + CAST(@DefragIndexThreshold AS [nvarchar]) + ' and ' + CAST(CAST(@RebuildIndexThreshold AS NUMERIC(6,2)) AS [nvarchar]) + ') and more than ' + CAST(@PageThreshold AS [nvarchar](4000)) + ' pages...'
+		SET @queryToRun=N'Defragmenting database tables indexes (fragmentation between ' + CAST(@defragIndexThreshold AS [nvarchar]) + ' and ' + CAST(CAST(@rebuildIndexThreshold AS NUMERIC(6,2)) AS [nvarchar]) + ') and more than ' + CAST(@pageThreshold AS [nvarchar](4000)) + ' pages...'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 		
 		DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT	DISTINCT doil.[table_schema], doil.[table_name]
 		   													FROM	#databaseObjectsWithIndexList doil
-															WHERE	doil.[page_count] >= @PageThreshold
+															WHERE	doil.[page_count] >= @pageThreshold
 																	AND doil.[index_type] <> 0 /* heap tables will be excluded */
 																	AND	( 
 																			(
-																				 doil.[avg_fragmentation_in_percent] >= @DefragIndexThreshold 
-																			 AND doil.[avg_fragmentation_in_percent] < @RebuildIndexThreshold
+																				 doil.[avg_fragmentation_in_percent] >= @defragIndexThreshold 
+																			 AND doil.[avg_fragmentation_in_percent] < @rebuildIndexThreshold
 																			)
 																		OR  /* when DETAILED analysis is selected, page density information will be used to reorganize / rebuild an index */
 																			(	  @flgOptions & 1024 = 1024 
-																			 AND doil.[page_density_deviation] >= @DefragIndexThreshold 
-																			 AND doil.[page_density_deviation] < @RebuildIndexThreshold
+																			 AND doil.[page_density_deviation] >= @defragIndexThreshold 
+																			 AND doil.[page_density_deviation] < @rebuildIndexThreshold
 																			)
 																		OR
 																			(	/* for very large tables, will performed reorganize instead of rebuild */
-																				doil.[page_count] >= @RebuildIndexPageCountLimit
+																				doil.[page_count] >= @rebuildIndexPageCountLimit
 																				AND	( 
 																						(
-																							doil.[avg_fragmentation_in_percent] >= @RebuildIndexThreshold
+																							doil.[avg_fragmentation_in_percent] >= @rebuildIndexThreshold
 																						)
 																					OR  /* when DETAILED analysis is selected, page density information will be used to reorganize / rebuild an index */
 																						(	  @flgOptions & 1024 = 1024 
-																							AND doil.[page_density_deviation] >= @RebuildIndexThreshold
+																							AND doil.[page_density_deviation] >= @rebuildIndexThreshold
 																						)
 																					)
 																			)
@@ -943,28 +943,28 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 							   													FROM	#databaseObjectsWithIndexList doil
    																				WHERE	doil.[table_name] = @CurrentTableName
 																						AND doil.[table_schema] = @CurrentTableSchema
-																						AND doil.[page_count] >= @PageThreshold
+																						AND doil.[page_count] >= @pageThreshold
 																						AND doil.[index_type] <> 0 /* heap tables will be excluded */
 																						AND	( 
 																								(
-																									 doil.[avg_fragmentation_in_percent] >= @DefragIndexThreshold 
-																								 AND doil.[avg_fragmentation_in_percent] < @RebuildIndexThreshold
+																									 doil.[avg_fragmentation_in_percent] >= @defragIndexThreshold 
+																								 AND doil.[avg_fragmentation_in_percent] < @rebuildIndexThreshold
 																								)
 																							OR  /* when DETAILED analysis is selected, page density information will be used to reorganize / rebuild an index */
 																								(	  @flgOptions & 1024 = 1024 
-																								 AND doil.[page_density_deviation] >= @DefragIndexThreshold 
-																								 AND doil.[page_density_deviation] < @RebuildIndexThreshold
+																								 AND doil.[page_density_deviation] >= @defragIndexThreshold 
+																								 AND doil.[page_density_deviation] < @rebuildIndexThreshold
 																								)
 																							OR
 																								(	/* for very large tables, will performed reorganize instead of rebuild */
-																									doil.[page_count] >= @RebuildIndexPageCountLimit
+																									doil.[page_count] >= @rebuildIndexPageCountLimit
 																									AND	( 
 																											(
-																												doil.[avg_fragmentation_in_percent] >= @RebuildIndexThreshold
+																												doil.[avg_fragmentation_in_percent] >= @rebuildIndexThreshold
 																											)
 																										OR  /* when DETAILED analysis is selected, page density information will be used to reorganize / rebuild an index */
 																											(	  @flgOptions & 1024 = 1024 
-																												AND doil.[page_density_deviation] >= @RebuildIndexThreshold
+																												AND doil.[page_density_deviation] >= @rebuildIndexThreshold
 																											)
 																										)
 																								)
@@ -989,7 +989,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 						--------------------------------------------------------------------------------------------------
 						--log index fragmentation information
 						SET @eventData='<index-fragmentation><detail>' + 
-											'<database_name>' + @DBName + '</database_name>' + 
+											'<database_name>' + @dbName + '</database_name>' + 
 											'<object_name>' + @objectName + '</object_name>'+ 
 											'<index_name>' + @childObjectName + '</index_name>' + 
 											'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
@@ -999,8 +999,8 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 											'<page_density_deviation>' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + '</page_density_deviation>' + 
 										'</detail></index-fragmentation>'
 
-						EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @SQLServerName,
-															@dbName			= @DBName,
+						EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+															@dbName			= @dbName,
 															@objectName		= @objectName,
 															@childObjectName= @childObjectName,
 															@module			= 'dbo.usp_mpDatabaseOptimize',
@@ -1013,29 +1013,29 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 							begin
 								SET @nestExecutionLevel = @executionLevel + 3
 
-								EXEC [dbo].[usp_mpAlterTableIndexes]	  @SQLServerName			= @SQLServerName
-																		, @DBName					= @DBName
-																		, @TableSchema				= @CurrentTableSchema
-																		, @TableName				= @CurrentTableName
-																		, @IndexName				= @IndexName
-																		, @IndexID					= NULL
-																		, @PartitionNumber			= DEFAULT
+								EXEC [dbo].[usp_mpAlterTableIndexes]	  @sqlServerName			= @sqlServerName
+																		, @dbName					= @dbName
+																		, @tableSchema				= @CurrentTableSchema
+																		, @tableName				= @CurrentTableName
+																		, @indexName				= @IndexName
+																		, @indexID					= NULL
+																		, @partitionNumber			= DEFAULT
 																		, @flgAction				= 2		--reorganize
 																		, @flgOptions				= @flgOptions
-																		, @MaxDOP					= @MaxDOP
+																		, @maxDOP					= @maxDOP
 																		, @executionLevel			= @nestExecutionLevel
 																		, @affectedDependentObjects = @affectedDependentObjects OUT
-																		, @DebugMode				= @DebugMode
+																		, @debugMode				= @debugMode
 							end
 						ELSE
 							begin
 								SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; '
 								SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'') IS NOT NULL DBCC INDEXDEFRAG (0, ' + RTRIM(@ObjectID) + ', ' + RTRIM(@IndexID) + ') WITH NO_INFOMSGS'
-								IF @DebugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+								IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								SET @nestedExecutionLevel = @executionLevel + 1
-								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
-																				@dbName			= @DBName,
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+																				@dbName			= @dbName,
 																				@objectName		= @objectName,
 																				@childObjectName= @childObjectName,
 																				@module			= 'dbo.usp_mpDatabaseOptimize',
@@ -1043,7 +1043,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 																				@queryToRun  	= @queryToRun,
 																				@flgOptions		= @flgOptions,
 																				@executionLevel	= @nestedExecutionLevel,
-																				@debugMode		= @DebugMode
+																				@debugMode		= @debugMode
 
 							end
 	   					FETCH NEXT FROM crsIndexesToDegfragment INTO @IndexName, @IndexType, @CurrentFragmentation, @CurrentPageCount, @ObjectID, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor
@@ -1066,21 +1066,21 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 --------------------------------------------------------------------------------------------------
 IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 	begin
-		SET @queryToRun='Rebuilding database tables indexes (fragmentation between ' + CAST(@RebuildIndexThreshold AS [nvarchar]) + ' and 100) or small tables (no more than ' + CAST(@PageThreshold AS [nvarchar](4000)) + ' pages)...'
+		SET @queryToRun='Rebuilding database tables indexes (fragmentation between ' + CAST(@rebuildIndexThreshold AS [nvarchar]) + ' and 100) or small tables (no more than ' + CAST(@pageThreshold AS [nvarchar](4000)) + ' pages)...'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 																		
 		DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR 	SELECT	DISTINCT doil.[table_schema], doil.[table_name]
 		   													FROM	#databaseObjectsWithIndexList doil
 															WHERE	    doil.[index_type] <> 0 /* heap tables will be excluded */
-																	AND doil.[page_count] >= @PageThreshold
-																	AND doil.[page_count] < @RebuildIndexPageCountLimit
+																	AND doil.[page_count] >= @pageThreshold
+																	AND doil.[page_count] < @rebuildIndexPageCountLimit
 																	AND	( 
 																			(
-																				doil.[avg_fragmentation_in_percent] >= @RebuildIndexThreshold
+																				doil.[avg_fragmentation_in_percent] >= @rebuildIndexThreshold
 																			)
 																		OR  /* when DETAILED analysis is selected, page density information will be used to reorganize / rebuild an index */
 																			(	  @flgOptions & 1024 = 1024 
-																			 AND doil.[page_density_deviation] >= @RebuildIndexThreshold
+																			 AND doil.[page_density_deviation] >= @rebuildIndexThreshold
 																			)
 																		)
 															ORDER BY doil.[table_schema], doil.[table_name]
@@ -1097,17 +1097,17 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 				   							   								FROM	#databaseObjectsWithIndexList doil
 		   																	WHERE	doil.[table_name] = @CurrentTableName
 		   																			AND doil.[table_schema] = @CurrentTableSchema
-																					AND doil.[page_count] >= @PageThreshold
-																					AND doil.[page_count] < @RebuildIndexPageCountLimit
+																					AND doil.[page_count] >= @pageThreshold
+																					AND doil.[page_count] < @rebuildIndexPageCountLimit
 																					AND doil.[index_type] <> 0 /* heap tables will be excluded */
 																					AND doil.[is_rebuilt] = 0
 																					AND	( 
 																							(
-																								doil.[avg_fragmentation_in_percent] >= @RebuildIndexThreshold
+																								doil.[avg_fragmentation_in_percent] >= @rebuildIndexThreshold
 																							)
 																						OR  /* when DETAILED analysis is selected, page density information will be used to reorganize / rebuild an index */
 																							(	  @flgOptions & 1024 = 1024 
-																							 AND doil.[page_density_deviation] >= @RebuildIndexThreshold
+																							 AND doil.[page_density_deviation] >= @rebuildIndexThreshold
 																							)
 																						)
 																			ORDER BY doil.[index_id]
@@ -1139,7 +1139,7 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 								--------------------------------------------------------------------------------------------------
 								--log index fragmentation information
 								SET @eventData='<index-fragmentation><detail>' + 
-													'<database_name>' + @DBName + '</database_name>' + 
+													'<database_name>' + @dbName + '</database_name>' + 
 													'<object_name>' + @objectName + '</object_name>'+ 
 													'<index_name>' + @childObjectName + '</index_name>' + 
 													'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
@@ -1149,8 +1149,8 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 													'<page_density_deviation>' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + '</page_density_deviation>' + 
 												'</detail></index-fragmentation>'
 
-								EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @SQLServerName,
-																	@dbName			= @DBName,
+								EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+																	@dbName			= @dbName,
 																	@objectName		= @objectName,
 																	@childObjectName= @childObjectName,
 																	@module			= 'dbo.usp_mpDatabaseOptimize',
@@ -1169,32 +1169,32 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 									begin
 										SET @nestExecutionLevel = @executionLevel + 3
 
-										EXEC [dbo].[usp_mpAlterTableIndexes]	  @SQLServerName			= @SQLServerName
-																				, @DBName					= @DBName
-																				, @TableSchema				= @CurrentTableSchema
-																				, @TableName				= @CurrentTableName
-																				, @IndexName				= @IndexName
-																				, @IndexID					= NULL
-																				, @PartitionNumber			= DEFAULT
+										EXEC [dbo].[usp_mpAlterTableIndexes]	  @sqlServerName			= @sqlServerName
+																				, @dbName					= @dbName
+																				, @tableSchema				= @CurrentTableSchema
+																				, @tableName				= @CurrentTableName
+																				, @indexName				= @IndexName
+																				, @indexID					= NULL
+																				, @partitionNumber			= DEFAULT
 																				, @flgAction				= 1		--rebuild
 																				, @flgOptions				= @flgOptions
-																				, @MaxDOP					= @MaxDOP
+																				, @maxDOP					= @maxDOP
 																				, @executionLevel			= @nestExecutionLevel
 																				, @affectedDependentObjects = @affectedDependentObjects OUT
-																				, @DebugMode				= @DebugMode
+																				, @debugMode				= @debugMode
 
 										--enable foreign key
 										IF @IndexType=1
 											begin
-												 EXEC [dbo].[usp_mpAlterTableForeignKeys]	@SQLServerName	= @SQLServerName
-																						  , @DBName			= @DBName
-																						  , @TableSchema	= @CurrentTableSchema
-																						  , @TableName		= @CurrentTableName
-																						  , @ConstraintName = '%'
+												 EXEC [dbo].[usp_mpAlterTableForeignKeys]	@sqlServerName	= @sqlServerName
+																						  , @dbName			= @dbName
+																						  , @tableSchema	= @CurrentTableSchema
+																						  , @tableName		= @CurrentTableName
+																						  , @constraintName = '%'
 																						  , @flgAction		= 1
 																						  , @flgOptions		= DEFAULT
 																						  , @executionLevel	= @nestExecutionLevel
-																						  , @DebugMode		= @DebugMode
+																						  , @debugMode		= @debugMode
 											end
 								
 										IF @IndexType IN (1,3) AND @flgOptions & 4 = 4
@@ -1212,11 +1212,11 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 									begin
 										SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; '
 										SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'') IS NOT NULL DBCC DBREINDEX (''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']' + ''', ''' + RTRIM(@IndexName) + ''') WITH NO_INFOMSGS'
-										IF @DebugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+										IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 										SET @nestedExecutionLevel = @executionLevel + 1
-										EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
-																						@dbName			= @DBName,
+										EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+																						@dbName			= @dbName,
 																						@objectName		= @objectName,
 																						@childObjectName= @childObjectName,
 																						@module			= 'dbo.usp_mpDatabaseOptimize',
@@ -1224,7 +1224,7 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 																						@queryToRun  	= @queryToRun,
 																						@flgOptions		= @flgOptions,
 																						@executionLevel	= @nestedExecutionLevel,
-																						@debugMode		= @DebugMode
+																						@debugMode		= @debugMode
 									end
 							end
 
@@ -1267,7 +1267,7 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 				DECLARE crsClusteredIndexes CURSOR LOCAL FAST_FORWARD FOR	SELECT doil.[table_schema], doil.[table_name], doil.[index_name]
 																			FROM	#databaseObjectsWithIndexList doil
 																			WHERE	doil.[index_type]=1 --clustered index
-																					AND doil.[page_count] >= @PageThreshold
+																					AND doil.[page_count] >= @pageThreshold
 																					AND EXISTS (
 																								SELECT 1
 																								FROM #databaseObjectsWithIndexList b
@@ -1306,14 +1306,14 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 							   										FROM	#databaseObjectsWithIndexList doil
    																	WHERE	doil.[index_type] <> 0 /* heap tables will be excluded */
 																			AND doil.[is_rebuilt]=0
-																			AND doil.[page_count] >= @PageThreshold
+																			AND doil.[page_count] >= @pageThreshold
 																			AND	( 
 																					(
-																						doil.[avg_fragmentation_in_percent] >= @DefragIndexThreshold
+																						doil.[avg_fragmentation_in_percent] >= @defragIndexThreshold
 																					)
 																				OR  /* when DETAILED analysis is selected, page density information will be used to reorganize / rebuild an index */
 																					(	  @flgOptions & 1024 = 1024 
-																						AND doil.[page_density_deviation] >= @DefragIndexThreshold
+																						AND doil.[page_density_deviation] >= @defragIndexThreshold
 																					)
 																				)
 																	ORDER BY doil.[table_schema], doil.[table_name], doil.[index_id]
@@ -1353,7 +1353,7 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 						SET @childObjectName = QUOTENAME(@IndexName)
 
 						SET @eventData='<index-fragmentation><detail>' + 
-											'<database_name>' + @DBName + '</database_name>' + 
+											'<database_name>' + @dbName + '</database_name>' + 
 											'<object_name>' + @objectName + '</object_name>'+ 
 											'<index_name>' + @childObjectName + '</index_name>' + 
 											'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
@@ -1363,8 +1363,8 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 											'<page_density_deviation>' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + '</page_density_deviation>' + 
 										'</detail></index-fragmentation>'
 
-						EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @SQLServerName,
-															@dbName			= @DBName,
+						EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+															@dbName			= @dbName,
 															@objectName		= @objectName,
 															@childObjectName= @childObjectName,
 															@module			= 'dbo.usp_mpDatabaseOptimize',
@@ -1376,31 +1376,31 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 						IF @serverVersionNum >= 9
 							begin
 								SET @nestExecutionLevel = @executionLevel + 3
-								EXEC [dbo].[usp_mpAlterTableIndexes]	  @SQLServerName			= @SQLServerName
-																		, @DBName					= @DBName
-																		, @TableSchema				= @CurrentTableSchema
-																		, @TableName				= @CurrentTableName
-																		, @IndexName				= @IndexName
-																		, @IndexID					= NULL
-																		, @PartitionNumber			= DEFAULT
+								EXEC [dbo].[usp_mpAlterTableIndexes]	  @sqlServerName			= @sqlServerName
+																		, @dbName					= @dbName
+																		, @tableSchema				= @CurrentTableSchema
+																		, @tableName				= @CurrentTableName
+																		, @indexName				= @IndexName
+																		, @indexID					= NULL
+																		, @partitionNumber			= DEFAULT
 																		, @flgAction				= 1		--rebuild
 																		, @flgOptions				= @flgOptions
-																		, @MaxDOP					= @MaxDOP
+																		, @maxDOP					= @maxDOP
 																		, @executionLevel			= @nestExecutionLevel
 																		, @affectedDependentObjects = @affectedDependentObjects OUT
-																		, @DebugMode				= @DebugMode
+																		, @debugMode				= @debugMode
 							--enable foreign key
 							IF @IndexType=1
 								begin
-									 EXEC [dbo].[usp_mpAlterTableForeignKeys]	@SQLServerName	= @SQLServerName
-																			  , @DBName			= @DBName
-																			  , @TableSchema	= @CurrentTableSchema
-																			  , @TableName		= @CurrentTableName
-																			  , @ConstraintName = '%'
+									 EXEC [dbo].[usp_mpAlterTableForeignKeys]	@sqlServerName	= @sqlServerName
+																			  , @dbName			= @dbName
+																			  , @tableSchema	= @CurrentTableSchema
+																			  , @tableName		= @CurrentTableName
+																			  , @constraintName = '%'
 																			  , @flgAction		= 1
 																			  , @flgOptions		= DEFAULT
 																			  , @executionLevel	= @nestExecutionLevel
-																			  , @DebugMode		= @DebugMode
+																			  , @debugMode		= @debugMode
 								end
 
 							--mark secondary indexes as being rebuilt, if primary xml was rebuilt
@@ -1420,14 +1420,14 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 							begin
 								SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; '
 								SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'') IS NOT NULL DBCC DBREINDEX (''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']' + ''', ''' + RTRIM(@IndexName) + ''') WITH NO_INFOMSGS'
-								IF @DebugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+								IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 								
 								SET @objectName = '[' + @CurrentTableSchema + '].[' + RTRIM(@CurrentTableName) + ']'
 								SET @childObjectName = QUOTENAME(@IndexName)
 								SET @nestedExecutionLevel = @executionLevel + 1
 
-								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
-																				@dbName			= @DBName,
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+																				@dbName			= @dbName,
 																				@objectName		= @objectName,
 																				@childObjectName= @childObjectName,
 																				@module			= 'dbo.usp_mpDatabaseOptimize',
@@ -1435,7 +1435,7 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 																				@queryToRun  	= @queryToRun,
 																				@flgOptions		= @flgOptions,
 																				@executionLevel	= @nestedExecutionLevel,
-																				@debugMode		= @DebugMode
+																				@debugMode		= @debugMode
 							end
 
 							--mark index as being rebuilt
@@ -1462,10 +1462,10 @@ IF @serverVersionNum >= 9 AND (GETDATE() <= @stopTimeLimit)
 		IF (@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4) OR (@flgActions & 16 = 16)
 		begin
 			SET @nestExecutionLevel = @executionLevel + 1
-			EXEC [dbo].[usp_mpCheckAndRevertInternalActions]	@sqlServerName	= @SQLServerName,
+			EXEC [dbo].[usp_mpCheckAndRevertInternalActions]	@sqlServerName	= @sqlServerName,
 																@flgOptions		= @flgOptions,
 																@executionLevel	= @nestExecutionLevel, 
-																@debugMode		= @DebugMode
+																@debugMode		= @debugMode
 		end
 	end
 
@@ -1481,15 +1481,15 @@ IF (@serverVersionNum >= 9.04035 AND @flgOptions & 65536 = 65536) AND (GETDATE()
 					SELECT SUM(doil.[ghost_record_count]) 
 					FROM	#databaseObjectsWithIndexList doil
 					WHERE	NOT (
-									doil.[page_count] >= @PageThreshold
+									doil.[page_count] >= @pageThreshold
 								AND doil.[index_type] <> 0 
 								AND	( 
 										(
-											doil.[avg_fragmentation_in_percent] >= @DefragIndexThreshold 
+											doil.[avg_fragmentation_in_percent] >= @defragIndexThreshold 
 										)
 									OR  
 										(	@flgOptions & 1024 = 1024 
-										AND doil.[page_density_deviation] >= @DefragIndexThreshold 
+										AND doil.[page_density_deviation] >= @defragIndexThreshold 
 										)
 									)
 								)
@@ -1499,7 +1499,7 @@ IF (@serverVersionNum >= 9.04035 AND @flgOptions & 65536 = 65536) AND (GETDATE()
 					SET @queryToRun='sp_clean_db_free_space (ghost records cleanup)...'
 					EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-					EXEC sp_clean_db_free_space @DBName
+					EXEC sp_clean_db_free_space @dbName
 				end
 
 
@@ -1509,8 +1509,8 @@ IF (@serverVersionNum >= 9.04035 AND @flgOptions & 65536 = 65536) AND (GETDATE()
 IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 	begin
 		SET @queryToRun=N'Update statistics for all tables (' + 
-					CASE WHEN @StatsSamplePercent<100 
-							THEN 'sample ' + CAST(@StatsSamplePercent AS [nvarchar]) + ' percent'
+					CASE WHEN @statsSamplePercent<100 
+							THEN 'sample ' + CAST(@statsSamplePercent AS [nvarchar]) + ' percent'
 							ELSE 'fullscan'
 					END + ')...'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
@@ -1580,7 +1580,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 						SET @childObjectName = QUOTENAME(@IndexName)
 
 						SET @eventData='<statistics-health><detail>' + 
-											'<database_name>' + @DBName + '</database_name>' + 
+											'<database_name>' + @dbName + '</database_name>' + 
 											'<object_name>' + @objectName + '</object_name>'+ 
 											'<stats_name>' + @childObjectName + '</stats_name>' + 
 											'<auto_created>' + CAST(@statsAutoCreated AS [varchar](32)) + '</auto_created>' + 
@@ -1591,8 +1591,8 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 											'<age_days>' + CAST(@statsAge AS [varchar](32)) + '</age_days>' + 
 										'</detail></statistics-health>'
 
-						EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @SQLServerName,
-															@dbName			= @DBName,
+						EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+															@dbName			= @dbName,
 															@objectName		= @objectName,
 															@childObjectName= @childObjectName,
 															@module			= 'dbo.usp_mpDatabaseOptimize',
@@ -1604,17 +1604,17 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 						SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
 						SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'') IS NOT NULL UPDATE STATISTICS [' + @CurrentTableSchema + '].[' + @CurrentTableName + '](' + dbo.ufn_mpObjectQuoteName(@IndexName) + ') WITH '
 								
-						IF @StatsSamplePercent<100
-							SET @queryToRun=@queryToRun + N'SAMPLE ' + CAST(@StatsSamplePercent AS [nvarchar]) + ' PERCENT'
+						IF @statsSamplePercent<100
+							SET @queryToRun=@queryToRun + N'SAMPLE ' + CAST(@statsSamplePercent AS [nvarchar]) + ' PERCENT'
 						ELSE
 							SET @queryToRun=@queryToRun + N'FULLSCAN'
 
-						IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 						
 						SET @nestedExecutionLevel = @executionLevel + 1
 
-						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
-																		@dbName			= @DBName,
+						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+																		@dbName			= @dbName,
 																		@objectName		= @objectName,
 																		@childObjectName= @childObjectName,
 																		@module			= 'dbo.usp_mpDatabaseOptimize',
@@ -1622,7 +1622,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 																		@queryToRun  	= @queryToRun,
 																		@flgOptions		= @flgOptions,
 																		@executionLevel	= @nestedExecutionLevel,
-																		@debugMode		= @DebugMode
+																		@debugMode		= @debugMode
 
 						SET @IndexID = @IndexID + 1
 						FETCH NEXT FROM crsTableStatsList INTO @IndexName, @statsAutoCreated, @tableRows, @statsModificationCounter, @lastUpdated, @percentChanges, @statsAge
@@ -1650,12 +1650,12 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				ELSE
 					SET @queryToRun = @queryToRun + N', @fullscan = ''fullscan'''
 
-				IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 				SET @nestedExecutionLevel = @executionLevel + 1
 
-				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
-																@dbName			= @DBName,
+				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+																@dbName			= @dbName,
 																@objectName		= @objectName,
 																@childObjectName= @childObjectName,
 																@module			= 'dbo.usp_mpDatabaseOptimize',
@@ -1663,7 +1663,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 																@queryToRun  	= @queryToRun,
 																@flgOptions		= @flgOptions,
 																@executionLevel	= @nestedExecutionLevel,
-																@debugMode		= @DebugMode
+																@debugMode		= @debugMode
 			end
 	end
 	

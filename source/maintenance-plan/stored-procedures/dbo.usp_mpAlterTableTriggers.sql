@@ -10,15 +10,15 @@ GO
 
 -----------------------------------------------------------------------------------------
 CREATE PROCEDURE [dbo].[usp_mpAlterTableTriggers]
-		@SQLServerName		[sysname],
-		@DBName				[sysname],
-		@TableSchema		[sysname] = '%', 
-		@TableName			[sysname] = '%',
-		@TriggerName		[sysname] = '%',
+		@sqlServerName		[sysname],
+		@dbName				[sysname],
+		@tableSchema		[sysname] = '%', 
+		@tableName			[sysname] = '%',
+		@triggerName		[sysname] = '%',
 		@flgAction			[bit] = 1,
 		@flgOptions			[int] = 2048,
 		@executionLevel		[tinyint] = 0,
-		@DebugMode			[bit] = 0
+		@debugMode			[bit] = 0
 /* WITH ENCRYPTION */
 AS
 
@@ -32,15 +32,15 @@ AS
 
 -----------------------------------------------------------------------------------------
 -- Input Parameters:
---		@SQLServerName	- name of SQL Server instance to analyze
---		@DBName			- database to be analyzed
---		@TableSchema	- schema that current table belongs to
---		@TableName		- specify table name to be analyzed. default = %, all tables will be analyzed
+--		@sqlServerName	- name of SQL Server instance to analyze
+--		@dbName			- database to be analyzed
+--		@tableSchema	- schema that current table belongs to
+--		@tableName		- specify table name to be analyzed. default = %, all tables will be analyzed
 --		@flgAction:		 1	- Enable Triggers (default)
 --						 0	- Disable Triggers
 --		@flgOptions:	 8  - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
 --					  2048  - send email when a error occurs (default)
---		@DebugMode:		 1 - print dynamic SQL statements 
+--		@debugMode:		 1 - print dynamic SQL statements 
 --						 0 - no statements will be displayed (default)
 -----------------------------------------------------------------------------------------
 -- Return : 
@@ -72,12 +72,12 @@ BEGIN TRY
 					[table_name]	[sysname]
 				)
 
-		SET @queryToRun = N'SELECT TABLE_SCHEMA, TABLE_NAME FROM [' + @DBName + N'].INFORMATION_SCHEMA.TABLES
+		SET @queryToRun = N'SELECT TABLE_SCHEMA, TABLE_NAME FROM [' + @dbName + N'].INFORMATION_SCHEMA.TABLES
 						WHERE	TABLE_TYPE = ''BASE TABLE'' 
-								AND TABLE_NAME LIKE ''' + @TableName + N''' 
-								AND TABLE_SCHEMA LIKE ''' + @TableSchema + N''''
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+								AND TABLE_NAME LIKE ''' + @tableName + N''' 
+								AND TABLE_SCHEMA LIKE ''' + @tableSchema + N''''
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		INSERT	INTO #tmpTableList ([table_schema], [table_name])
 				EXEC (@queryToRun)
@@ -107,16 +107,16 @@ BEGIN TRY
 						--if current action is to disable triggers, will get only enabled triggers
 						--if current action is to enable triggers, will get only disabled triggers
 						SET @queryToRun=N'SELECT DISTINCT st.[name]
-									FROM [' + @DBName + '].[sys].[triggers] st
-									INNER JOIN [' + @DBName + '].[sys].[objects] so ON so.[object_id] = st.[parent_id] 
-									INNER JOIN [' + @DBName + '].[sys].[schemas] sch ON sch.[schema_id] = so.[schema_id] 
+									FROM [' + @dbName + '].[sys].[triggers] st
+									INNER JOIN [' + @dbName + '].[sys].[objects] so ON so.[object_id] = st.[parent_id] 
+									INNER JOIN [' + @dbName + '].[sys].[schemas] sch ON sch.[schema_id] = so.[schema_id] 
 									WHERE	so.[name]=''' + @crtTableName + '''
 											AND sch.[name] = ''' + @crtTableSchema + '''
 											AND st.[is_disabled]=' + CAST(@flgAction AS [varchar]) + '
 											AND st.[is_ms_shipped] = 0
-											AND st.[name] LIKE ''' + @TriggerName + ''''
-						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-						IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+											AND st.[name] LIKE ''' + @triggerName + ''''
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 						TRUNCATE TABLE #tmpTableToAlterTriggers
 						INSERT	INTO #tmpTableToAlterTriggers([TriggerName])
@@ -132,19 +132,19 @@ BEGIN TRY
 								SET @queryToRun= @crtTriggerName
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
-								SET @queryToRun=N'ALTER TABLE [' + @DBName + N'].[' + @crtTableSchema + N'].[' + @crtTableName + '] ' + 
+								SET @queryToRun=N'ALTER TABLE [' + @dbName + N'].[' + @crtTableSchema + N'].[' + @crtTableName + '] ' + 
 													CASE WHEN @flgAction=1  THEN N'ENABLE'
 																			ELSE N'DISABLE'
 													END + N' TRIGGER [' + @crtTriggerName + ']'
-								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 								--
 								SET @objectName = '[' + @crtTableSchema + '].[' + @crtTableName + ']'
 								SET @childObjectName = QUOTENAME(@crtTriggerName)
 								SET @nestedExecutionLevel = @executionLevel + 1
 
-								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
-																				@dbName			= @DBName,
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+																				@dbName			= @dbName,
 																				@objectName		= @objectName,
 																				@childObjectName= @childObjectName,
 																				@module			= 'dbo.usp_mpAlterTableTriggers',
@@ -152,7 +152,7 @@ BEGIN TRY
 																				@queryToRun  	= @queryToRun,
 																				@flgOptions		= @flgOptions,
 																				@executionLevel	= @nestedExecutionLevel,
-																				@debugMode		= @DebugMode
+																				@debugMode		= @debugMode
 
 								FETCH NEXT FROM crsTableToAlterTriggers INTO @crtTriggerName
 							end

@@ -6,7 +6,7 @@ GO
 
 CREATE FUNCTION [dbo].[ufn_reportHTMLFormatTimeValue]
 (		
-	@ValueInMS	[bigint]
+	@valueInMS	[bigint]
 )
 RETURNS [nvarchar](64)
 /* WITH ENCRYPTION */
@@ -26,29 +26,29 @@ begin
 			@crtValue	[varchar](3)
 
 	SELECT    @timeValue = ''
-			, @ValueInMS = ISNULL(@ValueInMS, 0)
+			, @valueInMS = ISNULL(@valueInMS, 0)
 	
-	SELECT    @crtValue = CAST(@ValueInMS / (1000 * 60 * 60 * 24) AS [varchar])
-			, @ValueInMS = @ValueInMS % (1000 * 60 * 60 * 24)
+	SELECT    @crtValue = CAST(@valueInMS / (1000 * 60 * 60 * 24) AS [varchar])
+			, @valueInMS = @valueInMS % (1000 * 60 * 60 * 24)
 
 	SET @timeValue = @timeValue + CASE WHEN @crtValue>0 THEN @crtValue  + 'd ' ELSE '' END
 
-	SELECT    @crtValue = CAST(@ValueInMS / (1000 * 60 * 60) AS [varchar])
-			, @ValueInMS = @ValueInMS % (1000 * 60 * 60)
+	SELECT    @crtValue = CAST(@valueInMS / (1000 * 60 * 60) AS [varchar])
+			, @valueInMS = @valueInMS % (1000 * 60 * 60)
 
 	SET @timeValue = @timeValue + REPLICATE('0', 2-CASE WHEN LEN(@crtValue) < 2 THEN LEN(@crtValue) ELSE 2 END) + @crtValue + ':'
 
-	SELECT    @crtValue = CAST(@ValueInMS / (1000 * 60) AS [varchar])
-			, @ValueInMS = @ValueInMS % (1000 * 60)
+	SELECT    @crtValue = CAST(@valueInMS / (1000 * 60) AS [varchar])
+			, @valueInMS = @valueInMS % (1000 * 60)
 
 	SET @timeValue = @timeValue + REPLICATE('0', 2-CASE WHEN LEN(@crtValue) < 2 THEN LEN(@crtValue) ELSE 2 END) + @crtValue + ':'
 
-	SELECT    @crtValue = CAST(@ValueInMS / (1000) AS [varchar])
-			, @ValueInMS = @ValueInMS % (1000)
+	SELECT    @crtValue = CAST(@valueInMS / (1000) AS [varchar])
+			, @valueInMS = @valueInMS % (1000)
 
 	SET @timeValue = @timeValue + REPLICATE('0', 2-CASE WHEN LEN(@crtValue) < 2 THEN LEN(@crtValue) ELSE 2 END) + @crtValue + '.'
 
-	SELECT    @crtValue = CAST(@ValueInMS AS [varchar])
+	SELECT    @crtValue = CAST(@valueInMS AS [varchar])
 
 	SET @timeValue = @timeValue + REPLICATE('0', 3-CASE WHEN LEN(@crtValue) < 3 THEN LEN(@crtValue) ELSE 3 END) + @crtValue
 

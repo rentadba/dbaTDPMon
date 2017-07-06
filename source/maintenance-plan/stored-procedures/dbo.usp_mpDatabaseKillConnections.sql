@@ -10,11 +10,11 @@ GO
 
 -----------------------------------------------------------------------------------------
 CREATE PROCEDURE [dbo].[usp_mpDatabaseKillConnections]
-		@SQLServerName		[sysname],
-		@DBName				[sysname] = NULL,
+		@sqlServerName		[sysname],
+		@dbName				[sysname] = NULL,
 		@flgOptions			[int] = 2,
 		@executionLevel		[tinyint] = 0,
-		@DebugMode			[bit] = 0
+		@debugMode			[bit] = 0
 /* WITH ENCRYPTION */
 AS
 
@@ -28,11 +28,11 @@ AS
 
 -----------------------------------------------------------------------------------------
 -- Input Parameters:
---		@SQLServerName	- name of SQL Server instance to analyze
---		@DBName			- database to be analyzed
+--		@sqlServerName	- name of SQL Server instance to analyze
+--		@dbName			- database to be analyzed
 --		@flgOptions		- 1 - normal connections
 --						  2 - orphan connections
---		@DebugMode:		 1 - print dynamic SQL statements 
+--		@debugMode:		 1 - print dynamic SQL statements 
 --						 0 - no statements will be displayed (default)
 -----------------------------------------------------------------------------------------
 -- Return : 
@@ -72,7 +72,7 @@ BEGIN TRY
 		SET @StartTime = GETUTCDATE()
 
 		SET @serverToRun = N''
-		SET @serverToRun = @serverToRun + N'[' + @SQLServerName + '].[master].[dbo].[sp_executesql]'
+		SET @serverToRun = @serverToRun + N'[' + @sqlServerName + '].[master].[dbo].[sp_executesql]'
 
 		------------------------------------------------------------------------------
 		--get database list that will be analyzed
@@ -97,9 +97,9 @@ BEGIN TRY
 												WHERE	req_spid=-2
 														and req_transactionuow <> ''00000000-0000-0000-0000-000000000000''
 											 )x
-										WHERE [name] LIKE ''' + CASE WHEN @DBName IS NULL THEN '%' ELSE @DBName END + ''''
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+										WHERE [name] LIKE ''' + CASE WHEN @dbName IS NULL THEN '%' ELSE @dbName END + ''''
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		DELETE FROM @DatabaseList
 		INSERT	INTO @DatabaseList([dbname])
@@ -124,8 +124,8 @@ BEGIN TRY
 									AND (   (ec.session_id<>-2 and ' + CAST(@flgOptions AS [nvarchar](max)) + N' & 1 = 1)
 										 or (ec.session_id=-2  and ' + CAST(@flgOptions AS [nvarchar](max)) + N' & 2 = 2)
 										)'
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-				IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				DELETE FROM @RowCount
 				INSERT	INTO @RowCount([rowcount])
@@ -145,8 +145,8 @@ BEGIN TRY
 											AND req_transactionuow <> ''00000000-0000-0000-0000-000000000000''
 								 )y'
 
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-				IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				DELETE FROM @RowCount
 				INSERT	INTO @RowCount([rowcount])
@@ -179,8 +179,8 @@ BEGIN TRY
 																	AND ec.session_id <> @@SPID
 																	AND ec.session_id<>-2'
 
-										SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-										IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+										SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+										IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 										INSERT	INTO @SessionDetails([spid])
 												EXEC (@queryToRun)
@@ -205,8 +205,8 @@ BEGIN TRY
 															WHERE	DB_NAME(ISNULL(resource_database_id,1)) = ''' + @databaseName + '''
 																	AND ec.session_id=-2'
 
-										SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-										IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+										SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+										IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 										INSERT	INTO @SessionDetails([uow])
 												EXEC (@queryToRun)
@@ -234,8 +234,8 @@ BEGIN TRY
 																			AND req_transactionuow <> ''00000000-0000-0000-0000-000000000000''
 																 )x'
 
-										SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-										IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+										SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+										IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 										INSERT	INTO @SessionDetails([uow])
 												EXEC (@queryToRun)
@@ -317,8 +317,8 @@ BEGIN TRY
 											AND (   (ec.session_id<>-2 and ' + CAST(@flgOptions AS [nvarchar](max)) + N' & 1 = 1)
 												 or (ec.session_id=-2  and ' + CAST(@flgOptions AS [nvarchar](max)) + N' & 2 = 2)
 												)'
-						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-						IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 						DELETE FROM @RowCount
 						INSERT	INTO @RowCount([rowcount])
@@ -338,8 +338,8 @@ BEGIN TRY
 													AND req_transactionuow <> ''00000000-0000-0000-0000-000000000000''
 										 )y'
 
-						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-						IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 						DELETE FROM @RowCount
 						INSERT	INTO @RowCount([rowcount])
@@ -377,8 +377,8 @@ BEGIN TRY
 									AND req_transactionuow = ''00000000-0000-0000-0000-000000000000''
 						 )y'
 
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		DELETE FROM @RowCount
 		INSERT	INTO @RowCount([rowcount])

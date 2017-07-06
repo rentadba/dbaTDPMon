@@ -6,7 +6,7 @@ GO
 
 CREATE FUNCTION [dbo].[ufn_formatSQLQueryForLinkedServer]
 (		
-	@SQLServerName		[sysname],
+	@sqlServerName		[sysname],
 	@sqlText			[nvarchar] (4000)
 )
 RETURNS [nvarchar](4000)
@@ -23,7 +23,7 @@ AS
 -- ============================================================================
 -----------------------------------------------------------------------------------------
 -- Input Parameters:
---		@SQLServerName	- name of SQL Server instance
+--		@sqlServerName	- name of SQL Server instance
 --		@sqlText		- initial SQL statement to be executed.
 --						  this string is formated as to be executed on local server
 -----------------------------------------------------------------------------------------
@@ -37,12 +37,12 @@ begin
 
 	SET @SQLStatement = N''
 
-	IF @SQLServerName=@@SERVERNAME
+	IF @sqlServerName=@@SERVERNAME
 		SET @SQLStatement = @sqlText
 	ELSE
 		begin
 			SET @SQLStatement = @SQLStatement + 
-								N'SELECT x.* FROM OPENQUERY([' + @SQLServerName + '], ''' + 
+								N'SELECT x.* FROM OPENQUERY([' + @sqlServerName + '], ''' + 
 								REPLACE(@sqlText, '''', '''''') + 
 								''')x'
 		end

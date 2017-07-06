@@ -10,16 +10,16 @@ GO
 
 -----------------------------------------------------------------------------------------
 CREATE PROCEDURE [dbo].[usp_mpGetIndexCreationScript]
-		@SQLServerName		[sysname]=@@SERVERNAME,
-		@DBName				[sysname],
-		@TableSchema		[sysname]='dbo',
-		@TableName			[sysname],
-		@IndexName			[sysname],
-		@IndexID			[int],
+		@sqlServerName		[sysname]=@@SERVERNAME,
+		@dbName				[sysname],
+		@tableSchema		[sysname]='dbo',
+		@tableName			[sysname],
+		@indexName			[sysname],
+		@indexID			[int],
 		@flgOptions			[int] = 4099,
 		@sqlIndexCreate		[nvarchar](max) OUTPUT,
 		@executionLevel		[tinyint] = 0,
-		@DebugMode			[bit] = 0
+		@debugMode			[bit] = 0
 /* WITH ENCRYPTION */
 AS
 
@@ -33,17 +33,17 @@ AS
 
 -----------------------------------------------------------------------------------------
 -- Input Parameters:
---		@SQLServerName	- name of SQL Server instance to analyze
---		@DBName			- database to be analyzed
---		@TableSchema	- schema that current table belongs to
---		@TableName		- specify table name to be analyzed
---		@IndexName		- name of the index to be analyzed
---		@IndexID		- id of the index to be analyzed. to may specify either index name or id. 
+--		@sqlServerName	- name of SQL Server instance to analyze
+--		@dbName			- database to be analyzed
+--		@tableSchema	- schema that current table belongs to
+--		@tableName		- specify table name to be analyzed
+--		@indexName		- name of the index to be analyzed
+--		@indexID		- id of the index to be analyzed. to may specify either index name or id. 
 --						  if you specify both, index name will be taken into consideration
 --		@flgOptions:	1 - get also indexes that are created by a table constraint (primary or unique key) (default)
 --						2 - use drop existing to recreate the index (default)
 --					 4096 - use ONLINE=ON, if applicable (default)
---		@DebugMode:		1 - print dynamic SQL statements 
+--		@debugMode:		1 - print dynamic SQL statements 
 --						0 - no statements will be displayed (default)
 -----------------------------------------------------------------------------------------
 -- Output Parameters:
@@ -112,37 +112,37 @@ BEGIN TRY
 										, idx.[allow_row_locks]
 										, idx.[allow_page_locks]
 										, idx.[ignore_dup_key]
-									FROM [' + @DBName + '].[sys].[indexes]				idx
-									INNER JOIN [' + @DBName + '].[sys].[objects]		obj ON  idx.[object_id] = obj.[object_id]
-									INNER JOIN [' + @DBName + '].[sys].[schemas]		sch ON	sch.[schema_id] = obj.[schema_id]
-									INNER JOIN [' + @DBName + '].[sys].[data_spaces]	dSp	ON  idx.[data_space_id] = dSp.[data_space_id]
-									WHERE	obj.[name] = ''' + @TableName + '''
-											AND sch.[name] = ''' + @TableSchema + '''' + 
-											CASE	WHEN @IndexName IS NOT NULL 
-													THEN ' AND idx.[name] = ''' + @IndexName + ''''
-													ELSE ' AND idx.[index_id] = ' + CAST(@IndexID AS [nvarchar])
+									FROM [' + @dbName + '].[sys].[indexes]				idx
+									INNER JOIN [' + @dbName + '].[sys].[objects]		obj ON  idx.[object_id] = obj.[object_id]
+									INNER JOIN [' + @dbName + '].[sys].[schemas]		sch ON	sch.[schema_id] = obj.[schema_id]
+									INNER JOIN [' + @dbName + '].[sys].[data_spaces]	dSp	ON  idx.[data_space_id] = dSp.[data_space_id]
+									WHERE	obj.[name] = ''' + @tableName + '''
+											AND sch.[name] = ''' + @tableSchema + '''' + 
+											CASE	WHEN @indexName IS NOT NULL 
+													THEN ' AND idx.[name] = ''' + @indexName + ''''
+													ELSE ' AND idx.[index_id] = ' + CAST(@indexID AS [nvarchar])
 											END + 
 											CASE WHEN @flgOptions & 1 <> 1
 												 THEN '	AND NOT EXISTS	(
 																			SELECT 1
-																			FROM [' + @DBName + '].[INFORMATION_SCHEMA].[TABLE_CONSTRAINTS]
+																			FROM [' + @dbName + '].[INFORMATION_SCHEMA].[TABLE_CONSTRAINTS]
 																			WHERE [CONSTRAINT_TYPE]=''PRIMARY KEY''
-																					AND [CONSTRAINT_CATALOG]=''' + @DBName + '''
-																					AND [TABLE_NAME]=''' + @TableName + '''
-																					AND [TABLE_SCHEMA] = ''' + @TableSchema + '''
-																					AND [CONSTRAINT_NAME]=''' + @IndexName + '''
+																					AND [CONSTRAINT_CATALOG]=''' + @dbName + '''
+																					AND [TABLE_NAME]=''' + @tableName + '''
+																					AND [TABLE_SCHEMA] = ''' + @tableSchema + '''
+																					AND [CONSTRAINT_NAME]=''' + @indexName + '''
 																		)'
 												ELSE ''
 											END
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		DELETE FROM @IndexDetails
 		INSERT INTO @IndexDetails ([IndexName], [IndexType], [FillFactor], [FileGroupName], [IsUniqueConstraint], [IsPadded], [AllowRowLocks], [AllowPageLocks], [IgnoreDupKey])
 			EXEC (@queryToRun)
 
 		--get index fill factor and file group
-		SELECT	  @crtIndexName		= ISNULL(@IndexName, [IndexName])
+		SELECT	  @crtIndexName		= ISNULL(@indexName, [IndexName])
 				, @IndexType		= [IndexType]
 				, @FillFactor		= [FillFactor]
 				, @FileGroupName	= [FileGroupName]
@@ -161,33 +161,33 @@ BEGIN TRY
 										, idxCol.[is_included_column]
 										, idxCol.[is_descending_key]
 										, col.[name] AS [column_name]
-								FROM [' + @DBName + '].[sys].[indexes] idx
-								INNER JOIN [' + @DBName + '].[sys].[index_columns] idxCol ON	idx.[object_id] = idxCol.[object_id]
+								FROM [' + @dbName + '].[sys].[indexes] idx
+								INNER JOIN [' + @dbName + '].[sys].[index_columns] idxCol ON	idx.[object_id] = idxCol.[object_id]
 																								AND idx.[index_id] = idxCol.[index_id]
-								INNER JOIN [' + @DBName + '].[sys].[columns]		 col	ON	idxCol.[object_id] = col.[object_id]
+								INNER JOIN [' + @dbName + '].[sys].[columns]		 col	ON	idxCol.[object_id] = col.[object_id]
 																								AND idxCol.[column_id] = col.[column_id]
-								INNER JOIN [' + @DBName + '].[sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
-								INNER JOIN [' + @DBName + '].[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
-								WHERE	obj.[name] = ''' + @TableName + '''
-										AND sch.[name] = ''' + @TableSchema + '''' + 
-										CASE	WHEN @IndexName IS NOT NULL 
-												THEN ' AND idx.[name] = ''' + @IndexName + ''''
-												ELSE ' AND idx.[index_id] = ' + CAST(@IndexID AS [nvarchar])
+								INNER JOIN [' + @dbName + '].[sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
+								INNER JOIN [' + @dbName + '].[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
+								WHERE	obj.[name] = ''' + @tableName + '''
+										AND sch.[name] = ''' + @tableSchema + '''' + 
+										CASE	WHEN @indexName IS NOT NULL 
+												THEN ' AND idx.[name] = ''' + @indexName + ''''
+												ELSE ' AND idx.[index_id] = ' + CAST(@indexID AS [nvarchar])
 										END + 
 										CASE WHEN @flgOptions & 1 <> 1
 											 THEN '	AND NOT EXISTS	(
 																		SELECT 1
-																		FROM [' + @DBName + '].[INFORMATION_SCHEMA].[TABLE_CONSTRAINTS]
+																		FROM [' + @dbName + '].[INFORMATION_SCHEMA].[TABLE_CONSTRAINTS]
 																		WHERE [CONSTRAINT_TYPE]=''PRIMARY KEY''
-																				AND [CONSTRAINT_CATALOG]=''' + @DBName + '''
-																				AND [TABLE_NAME]=''' + @TableName + '''
-																				AND [TABLE_SCHEMA]=''' + @TableSchema + '''
-																				AND [CONSTRAINT_NAME]=''' + @IndexName + '''
+																				AND [CONSTRAINT_CATALOG]=''' + @dbName + '''
+																				AND [TABLE_NAME]=''' + @tableName + '''
+																				AND [TABLE_SCHEMA]=''' + @tableSchema + '''
+																				AND [CONSTRAINT_NAME]=''' + @indexName + '''
 																	)'
 											ELSE ''
 										END
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		DELETE FROM @IndexColumnDetails
 		INSERT INTO @IndexColumnDetails ([KeyOrdinal], [IndexColumnID], [IsIncludedColumn], [IsDescendingKey], [ColumnName])
@@ -198,17 +198,17 @@ BEGIN TRY
 			begin
 				-- check for online operation mode, for reorganize/rebuild
 				SET @nestExecutionLevel = @executionLevel + 1
-				EXEC [dbo].[usp_mpCheckIndexOnlineOperation]	@sqlServerName		= @SQLServerName,
-																@dbName				= @DBName,
-																@tableSchema		= @TableSchema,
-																@tableName			= @TableName,
-																@indexName			= @IndexName,
-																@indexID			= @IndexID,
+				EXEC [dbo].[usp_mpCheckIndexOnlineOperation]	@sqlServerName		= @sqlServerName,
+																@dbName				= @dbName,
+																@tableSchema		= @tableSchema,
+																@tableName			= @tableName,
+																@indexName			= @indexName,
+																@indexID			= @indexID,
 																@partitionNumber	= 1,
 																@sqlScriptOnline	= @sqlScriptOnline OUT,
 																@flgOptions			= @flgOptions,
 																@executionLevel		= @nestExecutionLevel,
-																@debugMode			= @DebugMode
+																@debugMode			= @debugMode
 
 				SET @sqlIndexCreate = @sqlIndexCreate + N'CREATE'
 				SET @sqlIndexCreate = @sqlIndexCreate +	 CASE	WHEN @IsUniqueConstraint=1	
@@ -219,7 +219,7 @@ BEGIN TRY
 																THEN ' CLUSTERED' 
 																ELSE ''
 														 END 
-				SET @sqlIndexCreate = @sqlIndexCreate +	 ' INDEX [' + @crtIndexName + '] ON [' + @TableSchema + '].[' + @TableName + '] ('
+				SET @sqlIndexCreate = @sqlIndexCreate +	 ' INDEX [' + @crtIndexName + '] ON [' + @tableSchema + '].[' + @tableName + '] ('
 				--index key columns
 				/*
 				DECLARE crsIndexKey CURSOR LOCAL FAST_FORWARD FOR	SELECT [ColumnName], [IsDescendingKey]

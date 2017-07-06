@@ -10,20 +10,20 @@ GO
 
 -----------------------------------------------------------------------------------------
 CREATE PROCEDURE [dbo].[usp_mpAlterTableIndexes]
-		@SQLServerName				[sysname],
-		@DBName						[sysname],
-		@TableSchema				[sysname] = '%',
-		@TableName					[sysname] = '%',
-		@IndexName					[sysname] = '%',
-		@IndexID					[int],
-		@PartitionNumber			[int] = 1,
+		@sqlServerName				[sysname],
+		@dbName						[sysname],
+		@tableSchema				[sysname] = '%',
+		@tableName					[sysname] = '%',
+		@indexName					[sysname] = '%',
+		@indexID					[int],
+		@partitionNumber			[int] = 1,
 		@flgAction					[tinyint] = 1,
 		@flgOptions					[int] = 6145, --4096 + 2048 + 1	/* 6177 for space optimized index rebuild */
-		@MaxDOP						[smallint] = 1,
-		@FillFactor					[tinyint] = 0,
+		@maxDOP						[smallint] = 1,
+		@fillFactor					[tinyint] = 0,
 		@executionLevel				[tinyint] = 0,
 		@affectedDependentObjects	[nvarchar](max) OUTPUT,
-		@DebugMode					[bit] = 0
+		@debugMode					[bit] = 0
 /* WITH ENCRYPTION */
 AS
 
@@ -38,14 +38,14 @@ AS
 
 -----------------------------------------------------------------------------------------
 -- Input Parameters:
---		@SQLServerName	- name of SQL Server instance to analyze
---		@DBName			- database to be analyzed
---		@TableSchema	- schema that current table belongs to
---		@TableName		- specify table name to be analyzed.
---		@IndexName		- name of the index to be analyzed
---		@IndexID		- id of the index to be analyzed. to may specify either index name or id. 
+--		@sqlServerName	- name of SQL Server instance to analyze
+--		@dbName			- database to be analyzed
+--		@tableSchema	- schema that current table belongs to
+--		@tableName		- specify table name to be analyzed.
+--		@indexName		- name of the index to be analyzed
+--		@indexID		- id of the index to be analyzed. to may specify either index name or id. 
 --						  if you specify both, index name will be taken into consideration
---		@PartitionNumber- index partition number. default value = 1 (index with no partitions)
+--		@partitionNumber- index partition number. default value = 1 (index with no partitions)
 --		@flgAction:		 1	- Rebuild index (default)
 --						 2  - Reorganize indexes
 --						 4	- Disable index
@@ -57,7 +57,7 @@ AS
 --						64  - When enabling foreign key constraints, do no check values. Default behaviour is to enabled foreign key constraint with check option
 --					  2048  - send email when a error occurs (default)
 --					  4096  - rebuild/reorganize indexes using ONLINE=ON, if applicable (default)
---		@DebugMode:		 1 - print dynamic SQL statements 
+--		@debugMode:		 1 - print dynamic SQL statements 
 --						 0 - no statements will be displayed (default)
 -----------------------------------------------------------------------------------------
 
@@ -128,12 +128,12 @@ BEGIN TRY
 				)
 
 		SET @queryToRun = N'SELECT TABLE_SCHEMA, TABLE_NAME 
-						FROM [' + @DBName + '].INFORMATION_SCHEMA.TABLES 
+						FROM [' + @dbName + '].INFORMATION_SCHEMA.TABLES 
 						WHERE	TABLE_TYPE = ''BASE TABLE'' 
-								AND TABLE_NAME LIKE ''' + @TableName + ''' 
-								AND TABLE_SCHEMA LIKE ''' + @TableSchema + ''''
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+								AND TABLE_NAME LIKE ''' + @tableName + ''' 
+								AND TABLE_SCHEMA LIKE ''' + @tableSchema + ''''
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		INSERT	INTO #tmpTableList ([table_schema], [table_name])
 				EXEC (@queryToRun)
@@ -167,19 +167,19 @@ BEGIN TRY
 														, CASE WHEN xi.[type]=3 AND xi.[using_xml_index_id] IS NULL THEN 1 ELSE 0 END AS [is_primary_xml]
 														, CASE WHEN SUM(CASE WHEN fk.[name] IS NOT NULL THEN 1 ELSE 0 END) > 0 THEN 1 ELSE 0 END AS [has_dependent_fk]
 														, ISNULL(st.[is_replicated], 0) | ISNULL(st.[is_merge_published], 0) | ISNULL(st.[is_published], 0) AS [is_replicated]
-													FROM [' + @DBName + '].[sys].[indexes]				si
-													INNER JOIN [' + @DBName + '].[sys].[objects]		so  ON so.[object_id] = si.[object_id]
-													INNER JOIN [' + @DBName + '].[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
-													LEFT  JOIN [' + @DBName + '].[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id] AND si.[type]=3
-													LEFT  JOIN [' + @DBName + '].[sys].[foreign_keys]	fk  ON fk.[referenced_object_id] = so.[object_id] AND fk.[key_index_id] = si.[index_id]
-													LEFT  JOIN [' + @DBName + '].[sys].[tables]			st  ON st.[object_id] = so.[object_id]
+													FROM [' + @dbName + '].[sys].[indexes]				si
+													INNER JOIN [' + @dbName + '].[sys].[objects]		so  ON so.[object_id] = si.[object_id]
+													INNER JOIN [' + @dbName + '].[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
+													LEFT  JOIN [' + @dbName + '].[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id] AND si.[type]=3
+													LEFT  JOIN [' + @dbName + '].[sys].[foreign_keys]	fk  ON fk.[referenced_object_id] = so.[object_id] AND fk.[key_index_id] = si.[index_id]
+													LEFT  JOIN [' + @dbName + '].[sys].[tables]			st  ON st.[object_id] = so.[object_id]
 													WHERE	so.[name] = ''' + @crtTableName + '''
 															AND sch.[name] = ''' + @crtTableSchema + '''
 															AND so.[is_ms_shipped] = 0' + 
-															CASE	WHEN @IndexName IS NOT NULL 
-																	THEN ' AND si.[name] LIKE ''' + @IndexName + ''''
-																	ELSE CASE WHEN @IndexID  IS NOT NULL 
-																			  THEN ' AND si.[index_id] = ' + CAST(@IndexID AS [nvarchar])
+															CASE	WHEN @indexName IS NOT NULL 
+																	THEN ' AND si.[name] LIKE ''' + @indexName + ''''
+																	ELSE CASE WHEN @indexID  IS NOT NULL 
+																			  THEN ' AND si.[index_id] = ' + CAST(@indexID AS [nvarchar])
 																			  ELSE ''
 																		 END
 															END + '
@@ -192,8 +192,8 @@ BEGIN TRY
 															, CASE WHEN xi.[type]=3 AND xi.[using_xml_index_id] IS NULL THEN 1 ELSE 0 END
 															, ISNULL(st.[is_replicated], 0) | ISNULL(st.[is_merge_published], 0) | ISNULL(st.[is_published], 0)'
 
-						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-						IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 						DELETE FROM @tmpTableToAlterIndexes
 						INSERT	INTO @tmpTableToAlterIndexes([index_id], [index_name], [index_type], [allow_page_locks], [is_disabled], [is_primary_xml], [has_dependent_fk], [is_replicated])
@@ -226,17 +226,17 @@ BEGIN TRY
 								IF @flgOptions & 4096 = 4096
 									begin
 										SET @nestedExecutionLevel = @executionLevel + 3
-										EXEC [dbo].[usp_mpCheckIndexOnlineOperation]	@sqlServerName		= @SQLServerName,
-																						@dbName				= @DBName,
+										EXEC [dbo].[usp_mpCheckIndexOnlineOperation]	@sqlServerName		= @sqlServerName,
+																						@dbName				= @dbName,
 																						@tableSchema		= @crtTableSchema,
 																						@tableName			= @crtTableName,
 																						@indexName			= @crtIndexName,
 																						@indexID			= @crtIndexID,
-																						@partitionNumber	= @PartitionNumber,
+																						@partitionNumber	= @partitionNumber,
 																						@sqlScriptOnline	= @sqlScriptOnline OUT,
 																						@flgOptions			= @flgOptions,
 																						@executionLevel		= @nestedExecutionLevel,
-																						@debugMode			= @DebugMode
+																						@debugMode			= @debugMode
 									end
 
 								---------------------------------------------------------------------------------------------
@@ -247,15 +247,15 @@ BEGIN TRY
 									AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0
 									begin
 										SET @nestedExecutionLevel = @executionLevel + 2
-										EXEC [dbo].[usp_mpAlterTableForeignKeys]	  @SQLServerName	= @SQLServerName
-																					, @DBName			= @DBName
-																					, @TableSchema		= @crtTableSchema
-																					, @TableName		= @crtTableName
-																					, @ConstraintName	= '%'
+										EXEC [dbo].[usp_mpAlterTableForeignKeys]	  @sqlServerName	= @sqlServerName
+																					, @dbName			= @dbName
+																					, @tableSchema		= @crtTableSchema
+																					, @tableName		= @crtTableName
+																					, @constraintName	= '%'
 																					, @flgAction		= 0		-- Disable Constraints
 																					, @flgOptions		= 1		-- Use tables that have foreign key constraints that reffers current table (default)
 																					, @executionLevel	= @nestedExecutionLevel
-																					, @DebugMode		= @DebugMode
+																					, @debugMode		= @debugMode
 									end
 
 								---------------------------------------------------------------------------------------------
@@ -269,16 +269,16 @@ BEGIN TRY
 												SET @queryToRun = N''
 												SET @queryToRun = @queryToRun + N'SELECT  si.[name]
 																				, CASE WHEN xi.[type]=3 AND xi.[using_xml_index_id] IS NULL THEN 1 ELSE 0 END AS [is_primary_xml]
-																			FROM [' + @DBName + '].[sys].[indexes]				si
-																			INNER JOIN [' + @DBName + '].[sys].[objects]		so ON  si.[object_id] = so.[object_id]
-																			INNER JOIN [' + @DBName + '].[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
-																			LEFT  JOIN [' + @DBName + '].[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id] AND si.[type]=3
+																			FROM [' + @dbName + '].[sys].[indexes]				si
+																			INNER JOIN [' + @dbName + '].[sys].[objects]		so ON  si.[object_id] = so.[object_id]
+																			INNER JOIN [' + @dbName + '].[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
+																			LEFT  JOIN [' + @dbName + '].[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id] AND si.[type]=3
 																			WHERE	so.[name] = ''' + @crtTableName + '''
 																					AND sch.[name] = ''' + @crtTableSchema + ''' 
 																					AND si.[type] in (2,3,4)
 																					AND si.[is_disabled] = 0'
-												SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-												IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+												SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+												IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 												INSERT INTO @DependentIndexes ([index_name], [is_primary_xml])
 													EXEC (@queryToRun)
@@ -297,18 +297,18 @@ BEGIN TRY
 												WHILE @@FETCH_STATUS=0
 													begin
 														SET @nestedExecutionLevel = @executionLevel + 2
-														EXEC [dbo].[usp_mpAlterTableIndexes]	  @SQLServerName	= @SQLServerName
-																								, @DBName			= @DBName
-																								, @TableSchema		= @crtTableSchema
-																								, @TableName		= @crtTableName
-																								, @IndexName		= @tmpIndexName
-																								, @IndexID			= NULL
-																								, @PartitionNumber	= DEFAULT
+														EXEC [dbo].[usp_mpAlterTableIndexes]	  @sqlServerName	= @sqlServerName
+																								, @dbName			= @dbName
+																								, @tableSchema		= @crtTableSchema
+																								, @tableName		= @crtTableName
+																								, @indexName		= @tmpIndexName
+																								, @indexID			= NULL
+																								, @partitionNumber	= DEFAULT
 																								, @flgAction		= 4				--disable
 																								, @flgOptions		= @flgOptions
 																								, @executionLevel	= @nestedExecutionLevel
 																								, @affectedDependentObjects = @affectedDependentObjects OUT
-																								, @DebugMode		= @DebugMode										
+																								, @debugMode		= @debugMode										
 
 														FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName
 													end
@@ -327,17 +327,17 @@ BEGIN TRY
 													--get all enabled secondary xml indexes for current table
 													SET @queryToRun = N''
 													SET @queryToRun = @queryToRun + N'SELECT  si.[name]
-																				FROM [' + @DBName + '].[sys].[indexes]				si
-																				INNER JOIN [' + @DBName + '].[sys].[objects]		so ON  si.[object_id] = so.[object_id]
-																				INNER JOIN [' + @DBName + '].[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
-																				INNER JOIN [' + @DBName + '].[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id]
+																				FROM [' + @dbName + '].[sys].[indexes]				si
+																				INNER JOIN [' + @dbName + '].[sys].[objects]		so ON  si.[object_id] = so.[object_id]
+																				INNER JOIN [' + @dbName + '].[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
+																				INNER JOIN [' + @dbName + '].[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id]
 																				WHERE	so.[name] = ''' + @crtTableName + '''
 																						AND sch.[name] = ''' + @crtTableSchema + ''' 
 																						AND si.[type] = 3
 																						AND xi.[using_xml_index_id] = ''' + CAST(@crtIndexID AS [sysname]) + '''
 																						AND si.[is_disabled] = 0'
-													SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-													IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+													SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+													IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 													INSERT INTO @DependentIndexes ([index_name])
 														EXEC (@queryToRun)
@@ -355,18 +355,18 @@ BEGIN TRY
 													WHILE @@FETCH_STATUS=0
 														begin
 															SET @nestedExecutionLevel = @executionLevel + 2
-															EXEC [dbo].[usp_mpAlterTableIndexes]	  @SQLServerName	= @SQLServerName
-																									, @DBName			= @DBName
-																									, @TableSchema		= @crtTableSchema
-																									, @TableName		= @crtTableName
-																									, @IndexName		= @tmpIndexName
-																									, @IndexID			= NULL
-																									, @PartitionNumber	= DEFAULT
+															EXEC [dbo].[usp_mpAlterTableIndexes]	  @sqlServerName	= @sqlServerName
+																									, @dbName			= @dbName
+																									, @tableSchema		= @crtTableSchema
+																									, @tableName		= @crtTableName
+																									, @indexName		= @tmpIndexName
+																									, @indexID			= NULL
+																									, @partitionNumber	= DEFAULT
 																									, @flgAction		= 4				--disable
 																									, @flgOptions		= @flgOptions
 																									, @executionLevel	= @nestedExecutionLevel
 																									, @affectedDependentObjects = @affectedDependentObjects OUT
-																									, @DebugMode		= @DebugMode										
+																									, @debugMode		= @debugMode										
 
 															FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName
 														end
@@ -380,18 +380,18 @@ BEGIN TRY
 										IF @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0
 											begin
 												SET @nestedExecutionLevel = @executionLevel + 2
-												EXEC [dbo].[usp_mpAlterTableIndexes]	  @SQLServerName	= @SQLServerName
-																						, @DBName			= @DBName
-																						, @TableSchema		= @crtTableSchema
-																						, @TableName		= @crtTableName
-																						, @IndexName		= @crtIndexName
-																						, @IndexID			= NULL
-																						, @PartitionNumber	= @PartitionNumber
+												EXEC [dbo].[usp_mpAlterTableIndexes]	  @sqlServerName	= @sqlServerName
+																						, @dbName			= @dbName
+																						, @tableSchema		= @crtTableSchema
+																						, @tableName		= @crtTableName
+																						, @indexName		= @crtIndexName
+																						, @indexID			= NULL
+																						, @partitionNumber	= @partitionNumber
 																						, @flgAction		= 4				--disable
 																						, @flgOptions		= @flgOptions
 																						, @executionLevel	= @nestedExecutionLevel
 																						, @affectedDependentObjects = @affectedDependentObjects OUT
-																						, @DebugMode		= @DebugMode										
+																						, @debugMode		= @debugMode										
 										end
 
 								---------------------------------------------------------------------------------------------
@@ -404,18 +404,18 @@ BEGIN TRY
 													@serverVersionNum				[numeric](9,6)
 
 										SET @nestedExecutionLevel = @executionLevel + 1
-										EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @SQLServerName,
+										EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 																				@serverEdition			= @serverEdition OUT,
 																				@serverVersionStr		= @serverVersionStr OUT,
 																				@serverVersionNum		= @serverVersionNum OUT,
 																				@executionLevel			= @nestedExecutionLevel,
-																				@debugMode				= @DebugMode
+																				@debugMode				= @debugMode
 										
 										IF     (@serverVersionNum >= 11.02100 AND @serverVersionNum < 11.03449) /* SQL Server 2012 RTM till SQL Server 2012 SP1 CU 11*/
 											OR (@serverVersionNum >= 11.05058 AND @serverVersionNum < 11.05532) /* SQL Server 2012 SP2 till SQL Server 2012 SP2 CU 1*/
 											OR (@serverVersionNum >= 12.02000 AND @serverVersionNum < 12.02370) /* SQL Server 2014 RTM CU 2*/
 											begin
-												SET @MaxDOP=1
+												SET @maxDOP=1
 											end
 									end
 
@@ -427,15 +427,15 @@ BEGIN TRY
 								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX ' + dbo.ufn_mpObjectQuoteName(@crtIndexName) + ' ON [' + @crtTableSchema + '].[' + @crtTableName + '] REBUILD'
 					
 								--rebuild options
-								SET @queryToRun = @queryToRun + N' WITH (SORT_IN_TEMPDB = ON' + CASE WHEN ISNULL(@MaxDOP, 0) <> 0 THEN N', MAXDOP = ' + CAST(@MaxDOP AS [nvarchar]) ELSE N'' END + 
+								SET @queryToRun = @queryToRun + N' WITH (SORT_IN_TEMPDB = ON' + CASE WHEN ISNULL(@maxDOP, 0) <> 0 THEN N', MAXDOP = ' + CAST(@maxDOP AS [nvarchar]) ELSE N'' END + 
 																						CASE WHEN ISNULL(@sqlScriptOnline, N'')<>N'' THEN N', ' + @sqlScriptOnline ELSE N'' END + 
-																						CASE WHEN ISNULL(@FillFactor, 0) <> 0 THEN N', FILLFACTOR = ' + CAST(@FillFactor AS [nvarchar]) ELSE N'' END +
+																						CASE WHEN ISNULL(@fillFactor, 0) <> 0 THEN N', FILLFACTOR = ' + CAST(@fillFactor AS [nvarchar]) ELSE N'' END +
 																N')'
 
-								IF @PartitionNumber>1
-									SET @queryToRun = @queryToRun + N' PARTITION ' + CAST(@PartitionNumber AS [nvarchar])
+								IF @partitionNumber>1
+									SET @queryToRun = @queryToRun + N' PARTITION ' + CAST(@partitionNumber AS [nvarchar])
 
-								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								IF @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%'))
 									begin
@@ -448,8 +448,8 @@ BEGIN TRY
 								SET @childObjectName = [dbo].[ufn_mpObjectQuoteName](@crtIndexName)
 								SET @nestedExecutionLevel = @executionLevel + 1
 
-								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
-																				@dbName			= @DBName,
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+																				@dbName			= @dbName,
 																				@objectName		= @objectName,
 																				@childObjectName= @childObjectName,
 																				@module			= 'dbo.usp_mpAlterTableIndexes',
@@ -457,13 +457,13 @@ BEGIN TRY
 																				@queryToRun  	= @queryToRun,
 																				@flgOptions		= @flgOptions,
 																				@executionLevel	= @nestedExecutionLevel,
-																				@debugMode		= @DebugMode
+																				@debugMode		= @debugMode
 								
 								IF @errorCode=0
 									EXEC [dbo].[usp_mpMarkInternalAction]	@actionName			= N'index-made-disable',
 																			@flgOperation		= 2,
-																			@server_name		= @SQLServerName,
-																			@database_name		= @DBName,
+																			@server_name		= @sqlServerName,
+																			@database_name		= @dbName,
 																			@schema_name		= @crtTableSchema,
 																			@object_name		= @crtTableName,
 																			@child_object_name	= @crtIndexName
@@ -481,8 +481,8 @@ BEGIN TRY
 																				SELECT DISTINCT di.[index_name], di.[is_primary_xml]
 																				FROM @DependentIndexes di
 																				LEFT JOIN [maintenance-plan].[logInternalAction] smpi ON	smpi.[name]=N'index-made-disable'
-																																					AND smpi.[server_name]=@SQLServerName
-																																					AND smpi.[database_name]=@DBName
+																																					AND smpi.[server_name]=@sqlServerName
+																																					AND smpi.[database_name]=@dbName
 																																					AND smpi.[schema_name]=@crtTableSchema
 																																					AND smpi.[object_name]=@crtTableName
 																																					AND smpi.[child_object_name]=di.[index_name]
@@ -503,18 +503,18 @@ BEGIN TRY
 												WHILE @@FETCH_STATUS=0
 													begin
 														SET @nestedExecutionLevel = @executionLevel + 2
-														EXEC [dbo].[usp_mpAlterTableIndexes]	  @SQLServerName	= @SQLServerName
-																								, @DBName			= @DBName
-																								, @TableSchema		= @crtTableSchema
-																								, @TableName		= @crtTableName
-																								, @IndexName		= @tmpIndexName
-																								, @IndexID			= NULL
-																								, @PartitionNumber	= DEFAULT
+														EXEC [dbo].[usp_mpAlterTableIndexes]	  @sqlServerName	= @sqlServerName
+																								, @dbName			= @dbName
+																								, @tableSchema		= @crtTableSchema
+																								, @tableName		= @crtTableName
+																								, @indexName		= @tmpIndexName
+																								, @indexID			= NULL
+																								, @partitionNumber	= DEFAULT
 																								, @flgAction		= 1		--rebuild
 																								, @flgOptions		= @flgOptions
 																								, @executionLevel	= @nestedExecutionLevel
 																								, @affectedDependentObjects = @affectedDependentObjects OUT
-																								, @DebugMode		= @DebugMode										
+																								, @debugMode		= @debugMode										
 
 														FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName, @tmpIndexIsPrimaryXML
 													end
@@ -537,15 +537,15 @@ BEGIN TRY
 											SET @flgInheritOptions = @flgInheritOptions + 4		-- Enable constraints with NOCHECK. Default is to enable constraints using CHECK option
 
 										SET @nestedExecutionLevel = @executionLevel + 2
-										EXEC [dbo].[usp_mpAlterTableForeignKeys]	  @SQLServerName	= @SQLServerName
-																					, @DBName			= @DBName
-																					, @TableSchema		= @crtTableSchema
-																					, @TableName		= @crtTableName
-																					, @ConstraintName	= '%'
+										EXEC [dbo].[usp_mpAlterTableForeignKeys]	  @sqlServerName	= @sqlServerName
+																					, @dbName			= @dbName
+																					, @tableSchema		= @crtTableSchema
+																					, @tableName		= @crtTableName
+																					, @constraintName	= '%'
 																					, @flgAction		= 1		-- Enable Constraints
 																					, @flgOptions		= @flgInheritOptions
 																					, @executionLevel	= @nestedExecutionLevel
-																					, @DebugMode		= @DebugMode
+																					, @debugMode		= @debugMode
 									end
 							end
 
@@ -566,17 +566,17 @@ BEGIN TRY
 									ELSE
 										SET @queryToRun = @queryToRun + N' WITH (LOB_COMPACTION = OFF) '
 				
-									IF @PartitionNumber>1
-										SET @queryToRun = @queryToRun + N' PARTITION ' + CAST(@PartitionNumber AS [nvarchar])
-									IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+									IF @partitionNumber>1
+										SET @queryToRun = @queryToRun + N' PARTITION ' + CAST(@partitionNumber AS [nvarchar])
+									IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 
 									SET @objectName = '[' + @crtTableSchema + '].[' + @crtTableName + ']'
 									SET @childObjectName = [dbo].[ufn_mpObjectQuoteName](@crtIndexName)
 									SET @nestedExecutionLevel = @executionLevel + 1
 
-									EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
-																					@dbName			= @DBName,
+									EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+																					@dbName			= @dbName,
 																					@objectName		= @objectName,
 																					@childObjectName= @childObjectName,
 																					@module			= 'dbo.usp_mpAlterTableIndexes',
@@ -584,7 +584,7 @@ BEGIN TRY
 																					@queryToRun  	= @queryToRun,
 																					@flgOptions		= @flgOptions,
 																					@executionLevel	= @nestedExecutionLevel,
-																					@debugMode		= @DebugMode
+																					@debugMode		= @debugMode
 								end
 							ELSE
 								begin
@@ -601,14 +601,14 @@ BEGIN TRY
 								SET @queryToRun = @queryToRun + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
 								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX ' + dbo.ufn_mpObjectQuoteName(@crtIndexName) + ' ON [' + @crtTableSchema + '].[' + @crtTableName + '] DISABLE'
 				
-								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								SET @objectName = '[' + @crtTableSchema + '].[' + @crtTableName + ']'
 								SET @childObjectName = [dbo].[ufn_mpObjectQuoteName](@crtIndexName)
 								SET @nestedExecutionLevel = @executionLevel + 1
 
-								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
-																				@dbName			= @DBName,
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+																				@dbName			= @dbName,
 																				@objectName		= @objectName,
 																				@childObjectName= @childObjectName,
 																				@module			= 'dbo.usp_mpAlterTableIndexes',
@@ -616,14 +616,14 @@ BEGIN TRY
 																				@queryToRun  	= @queryToRun,
 																				@flgOptions		= @flgOptions,
 																				@executionLevel	= @nestedExecutionLevel,
-																				@debugMode		= @DebugMode
+																				@debugMode		= @debugMode
 
 								/* 4 disable index -> insert action 1 */
 								IF @errorCode=0
 									EXEC [dbo].[usp_mpMarkInternalAction]	@actionName		= N'index-made-disable',
 																			@flgOperation	= 1,
-																			@server_name		= @SQLServerName,
-																			@database_name		= @DBName,
+																			@server_name		= @sqlServerName,
+																			@database_name		= @dbName,
 																			@schema_name		= @crtTableSchema,
 																			@object_name		= @crtTableName,
 																			@child_object_name	= @crtIndexName

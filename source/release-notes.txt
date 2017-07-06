@@ -551,3 +551,6 @@
 /*----------------------------------------------------------------------*/
 /* 04.07.2017 */
 	- allow database consistency checks for non-readable secondary replicas in an AlwaysOn environment (reported by Mihail Grebencio)
+
+/* 06.07.2017 */
+	- change procedure parameter names to mixed case 

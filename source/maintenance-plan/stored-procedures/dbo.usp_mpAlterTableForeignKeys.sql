@@ -10,15 +10,15 @@ GO
 
 -----------------------------------------------------------------------------------------
 CREATE PROCEDURE [dbo].[usp_mpAlterTableForeignKeys]
-		@SQLServerName		[sysname],
-		@DBName				[sysname],
-		@TableSchema		[sysname] = '%', 
-		@TableName			[sysname] = '%',
-		@ConstraintName		[sysname] = '%',
+		@sqlServerName		[sysname],
+		@dbName				[sysname],
+		@tableSchema		[sysname] = '%', 
+		@tableName			[sysname] = '%',
+		@constraintName		[sysname] = '%',
 		@flgAction			[bit] = 1,
 		@flgOptions			[int] = 2049,
 		@executionLevel		[tinyint] = 0,
-		@DebugMode			[bit] = 0
+		@debugMode			[bit] = 0
 /* WITH ENCRYPTION */
 AS
 
@@ -32,11 +32,11 @@ AS
 
 -----------------------------------------------------------------------------------------
 -- Input Parameters:
---		@SQLServerName	- name of SQL Server instance to analyze
---		@DBName			- database to be analyzed
---		@TableSchema	- schema that current table belongs to
---		@TableName		- specify table name to be analyzed. default = %, all tables will be analyzed
---		@ConstraintName	- specify constraint name to be enabled/disabled. default all
+--		@sqlServerName	- name of SQL Server instance to analyze
+--		@dbName			- database to be analyzed
+--		@tableSchema	- schema that current table belongs to
+--		@tableName		- specify table name to be analyzed. default = %, all tables will be analyzed
+--		@constraintName	- specify constraint name to be enabled/disabled. default all
 --		@flgAction:		 1	- Enable Constraints (default)
 --						 0	- Disable Constraints
 --		@flgOptions:	 1	- Use tables that have foreign key constraints that reffer current table (default)
@@ -44,7 +44,7 @@ AS
 --						 4  - Enable constraints with NOCHECK. Default is to enable constraints using CHECK option
 --						 8  - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
 --					  2048  - send email when a error occurs (default)
---		@DebugMode:		 1 - print dynamic SQL statements 
+--		@debugMode:		 1 - print dynamic SQL statements 
 --						 0 - no statements will be displayed (default)
 -----------------------------------------------------------------------------------------
 -- Return : 
@@ -79,12 +79,12 @@ BEGIN TRY
 				)
 
 		SET @queryToRun = N'SELECT TABLE_SCHEMA, TABLE_NAME 
-						FROM [' + @DBName + '].INFORMATION_SCHEMA.TABLES 
+						FROM [' + @dbName + '].INFORMATION_SCHEMA.TABLES 
 						WHERE	TABLE_TYPE = ''BASE TABLE'' 
-								AND TABLE_NAME LIKE ''' + @TableName + ''' 
-								AND TABLE_SCHEMA LIKE ''' + @TableSchema + ''''
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-		IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+								AND TABLE_NAME LIKE ''' + @tableName + ''' 
+								AND TABLE_SCHEMA LIKE ''' + @tableSchema + ''''
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		INSERT	INTO #tmpTableList ([table_schema], [table_name])
 				EXEC (@queryToRun)
@@ -118,17 +118,17 @@ BEGIN TRY
 							begin
 								--list all tables that have foreign key constraints that reffers current table					
 								SET @queryToRun=N'SELECT DISTINCT sch.[name] AS [schema_name], so.[name] AS [table_name], sfk.[name] AS [constraint_name]
-												FROM [' + @DBName + '].[sys].[objects] so
-												INNER JOIN [' + @DBName + '].[sys].[schemas]		sch  ON sch.[schema_id] = so.[schema_id]
-												INNER JOIN [' + @DBName + '].[sys].[foreign_keys]	sfk  ON so.[object_id] = sfk.[parent_object_id]
-												INNER JOIN [' + @DBName + '].[sys].[objects]		so2  ON sfk.[referenced_object_id] = so2.[object_id]
-												INNER JOIN [' + @DBName + '].[sys].[schemas]		sch2 ON sch2.[schema_id] = so2.[schema_id]
+												FROM [' + @dbName + '].[sys].[objects] so
+												INNER JOIN [' + @dbName + '].[sys].[schemas]		sch  ON sch.[schema_id] = so.[schema_id]
+												INNER JOIN [' + @dbName + '].[sys].[foreign_keys]	sfk  ON so.[object_id] = sfk.[parent_object_id]
+												INNER JOIN [' + @dbName + '].[sys].[objects]		so2  ON sfk.[referenced_object_id] = so2.[object_id]
+												INNER JOIN [' + @dbName + '].[sys].[schemas]		sch2 ON sch2.[schema_id] = so2.[schema_id]
 												WHERE	so2.[name]=''' + @crtTableName + '''
 														AND sch2.[name] = ''' + @crtTableSchema + '''
 														AND sfk.[is_disabled]=' + CAST(@flgAction AS [varchar]) + '
-														AND sfk.[name] LIKE ''' + @ConstraintName + ''''
-								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+														AND sfk.[name] LIKE ''' + @constraintName + ''''
+								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								INSERT	INTO #tmpTableToAlterConstraints([TableSchema], [TableName], [ConstraintName])
 										EXEC (@queryToRun)
@@ -138,18 +138,18 @@ BEGIN TRY
 							begin
 								--list all tables that current table foreign key constraints reffers 
 								SET @queryToRun='SELECT DISTINCT sch2.[name] AS [schema_name], so2.[name] AS [table_name], sfk.[name] AS [constraint_name]
-												FROM [' + @DBName + '].[sys].[objects] so
-												INNER JOIN [' + @DBName + '].[sys].[schemas]		sch  ON sch.[schema_id] = so.[schema_id]
-												INNER JOIN [' + @DBName + '].[sys].[foreign_keys]	sfk ON so.[object_id] = sfk.[referenced_object_id]
-												INNER JOIN [' + @DBName + '].[sys].[objects]		so2 ON sfk.[parent_object_id] = so2.[object_id]
-												INNER JOIN [' + @DBName + '].[sys].[schemas]		sch2 ON sch.[schema_id] = so2.[schema_id]
+												FROM [' + @dbName + '].[sys].[objects] so
+												INNER JOIN [' + @dbName + '].[sys].[schemas]		sch  ON sch.[schema_id] = so.[schema_id]
+												INNER JOIN [' + @dbName + '].[sys].[foreign_keys]	sfk ON so.[object_id] = sfk.[referenced_object_id]
+												INNER JOIN [' + @dbName + '].[sys].[objects]		so2 ON sfk.[parent_object_id] = so2.[object_id]
+												INNER JOIN [' + @dbName + '].[sys].[schemas]		sch2 ON sch.[schema_id] = so2.[schema_id]
 												WHERE	so2.[name]=''' + @crtTableName + '''
 														AND sch2.[name] = ''' + @crtTableSchema + '''
 														AND sfk.[is_disabled]=' + CAST(@flgAction AS [varchar])+ '
-														AND sfk.[name] LIKE ''' + @ConstraintName + ''''
+														AND sfk.[name] LIKE ''' + @constraintName + ''''
 
-								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								INSERT	INTO #tmpTableToAlterConstraints ([TableSchema], [TableName], [ConstraintName])
 										EXEC (@queryToRun)
@@ -166,7 +166,7 @@ BEGIN TRY
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 								--enable/disable foreign key constraints
-								SET @queryToRun='ALTER TABLE [' + @DBName + '].[' + @tmpSchemaName + '].[' + @tmpTableName + ']' + 
+								SET @queryToRun='ALTER TABLE [' + @dbName + '].[' + @tmpSchemaName + '].[' + @tmpTableName + ']' + 
 												CASE WHEN @flgAction=1	
 													 THEN ' WITH ' + 
 															CASE WHEN @flgOptions & 4 = 4	THEN 'NOCHECK'
@@ -174,15 +174,15 @@ BEGIN TRY
 															END + ' CHECK '	
 													 ELSE ' NOCHECK '
 												END + 'CONSTRAINT [' + @tmpConstraintName + ']'
-								IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								--
 								SET @objectName = '[' + @tmpSchemaName + '].[' + @tmpTableName + ']'
 								SET @childObjectName = QUOTENAME(@tmpConstraintName)
 								SET @nestedExecutionLevel = @executionLevel + 1
 
-								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
-																				@dbName			= @DBName,
+								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+																				@dbName			= @dbName,
 																				@objectName		= @objectName,
 																				@childObjectName= @childObjectName,
 																				@module			= 'dbo.usp_mpAlterTableForeignKeys',
@@ -190,7 +190,7 @@ BEGIN TRY
 																				@queryToRun  	= @queryToRun,
 																				@flgOptions		= @flgOptions,
 																				@executionLevel	= @nestedExecutionLevel,
-																				@debugMode		= @DebugMode
+																				@debugMode		= @debugMode
 
 								IF @errorCode=0	
 									begin
@@ -199,8 +199,8 @@ BEGIN TRY
 										SET @tmpFlgAction = CASE WHEN @flgAction=1 THEN 2 ELSE 1 END
 										EXEC [dbo].[usp_mpMarkInternalAction]		@actionName			= N'foreign-key-made-disable',
 																					@flgOperation		= @tmpFlgAction,
-																					@server_name		= @SQLServerName,
-																					@database_name		= @DBName,
+																					@server_name		= @sqlServerName,
+																					@database_name		= @dbName,
 																					@schema_name		= @tmpSchemaName,
 																					@object_name		= @tmpTableName,
 																					@child_object_name	= @tmpConstraintName

@@ -468,18 +468,18 @@ END CATCH'
 	SET @queryToRun = '
 /* only once a week on Sunday */
 IF DATENAME(weekday, GETDATE()) = ''Sunday''
-	EXEC [dbo].[usp_mpDatabaseOptimize]		@SQLServerName			= @@SERVERNAME,
-											@DBName					= ''master'',
-											@TableSchema			= ''%'',
-											@TableName				= ''%'',
+	EXEC [dbo].[usp_mpDatabaseOptimize]		@sqlServerName			= @@SERVERNAME,
+											@dbName					= ''master'',
+											@tableSchema			= ''%'',
+											@tableName				= ''%'',
 											@flgActions				= 11,
 											@flgOptions				= DEFAULT,
-											@DefragIndexThreshold	= DEFAULT,
-											@RebuildIndexThreshold	= DEFAULT,
-											@StatsSamplePercent		= DEFAULT,
-											@StatsAgeDays			= DEFAULT,
-											@StatsChangePercent		= DEFAULT,
-											@DebugMode				= DEFAULT'
+											@defragIndexThreshold	= DEFAULT,
+											@rebuildIndexThreshold	= DEFAULT,
+											@statsSamplePercent		= DEFAULT,
+											@statsAgeDays			= DEFAULT,
+											@statsChangePercent		= DEFAULT,
+											@debugMode				= DEFAULT'
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId,
 												@step_name=N'master - Index & Statistics Maintenance (weekly)', 
@@ -504,18 +504,18 @@ IF DATENAME(weekday, GETDATE()) = ''Sunday''
 	SET @queryToRun = '
 /* only once a week on Sunday */
 IF DATENAME(weekday, GETDATE()) = ''Sunday''
-	EXEC [dbo].[usp_mpDatabaseOptimize]		@SQLServerName			= @@SERVERNAME,
-											@DBName					= ''msdb'',
-											@TableSchema			= ''%'',
-											@TableName				= ''%'',
+	EXEC [dbo].[usp_mpDatabaseOptimize]		@sqlServerName			= @@SERVERNAME,
+											@dbName					= ''msdb'',
+											@tableSchema			= ''%'',
+											@tableName				= ''%'',
 											@flgActions				= 11,
 											@flgOptions				= DEFAULT,
-											@DefragIndexThreshold	= DEFAULT,
-											@RebuildIndexThreshold	= DEFAULT,
-											@StatsSamplePercent		= DEFAULT,
-											@StatsAgeDays			= DEFAULT,
-											@StatsChangePercent		= DEFAULT,
-											@DebugMode				= DEFAULT'
+											@defragIndexThreshold	= DEFAULT,
+											@rebuildIndexThreshold	= DEFAULT,
+											@statsSamplePercent		= DEFAULT,
+											@statsAgeDays			= DEFAULT,
+											@statsChangePercent		= DEFAULT,
+											@debugMode				= DEFAULT'
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId,
 												@step_name=N'msdb - Index & Statistics Maintenance (weekly)', 
@@ -562,12 +562,12 @@ IF DATENAME(weekday, GETDATE()) = ''Monday''
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseShrink]	@SQLServerName		= @@SERVERNAME,
-													@DBName				= @databaseName,
+				EXEC [dbo].[usp_mpDatabaseShrink]	@sqlServerName		= @@SERVERNAME,
+													@dbName				= @databaseName,
 													@flgActions			= 2,	
 													@flgOptions			= 1,
 													@executionLevel		= DEFAULT,
-													@DebugMode			= DEFAULT
+													@debugMode			= DEFAULT
 				
 				FETCH NEXT FROM crsDatabases INTO @databaseName
 			end
@@ -619,12 +619,12 @@ IF DATENAME(weekday, GETDATE()) = ''Saturday'' AND DATEPART(dd, GETDATE())<=7
 		FETCH NEXT FROM crsDatabases INTO @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				EXEC [dbo].[usp_mpDatabaseShrink]	@SQLServerName		= @@SERVERNAME,
-													@DBName				= @databaseName,
+				EXEC [dbo].[usp_mpDatabaseShrink]	@sqlServerName		= @@SERVERNAME,
+													@dbName				= @databaseName,
 													@flgActions			= 1,	
 													@flgOptions			= 0,
 													@executionLevel		= DEFAULT,
-													@DebugMode			= DEFAULT
+													@debugMode			= DEFAULT
 				
 				FETCH NEXT FROM crsDatabases INTO @databaseName
 			end

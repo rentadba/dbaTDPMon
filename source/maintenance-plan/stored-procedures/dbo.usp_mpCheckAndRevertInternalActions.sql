@@ -84,16 +84,16 @@ OPEN crslogInternalAction
 FETCH NEXT FROM crslogInternalAction INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
 WHILE @@FETCH_STATUS=0
 	begin
-		EXEC [dbo].[usp_mpAlterTableIndexes]		@SQLServerName				= @sqlServerName,
-													@DBName						= @crtDatabaseName,
-													@TableSchema				= @crtSchemaName,
-													@TableName					= @crtObjectName,
-													@IndexName					= @crtChildObjectName,
-													@IndexID					= NULL,
-													@PartitionNumber			= DEFAULT,
+		EXEC [dbo].[usp_mpAlterTableIndexes]		@sqlServerName				= @sqlServerName,
+													@dbName						= @crtDatabaseName,
+													@tableSchema				= @crtSchemaName,
+													@tableName					= @crtObjectName,
+													@indexName					= @crtChildObjectName,
+													@indexID					= NULL,
+													@partitionNumber			= DEFAULT,
 													@flgAction					= 1,
 													@flgOptions					= @flgOptions,
-													@MaxDOP						= 1,
+													@maxDOP						= 1,
 													@executionLevel				= @nestExecutionLevel,
 													@affectedDependentObjects	= @affectedDependentObjects OUT,
 													@debugMode					= @debugMode
@@ -116,11 +116,11 @@ OPEN crslogInternalAction
 FETCH NEXT FROM crslogInternalAction INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
 WHILE @@FETCH_STATUS=0
 	begin
-		EXEC [dbo].[usp_mpAlterTableForeignKeys]	@SQLServerName		= @sqlServerName,
-													@DBName				= @crtDatabaseName,
-													@TableSchema		= @crtSchemaName,
-													@TableName			= @crtObjectName,
-													@ConstraintName		= @crtChildObjectName,
+		EXEC [dbo].[usp_mpAlterTableForeignKeys]	@sqlServerName		= @sqlServerName,
+													@dbName				= @crtDatabaseName,
+													@tableSchema		= @crtSchemaName,
+													@tableName			= @crtObjectName,
+													@constraintName		= @crtChildObjectName,
 													@flgAction			= 1,
 													@flgOptions			= @flgOptions,
 													@executionLevel		= @nestExecutionLevel,

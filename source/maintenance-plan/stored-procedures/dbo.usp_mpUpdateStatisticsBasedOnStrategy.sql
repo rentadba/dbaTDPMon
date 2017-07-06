@@ -9,10 +9,10 @@ DROP PROCEDURE [dbo].[usp_mpUpdateStatisticsBasedOnStrategy]
 GO
 
 CREATE PROCEDURE [dbo].[usp_mpUpdateStatisticsBasedOnStrategy]
-		@SQLServerName				[sysname],
-		@DBName						[sysname],
-		@TableSchema				[sysname]		= 'dbo',
-		@TableName					[sysname],
+		@sqlServerName				[sysname],
+		@dbName						[sysname],
+		@tableSchema				[sysname]		= 'dbo',
+		@tableName					[sysname],
 		@columnName					[sysname]		= NULL,
 		@indexName					[sysname]		= NULL,
 		@columnValue				[nvarchar](max)	= NULL,
@@ -24,7 +24,7 @@ CREATE PROCEDURE [dbo].[usp_mpUpdateStatisticsBasedOnStrategy]
 		@forceUpdateStatistics		[bit]			=    0,
 		@flgOptions					[int]			=  528,
 		@executionLevel				[tinyint]		=    0,
-		@DebugMode					[tinyint]		=    1
+		@debugMode					[tinyint]		=    1
 /* WITH ENCRYPTION */
 AS
 
@@ -58,7 +58,7 @@ our approach:
 ----------------------------------------------------------------------------------------------------------------------------
 /*
 --sample usage for impact analysis
-EXEC [dbo].[usp_mpUpdateStatisticsBasedOnStrategy]	  @TableName					= 'REPORT_PERIOD_FILE'
+EXEC [dbo].[usp_mpUpdateStatisticsBasedOnStrategy]	  @tableName					= 'REPORT_PERIOD_FILE'
 											, @columnName					= 'RPF_REPORT_DEF_ID'
 											, @indexName					= 'RPF_RD_ID_TIMECOLS_SI'
 											, @columnValue					= 176446
@@ -69,12 +69,12 @@ EXEC [dbo].[usp_mpUpdateStatisticsBasedOnStrategy]	  @TableName					= 'REPORT_PE
 											, @densityConstantThreshold		= 500
 											, @forceUpdateStatistics		=   0
 											, @flgOptions					= 466	
-											, @DebugMode					=   1
+											, @debugMode					=   1
 */
 ----------------------------------------------------------------------------------------------------------------------------
 -- Input Parameters:
---		@TableSchema				= table schema that current table belongs to
---		@TableName					= table name to be analysed
+--		@tableSchema				= table schema that current table belongs to
+--		@tableName					= table name to be analysed
 --		@columnName					= column name that will have @columnValue value for @columnCardinality rows. if null, histogram analysis will be ignored
 --		@indexName					= index name to be analysed. default is to analyze all indexes that have as lead column @columnName
 --		@columnValue				= value for specified column name to be found in all @columnCardinality rows
@@ -97,7 +97,7 @@ EXEC [dbo].[usp_mpUpdateStatisticsBasedOnStrategy]	  @TableName					= 'REPORT_PE
 --											if this option is not present, initial cardinality will be computed using uniform distribution formulas
 --									  512 - print update statistics statement (default)
 --									 1024 - always have statistics with full scan. if sample mode is used, do an update with fullscan
---		@DebugMode					=   2 - print dynamic SQL statements
+--		@debugMode					=   2 - print dynamic SQL statements
 --										1 - print debug messages
 --										0 - no messages will be printed
 -----------------------------------------------------------------------------------------
@@ -194,7 +194,7 @@ BEGIN TRY
 	SET @ReturnValue=0
 
 	SET @SnapshotStartTime = GETUTCDATE()
-	SET @serverToRun	  = N'[' + @SQLServerName + '].[' + @DBName + '].dbo.sp_executesql'
+	SET @serverToRun	  = N'[' + @sqlServerName + '].[' + @dbName + '].dbo.sp_executesql'
 
 	----------------------------------------------------------------------------------------------------------------------------
 	--get current table indexes
@@ -206,52 +206,52 @@ BEGIN TRY
 									, si.[indid]						AS [index_id]
 									, si.[rowcnt]						AS [aprox_rowcnt]
 									, si.[rowmodctr]					AS [rowmodctr]
-							FROM [' + @DBName + N'].sys.sysindexes si
-							INNER JOIN [' + @DBName + N'].sys.objects ob ON ob.[object_id] = si.[id] 
-							WHERE	ob.[name]=@TableName
+							FROM [' + @dbName + N'].sys.sysindexes si
+							INNER JOIN [' + @dbName + N'].sys.objects ob ON ob.[object_id] = si.[id] 
+							WHERE	ob.[name]=@tableName
 									AND si.[name] NOT LIKE ''_WA_Sys_%''
 									AND ob.[schema_id] IN (	SELECT [schema_id] 
-															FROM [' + @DBName + N'].sys.schemas 
-															WHERE [name]=@TableSchema
+															FROM [' + @dbName + N'].sys.schemas 
+															WHERE [name]=@tableSchema
 														  )' + 
 							CASE WHEN @columnName IS NOT NULL 
 								THEN N'	AND si.[indid] IN (	SELECT ic.[index_id]
-															FROM [' + @DBName + N'].sys.index_columns  ic
-															INNER JOIN [' + @DBName + N'].sys.columns	cl ON	ic.[object_id] = cl.[object_id]
+															FROM [' + @dbName + N'].sys.index_columns  ic
+															INNER JOIN [' + @dbName + N'].sys.columns	cl ON	ic.[object_id] = cl.[object_id]
 																													AND ic.[column_id] = cl.[column_id]
-															INNER JOIN [' + @DBName + N'].sys.objects	ob ON	ob.[object_id] = ic.[object_id] 
-															WHERE	ob.[name]=@TableName
-																	AND ob.[schema_id] IN (SELECT [schema_id] FROM [' + @DBName + N'].sys.schemas WHERE [name]=@TableSchema)
+															INNER JOIN [' + @dbName + N'].sys.objects	ob ON	ob.[object_id] = ic.[object_id] 
+															WHERE	ob.[name]=@tableName
+																	AND ob.[schema_id] IN (SELECT [schema_id] FROM [' + @dbName + N'].sys.schemas WHERE [name]=@tableSchema)
 																	AND cl.[name] =@columnName
 															)'
 								ELSE '' END + 
 							CASE WHEN @indexName IS NOT NULL
 								THEN N' AND si.[name] =@indexName'
 								ELSE '' END
-	IF @SQLServerName<>@@SERVERNAME
+	IF @sqlServerName<>@@SERVERNAME
 		begin
-			SET @queryToRun=REPLACE(@queryToRun, '@TableName', '''' + @TableName + '''')
-			SET @queryToRun=REPLACE(@queryToRun, '@TableSchema', '''' + @TableSchema + '''')
+			SET @queryToRun=REPLACE(@queryToRun, '@tableName', '''' + @tableName + '''')
+			SET @queryToRun=REPLACE(@queryToRun, '@tableSchema', '''' + @tableSchema + '''')
 			IF @columnName IS NOT NULL
 				SET @queryToRun=REPLACE(@queryToRun, '@columnName', '''' + @columnName + '''')
 			IF @indexName IS NOT NULL
 				SET @queryToRun=REPLACE(@queryToRun, '@indexName', '''' + @indexName + '''')
-			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
+			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 
-			IF @DebugMode & 2 = 2	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+			IF @debugMode & 2 = 2	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 			INSERT	INTO @crtTableIndexes([table_object_id], [index_name], [index_id], [aprox_rowcnt], [rowmodctr])
 					EXEC (@queryToRun)
 		end	
 	ELSE
 		begin
-			IF @DebugMode & 2 = 2	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+			IF @debugMode & 2 = 2	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
-			SET @spParameterList='@TableName [sysname], @TableSchema [sysname], @columnName [sysname], @indexName [sysname]'
+			SET @spParameterList='@tableName [sysname], @tableSchema [sysname], @columnName [sysname], @indexName [sysname]'
 
 			INSERT	INTO @crtTableIndexes([table_object_id], [index_name], [index_id], [aprox_rowcnt], [rowmodctr])
-					EXEC sp_executesql @queryToRun, @spParameterList, @TableName = @TableName
-																	, @TableSchema = @TableSchema 
+					EXEC sp_executesql @queryToRun, @spParameterList, @tableName = @tableName
+																	, @tableSchema = @tableSchema 
 																	, @columnName = @columnName 
 																	, @indexName = @indexName
 		end
@@ -262,12 +262,12 @@ BEGIN TRY
 			SET @queryToRun = N''
 			SET @queryToRun = @queryToRun + N'
 								SELECT [DATA_TYPE]
-								FROM [' + @DBName + N'].INFORMATION_SCHEMA.COLUMNS
-								WHERE [TABLE_NAME] = ''' + @TableName + N'''
-										AND [TABLE_SCHEMA] = ''' + @TableSchema + N'''
+								FROM [' + @dbName + N'].INFORMATION_SCHEMA.COLUMNS
+								WHERE [TABLE_NAME] = ''' + @tableName + N'''
+										AND [TABLE_SCHEMA] = ''' + @tableSchema + N'''
 										AND [COLUMN_NAME] = ''' + @columnName + ''''
-			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-			IF @DebugMode & 2 = 2	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+			IF @debugMode & 2 = 2	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 			DELETE FROM @columnsTypes
 			INSERT	INTO @columnsTypes([data_type])
@@ -291,13 +291,13 @@ BEGIN TRY
 			SET @queryToRun = N''
 			SET @queryToRun = @queryToRun + N'
 									SELECT COUNT(*) [row_count] 
-									FROM [' + @DBName + N'].[' + @TableSchema + '].[' + @TableName + ']' + 
+									FROM [' + @dbName + N'].[' + @tableSchema + '].[' + @tableName + ']' + 
 									CASE WHEN @columnName IS NOT NULL
 										 THEN ' WHERE [' + @columnName + '] = ' + @columnValue
 										 ELSE ''
 									END
-			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-			IF @DebugMode & 2 = 2	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+			IF @debugMode & 2 = 2	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 						
 			INSERT	INTO @crtValueCardinality([row_count])
 					EXEC (@queryToRun)
@@ -305,7 +305,7 @@ BEGIN TRY
 			SELECT @realInitCardinality = [row_count] FROM @crtValueCardinality
 		end
 
-	IF @DebugMode & 1 = 1 
+	IF @debugMode & 1 = 1 
 		begin
 			SET @queryToRun= N'Get curent index information = ' + CAST(DATEDIFF(ms, @SnapshotStartTime, GETUTCDATE()) AS VARCHAR) + ' ms'
 			EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -346,13 +346,13 @@ BEGIN TRY
 												, [Rows]			AS [rows]
 												, [Rows Sampled]	AS [rows_sampled]
 												, CAST(CASE WHEN [Rows]=0 THEN 0 ELSE ([Rows Sampled] * 100.)/ [Rows] END AS [numeric](6,2)) AS SamplePercent
-										FROM OPENQUERY([' + @SQLServerName + '], ''SET FMTONLY OFF; USE [' + @DBName + ']; EXEC(''''DBCC SHOW_STATISTICS (''''''''[' + @TableSchema + '].[' + @TableName + ']'''''''', ''''''''' + @crtIndexName + ''''''''') WITH NO_INFOMSGS, STAT_HEADER'''')'')x'
-					IF @DebugMode & 2 = 2	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+										FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; USE [' + @dbName + ']; EXEC(''''DBCC SHOW_STATISTICS (''''''''[' + @tableSchema + '].[' + @tableName + ']'''''''', ''''''''' + @crtIndexName + ''''''''') WITH NO_INFOMSGS, STAT_HEADER'''')'')x'
+					IF @debugMode & 2 = 2	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 					
 					DELETE FROM @currentStatsHeader
 
 					SET @run_spServerOption=0
-					IF (SELECT is_data_access_enabled FROM sys.servers WHERE [name]=@@SERVERNAME)=0 AND @SQLServerName = @@SERVERNAME
+					IF (SELECT is_data_access_enabled FROM sys.servers WHERE [name]=@@SERVERNAME)=0 AND @sqlServerName = @@SERVERNAME
 						begin
 							EXEC sp_serveroption @@SERVERNAME, 'data access', 'true'
 							SET @run_spServerOption=1
@@ -384,7 +384,7 @@ BEGIN TRY
 							SET @flgDoStatsUpdate = 1					
 				end
 			
-			IF @DebugMode & 1 = 1 
+			IF @debugMode & 1 = 1 
 					begin
 						SET @queryToRun=N'	statistics analysis for [' + @crtIndexName + '] = ' + CAST(DATEDIFF(ms, @SnapshotStartTime, GETUTCDATE()) AS VARCHAR) + ' ms'
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -406,13 +406,13 @@ BEGIN TRY
 												, x.[EQ_ROWS]
 												, x.[DISTINCT_RANGE_ROWS]
 												, x.[AVG_RANGE_ROWS]
-										FROM OPENQUERY([' + @SQLServerName + '], ''SET FMTONLY OFF; EXEC(''''DBCC SHOW_STATISTICS (''''''''[' + @DBName + '].[' + @TableSchema + '].[' + @TableName + ']'''''''', ''''''''' + @crtIndexName + ''''''''') WITH NO_INFOMSGS, HISTOGRAM'''')'')x'
-					IF @DebugMode & 2 = 2	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+										FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''DBCC SHOW_STATISTICS (''''''''[' + @dbName + '].[' + @tableSchema + '].[' + @tableName + ']'''''''', ''''''''' + @crtIndexName + ''''''''') WITH NO_INFOMSGS, HISTOGRAM'''')'')x'
+					IF @debugMode & 2 = 2	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 					DELETE FROM @maxDiffColumnHistogram
 
 					SET @run_spServerOption=0
-					IF (SELECT is_data_access_enabled FROM sys.servers WHERE [name]=@@SERVERNAME)=0 AND @SQLServerName = @@SERVERNAME
+					IF (SELECT is_data_access_enabled FROM sys.servers WHERE [name]=@@SERVERNAME)=0 AND @sqlServerName = @@SERVERNAME
 						begin
 							EXEC sp_serveroption @@SERVERNAME, 'data access', 'true'
 							SET @run_spServerOption=1
@@ -439,7 +439,7 @@ BEGIN TRY
 									ORDER BY [rowno]
 						end
 
-					IF @DebugMode & 1 = 1 
+					IF @debugMode & 1 = 1 
 						begin
 							SET @queryToRun= N'Get curent index histogram done at = ' + CAST(DATEDIFF(ms, @SnapshotStartTime, GETUTCDATE()) AS VARCHAR) + ' ms'
 							EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -811,7 +811,7 @@ BEGIN TRY
 												) y ON x.[RANGE_HI_KEY] = y.[RANGE_HI_KEY]
 								end
 
-							IF @DebugMode & 1 = 1 
+							IF @debugMode & 1 = 1 
 								begin
 									SET @queryToRun= N'Split/Insert bucket to current histogram done at = ' + CAST(DATEDIFF(ms, @SnapshotStartTime, GETUTCDATE()) AS VARCHAR) + ' ms'
 									EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -959,7 +959,7 @@ BEGIN TRY
 													AND @columnValue > bckt1.[RANGE_HI_KEY]
 										)x
 
-							IF @DebugMode & 1 = 1 
+							IF @debugMode & 1 = 1 
 								begin
 									SET @queryToRun= N'Compress current histogram done at = ' + CAST(DATEDIFF(ms, @SnapshotStartTime, GETUTCDATE()) AS VARCHAR) + ' ms'
 									EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -983,8 +983,8 @@ BEGIN TRY
 			SET @queryUpdateStats = N''
 			IF @flgDoStatsUpdate = 1
 				begin
-					SET @serverToRun	  = N'[' + @SQLServerName + '].[' + @DBName + '].dbo.sp_executesql'
-					SET @queryUpdateStats = N'UPDATE STATISTICS [' + @TableSchema + '].[' + @TableName + '](' + @crtIndexName + ') WITH FULLSCAN'
+					SET @serverToRun	  = N'[' + @sqlServerName + '].[' + @dbName + '].dbo.sp_executesql'
+					SET @queryUpdateStats = N'UPDATE STATISTICS [' + @tableSchema + '].[' + @tableName + '](' + @crtIndexName + ') WITH FULLSCAN'
 				end
 
 			-- return computed histogram for current index 
@@ -1039,7 +1039,7 @@ BEGIN TRY
 					end
 			IF (@flgOptions & 16 = 16) AND (LEN(@queryUpdateStats)>0)
 				begin
-					IF @DebugMode & 2 = 2	OR @flgOptions & 512 = 512
+					IF @debugMode & 2 = 2	OR @flgOptions & 512 = 512
 						begin
 							EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryUpdateStats, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 						end
@@ -1047,7 +1047,7 @@ BEGIN TRY
 					EXEC @serverToRun @queryUpdateStats
 					SET @ReturnValue = 1
 
-					IF @DebugMode & 1 = 1 
+					IF @debugMode & 1 = 1 
 						begin
 							SET @queryToRun=N'Run update statistics script done at = ' + CAST(DATEDIFF(ms, @SnapshotStartTime, GETUTCDATE()) AS VARCHAR) + ' ms'
 							EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -1062,11 +1062,11 @@ BEGIN TRY
 														, x.[EQ_ROWS]
 														, x.[DISTINCT_RANGE_ROWS]
 														, x.[AVG_RANGE_ROWS]
-												FROM OPENQUERY([' + @SQLServerName + '], ''SET FMTONLY OFF; EXEC(''''DBCC SHOW_STATISTICS (''''''''[' + @DBName + '].[' + @TableSchema + '].[' + @TableName + ']'''''''', ''''''''' + @crtIndexName + ''''''''') WITH NO_INFOMSGS, HISTOGRAM'''')'')x'
-							IF @DebugMode & 2 = 2	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+												FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''DBCC SHOW_STATISTICS (''''''''[' + @dbName + '].[' + @tableSchema + '].[' + @tableName + ']'''''''', ''''''''' + @crtIndexName + ''''''''') WITH NO_INFOMSGS, HISTOGRAM'''')'')x'
+							IF @debugMode & 2 = 2	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 																	
 							SET @run_spServerOption=0
-							IF (SELECT is_data_access_enabled FROM sys.servers WHERE [name]=@@SERVERNAME)=0 AND @SQLServerName = @@SERVERNAME
+							IF (SELECT is_data_access_enabled FROM sys.servers WHERE [name]=@@SERVERNAME)=0 AND @sqlServerName = @@SERVERNAME
 								begin
 									EXEC sp_serveroption @@SERVERNAME, 'data access', 'true'
 									SET @run_spServerOption=1
@@ -1113,7 +1113,7 @@ BEGIN TRY
 										end
 								end
 
-							IF @DebugMode & 1 = 1 
+							IF @debugMode & 1 = 1 
 								begin
 									SET @queryToRun= N'Get final density value done at = ' + CAST(DATEDIFF(ms, @SnapshotStartTime, GETUTCDATE()) AS VARCHAR) + ' ms'
 									EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -1143,7 +1143,7 @@ BEGIN TRY
 	CLOSE crsTableIndexes
 	DEALLOCATE crsTableIndexes
 
-	IF @DebugMode & 1 = 1 
+	IF @debugMode & 1 = 1 
 		begin
 			SET @queryToRun= N'done in = ' + CAST(DATEDIFF(ms, @SnapshotStartTime, GETUTCDATE()) AS VARCHAR) + ' ms'
 			EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0

@@ -10,15 +10,15 @@ GO
 
 -----------------------------------------------------------------------------------------
 CREATE PROCEDURE [dbo].[usp_mpDatabaseShrink]
-		@SQLServerName		[sysname],
-		@DBName				[sysname] = NULL,
+		@sqlServerName		[sysname],
+		@dbName				[sysname] = NULL,
 		@flgActions			[smallint] = 1,	/*	1 - shrink log file
 												2 - shrink database
 											*/
 		@flgOptions			[int] = 1,	/*	1 - use truncate only
 											*/		
 		@executionLevel		[tinyint] = 0,
-		@DebugMode			[bit] = 0
+		@debugMode			[bit] = 0
 /* WITH ENCRYPTION */
 AS
 
@@ -33,9 +33,9 @@ AS
 
 -----------------------------------------------------------------------------------------
 -- Input Parameters:
---		@SQLServerName	- name of SQL Server instance to analyze
---		@DBName			- database to be analyzed
---		@DebugMode:		 1 - print dynamic SQL statements 
+--		@sqlServerName	- name of SQL Server instance to analyze
+--		@dbName			- database to be analyzed
+--		@debugMode:		 1 - print dynamic SQL statements 
 --						 0 - no statements will be displayed (default)
 -----------------------------------------------------------------------------------------
 -- Return : 
@@ -75,12 +75,12 @@ DECLARE		@serverEdition					[sysname],
 			@serverVersionNum				[numeric](9,6)
 
 SET @nestedExecutionLevel = @executionLevel + 1
-EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @SQLServerName,
+EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@serverEdition			= @serverEdition OUT,
 										@serverVersionStr		= @serverVersionStr OUT,
 										@serverVersionNum		= @serverVersionNum OUT,
 										@executionLevel			= @nestedExecutionLevel,
-										@debugMode				= @DebugMode
+										@debugMode				= @debugMode
 
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
@@ -96,8 +96,8 @@ IF @flgActions & 1 = 1	SET @actionType = 'shrink log'
 IF @flgActions & 2 = 2	SET @actionType = 'shrink database'
 
 IF @serverVersionNum >= 11 AND @flgActions IS NOT NULL
-	EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @SQLServerName,
-																		@dbName				= @DBName,
+	EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @sqlServerName,
+																		@dbName				= @dbName,
 																		@actionName			= 'database shrink',
 																		@actionType			= @actionType,
 																		@flgActions			= @flgActions,
@@ -105,7 +105,7 @@ IF @serverVersionNum >= 11 AND @flgActions IS NOT NULL
 																		@agName				= @agName OUTPUT,
 																		@agInstanceRoleDesc = @agInstanceRoleDesc OUTPUT,
 																		@executionLevel		= @executionLevel,
-																		@debugMode			= @DebugMode
+																		@debugMode			= @debugMode
 
 IF @agStopLimit <> 0
 	RETURN 0
@@ -123,10 +123,10 @@ SET @queryToRun = N''
 	Msg 3023, Level 16, State 2, Line 1
 	Backup and file manipulation operations (such as ALTER DATABASE ADD FILE) on a database must be serialized. Reissue the statement after the current backup or file manipulation operation is completed.
 */
-IF @DBName IS NULL
+IF @dbName IS NULL
 	SET @queryToRun = @queryToRun + N'SELECT DISTINCT sdb.[name] 
 										FROM master..sysdatabases sdb
-										WHERE sdb.[name] LIKE ''' + CASE WHEN @DBName IS NULL THEN '%' ELSE @DBName END + '''
+										WHERE sdb.[name] LIKE ''' + CASE WHEN @dbName IS NULL THEN '%' ELSE @dbName END + '''
 											AND NOT EXISTS (
 															 SELECT 1
 															 FROM  master.dbo.sysprocesses sp
@@ -134,16 +134,16 @@ IF @DBName IS NULL
 																	AND sp.[dbid]=sdb.[dbid]
 															)'
 ELSE
-	SET @queryToRun = @queryToRun + N'SELECT ''' + @DBName + ''' AS [name]
+	SET @queryToRun = @queryToRun + N'SELECT ''' + @dbName + ''' AS [name]
 										WHERE NOT EXISTS (
 															 SELECT 1
 															 FROM  master.dbo.sysprocesses sp
 															 WHERE sp.[cmd] LIKE ''BACKUP %''
-																	AND sp.[dbid]= DB_ID(''' + @DBName + ''')
+																	AND sp.[dbid]= DB_ID(''' + @dbName + ''')
 															)'
 
-SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 DELETE FROM #DatabaseList
 INSERT	INTO #DatabaseList([dbname])
@@ -160,21 +160,21 @@ WHILE @@FETCH_STATUS=0
 		--shrink database
 		IF @flgActions & 2 = 2
 			begin
-				SET @queryToRun= 'Shrinking database...' + ' [' + @DBName + ']'
+				SET @queryToRun= 'Shrinking database...' + ' [' + @dbName + ']'
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				SET @queryToRun = N'DBCC SHRINKDATABASE([' + @databaseName + N']' + CASE WHEN @flgOptions & 1 = 1 THEN N', TRUNCATEONLY' ELSE N'' END + N') WITH NO_INFOMSGS'
-				IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				SET @nestedExecutionLevel = @executionLevel + 1
-				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
-																@dbName			= @DBName,
+				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+																@dbName			= @dbName,
 																@module			= 'dbo.usp_mpDatabaseShrink',
 																@eventName		= 'database shrink',
 																@queryToRun  	= @queryToRun,
 																@flgOptions		= @flgOptions,
 																@executionLevel	= @nestedExecutionLevel,
-																@debugMode		= @DebugMode						
+																@debugMode		= @debugMode						
 			end
 
 
@@ -182,14 +182,14 @@ WHILE @@FETCH_STATUS=0
 		--shrink log file
 		IF @flgActions & 1 = 1
 			begin
-				SET @queryToRun= 'Shrinking database log files...' + ' [' + @DBName + ']'
+				SET @queryToRun= 'Shrinking database log files...' + ' [' + @dbName + ']'
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				DELETE FROM #databaseFiles
 
 				SET @queryToRun = N'SELECT [name] FROM [' + @databaseName + ']..sysfiles WHERE [status] & 0x40 = 0x40'
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@SQLServerName, @queryToRun)
-				IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 				
 				INSERT	INTO #databaseFiles
 						EXEC (@queryToRun)
@@ -200,17 +200,17 @@ WHILE @@FETCH_STATUS=0
 				WHILE @@FETCH_STATUS=0
 					begin
 						SET @queryToRun = N'USE [' + @databaseName + ']; DBCC SHRINKFILE([' + @logName + N']' + CASE WHEN @flgOptions & 1 = 1 THEN N', TRUNCATEONLY' ELSE N'' END + N') WITH NO_INFOMSGS'
-						IF @DebugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 						SET @nestedExecutionLevel = @executionLevel + 1
-						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @SQLServerName,
-																		@dbName			= @DBName,
+						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+																		@dbName			= @dbName,
 																		@module			= 'dbo.usp_mpDatabaseShrink',
 																		@eventName		= 'database shrink log',
 																		@queryToRun  	= @queryToRun,
 																		@flgOptions		= @flgOptions,
 																		@executionLevel	= @nestedExecutionLevel,
-																		@debugMode		= @DebugMode						
+																		@debugMode		= @debugMode						
 						
 						FETCH NEXT FROM crsLogFile INTO @logName
 					END
