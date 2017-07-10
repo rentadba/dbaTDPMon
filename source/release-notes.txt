@@ -554,3 +554,6 @@
 
 /* 06.07.2017 */
 	- change procedure parameter names to mixed case 
+
+/* 10.07.2017 */
+	- raise error when backup file name & path are exceeding 259 characters (reported by Mihail Grebencio)
