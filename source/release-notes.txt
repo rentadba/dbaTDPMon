@@ -557,3 +557,9 @@
 
 /* 10.07.2017 */
 	- raise error when backup file name & path are exceeding 259 characters (reported by Mihail Grebencio)
+
+/*----------------------------------------------------------------------*/
+/* August 2017 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 07.08.2017 */
+	- fix "Unable to post notification to SQLServerAgent (reason: The maximum number of pending SQLServerAgent notifications has been exceeded.  The notification will be ignored.)" (reported by Razvan Puscasu)

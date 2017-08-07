@@ -140,7 +140,6 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 
 								UPDATE [dbo].[jobExecutionQueue]
 									SET [status] = @lastExecutionStatus,
-										[execution_date] = CONVERT([datetime], @lastExecutionDate + ' ' + @lastExecutionTime, 120),
 										[running_time_sec] = @runningTimeSec,
 										[log_message] = @strMessage
 								WHERE [id] = @jobQueueID
