@@ -563,3 +563,6 @@
 /*----------------------------------------------------------------------*/
 /* 07.08.2017 */
 	- fix "Unable to post notification to SQLServerAgent (reason: The maximum number of pending SQLServerAgent notifications has been exceeded.  The notification will be ignored.)" (reported by Razvan Puscasu)
+
+/* 07.08.2017 */
+	- fix a small bug when performing orphan log backup files cleanup (reported by Mihail Grebencio)
