@@ -211,7 +211,7 @@ WHILE @@FETCH_STATUS=0
 
 				SET @queryToRun = N''
 				SET @queryToRun = @queryToRun + N'SELECT  tat.[transaction_begin_time]
-														, tasdt.[elapsed_time_seconds]
+														, ISNULL(tasdt.[elapsed_time_seconds], ABS(DATEDIFF(ss, tat.[transaction_begin_time], GETDATE()))) [elapsed_time_seconds]
 														, ISNULL(tst.[session_id], tasdt.[session_id]) AS [session_id]
 														, DB_NAME(tdt.[database_id]) AS [database_name]
 												FROM sys.dm_tran_active_transactions						tat WITH (READPAST)
