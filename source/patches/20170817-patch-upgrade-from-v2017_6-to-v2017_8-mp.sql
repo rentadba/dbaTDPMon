@@ -1,3 +1,24 @@
+USE [dbaTDPMon]
+GO
+
+RAISERROR('*-----------------------------------------------------------------------------*', 10, 1) WITH NOWAIT
+RAISERROR('* dbaTDPMon (Troubleshoot Database Performance / Monitoring)                  *', 10, 1) WITH NOWAIT
+RAISERROR('* https://github.com/rentadba/dbaTDPMon, under GNU (GPLv3) licence model      *', 10, 1) WITH NOWAIT
+RAISERROR('*-----------------------------------------------------------------------------*', 10, 1) WITH NOWAIT
+RAISERROR('* Patch script: from version 2017.6 to 2017.8 (2017.08.17)				  *', 10, 1) WITH NOWAIT
+RAISERROR('*-----------------------------------------------------------------------------*', 10, 1) WITH NOWAIT
+
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+UPDATE [dbo].[appConfigurations] SET [value] = N'2017.08.17' WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+
+
+/*---------------------------------------------------------------------------------------------------------------------*/
+/* patch module: maintenance-plan																							   */
+/*---------------------------------------------------------------------------------------------------------------------*/
+RAISERROR('Patching module: MAINTENANCE-PLAN', 10, 1) WITH NOWAIT
+
 RAISERROR('Create procedure: [dbo].[usp_mpDatabaseBackup]', 10, 1) WITH NOWAIT
 GO
 IF  EXISTS (
@@ -824,3 +845,13 @@ IF @errorCode = 0 AND ISNULL(@retentionDays,0) <> 0
 
 RETURN @errorCode
 GO
+
+
+/*---------------------------------------------------------------------------------------------------------------------*/
+USE [dbaTDPMon]
+GO
+SELECT * FROM [dbo].[appConfigurations] WHERE [module] = 'common' AND [name] = 'Application Version'
+GO
+
+RAISERROR('* Done *', 10, 1) WITH NOWAIT
+

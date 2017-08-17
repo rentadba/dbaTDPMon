@@ -569,3 +569,6 @@
 
 /* 15.08.2017 */
 	- when computing elapsed transaction time, if sys.dm_tran_active_snapshot_database_transactions.elapsed_time_seconds is null, will compute duration based on sys.dm_tran_active_transactions.transaction_begin_time (reported by Razvan Puscasu)
+
+/* 17.08.2017 */
+	- fix a small bug when checking for an existing full database backup and "SQL Server VSS Writer" service was running
