@@ -13,6 +13,7 @@ GO
 CREATE PROCEDURE [dbo].[usp_changeServerOption_xp_cmdshell]
 		  @serverToRun			[sysname]
 		, @flgAction			[tinyint] = 1 -- 1=enable | 0=disable
+		, @optionXPValue		[bit] = 0 OUTPUT
 		, @debugMode			[bit]=0
 /* WITH ENCRYPTION */
 AS
@@ -29,7 +30,6 @@ SET NOCOUNT ON
 
 DECLARE @queryToRun					[nvarchar](1024), 
 		@optionXPIsAvailable		[bit],
-		@optionXPValue				[int],
 		@optionXPHasChanged			[bit],
 		@optionAdvancedIsAvailable	[bit],
 		@optionAdvancedValue		[int],
@@ -113,6 +113,8 @@ IF @flgAction = 1
 							begin
 								set @queryToRun='xp_cmdshell component is turned off. Cannot continue.'
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+								RETURN 1
 							end		
 						ELSE
 							begin
@@ -133,6 +135,8 @@ IF @flgAction = 1
 								SELECT @@SPID, @optionXPHasChanged, @optionAdvancedHasChanged, 1
 					end
 			end
+		ELSE
+			SET @optionXPValue = 1
 	end
 
 
@@ -174,6 +178,8 @@ IF @flgAction = 0 AND OBJECT_ID('tempdb..##tdp_xp_cmdshell_requests') IS NOT NUL
 																			@executionLevel		= 0,
 																			@debugMode			= @debugMode
 			end
+		ELSE
+			SET @optionXPValue = 1
 
 		/* decrement counter value. when 0, remove the entry */
 		SET @currentSPIDCounterValue = @currentSPIDCounterValue - 1
@@ -189,4 +195,6 @@ IF @flgAction = 0 AND OBJECT_ID('tempdb..##tdp_xp_cmdshell_requests') IS NOT NUL
 		IF @currentAllCounterValue = 1 AND OBJECT_ID('tempdb..##tdp_xp_cmdshell_requests') IS NOT NULL
 			DROP TABLE ##tdp_xp_cmdshell_requests
 	end
+
+	RETURN 0
 GO
