@@ -37,7 +37,7 @@ RAISERROR('		...insert default data', 10, 1) WITH NOWAIT
 GO
 SET NOCOUNT ON
 GO
-INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value]
+INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 		  SELECT 'common'			AS [module], 'Application Version'															AS [name], N'2017.10.02'AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Default project code'															AS [name], '$(projectCode)'	AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Database Mail profile name to use for sending emails'							AS [name], NULL			AS [value]		UNION ALL
