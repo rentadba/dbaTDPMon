@@ -220,6 +220,9 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_changeServerConfigurationOption.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_changeServerOption_xp_cmdshell.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_createFolderOnDisk.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
