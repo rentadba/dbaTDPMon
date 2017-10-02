@@ -82,7 +82,7 @@ BEGIN TRY
 	SET @projectName = ISNULL(@projectName, 'DEFAULT')
 	SET @projectName = REPLACE(@projectName, '.', '')
 
-	SET @relativeStoragePath = @relativeStoragePath + CASE WHEN @projectName IS NOT NULL THEN @projectName + '\' ELSE '' END
+	--SET @relativeStoragePath = @relativeStoragePath + CASE WHEN @projectName IS NOT NULL THEN @projectName + '\' ELSE '' END
 
 	IF @instanceName IS NOT NULL
 		begin
@@ -95,6 +95,7 @@ BEGIN TRY
 														DATENAME(M, ISNULL(@StopDate, GETUTCDATE())) + '\'
 
 	SET @localStoragePath = REPLACE(@localStoragePath, ' ', '_')		
+	SET @localStoragePath = @localStoragePath + CASE WHEN RIGHT(@localStoragePath, 1) <> '\' THEN N'\' ELSE N'' END
 	SET @localStoragePath = @localStoragePath + @relativeStoragePath
 	
 	IF @flgCreateOutputFolder=1	
