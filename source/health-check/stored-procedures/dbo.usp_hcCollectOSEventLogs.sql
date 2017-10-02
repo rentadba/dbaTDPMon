@@ -54,14 +54,7 @@ DECLARE   @eventDescriptor				[varchar](256)
 		, @endTime						[datetime]
 		, @getInformationEvent			[bit]
 		, @getWarningsEvent				[bit]
-		
-
-DECLARE @optionXPIsAvailable		[bit],
-		@optionXPValue				[int],
-		@optionXPHasChanged			[bit],
-		@optionAdvancedIsAvailable	[bit],
-		@optionAdvancedValue		[int],
-		@optionAdvancedHasChanged	[bit]
+		, @optionXPValue				[int]
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
 IF object_id('tempdb..#psOutput') IS NOT NULL DROP TABLE #psOutput
@@ -192,51 +185,16 @@ SET @configEventsTimeOutSeconds = ISNULL(@configEventsTimeOutSeconds, 600)
 -------------------------------------------------------------------------------------------------------------------------
 IF @enableXPCMDSHELL=1
 	begin
-		SELECT  @optionXPIsAvailable		= 0,
-				@optionXPValue				= 0,
-				@optionXPHasChanged			= 0,
-				@optionAdvancedIsAvailable	= 0,
-				@optionAdvancedValue		= 0,
-				@optionAdvancedHasChanged	= 0
+		SET @optionXPValue = 0
 
 		/* enable xp_cmdshell configuration option */
-		EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
-															@configOptionName	= 'xp_cmdshell',
-															@configOptionValue	= 1,
-															@optionIsAvailable	= @optionXPIsAvailable OUT,
-															@optionCurrentValue	= @optionXPValue OUT,
-															@optionHasChanged	= @optionXPHasChanged OUT,
-															@executionLevel		= 3,
-															@debugMode			= @debugMode
+		EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @@SERVERNAME
+														, @flgAction	 = 1			-- 1=enable | 0=disable
+														, @optionXPValue = @optionXPValue OUTPUT
+														, @debugMode	 = @debugMode
 
-		IF @optionXPIsAvailable = 0
+		IF @optionXPValue = 0
 			begin
-				/* enable show advanced options configuration option */
-				EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
-																	@configOptionName	= 'show advanced options',
-																	@configOptionValue	= 1,
-																	@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
-																	@optionCurrentValue	= @optionAdvancedValue OUT,
-																	@optionHasChanged	= @optionAdvancedHasChanged OUT,
-																	@executionLevel		= 3,
-																	@debugMode			= @debugMode
-
-				IF @optionAdvancedIsAvailable = 1 AND (@optionAdvancedValue=1 OR @optionAdvancedHasChanged=1)
-					EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
-																		@configOptionName	= 'xp_cmdshell',
-																		@configOptionValue	= 1,
-																		@optionIsAvailable	= @optionXPIsAvailable OUT,
-																		@optionCurrentValue	= @optionXPValue OUT,
-																		@optionHasChanged	= @optionXPHasChanged OUT,
-																		@executionLevel		= 3,
-																		@debugMode			= @debugMode
-
-			end
-
-		IF @optionXPIsAvailable=0 OR @optionXPValue=0
-			begin
-				set @strMessage='xp_cmdshell component is turned off. Cannot continue'
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 				RETURN 1
 			end		
 	end
@@ -396,7 +354,7 @@ WHILE @@FETCH_STATUS=0
 
 			
 				-------------------------------------------------------------------------------------------------------------------------
-				IF NOT (@optionXPIsAvailable=0 OR @optionXPValue=0)
+				IF @optionXPValue = 1
 					begin
 						-- save powershell script
 						SET @psFileName = 'GetOSSystemEvents_' + REPLACE(@machineName, '\', '$') + '_' + @psLogTypeName + '.ps1'
@@ -408,7 +366,7 @@ WHILE @@FETCH_STATUS=0
 
 				-------------------------------------------------------------------------------------------------------------------------
 				--executing script to get the OS events
-				IF NOT (@optionXPIsAvailable=0 OR @optionXPValue=0)
+				IF @optionXPValue = 1
 					begin
 						SET @strMessage=N'running powershell script - get OS events...'
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
@@ -573,26 +531,10 @@ WHERE cin.[project_id] = @projectID
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
 /* disable xp_cmdshell configuration option */
-IF @optionXPHasChanged = 1
-	EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
-														@configOptionName	= 'xp_cmdshell',
-														@configOptionValue	= 0,
-														@optionIsAvailable	= @optionXPIsAvailable OUT,
-														@optionCurrentValue	= @optionXPValue OUT,
-														@optionHasChanged	= @optionXPHasChanged OUT,
-														@executionLevel		= 3,
-														@debugMode			= @debugMode
-
-/* disable show advanced options configuration option */
-IF @optionAdvancedHasChanged = 1
-		EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @@SERVERNAME,
-															@configOptionName	= 'show advanced options',
-															@configOptionValue	= 0,
-															@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
-															@optionCurrentValue	= @optionAdvancedValue OUT,
-															@optionHasChanged	= @optionAdvancedHasChanged OUT,
-															@executionLevel		= 3,
-															@debugMode			= @debugMode
+EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @@SERVERNAME
+												, @flgAction	 = 0			-- 1=enable | 0=disable
+												, @optionXPValue = @optionXPValue OUTPUT
+												, @debugMode	 = @debugMode
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
 GO

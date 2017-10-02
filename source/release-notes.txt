@@ -577,5 +577,5 @@
 /* October 2017 new features & fixes
 /*----------------------------------------------------------------------*/
 /* 02.10.2017 */
-	- add procedure for minimizing the number of server configuration option xp_cmdshell enable/disable calls
+	- minimize the number of server configuration option xp_cmdshell enable/disable calls
 	
