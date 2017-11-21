@@ -69,7 +69,7 @@ SET @queryToRun = N'
 			INNER JOIN sys.dm_hadr_database_replica_states hdrs ON ar.[replica_id]=hdrs.[replica_id]
 			INNER JOIN sys.availability_databases_cluster adc ON adc.[group_id]=hdrs.[group_id] AND adc.[group_database_id]=hdrs.[group_database_id]
 			WHERE arcn.[replica_server_name] = ''' + @sqlServerName + N'''
-				  AND adc.[database_name] = ''' + @dbName + N''''
+				  AND adc.[database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 
 SET @queryToRun = N'SELECT    @agName = [name]
@@ -90,14 +90,14 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 		/* availability group synchronization status */
 		SET @queryToRun = N'
 				SELECT    hdrs.[synchronization_state_desc]
-						, sys.fn_hadr_backup_is_preferred_replica(''' + @dbName + N''') AS [backup_is_preferred_replica]
+						, sys.fn_hadr_backup_is_preferred_replica(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''') AS [backup_is_preferred_replica]
 				FROM sys.dm_hadr_database_replica_states hdrs
 				INNER JOIN sys.availability_replicas ar ON ar.[replica_id]=hdrs.[replica_id]
 				INNER JOIN sys.availability_databases_cluster adc ON adc.[group_id]=hdrs.[group_id] AND adc.[group_database_id]=hdrs.[group_database_id]
 				INNER JOIN sys.dm_hadr_availability_replica_cluster_states rcs ON rcs.[replica_id]=ar.[replica_id] AND rcs.[group_id]=hdrs.[group_id]
 				INNER JOIN sys.databases sd ON sd.name = adc.database_name
 				WHERE	ar.[replica_server_name] = ''' + @sqlServerName + N'''
-						AND adc.[database_name] = ''' + @dbName + N''''
+						AND adc.[database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 
 		SET @queryToRun = N'SELECT    @agSynchronizationState = [synchronization_state_desc]
@@ -123,7 +123,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 						SET @eventData='<skipaction><detail>' + 
 											'<name>' + @actionName + '</name>' + 
 											'<type>' + @actionType + '</type>' + 
-											'<affected_object>' + @dbName + '</affected_object>' + 
+											'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 											'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 											'<reason>' + @queryToRun + '</reason>' + 
 										'</detail></skipaction>'
@@ -176,7 +176,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 								SET @eventData='<skipaction><detail>' + 
 													'<name>' + @actionName + '</name>' + 
 													'<type>' + @actionType + '</type>' + 
-													'<affected_object>' + @dbName + '</affected_object>' + 
+													'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 													'<reason>' + @queryToRun + '</reason>' + 
 												'</detail></skipaction>'
@@ -194,13 +194,13 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 						/* if instance is preferred replica */
 						IF @agPreferredBackupReplica = 0
 							begin
-								SET @queryToRun=N'Availability Group: Current instance [ ' + @sqlServerName + N'] is not a backup preferred replica for the database [' + @dbName + N'].'
+								SET @queryToRun=N'Availability Group: Current instance [ ' + @sqlServerName + N'] is not a backup preferred replica for the database ' + [dbo].[ufn_getObjectQuoteName](@dbName, NULL) + N'.'
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								SET @eventData='<skipaction><detail>' + 
 													'<name>' + @actionName + '</name>' + 
 													'<type>' + @actionType + '</type>' + 
-													'<affected_object>' + @dbName + '</affected_object>' + 
+													'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 													'<reason>' + @queryToRun + '</reason>' + 
 												'</detail></skipaction>'
@@ -234,7 +234,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 										SET @eventData='<skipaction><detail>' + 
 															'<name>' + @actionName + '</name>' + 
 															'<type>' + @actionType + '</type>' + 
-															'<affected_object>' + @dbName + '</affected_object>' + 
+															'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 															'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 															'<reason>' + @queryToRun + '</reason>' + 
 														'</detail></skipaction>'
@@ -259,7 +259,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 								SET @eventData='<skipaction><detail>' + 
 													'<name>' + @actionName + '</name>' + 
 													'<type>' + @actionType + '</type>' + 
-													'<affected_object>' + @dbName + '</affected_object>' + 
+													'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 													'<reason>' + @queryToRun + '</reason>' + 
 												'</detail></skipaction>'
@@ -283,7 +283,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 								SET @eventData='<skipaction><detail>' + 
 													'<name>' + @actionName + '</name>' + 
 													'<type>' + @actionType + '</type>' + 
-													'<affected_object>' + @dbName + '</affected_object>' + 
+													'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 													'<reason>' + @queryToRun + '</reason>' + 
 												'</detail></skipaction>'
@@ -307,7 +307,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 								SET @eventData='<skipaction><detail>' + 
 													'<name>' + @actionName + '</name>' + 
 													'<type>' + @actionType + '</type>' + 
-													'<affected_object>' + @dbName + '</affected_object>' + 
+													'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 													'<reason>' + @queryToRun + '</reason>' + 
 												'</detail></skipaction>'
@@ -336,7 +336,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 								SET @eventData='<skipaction><detail>' + 
 													'<name>' + @actionName + '</name>' + 
 													'<type>' + @actionType + '</type>' + 
-													'<affected_object>' + @dbName + '</affected_object>' + 
+													'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 													'<reason>' + @queryToRun + '</reason>' + 
 												'</detail></skipaction>'
@@ -365,7 +365,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 													INNER JOIN sys.dm_hadr_availability_replica_cluster_states rcs ON rcs.[replica_id]=ar.[replica_id] AND rcs.[group_id]=hdrs.[group_id]
 													INNER JOIN sys.dm_hadr_availability_replica_states ars ON ars.[replica_id]=ar.[replica_id] AND ars.[group_id]=ar.[group_id]
 													INNER JOIN sys.databases sd ON sd.name = adc.database_name
-													WHERE	adc.[database_name] = ''' + @dbName + N'''
+													WHERE	adc.[database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
 															AND hdrs.[synchronization_state_desc] IN (''SYNCHRONIZED'', ''SYNCHRONIZING'')
 															AND ars.[role_desc] = ''SECONDARY'''
 
@@ -384,7 +384,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 										SET @eventData='<skipaction><detail>' + 
 															'<name>' + @actionName + '</name>' + 
 															'<type>' + @actionType + '</type>' + 
-															'<affected_object>' + @dbName + '</affected_object>' + 
+															'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 															'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 															'<reason>' + @queryToRun + '</reason>' + 
 														'</detail></skipaction>'
@@ -411,7 +411,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 						SET @eventData='<skipaction><detail>' + 
 											'<name>' + @actionName + '</name>' + 
 											'<type>' + @actionType + '</type>' + 
-											'<affected_object>' + @dbName + '</affected_object>' + 
+											'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 											'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 											'<reason>' + @queryToRun + '</reason>' + 
 										'</detail></skipaction>'
@@ -436,7 +436,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 						SET @eventData='<skipaction><detail>' + 
 											'<name>' + @actionName + '</name>' + 
 											'<type>' + @actionType + '</type>' + 
-											'<affected_object>' + @dbName + '</affected_object>' + 
+											'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 											'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 											'<reason>' + @queryToRun + '</reason>' + 
 										'</detail></skipaction>'
@@ -461,7 +461,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 						SET @eventData='<skipaction><detail>' + 
 											'<name>' + @actionName + '</name>' + 
 											'<type>' + @actionType + '</type>' + 
-											'<affected_object>' + @dbName + '</affected_object>' + 
+											'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 											'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 											'<reason>' + @queryToRun + '</reason>' + 
 										'</detail></skipaction>'

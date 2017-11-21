@@ -38,7 +38,7 @@ SET @customMessage = @messageHead + @customMessage
 
 IF @stopExecution=0
 	begin	
-		IF @raiseErrorAsPrint=1
+		IF @raiseErrorAsPrint=1 AND CHARINDEX('%', @customMessage)=0
 			RAISERROR(@customMessage, 10, 1) WITH NOWAIT
 		ELSE
 			PRINT @customMessage

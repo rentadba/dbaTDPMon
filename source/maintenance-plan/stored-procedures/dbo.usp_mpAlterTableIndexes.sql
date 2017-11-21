@@ -213,7 +213,7 @@ BEGIN TRY
 				FETCH NEXT FROM crsTableToAlterIndexes INTO @crtIndexID, @crtIndexName, @crtIndexType, @crtIndexAllowPageLocks, @crtIndexIsDisabled, @crtIndexIsPrimaryXML, @crtIndexHasDependentFK, @crtTableIsReplicated
 				WHILE @@FETCH_STATUS=0
 					begin
-						SET @strMessage= [dbo].[ufn_mpObjectQuoteName](@crtIndexName)
+						SET @strMessage= [dbo].[ufn_getObjectQuoteName](@crtIndexName, NULL)
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 						SET @sqlScriptOnline=N''
@@ -424,7 +424,7 @@ BEGIN TRY
 								SET @queryToRun = N''
 
 								SET @queryToRun = @queryToRun + N'SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX ' + dbo.ufn_mpObjectQuoteName(@crtIndexName) + ' ON [' + @crtTableSchema + '].[' + @crtTableName + '] REBUILD'
+								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, NULL) + ' ON [' + @crtTableSchema + '].[' + @crtTableName + '] REBUILD'
 					
 								--rebuild options
 								SET @queryToRun = @queryToRun + N' WITH (SORT_IN_TEMPDB = ON' + CASE WHEN ISNULL(@maxDOP, 0) <> 0 THEN N', MAXDOP = ' + CAST(@maxDOP AS [nvarchar]) ELSE N'' END + 
@@ -445,7 +445,7 @@ BEGIN TRY
 									end
 
 								SET @objectName = '[' + @crtTableSchema + '].[' + @crtTableName + ']'
-								SET @childObjectName = [dbo].[ufn_mpObjectQuoteName](@crtIndexName)
+								SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, NULL)
 								SET @nestedExecutionLevel = @executionLevel + 1
 
 								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
@@ -558,7 +558,7 @@ BEGIN TRY
 								begin
 									SET @queryToRun = N''
 									SET @queryToRun = @queryToRun + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-									SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX ' + dbo.ufn_mpObjectQuoteName(@crtIndexName) + ' ON [' + @crtTableSchema + '].[' + @crtTableName + '] REORGANIZE'
+									SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, NULL) + ' ON [' + @crtTableSchema + '].[' + @crtTableName + '] REORGANIZE'
 				
 									--  1  - Compact large objects (LOB) (default)
 									IF @flgOptions & 1 = 1
@@ -572,7 +572,7 @@ BEGIN TRY
 
 
 									SET @objectName = '[' + @crtTableSchema + '].[' + @crtTableName + ']'
-									SET @childObjectName = [dbo].[ufn_mpObjectQuoteName](@crtIndexName)
+									SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, NULL)
 									SET @nestedExecutionLevel = @executionLevel + 1
 
 									EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
@@ -599,12 +599,12 @@ BEGIN TRY
 							begin
 								SET @queryToRun = N''
 								SET @queryToRun = @queryToRun + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX ' + dbo.ufn_mpObjectQuoteName(@crtIndexName) + ' ON [' + @crtTableSchema + '].[' + @crtTableName + '] DISABLE'
+								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, NULL) + ' ON [' + @crtTableSchema + '].[' + @crtTableName + '] DISABLE'
 				
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								SET @objectName = '[' + @crtTableSchema + '].[' + @crtTableName + ']'
-								SET @childObjectName = [dbo].[ufn_mpObjectQuoteName](@crtIndexName)
+								SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, NULL)
 								SET @nestedExecutionLevel = @executionLevel + 1
 
 								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,

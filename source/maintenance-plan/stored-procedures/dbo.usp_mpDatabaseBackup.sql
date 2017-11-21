@@ -89,7 +89,7 @@ CREATE TABLE #serverPropertyConfig
 
 -----------------------------------------------------------------------------------------
 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-SET @queryToRun= 'Backup database: ' + ' [' + @dbName + ']'
+SET @queryToRun= 'Backup database: ' + @dbName
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 -----------------------------------------------------------------------------------------
@@ -154,7 +154,7 @@ SELECT @backupType = CASE WHEN @flgActions & 1 = 1 THEN N'full'
 --get database status
 IF @serverVersionNum >= 9
 	begin
-		SET @queryToRun = N'SELECT CONVERT([sysname], DATABASEPROPERTYEX(''' + @dbName + N''', ''Status'')) AS [state]' 
+		SET @queryToRun = N'SELECT CONVERT([sysname], DATABASEPROPERTYEX(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''', ''Status'')) AS [state]' 
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -170,7 +170,7 @@ IF @serverVersionNum >= 9
 		/* check for the standby property */
 		IF  @databaseStateDesc IN ('ONLINE')
 			begin
-				SET @queryToRun = N'SELECT CONVERT([sysname], DATABASEPROPERTYEX(''' + @dbName + N''', ''IsInStandBy'')) AS [state]' 
+				SET @queryToRun = N'SELECT CONVERT([sysname], DATABASEPROPERTYEX(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''', ''IsInStandBy'')) AS [state]' 
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -185,7 +185,7 @@ IF @serverVersionNum >= 9
 	end
 ELSE
 	begin
-		SET @queryToRun = N'SELECT [status] FROM master.dbo.sysdatabases WHERE [name]=''' + @dbName + N'''' 
+		SET @queryToRun = N'SELECT [status] FROM master.dbo.sysdatabases WHERE [name]=''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''' 
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -219,7 +219,7 @@ begin
 	SET @eventData='<skipaction><detail>' + 
 						'<name>database backup</name>' + 
 						'<type>' + @backupType + '</type>' + 
-						'<affected_object>' + @dbName + '</affected_object>' + 
+						'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 						'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 						'<reason>' + @queryToRun + '</reason>' + 
 					'</detail></skipaction>'
@@ -246,12 +246,12 @@ IF @flgOptions & 512 = 512
 					SET @queryToRun = N'SELECT	[secondary_database]
 										FROM	msdb.dbo.log_shipping_monitor_secondary
 										WHERE	[secondary_server]=@@SERVERNAME
-												AND [secondary_database] = ''' + @dbName + N''''
+												AND [secondary_database] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
 				ELSE 
 					SET @queryToRun = N'SELECT	[secondary_database_name]
 										FROM	msdb.dbo.log_shipping_secondaries
 										WHERE	[secondary_server_name]=@@SERVERNAME
-												AND [secondary_database_name] = ''' + @dbName + N''''
+												AND [secondary_database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
 			end
 
 		--for log backups
@@ -261,22 +261,22 @@ IF @flgOptions & 512 = 512
 					SET @queryToRun = N'SELECT	[primary_database]
 										FROM	msdb.dbo.log_shipping_monitor_primary
 										WHERE	[primary_server]=@@SERVERNAME
-												AND [primary_database] = ''' + @dbName + N'''
+												AND [primary_database] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
 										UNION ALL
 										SELECT	[secondary_database]
 										FROM	msdb.dbo.log_shipping_monitor_secondary
 										WHERE	[secondary_server]=@@SERVERNAME
-												AND [secondary_database] = ''' + @dbName + N''''
+												AND [secondary_database] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
 				ELSE 
 					SET @queryToRun = N'SELECT	[primary_database_name]
 										FROM	msdb.dbo.log_shipping_primaries
 										WHERE	[primary_server_name]=@@SERVERNAME
-												AND [primary_database_name] = ''' + @dbName + N'''
+												AND [primary_database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
 										UNION ALL
 										SELECT	[secondary_database_name]
 										FROM	msdb.dbo.log_shipping_secondaries
 										WHERE	[secondary_server_name]=@@SERVERNAME
-												AND [secondary_database_name] = ''' + @dbName + N''''
+												AND [secondary_database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
 			end
 
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
@@ -299,7 +299,7 @@ IF @flgOptions & 512 = 512
 				SET @eventData='<skipaction><detail>' + 
 									'<name>database backup</name>' + 
 									'<type>' + @backupType + '</type>' + 
-									'<affected_object>' + @dbName + '</affected_object>' + 
+									'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 									'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 									'<reason>' + @queryToRun + '</reason>' + 
 								'</detail></skipaction>'
@@ -344,7 +344,7 @@ IF @agStopLimit <> 0
 IF @flgActions & 4 = 4
 	begin
 		SET @queryToRun = N''
-		SET @queryToRun = @queryToRun + 'SELECT CAST(DATABASEPROPERTYEX(''' + @dbName + N''', ''Recovery'') AS [sysname])'
+		SET @queryToRun = @queryToRun + 'SELECT CAST(DATABASEPROPERTYEX(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''', ''Recovery'') AS [sysname])'
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -360,7 +360,7 @@ IF @flgActions & 4 = 4
 				SET @eventData='<skipaction><detail>' + 
 									'<name>database backup</name>' + 
 									'<type>' + @backupType + '</type>' + 
-									'<affected_object>' + @dbName + '</affected_object>' + 
+									'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 									'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 									'<reason>' + @queryToRun + '</reason>' + 
 								'</detail></skipaction>'
@@ -383,11 +383,10 @@ IF @agName IS NULL
 	SET @backupLocation = @backupLocation + REPLACE(@sqlServerName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
 ELSE
 	SET @backupLocation = @backupLocation + REPLACE(@agName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
+SET @backupLocation = SUBSTRING(@backupLocation, 1, 2) + REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING(@backupLocation, 3, LEN(@backupLocation)), '<', '_'), '>', '_'), ':', '_'), '"', '_')
 
 --check for maximum length of the file path
 --https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
-print @backupLocation
-print LEN(@backupLocation)
 IF LEN(@backupLocation) >= @maxPATHLength
 	begin
 		SET @eventData='<alert><detail>' + 
@@ -395,9 +394,9 @@ IF LEN(@backupLocation) >= @maxPATHLength
 							'<instance_name>' + @sqlServerName + '</instance_name>' + 
 							'<name>database backup</name>' + 
 							'<type>' + @backupType + '</type>' + 
-							'<affected_object>' + @dbName + '</affected_object>' + 
+							'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 							'<reason>Msg 3057, Level 16: The length of the device name provided exceeds supported limit (maximum length is:' + CAST(@maxPATHLength AS [nvarchar]) + ')</reason>' + 
-							'<path>' + @backupLocation + '</path>' + 
+							'<path>' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'xml') + '</path>' + 
 							'<event_date_utc>' + CONVERT([varchar](24), GETDATE(), 121) + '</event_date_utc>' + 
 						'</detail></alert>'
 
@@ -420,7 +419,7 @@ IF LEN(@backupLocation) >= @maxPATHLength
 ELSE
 	begin
 		SET @queryToRun = N'EXEC [' + DB_NAME() + '].[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @sqlServerName + N''',
-																					@folderName		= ''' + @backupLocation + N''',
+																					@folderName		= ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + N''',
 																					@executionLevel	= ' + CAST(@nestedExecutionLevel AS [nvarchar]) + N',
 																					@debugMode		= ' + CAST(@debugMode AS [nvarchar]) 
 
@@ -469,7 +468,7 @@ IF @flgOptions & 8 = 8 AND 	(@agName IS NULL OR (@agName IS NOT NULL AND @agInst
 		IF @flgActions & 2 = 2 OR @flgActions & 4 = 4
 			begin
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + 'SELECT	[differential_base_lsn] FROM sys.master_files WHERE [database_id] = DB_ID(''' + @dbName + N''') AND [type] = 0 AND [file_id] = 1'
+				SET @queryToRun = @queryToRun + 'SELECT	[differential_base_lsn] FROM sys.master_files WHERE [database_id] = DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''') AND [type] = 0 AND [file_id] = 1'
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -494,7 +493,7 @@ IF @flgOptions & 8 = 8 AND 	(@agName IS NULL OR (@agName IS NOT NULL AND @agInst
 														FROM msdb.dbo.backupset bs
 														INNER JOIN msdb.dbo.backupmediafamily bmf ON bmf.[media_set_id] = bs.[media_set_id]
 														WHERE bs.[server_name] = N''' + @sqlServerName + ''' 
-															AND bs.[database_name]=''' + @dbName + N''' 
+															AND bs.[database_name]=''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''' 
 															AND bs.[type] IN (''D''' + CASE WHEN @flgActions & 4 = 4 THEN N', ''I''' ELSE N'' END + N')
 															AND ' + CAST(@differentialBaseLSN AS [nvarchar]) + N' BETWEEN bs.[first_lsn] AND bs.[last_lsn]
 															AND bmf.[device_type] <> 7 /* virtual device */'
@@ -514,87 +513,6 @@ IF @flgOptions & 8 = 8 AND 	(@agName IS NULL OR (@agName IS NOT NULL AND @agInst
 
 								SET @optionForceChangeBackupType=1 
 							end
-						/*
-						ELSE
-							begin
-								--check database differentialBaseLSN in its header (if not set, the existing full backup is not usefull)
-								IF object_id('#differentialBaseLSN') IS NOT NULL DROP TABLE #differentialBaseLSN
-								CREATE TABLE #differentialBaseLSN
-								(
-									[Value]					[varchar](255)			NULL
-								)
-
-								IF @sqlServerName <> @@SERVERNAME
-									begin
-										IF @serverVersionNum < 11
-											SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
-																FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @dbName + N']) WITH TABLERESULTS'''')'')x
-																WHERE [Object]=''differentialBaseLSN'' AND [Field]=''m_blockOffset'''
-										ELSE
-											SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
-																FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @dbName + N']) WITH TABLERESULTS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [VALUE] [nvarchar](max))) '')x
-																WHERE [Field]=''differentialBaseLSN'''
-									end
-								ELSE
-									begin	
-										IF object_id('#dbccDBINFO') IS NOT NULL DROP TABLE #dbccDBINFO
-										CREATE TABLE #dbccDBINFO
-											(
-												[id]				[int] IDENTITY(1,1),
-												[ParentObject]		[varchar](255),
-												[Object]			[varchar](255),
-												[Field]				[varchar](255),
-												[Value]				[varchar](255)
-											)
-
-										SET @queryToRun=N'INSERT INTO #dbccDBINFO EXEC (''DBCC DBINFO (''''' + @dbName + N''''') WITH TABLERESULTS'')'
-
-										IF @serverVersionNum >= 9
-											begin
-												SET @queryToRun=N'BEGIN TRY 
-																	' + @queryToRun + ' 
-																	END TRY 
-																	BEGIN CATCH 
-																		PRINT ERROR_MESSAGE() 
-																	END CATCH'
-											end
-								
-										IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-										EXEC sp_executesql @queryToRun
-
-										IF @serverVersionNum < 11
-											SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Object]=''dbi_differentialBaseLSN'' AND [Field]=''m_blockOffset'''											
-										ELSE
-											SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_differentialBaseLSN'''
-									end
-
-								IF @debugMode = 1 PRINT @queryToRun
-				
-								TRUNCATE TABLE #differentialBaseLSN
-								SET @queryToRun=N'INSERT INTO #differentialBaseLSN([Value]) EXEC (''' + REPLACE(@queryToRun, '''', '''''') + ''')'
-
-								IF @serverVersionNum >=9
-									begin
-										SET @queryToRun=N'BEGIN TRY 
-															' + @queryToRun + ' 
-															END TRY 
-															BEGIN CATCH 
-																PRINT ERROR_MESSAGE() 
-															END CATCH'
-									end
-
-								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-								EXEC sp_executesql @queryToRun
-
-								IF ISNULL((SELECT [Value] FROM #differentialBaseLSN), '0') IN ('0', '0:0:0 (0x00000000:00000000:0000)')
-									begin
-										SET @queryToRun = 'WARNING: Specified backup type cannot be performed since no VALID full database backup exists. A full database backup will be taken before the requested backup type.'
-										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-										SET @optionForceChangeBackupType=1 
-									end
-							end
-						*/
 					end
 			end			
 	end
@@ -632,9 +550,9 @@ IF @optionForceChangeBackupType=1
 									'<instance_name>' + @sqlServerName + '</instance_name>' + 
 									'<name>database backup</name>' + 
 									'<type>' + @backupType + '</type>' + 
-									'<affected_object>' + @dbName + '</affected_object>' + 
+									'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 									'<reason>Msg 3057, Level 16: The length of the device name provided exceeds supported limit (maximum length is:' + CAST(@maxPATHLength AS [nvarchar]) + ')</reason>' + 
-									'<path>' + @backupLocation + @backupFileName + '</path>' + 
+									'<path>' + [dbo].[ufn_getObjectQuoteName](@backupLocation + @backupFileName, 'xml') + '</path>' + 
 									'<event_date_utc>' + CONVERT([varchar](24), GETDATE(), 121) + '</event_date_utc>' + 
 								'</detail></alert>'
 
@@ -656,7 +574,7 @@ IF @optionForceChangeBackupType=1
 			end
 		ELSE
 			begin
-				SET @queryToRun	= N'BACKUP DATABASE ['+ @dbName + N'] TO DISK = ''' + @backupLocation + @backupFileName + N''' WITH STATS = 10, NAME = ''' + @backupFileName + N'''' + @backupOptions
+				SET @queryToRun	= N'BACKUP DATABASE '+ [dbo].[ufn_getObjectQuoteName](@dbName, NULL) + N' TO DISK = ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH STATS = 10, NAME = ''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
@@ -679,17 +597,17 @@ ELSE
 
 IF @flgActions & 1 = 1 
 	begin
-		SET @queryToRun	= N'BACKUP DATABASE ['+ @dbName + N'] TO DISK = ''' + @backupLocation + @backupFileName + N''' WITH STATS = 10, NAME = ''' + @backupFileName + N'''' + @backupOptions
+		SET @queryToRun	= N'BACKUP DATABASE '+ [dbo].[ufn_getObjectQuoteName](@dbName, NULL) + N' TO DISK = ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH STATS = 10, NAME = ''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
 	end
 
 IF @flgActions & 2 = 2
 	begin
-		SET @queryToRun	= N'BACKUP DATABASE ['+ @dbName + N'] TO DISK = ''' + @backupLocation + @backupFileName + N''' WITH DIFFERENTIAL, STATS = 10, NAME=''' + @backupFileName + N'''' + @backupOptions
+		SET @queryToRun	= N'BACKUP DATABASE '+ [dbo].[ufn_getObjectQuoteName](@dbName, NULL) + N' TO DISK = ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH DIFFERENTIAL, STATS = 10, NAME=''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
 	end
 
 IF @flgActions & 4 = 4
 	begin
-		SET @queryToRun	= N'BACKUP LOG ['+ @dbName + N'] TO DISK = ''' + @backupLocation + @backupFileName + N''' WITH STATS = 10, NAME=''' + @backupFileName + N'''' + @backupOptions
+		SET @queryToRun	= N'BACKUP LOG '+ [dbo].[ufn_getObjectQuoteName](@dbName, NULL) + N' TO DISK = ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH STATS = 10, NAME=''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
 	end
 
 --check for maximum length of the file path
@@ -701,9 +619,9 @@ IF LEN(@backupLocation + @backupFileName) > @maxPATHLength
 							'<instance_name>' + @sqlServerName + '</instance_name>' + 
 							'<name>database backup</name>' + 
 							'<type>' + @backupType + '</type>' + 
-							'<affected_object>' + @dbName + '</affected_object>' + 
+							'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
 							'<reason>Msg 3057, Level 16: The length of the device name provided exceeds supported limit (maximum length is:' + CAST(@maxPATHLength AS [nvarchar]) + ')</reason>' + 
-							'<path>' + @backupLocation + @backupFileName + '</path>' + 
+							'<path>' + [dbo].[ufn_getObjectQuoteName](@backupLocation + @backupFileName, 'xml') + '</path>' + 
 							'<event_date_utc>' + CONVERT([varchar](24), GETDATE(), 121) + '</event_date_utc>' + 
 						'</detail></alert>'
 
@@ -743,7 +661,7 @@ IF @errorCode=0
 										, ' + CASE WHEN @optionBackupWithCompression=1 THEN 'bs.[compressed_backup_size]' ELSE 'bs.[backup_size]' END + ' AS [backup_size]
 							FROM msdb.dbo.backupset bs
 							INNER JOIN msdb.dbo.backupmediafamily bmf ON bmf.[media_set_id] = bs.[media_set_id]
-							WHERE bmf.[physical_device_name] = (''' + @backupLocation + @backupFileName + N''')
+							WHERE bmf.[physical_device_name] = (''' + [dbo].[ufn_getObjectQuoteName](@backupLocation + @backupFileName, 'sql') + N''')
 							ORDER BY bs.[backup_set_id] DESC'
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		SET @queryToRun = N' SELECT   @backupStartDate = [backup_start_date]
@@ -763,7 +681,7 @@ IF @errorCode=0
 --verify backup, if option is selected
 IF @flgOptions & 16 = 16 AND @errorCode = 0 
 	begin
-		SET @queryToRun	= N'RESTORE VERIFYONLY FROM DISK=''' + @backupLocation + @backupFileName + N''''
+		SET @queryToRun	= N'RESTORE VERIFYONLY FROM DISK=''' + [dbo].[ufn_getObjectQuoteName](@backupLocation + @backupFileName, 'sql') + N''''
 		IF @optionBackupWithChecksum=1
 			SET @queryToRun = @queryToRun + N' WITH CHECKSUM'
 
@@ -783,7 +701,7 @@ IF @errorCode = 0
 	begin
 		--log backup database information
 		SET @eventData='<backupset><detail>' + 
-							'<database_name>' + @dbName + '</database_name>' + 
+							'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
 							'<type>' + @backupType + '</type>' + 
 							'<start_date>' + CONVERT([varchar](24), ISNULL(@backupStartDate, GETDATE()), 121) + '</start_date>' + 
 							'<duration>' + REPLICATE('0', 2-LEN(CAST(@backupDurationSec / 3600 AS [varchar]))) + CAST(@backupDurationSec / 3600 AS [varchar]) + 'h'

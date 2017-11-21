@@ -206,7 +206,7 @@ WHILE @@FETCH_STATUS=0
 										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName	= ''' + @forSQLServerName + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 1, @flgOptions = 3, @maxDOP	= DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
-										SELECT [name] AS [database_name]
+										SELECT REPLACE([name], '''', '''''') AS [database_name]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -235,7 +235,7 @@ WHILE @@FETCH_STATUS=0
 										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = ' + CAST(@featureflgActions AS [nvarchar]) + N', @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
-										SELECT [name] AS [database_name]
+										SELECT REPLACE([name], '''', '''''') AS [database_name]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -258,7 +258,7 @@ WHILE @@FETCH_STATUS=0
 										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 2, @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
-										SELECT [name] AS [database_name]
+										SELECT REPLACE([name], '''', '''''') AS [database_name]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -281,7 +281,7 @@ WHILE @@FETCH_STATUS=0
 										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 16, @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
-										SELECT [name] AS [database_name]
+										SELECT REPLACE([name], '''', '''''') AS [database_name]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -304,7 +304,7 @@ WHILE @@FETCH_STATUS=0
 										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 64, @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
-										SELECT [name] AS [database_name]
+										SELECT REPLACE([name], '''', '''''') AS [database_name]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -332,7 +332,7 @@ WHILE @@FETCH_STATUS=0
 										'EXEC [dbo].[usp_mpDatabaseOptimize] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 16, @flgOptions = DEFAULT, @defragIndexThreshold = DEFAULT, @rebuildIndexThreshold = DEFAULT, @pageThreshold = DEFAULT, @rebuildIndexPageCountLimit = DEFAULT, @maxDOP = DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
-										SELECT [name] AS [database_name]
+										SELECT REPLACE([name], '''', '''''') AS [database_name]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -361,7 +361,7 @@ WHILE @@FETCH_STATUS=0
 										'EXEC [dbo].[usp_mpDatabaseOptimize] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = ' + CAST(@featureflgActions AS [varchar]) + ', @flgOptions = DEFAULT, @defragIndexThreshold = DEFAULT, @rebuildIndexThreshold = DEFAULT, @pageThreshold = DEFAULT, @rebuildIndexPageCountLimit = DEFAULT, @statsSamplePercent = DEFAULT, @statsAgeDays = DEFAULT, @statsChangePercent = DEFAULT, @maxDOP = DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
-										SELECT [name] AS [database_name]
+										SELECT REPLACE([name], '''', '''''') AS [database_name]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -385,7 +385,7 @@ WHILE @@FETCH_STATUS=0
 										'EXEC [dbo].[usp_mpDatabaseOptimize] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 8, @flgOptions = DEFAULT, @statsSamplePercent = DEFAULT, @statsAgeDays = DEFAULT, @statsChangePercent = DEFAULT, @maxDOP = DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
-										SELECT [name] AS [database_name]
+										SELECT REPLACE([name], '''', '''''') AS [database_name]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -412,7 +412,7 @@ WHILE @@FETCH_STATUS=0
 										'EXEC [dbo].[usp_mpDatabaseShrink] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @flgActions = 2, @flgOptions = 1, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
-										SELECT [name] AS [database_name]
+										SELECT REPLACE([name], '''', '''''') AS [database_name]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -435,7 +435,7 @@ WHILE @@FETCH_STATUS=0
 										'EXEC [dbo].[usp_mpDatabaseShrink] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @flgActions = 1, @flgOptions = 0, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
-										SELECT [name] AS [database_name]
+										SELECT REPLACE([name], '''', '''''') AS [database_name]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -464,7 +464,7 @@ WHILE @@FETCH_STATUS=0
 										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 2, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
-										SELECT [name] AS [database_name]
+										SELECT REPLACE([name], '''', '''''') AS [database_name]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -486,7 +486,7 @@ WHILE @@FETCH_STATUS=0
 										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 1, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
-										SELECT [name] AS [database_name]
+										SELECT REPLACE([name], '''', '''''') AS [database_name]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -508,7 +508,7 @@ WHILE @@FETCH_STATUS=0
 										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 1, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
-										SELECT [name] AS [database_name]
+										SELECT REPLACE([name], '''', '''''') AS [database_name]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -534,7 +534,7 @@ WHILE @@FETCH_STATUS=0
 										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 4, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
 								FROM
 									(
-										SELECT [name] AS [database_name]
+										SELECT REPLACE([name], '''', '''''') AS [database_name]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID

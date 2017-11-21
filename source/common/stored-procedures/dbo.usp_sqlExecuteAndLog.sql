@@ -120,7 +120,7 @@ IF @serverVersionNum >= 9
 						SET @eventMessageData = ''<alert><detail>'' + 
 												''<error_code>'' + CAST(@errorCode AS [varchar](32)) + ''</error_code>'' + 
 												''<error_string>'' + @errorString + ''</error_string>'' + 
-												''<query_executed>'' + @queryToRun + ''</query_executed>'' + 
+												''<query_executed>'' + [dbo].[ufn_getObjectQuoteName](@queryToRun, ''xml'') + ''</query_executed>'' + 
 												''<duration_seconds>'' + CAST(@durationSeconds AS [varchar](32)) + ''</duration_seconds>'' + 
 												''<event_date_utc>'' + CONVERT([varchar](20), GETUTCDATE(), 120) + ''</event_date_utc>'' + 
 												''</detail></alert>''
@@ -161,7 +161,7 @@ ELSE
 							SET @eventData = ''<alert><detail>'' + 
 												''<error_code>'' + CAST(@errorCode AS [varchar](32)) + ''</error_code>'' + 
 												''<error_string>'' + ISNULL(@errorString, '''') + ''</error_string>'' + 
-												''<query_executed>'' + @queryToRun + ''</query_executed>'' + 
+												''<query_executed>'' + [dbo].[ufn_getObjectQuoteName](@queryToRun, ''xml'') + ''</query_executed>'' + 
 												''<duration_seconds>'' + CAST(@durationSeconds AS [varchar](32)) + ''</duration_seconds>'' + 
 											''</detail></alert>''
 
@@ -190,8 +190,12 @@ IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @childObjectName, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
+DECLARE @tmpQueryToRun [nvarchar](4000)
+--SET @tmpQueryToRun = [dbo].[ufn_getObjectQuoteName](@queryToRun, 'sql')
+SET @tmpQueryToRun = @queryToRun
+
 EXEC sp_executesql @tmpSQL, @queryParameters, @tmpServer		= @tmpServer
-											, @queryToRun		= @queryToRun
+											, @queryToRun		= @tmpQueryToRun
 											, @flgOptions		= @flgOptions
 											, @eventName		= @eventName
 											, @module			= @module
@@ -211,7 +215,7 @@ IF @logEventActions = 'true'
 							CASE WHEN @eventName IS NOT NULL THEN '<event_name>' + @eventName + '</event_name>' ELSE N'' END + 
 							CASE WHEN @objectName IS NOT NULL THEN '<object_name>' + @objectName + '</object_name>' ELSE N'' END + 
 							CASE WHEN @childObjectName IS NOT NULL THEN '<child_object_name>' + @childObjectName + '</child_object_name>' ELSE N'' END + 
-							'<query_executed>' + @queryToRun + '</query_executed>' + 
+							'<query_executed>' + [dbo].[ufn_getObjectQuoteName](@queryToRun, 'xml') + '</query_executed>' + 
 							'<duration>' + REPLICATE('0', 2-LEN(CAST(@durationSeconds / 3600 AS [varchar]))) + CAST(@durationSeconds / 3600 AS [varchar]) + 'h'
 												+ ' ' + REPLICATE('0', 2-LEN(CAST((@durationSeconds / 60) % 60 AS [varchar]))) + CAST((@durationSeconds / 60) % 60 AS [varchar]) + 'm'
 												+ ' ' + REPLICATE('0', 2-LEN(CAST(@durationSeconds % 60 AS [varchar]))) + CAST(@durationSeconds % 60 AS [varchar]) + 's' + '</duration>' + 
