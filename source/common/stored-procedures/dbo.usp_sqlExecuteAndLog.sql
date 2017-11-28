@@ -120,7 +120,7 @@ IF @serverVersionNum >= 9
 						SET @eventMessageData = ''<alert><detail>'' + 
 												''<error_code>'' + CAST(@errorCode AS [varchar](32)) + ''</error_code>'' + 
 												''<error_string>'' + @errorString + ''</error_string>'' + 
-												''<query_executed>'' + [dbo].[ufn_getObjectQuoteName](@queryToRun, ''xml'') + ''</query_executed>'' + 
+												''<query_executed>'' + [dbo].[ufn_getObjectQuoteName](@queryToRun, ''sql'') + ''</query_executed>'' + 
 												''<duration_seconds>'' + CAST(@durationSeconds AS [varchar](32)) + ''</duration_seconds>'' + 
 												''<event_date_utc>'' + CONVERT([varchar](20), GETUTCDATE(), 120) + ''</event_date_utc>'' + 
 												''</detail></alert>''
