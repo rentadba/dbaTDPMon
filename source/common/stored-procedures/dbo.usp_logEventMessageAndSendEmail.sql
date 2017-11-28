@@ -186,7 +186,8 @@ IF @alertSent < @maxAlertCountPer5Min
 -----------------------------------------------------------------------------------------------------
 --processing the xml message
 -----------------------------------------------------------------------------------------------------
-SET @eventMessage = REPLACE(@eventMessage, '&', '&amp;')
+--PRINT @eventMessage
+--SET @eventMessage = [dbo].[ufn_getObjectQuoteName](@eventMessage, 'xml')
 SET @eventMessageXML = CAST(@eventMessage AS [xml])
 SET @HTMLBody = N''
 
@@ -533,11 +534,8 @@ IF @eventType IN (5) AND @eventMessageXML IS NOT NULL
 	end
 
 
-SET @eventMessage = REPLACE(@eventMessage, N'&amp;', N'&')
-
-SET @HTMLBody = REPLACE(@HTMLBody, N'&amp;', N'&')
-SET @HTMLBody = REPLACE(@HTMLBody, N'&amp;lt;', N'<')
-SET @HTMLBody = REPLACE(@HTMLBody, N'&amp;gt;', N'>')
+--SET @eventMessage = [dbo].[ufn_getObjectQuoteName](@eventMessage, 'undo-xml')
+SET @HTMLBody = [dbo].[ufn_getObjectQuoteName](@HTMLBody, 'undo-xml')
 
 
 -----------------------------------------------------------------------------------------------------

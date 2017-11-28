@@ -3853,9 +3853,9 @@ BEGIN TRY
 
 	SELECT @eventMessageData='<report-html><detail>' + 
 								'<message>Health Check report is attached.</message>' + 
-								'<file_name>' + ISNULL(@HTMLReportFileName,'') + '</file_name>' + 
-								CASE WHEN @HTTPAddress IS NOT NULL THEN '<http_address>' + @HTTPAddress + '</http_address>' ELSE '' END + 
-								'<relative_path>' + ISNULL(@relativeStoragePath,'') + '</relative_path>' + 
+								'<file_name>' + [dbo].[ufn_getObjectQuoteName](ISNULL(@HTMLReportFileName,''), 'xml') + '</file_name>' + 
+								CASE WHEN @HTTPAddress IS NOT NULL THEN '<http_address>' + [dbo].[ufn_getObjectQuoteName](@HTTPAddress, 'xml') + '</http_address>' ELSE '' END + 
+								'<relative_path>' + [dbo].[ufn_getObjectQuoteName](ISNULL(@relativeStoragePath,''), 'xml') + '</relative_path>' + 
 								'</detail></report-html>'
 
 	IF (@sendReportAsAttachment=1) OR (@HTTPAddress IS NULL)

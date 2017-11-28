@@ -93,7 +93,7 @@ DECLARE crsDiskSpaceAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINCT
 																	, 'low disk space'	AS [event_name]
 																	, '<alert><detail>' + 
 																		'<severity>warning</severity>' + 
-																		'<machine_name>' + cin.[machine_name] + '</machine_name>' + 
+																		'<machine_name>' + [dbo].[ufn_getObjectQuoteName](cin.[machine_name], 'xml') + '</machine_name>' + 
 																		'<counter_name>low disk space</counter_name><target_name>' + ISNULL(dsi.[volume_mount_point], dsi.[logical_drive]) + '</target_name>' + 
 																		'<measure_unit>MB</measure_unit>' + 
 																		'<current_value>' + CAST(dsi.[available_space_mb] AS [varchar]) +'</current_value>' + 
@@ -144,7 +144,7 @@ DECLARE crsDiskSpaceAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINCT
 																	, 'low disk space'	AS [event_name]
 																	, '<alert><detail>' + 
 																		'<severity>critical</severity>' + 
-																		'<machine_name>' + cin.[machine_name] + '</machine_name>' + 
+																		'<machine_name>' + [dbo].[ufn_getObjectQuoteName](cin.[machine_name], 'xml') + '</machine_name>' + 
 																		'<counter_name>low disk space</counter_name><target_name>' + ISNULL(dsi.[volume_mount_point], dsi.[logical_drive]) + '</target_name>' + 
 																		'<measure_unit>MB</measure_unit>' + 
 																		'<current_value>' + CAST(dsi.[available_space_mb] AS [varchar]) +'</current_value>' + 

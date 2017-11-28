@@ -193,12 +193,12 @@ SET @eventMessageData = ''
 SELECT @eventMessageData = @eventMessageData + 
 							'<job-step>' + 
 							'<step_id>' + CAST(ISNULL([step_id], 0) AS [varchar](32)) + '</step_id>' + 
-							'<step_name>' + ISNULL([step_name], '') + '</step_name>' + 
+							'<step_name>' + [dbo].[ufn_getObjectQuoteName](ISNULL([step_name], ''), 'xml') + '</step_name>' + 
 							'<run_status>' + ISNULL([run_status], '') + '</run_status>' + 
 							'<run_date>' + ISNULL([run_date], '') + '</run_date>' + 
 							'<run_time>' + ISNULL([run_time], '') + '</run_time>' + 
 							'<duration>' + ISNULL([duration], '') + '</duration>' +
-							'<message>' + ISNULL([message], '') + '</message>' +
+							'<message>' + [dbo].[ufn_getObjectQuoteName](ISNULL([message], ''), 'xml') + '</message>' +
 							'</job-step>'
 FROM #jobHistory
 

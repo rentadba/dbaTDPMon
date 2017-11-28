@@ -515,8 +515,8 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 				--------------------------------------------------------------------------------------------------
 				--log heap fragmentation information
 				SET @eventData='<heap-fragmentation><detail>' + 
-									'<database_name>' + @dbName + '</database_name>' + 
-									'<object_name>' + @objectName + '</object_name>'+ 
+									'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
+									'<object_name>' + [dbo].[ufn_getObjectQuoteName](@objectName, 'xml') + '</object_name>'+ 
 									'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
 									'<page_count>' + CAST(@CurrentPageCount AS [varchar](32)) + '</page_count>' + 
 									'<page_density_deviation>' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + '</page_density_deviation>' + 
@@ -989,9 +989,9 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 						--------------------------------------------------------------------------------------------------
 						--log index fragmentation information
 						SET @eventData='<index-fragmentation><detail>' + 
-											'<database_name>' + @dbName + '</database_name>' + 
-											'<object_name>' + @objectName + '</object_name>'+ 
-											'<index_name>' + @childObjectName + '</index_name>' + 
+											'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
+											'<object_name>' + [dbo].[ufn_getObjectQuoteName](@objectName, 'xml') + '</object_name>'+ 
+											'<index_name>' + [dbo].[ufn_getObjectQuoteName](@childObjectName, 'xml') + '</index_name>' + 
 											'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
 											'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
 											'<page_count>' + CAST(@CurrentPageCount AS [varchar](32)) + '</page_count>' + 
@@ -1139,9 +1139,9 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 								--------------------------------------------------------------------------------------------------
 								--log index fragmentation information
 								SET @eventData='<index-fragmentation><detail>' + 
-													'<database_name>' + @dbName + '</database_name>' + 
-													'<object_name>' + @objectName + '</object_name>'+ 
-													'<index_name>' + @childObjectName + '</index_name>' + 
+													'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
+													'<object_name>' + [dbo].[ufn_getObjectQuoteName](@objectName, 'xml') + '</object_name>'+ 
+													'<index_name>' + [dbo].[ufn_getObjectQuoteName](@childObjectName, 'xml') + '</index_name>' + 
 													'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
 													'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
 													'<page_count>' + CAST(@CurrentPageCount AS [varchar](32)) + '</page_count>' + 
@@ -1353,9 +1353,9 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 						SET @childObjectName = QUOTENAME(@IndexName)
 
 						SET @eventData='<index-fragmentation><detail>' + 
-											'<database_name>' + @dbName + '</database_name>' + 
-											'<object_name>' + @objectName + '</object_name>'+ 
-											'<index_name>' + @childObjectName + '</index_name>' + 
+											'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
+											'<object_name>' + [dbo].[ufn_getObjectQuoteName](@objectName, 'xml') + '</object_name>'+ 
+											'<index_name>' + [dbo].[ufn_getObjectQuoteName](@childObjectName, 'xml') + '</index_name>' + 
 											'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
 											'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
 											'<page_count>' + CAST(@CurrentPageCount AS [varchar](32)) + '</page_count>' + 
@@ -1580,9 +1580,9 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 						SET @childObjectName = QUOTENAME(@IndexName)
 
 						SET @eventData='<statistics-health><detail>' + 
-											'<database_name>' + @dbName + '</database_name>' + 
-											'<object_name>' + @objectName + '</object_name>'+ 
-											'<stats_name>' + @childObjectName + '</stats_name>' + 
+											'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
+											'<object_name>' + [dbo].[ufn_getObjectQuoteName](@objectName, 'xml') + '</object_name>'+ 
+											'<stats_name>' + [dbo].[ufn_getObjectQuoteName](@childObjectName, 'xml') + '</stats_name>' + 
 											'<auto_created>' + CAST(@statsAutoCreated AS [varchar](32)) + '</auto_created>' + 
 											'<rows>' + CAST(@tableRows AS [varchar](32)) + '</rows>' + 
 											'<modification_counter>' + CAST(@statsModificationCounter AS [varchar](32)) + '</modification_counter>' + 
