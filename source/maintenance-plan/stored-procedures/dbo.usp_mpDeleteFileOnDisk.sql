@@ -64,12 +64,12 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 /*-------------------------------------------------------------------------------------------------------------------------------*/
 /* check if folderName exists																									 */
 IF @sqlServerName=@@SERVERNAME
-		SET @queryToRun = N'master.dbo.xp_fileexist ''' + @fileName + ''''
+		SET @queryToRun = N'master.dbo.xp_fileexist ''' + [dbo].[ufn_getObjectQuoteName](@fileName, 'sql') + ''''
 else
 	IF @serverVersionNum < 11
-		SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC master.dbo.xp_fileexist ''''' + @fileName + ''''';'')x'
+		SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC master.dbo.xp_fileexist ''''' + [dbo].[ufn_getObjectQuoteName](@fileName, 'sql') + ''''';'')x'
 	ELSE
-		SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''master.dbo.xp_fileexist ''''''''' + @fileName + ''''''''' '''') WITH RESULT SETS(([File Exists] [int], [File is a Directory] [int], [Parent Directory Exists] [int])) '')x'
+		SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''master.dbo.xp_fileexist ''''''''' + [dbo].[ufn_getObjectQuoteName](@fileName, 'sql') + ''''''''' '''') WITH RESULT SETS(([File Exists] [int], [File is a Directory] [int], [Parent Directory Exists] [int])) '')x'
 
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 INSERT	INTO #fileExists([file_exists], [file_is_directory], [parent_directory_exists])
@@ -98,7 +98,7 @@ IF (SELECT [file_exists] FROM #fileExists)=1
 
 		/*-------------------------------------------------------------------------------------------------------------------------------*/
 		/* deleting file     																											 */
-		SET @queryToRun = N'DEL "' + @fileName + '"'
+		SET @queryToRun = N'DEL "' + [dbo].[ufn_getObjectQuoteName](@fileName, 'sql') + '"'
 		SET @serverToRun = N'[' + @sqlServerName + '].master.dbo.xp_cmdshell'
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 		EXEC @serverToRun @queryToRun , NO_OUTPUT
@@ -118,9 +118,9 @@ IF (SELECT [file_exists] FROM #fileExists)=1
 		/*-------------------------------------------------------------------------------------------------------------------------------*/
 		/* check if file still exists																									 */
 		IF @sqlServerName=@@SERVERNAME
-				SET @queryToRun = N'master.dbo.xp_fileexist ''' + @fileName + ''''
+				SET @queryToRun = N'master.dbo.xp_fileexist ''' + [dbo].[ufn_getObjectQuoteName](@fileName, 'sql') + ''''
 		else
-				SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC master.dbo.xp_fileexist ''''' + @fileName + ''''';'')x'
+				SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC master.dbo.xp_fileexist ''''' + [dbo].[ufn_getObjectQuoteName](@fileName, 'sql') + ''''';'')x'
 
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 		DELETE FROM #fileExists

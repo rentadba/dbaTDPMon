@@ -578,4 +578,10 @@
 /*----------------------------------------------------------------------*/
 /* 02.10.2017 */
 	- minimize the number of server configuration option xp_cmdshell enable/disable calls
+
+/*----------------------------------------------------------------------*/
+/* November 2017 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 27.10.2017 */	
+	- threat special characters in database name, for backup operation: '!@#$%^&()-={};:'"<>.,\/[[]
 	

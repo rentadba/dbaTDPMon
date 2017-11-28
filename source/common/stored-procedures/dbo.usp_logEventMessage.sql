@@ -90,6 +90,7 @@ IF @childObjectName IS NOT NULL
 				SET @eventMessage = REPLACE(@eventMessage, @childObjectName, REPLACE(@childObjectName, '>', '&gt;'))
 	end
 */
+
 -----------------------------------------------------------------------------------------------------
 INSERT	INTO [dbo].[logEventMessages]([project_id], [instance_id], [event_date_utc], [module], [parameters], [event_name], [database_name], [object_name], [child_object_name], [message], [send_email_to], [event_type], [is_email_sent], [flood_control])
 		SELECT @projectID, @instanceID, GETUTCDATE(), @module, @parameters, @eventName, @dbName, @objectName, @childObjectName, @eventMessage, @recipientsList, @eventType, @isEmailSent, @isFloodControl

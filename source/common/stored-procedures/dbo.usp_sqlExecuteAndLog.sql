@@ -89,7 +89,7 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@debugMode				= @debugMode
 
 --------------------------------------------------------------------------------------------------
-SET @tmpServer='[' + @sqlServerName + '].[' + ISNULL(@dbName, 'master') + '].[dbo].[sp_executesql]'
+SET @tmpServer= [dbo].[ufn_getObjectQuoteName](@sqlServerName, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](ISNULL(@dbName, 'master'), NULL) + '.[dbo].[sp_executesql]'
 
 IF @serverVersionNum >= 9
 	SET @tmpSQL = N'DECLARE @startTime [datetime]
@@ -190,12 +190,8 @@ IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @childObjectName, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-DECLARE @tmpQueryToRun [nvarchar](4000)
---SET @tmpQueryToRun = [dbo].[ufn_getObjectQuoteName](@queryToRun, 'sql')
-SET @tmpQueryToRun = @queryToRun
-
 EXEC sp_executesql @tmpSQL, @queryParameters, @tmpServer		= @tmpServer
-											, @queryToRun		= @tmpQueryToRun
+											, @queryToRun		= @queryToRun
 											, @flgOptions		= @flgOptions
 											, @eventName		= @eventName
 											, @module			= @module

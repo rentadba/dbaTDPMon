@@ -56,9 +56,10 @@ CREATE TABLE #fileExists
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
 IF RIGHT(@folderName, 1)<>'\' SET @folderName = @folderName + N'\'
+
+
 --checking for invalid characters <>:"'
-SET @folderName = REPLACE(@folderName, '''', '''''')
-SET @folderName = SUBSTRING(@folderName, 1, 2) + REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING(@folderName, 3, LEN(@folderName)), '<', '_'), '>', '_'), ':', '_'), '"', '_')
+SET @folderName = [dbo].[ufn_getObjectQuoteName](@folderName, 'folder')
 
 SET @queryToRun= 'Creating destination folder: "' + @folderName + '"'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0

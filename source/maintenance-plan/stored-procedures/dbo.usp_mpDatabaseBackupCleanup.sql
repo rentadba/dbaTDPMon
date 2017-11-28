@@ -89,7 +89,7 @@ SET NOCOUNT ON
 IF @executionLevel=0
 	EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
-SET @queryToRun= 'Cleanup backup files for database: ' + ' [' + @dbName + ']'
+SET @queryToRun= 'Cleanup backup files for database: ' + @dbName 
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 -----------------------------------------------------------------------------------------
@@ -131,7 +131,9 @@ IF @backupLocation IS NULL
 		IF RIGHT(@backupLocation, 1)<>'\' SET @backupLocation = @backupLocation + N'\'
 		SET @backupLocation = @backupLocation + @sqlServerName + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
 	end
-	
+
+SET @backupLocation = [dbo].[ufn_getObjectQuoteName](@backupLocation, 'folder')
+
 -----------------------------------------------------------------------------------------
 --changing backup expiration date from RetentionDays to full/diff database backup count
 IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'
@@ -142,8 +144,9 @@ IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'
 										FROM msdb.dbo.backupset bs
 										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
 										WHERE	bs.[type] IN (''D'', ''I'')
-												AND bs.[database_name] = ''' + @dbName + N'''
-												AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
+												AND bs.[database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
+												AND CHARINDEX(''' + @backupLocation + ''', mf.[physical_device_name]
+												AND CHARINDEX(''' + @backupLocation + ''', bmf.[physical_device_name]) <> 0
 										ORDER BY bs.[backup_start_date] DESC
 										SET ROWCOUNT 0'
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -179,9 +182,9 @@ IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'
 												FROM msdb.dbo.backupset bs
 												INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
 												WHERE	bs.[type] IN (''D'')
-														AND bs.[database_name] = ''' + @dbName + N'''
+														AND bs.[database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
 														AND bs.[backup_set_id] < ' + CAST(@lastFullRemainingBackupSetID AS [nvarchar]) + N'
-														AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
+														AND CHARINDEX(''' + @backupLocation + ''', bmf.[physical_device_name]) <> 0
 												ORDER BY bs.[backup_start_date] DESC'
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
@@ -210,10 +213,10 @@ IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'
 										FROM msdb.dbo.backupset bs
 										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
 										WHERE	bs.[type]=''I''
-												AND bs.[database_name] = ''' + @dbName + N'''
+												AND bs.[database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
 												AND bs.[backup_start_date] <= DATEADD(dd, -' + CAST(@retentionDays AS [nvarchar]) + N', GETDATE())
 												AND bs.[backup_set_id] > ' + CAST(@lastFullRemainingBackupSetID AS [nvarchar]) + N'
-												AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
+												AND CHARINDEX(''' + @backupLocation + ''', bmf.[physical_device_name]) <> 0
 										ORDER BY bs.[backup_set_id] DESC'
 
 		DELETE FROM #backupSET
@@ -243,9 +246,9 @@ ELSE
 										FROM msdb.dbo.backupset bs
 										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
 										WHERE	bs.[type]=''D''
-												AND bs.[database_name] = ''' + @dbName + N'''
+												AND bs.[database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
 												AND bs.[backup_start_date] <= DATEADD(dd, -' + CAST(@retentionDays AS [nvarchar]) + N', GETDATE())
-												AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
+												AND CHARINDEX(''' + @backupLocation + ''', bmf.[physical_device_name]) <> 0
 										ORDER BY bs.[backup_start_date] DESC
 										SET ROWCOUNT 0'
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -272,10 +275,10 @@ ELSE
 										FROM msdb.dbo.backupset bs
 										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
 										WHERE	bs.[type]=''I''
-												AND bs.[database_name] = ''' + @dbName + N'''
+												AND bs.[database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
 												AND bs.[backup_start_date] <= DATEADD(dd, -' + CAST(@retentionDays AS [nvarchar]) + N', GETDATE())
 												AND bs.[backup_set_id] > ' + CAST(@lastFullRemainingBackupSetID AS [nvarchar]) + N'
-												AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.%' + N''')
+												AND CHARINDEX(''' + @backupLocation + ''', bmf.[physical_device_name]) <> 0
 										ORDER BY bs.[backup_set_id] DESC'
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
@@ -351,7 +354,8 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 										FROM [msdb].[dbo].[backupset] bs
 										INNER JOIN [msdb].[dbo].[backupmediafamily] bmf ON bmf.[media_set_id]=bs.[media_set_id]
 										WHERE	(   (    bs.[backup_start_date] <= CONVERT([datetime], ''' + CONVERT([nvarchar](20), @maxAllowedDate, 120) + N''', 120)
-														AND bmf.[physical_device_name] LIKE (''' + @backupLocation + '%.' + @backupFileExtension + N''')
+														AND CHARINDEX(''' + @backupLocation + ''', bmf.[physical_device_name]) <> 0
+														AND bmf.[physical_device_name] LIKE (''%.' + @backupFileExtension + N''')
 														AND (	 (' + CAST(@flgOptions AS [nvarchar]) + N' & 256 = 0) 
 															OR (' + CAST(@errorCode AS [nvarchar]) + N'<>0 AND ' + CAST(@flgOptions AS [nvarchar]) + N' & 256 = 256) 
 															OR (' + CAST(@serverVersionNum AS [nvarchar]) + N'< 9)
@@ -360,9 +364,9 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 													OR (
 															-- when performing cleanup, delete also orphans diff and log backups, when cleanup full database backups(default)
 															bs.[backup_set_id] < ' + CAST(@lastFullRemainingBackupSetID AS [nvarchar]) + N'
-														AND bs.[database_name] = ''' + @dbName + N'''
+														AND bs.[database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
 														AND bs.[type] IN (''I'', ''L'')
-														AND bmf.[physical_device_name] LIKE (''' + @backupLocation + N'%'')
+														AND CHARINDEX(''' + @backupLocation + ''', bmf.[physical_device_name]) <> 0
 														AND bs.[database_backup_lsn] <> ' + CAST(ISNULL(@lastFullRemainingFirstLSN, 0) AS [nvarchar]) + N'
 														AND ' + CAST(@flgOptions AS [nvarchar]) + N' & 128 = 128
 													)
@@ -370,9 +374,9 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 															-- delete incremental and transaction log backups to keep the retention/restore period fixed
 															' + CAST(ISNULL(@lastDiffRemainingBackupSetID, 0)  AS [nvarchar]) + N' <> 0
 														AND bs.[backup_set_id] < ' + CAST(ISNULL(@lastDiffRemainingBackupSetID, 0) AS [nvarchar]) + N'
-														AND bs.[database_name] = ''' + @dbName + N'''
+														AND bs.[database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
 														AND bs.[type] IN (''I'', ''L'')
-														AND bmf.[physical_device_name] LIKE (''' + @backupLocation + N'%'')
+														AND CHARINDEX(''' + @backupLocation + ''', bmf.[physical_device_name]) <> 0
 														AND ' + CAST(@flgOptions AS [nvarchar]) + N' & 128 = 128
 													)
 												)														
@@ -390,7 +394,6 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 				INSERT	INTO #backupDevice([backup_set_id], [physical_device_name])
 						EXEC (@queryToRun)
 			end
-
 
 		/* identify backup files to be deleted, based on file existence on disk */
 		/* use xp_dirtree to identify orphan backup files to be deleted, when using option 128 (default) */
@@ -438,8 +441,8 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 		FETCH NEXT FROM crsCleanupBackupFiles INTO @backupFileName
 		WHILE @@FETCH_STATUS=0
 			begin
-				SET @queryToRun = N'EXEC [' + DB_NAME() + '].[dbo].[usp_mpDeleteFileOnDisk]	@sqlServerName	= ''' + @sqlServerName + N''',
-																							@fileName		= ''' + @backupFileName + N''',
+				SET @queryToRun = N'EXEC [' + DB_NAME() + '].[dbo].[usp_mpDeleteFileOnDisk]	@sqlServerName	= ''' + [dbo].[ufn_getObjectQuoteName](@sqlServerName, 'sql') + N''',
+																							@fileName		= ''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''',
 																							@executionLevel	= ' + CAST(@nestedExecutionLevel AS [nvarchar]) + N',
 																							@debugMode		= ' + CAST(@debugMode AS [nvarchar]) 
 
