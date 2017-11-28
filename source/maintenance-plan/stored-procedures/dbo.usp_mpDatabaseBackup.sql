@@ -219,7 +219,7 @@ begin
 	SET @eventData='<skipaction><detail>' + 
 						'<name>database backup</name>' + 
 						'<type>' + @backupType + '</type>' + 
-						'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+						'<affected_object>' + @dbName + '</affected_object>' + 
 						'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 						'<reason>' + @queryToRun + '</reason>' + 
 					'</detail></skipaction>'
@@ -299,7 +299,7 @@ IF @flgOptions & 512 = 512
 				SET @eventData='<skipaction><detail>' + 
 									'<name>database backup</name>' + 
 									'<type>' + @backupType + '</type>' + 
-									'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+									'<affected_object>' + @dbName + '</affected_object>' + 
 									'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 									'<reason>' + @queryToRun + '</reason>' + 
 								'</detail></skipaction>'
@@ -360,7 +360,7 @@ IF @flgActions & 4 = 4
 				SET @eventData='<skipaction><detail>' + 
 									'<name>database backup</name>' + 
 									'<type>' + @backupType + '</type>' + 
-									'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+									'<affected_object>' + @dbName + '</affected_object>' + 
 									'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 									'<reason>' + @queryToRun + '</reason>' + 
 								'</detail></skipaction>'
@@ -394,9 +394,9 @@ IF LEN(@backupLocation) >= @maxPATHLength
 							'<instance_name>' + @sqlServerName + '</instance_name>' + 
 							'<name>database backup</name>' + 
 							'<type>' + @backupType + '</type>' + 
-							'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+							'<affected_object>' + @dbName + '</affected_object>' + 
 							'<reason>Msg 3057, Level 16: The length of the device name provided exceeds supported limit (maximum length is:' + CAST(@maxPATHLength AS [nvarchar]) + ')</reason>' + 
-							'<path>' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'xml') + '</path>' + 
+							'<path>' + @backupLocation + '</path>' + 
 							'<event_date_utc>' + CONVERT([varchar](24), GETDATE(), 121) + '</event_date_utc>' + 
 						'</detail></alert>'
 
@@ -550,9 +550,9 @@ IF @optionForceChangeBackupType=1
 									'<instance_name>' + @sqlServerName + '</instance_name>' + 
 									'<name>database backup</name>' + 
 									'<type>' + @backupType + '</type>' + 
-									'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+									'<affected_object>' + @dbName + '</affected_object>' + 
 									'<reason>Msg 3057, Level 16: The length of the device name provided exceeds supported limit (maximum length is:' + CAST(@maxPATHLength AS [nvarchar]) + ')</reason>' + 
-									'<path>' + [dbo].[ufn_getObjectQuoteName](@backupLocation + @backupFileName, 'xml') + '</path>' + 
+									'<path>' + (@backupLocation + @backupFileName) + '</path>' + 
 									'<event_date_utc>' + CONVERT([varchar](24), GETDATE(), 121) + '</event_date_utc>' + 
 								'</detail></alert>'
 
@@ -619,9 +619,9 @@ IF LEN(@backupLocation + @backupFileName) > @maxPATHLength
 							'<instance_name>' + @sqlServerName + '</instance_name>' + 
 							'<name>database backup</name>' + 
 							'<type>' + @backupType + '</type>' + 
-							'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+							'<affected_object>' + @dbName + '</affected_object>' + 
 							'<reason>Msg 3057, Level 16: The length of the device name provided exceeds supported limit (maximum length is:' + CAST(@maxPATHLength AS [nvarchar]) + ')</reason>' + 
-							'<path>' + [dbo].[ufn_getObjectQuoteName](@backupLocation + @backupFileName, 'xml') + '</path>' + 
+							'<path>' + (@backupLocation + @backupFileName) + '</path>' + 
 							'<event_date_utc>' + CONVERT([varchar](24), GETDATE(), 121) + '</event_date_utc>' + 
 						'</detail></alert>'
 
@@ -701,7 +701,7 @@ IF @errorCode = 0
 	begin
 		--log backup database information
 		SET @eventData='<backupset><detail>' + 
-							'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
+							'<database_name>' + @dbName + '</database_name>' + 
 							'<type>' + @backupType + '</type>' + 
 							'<start_date>' + CONVERT([varchar](24), ISNULL(@backupStartDate, GETDATE()), 121) + '</start_date>' + 
 							'<duration>' + REPLICATE('0', 2-LEN(CAST(@backupDurationSec / 3600 AS [varchar]))) + CAST(@backupDurationSec / 3600 AS [varchar]) + 'h'

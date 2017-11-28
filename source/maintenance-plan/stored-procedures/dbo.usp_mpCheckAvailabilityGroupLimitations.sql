@@ -123,7 +123,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 						SET @eventData='<skipaction><detail>' + 
 											'<name>' + @actionName + '</name>' + 
 											'<type>' + @actionType + '</type>' + 
-											'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+											'<affected_object>' + @dbName + '</affected_object>' + 
 											'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 											'<reason>' + @queryToRun + '</reason>' + 
 										'</detail></skipaction>'
@@ -176,7 +176,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 								SET @eventData='<skipaction><detail>' + 
 													'<name>' + @actionName + '</name>' + 
 													'<type>' + @actionType + '</type>' + 
-													'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+													'<affected_object>' + @dbName + '</affected_object>' + 
 													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 													'<reason>' + @queryToRun + '</reason>' + 
 												'</detail></skipaction>'
@@ -200,7 +200,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 								SET @eventData='<skipaction><detail>' + 
 													'<name>' + @actionName + '</name>' + 
 													'<type>' + @actionType + '</type>' + 
-													'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+													'<affected_object>' + @dbName + '</affected_object>' + 
 													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 													'<reason>' + @queryToRun + '</reason>' + 
 												'</detail></skipaction>'
@@ -234,7 +234,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 										SET @eventData='<skipaction><detail>' + 
 															'<name>' + @actionName + '</name>' + 
 															'<type>' + @actionType + '</type>' + 
-															'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+															'<affected_object>' + @dbName + '</affected_object>' + 
 															'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 															'<reason>' + @queryToRun + '</reason>' + 
 														'</detail></skipaction>'
@@ -259,7 +259,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 								SET @eventData='<skipaction><detail>' + 
 													'<name>' + @actionName + '</name>' + 
 													'<type>' + @actionType + '</type>' + 
-													'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+													'<affected_object>' + @dbName + '</affected_object>' + 
 													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 													'<reason>' + @queryToRun + '</reason>' + 
 												'</detail></skipaction>'
@@ -283,7 +283,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 								SET @eventData='<skipaction><detail>' + 
 													'<name>' + @actionName + '</name>' + 
 													'<type>' + @actionType + '</type>' + 
-													'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+													'<affected_object>' + @dbName + '</affected_object>' + 
 													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 													'<reason>' + @queryToRun + '</reason>' + 
 												'</detail></skipaction>'
@@ -307,7 +307,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 								SET @eventData='<skipaction><detail>' + 
 													'<name>' + @actionName + '</name>' + 
 													'<type>' + @actionType + '</type>' + 
-													'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+													'<affected_object>' + @dbName + '</affected_object>' + 
 													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 													'<reason>' + @queryToRun + '</reason>' + 
 												'</detail></skipaction>'
@@ -336,7 +336,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 								SET @eventData='<skipaction><detail>' + 
 													'<name>' + @actionName + '</name>' + 
 													'<type>' + @actionType + '</type>' + 
-													'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+													'<affected_object>' + @dbName + '</affected_object>' + 
 													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 													'<reason>' + @queryToRun + '</reason>' + 
 												'</detail></skipaction>'
@@ -384,7 +384,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 										SET @eventData='<skipaction><detail>' + 
 															'<name>' + @actionName + '</name>' + 
 															'<type>' + @actionType + '</type>' + 
-															'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+															'<affected_object>' + @dbName + '</affected_object>' + 
 															'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 															'<reason>' + @queryToRun + '</reason>' + 
 														'</detail></skipaction>'
@@ -411,7 +411,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 						SET @eventData='<skipaction><detail>' + 
 											'<name>' + @actionName + '</name>' + 
 											'<type>' + @actionType + '</type>' + 
-											'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+											'<affected_object>' + @dbName + '</affected_object>' + 
 											'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 											'<reason>' + @queryToRun + '</reason>' + 
 										'</detail></skipaction>'
@@ -436,7 +436,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 						SET @eventData='<skipaction><detail>' + 
 											'<name>' + @actionName + '</name>' + 
 											'<type>' + @actionType + '</type>' + 
-											'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+											'<affected_object>' + @dbName + '</affected_object>' + 
 											'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 											'<reason>' + @queryToRun + '</reason>' + 
 										'</detail></skipaction>'
@@ -461,7 +461,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 						SET @eventData='<skipaction><detail>' + 
 											'<name>' + @actionName + '</name>' + 
 											'<type>' + @actionType + '</type>' + 
-											'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+											'<affected_object>' + @dbName + '</affected_object>' + 
 											'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
 											'<reason>' + @queryToRun + '</reason>' + 
 										'</detail></skipaction>'

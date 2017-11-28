@@ -187,7 +187,6 @@ IF @alertSent < @maxAlertCountPer5Min
 --processing the xml message
 -----------------------------------------------------------------------------------------------------
 SET @eventMessage = REPLACE(@eventMessage, '&', '&amp;')
-
 SET @eventMessageXML = CAST(@eventMessage AS [xml])
 SET @HTMLBody = N''
 
@@ -534,6 +533,8 @@ IF @eventType IN (5) AND @eventMessageXML IS NOT NULL
 	end
 
 
+SET @eventMessage = REPLACE(@eventMessage, N'&amp;', N'&')
+
 SET @HTMLBody = REPLACE(@HTMLBody, N'&amp;', N'&')
 SET @HTMLBody = REPLACE(@HTMLBody, N'&amp;lt;', N'<')
 SET @HTMLBody = REPLACE(@HTMLBody, N'&amp;gt;', N'>')
@@ -630,7 +631,7 @@ ELSE
 		SET @isFloodControl=1
 	end
 
-SET @eventData = SUBSTRING(CAST(@eventMessageXML AS [varchar](8000)), 1, 8000)
+SET @eventData = SUBSTRING(@eventMessage, 1, 8000)
 EXEC [dbo].[usp_logEventMessage]	@projectCode			= @projectCode,
 									@sqlServerName			= @sqlServerName,
 									@dbName					= @dbName,

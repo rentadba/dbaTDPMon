@@ -65,6 +65,7 @@ WHERE	[name] = @sqlServerName
 		AND [project_id] = @projectID
 
 -----------------------------------------------------------------------------------------------------
+
 --xml corrections
 SET @eventMessage = REPLACE(@eventMessage, CHAR(38), CHAR(38) + 'amp;')
 IF @objectName IS NOT NULL
