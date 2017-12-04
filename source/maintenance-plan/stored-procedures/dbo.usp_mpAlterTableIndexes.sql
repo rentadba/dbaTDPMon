@@ -127,11 +127,12 @@ BEGIN TRY
 					[table_name] [sysname]
 				)
 
-		SET @queryToRun = N'SELECT TABLE_SCHEMA, TABLE_NAME 
-						FROM [' + @dbName + '].INFORMATION_SCHEMA.TABLES 
+		SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+						SELECT TABLE_SCHEMA, TABLE_NAME 
+						FROM INFORMATION_SCHEMA.TABLES 
 						WHERE	TABLE_TYPE = ''BASE TABLE'' 
-								AND TABLE_NAME LIKE ''' + @tableName + ''' 
-								AND TABLE_SCHEMA LIKE ''' + @tableSchema + ''''
+								AND TABLE_NAME LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + ''' 
+								AND TABLE_SCHEMA LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + ''''
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -148,7 +149,7 @@ BEGIN TRY
 				FETCH NEXT FROM crsTableList INTO @crtTableSchema, @crtTableName
 				WHILE @@FETCH_STATUS=0
 					begin
-						SET @strMessage=N'Alter indexes ON [' + @crtTableSchema + '].[' + @crtTableName + '] : ' + 
+						SET @strMessage=N'Alter indexes ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL) + ' : ' + 
 											CASE @flgAction WHEN 1 THEN 'REBUILD'
 															WHEN 2 THEN 'REORGANIZE'
 															WHEN 4 THEN 'DISABLE'
@@ -159,7 +160,8 @@ BEGIN TRY
 						--if current action is to disable/reorganize indexes, will get only enabled indexes
 						--if current action is to rebuild, will get both enabled/disabled indexes
 						SET @queryToRun = N''
-						SET @queryToRun = @queryToRun + N'SELECT  si.[index_id]
+						SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+													SELECT  si.[index_id]
 														, si.[name]
 														, si.[type]
 														, si.[allow_page_locks]
@@ -167,17 +169,17 @@ BEGIN TRY
 														, CASE WHEN xi.[type]=3 AND xi.[using_xml_index_id] IS NULL THEN 1 ELSE 0 END AS [is_primary_xml]
 														, CASE WHEN SUM(CASE WHEN fk.[name] IS NOT NULL THEN 1 ELSE 0 END) > 0 THEN 1 ELSE 0 END AS [has_dependent_fk]
 														, ISNULL(st.[is_replicated], 0) | ISNULL(st.[is_merge_published], 0) | ISNULL(st.[is_published], 0) AS [is_replicated]
-													FROM [' + @dbName + '].[sys].[indexes]				si
-													INNER JOIN [' + @dbName + '].[sys].[objects]		so  ON so.[object_id] = si.[object_id]
-													INNER JOIN [' + @dbName + '].[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
-													LEFT  JOIN [' + @dbName + '].[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id] AND si.[type]=3
-													LEFT  JOIN [' + @dbName + '].[sys].[foreign_keys]	fk  ON fk.[referenced_object_id] = so.[object_id] AND fk.[key_index_id] = si.[index_id]
-													LEFT  JOIN [' + @dbName + '].[sys].[tables]			st  ON st.[object_id] = so.[object_id]
-													WHERE	so.[name] = ''' + @crtTableName + '''
-															AND sch.[name] = ''' + @crtTableSchema + '''
+													FROM [sys].[indexes]			si
+													INNER JOIN [sys].[objects]		so  ON so.[object_id] = si.[object_id]
+													INNER JOIN [sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
+													LEFT  JOIN [sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id] AND si.[type]=3
+													LEFT  JOIN [sys].[foreign_keys]	fk  ON fk.[referenced_object_id] = so.[object_id] AND fk.[key_index_id] = si.[index_id]
+													LEFT  JOIN [sys].[tables]		st  ON st.[object_id] = so.[object_id]
+													WHERE	so.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'sql') + '''
+															AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'sql') + '''
 															AND so.[is_ms_shipped] = 0' + 
 															CASE	WHEN @indexName IS NOT NULL 
-																	THEN ' AND si.[name] LIKE ''' + @indexName + ''''
+																	THEN ' AND si.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@indexName, 'sql') + ''''
 																	ELSE CASE WHEN @indexID  IS NOT NULL 
 																			  THEN ' AND si.[index_id] = ' + CAST(@indexID AS [nvarchar])
 																			  ELSE ''
@@ -203,8 +205,6 @@ BEGIN TRY
 					end
 				CLOSE crsTableList
 				DEALLOCATE crsTableList
-
-
 
 				DECLARE crsTableToAlterIndexes CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [index_id], [index_name], [index_type], [allow_page_locks], [is_disabled], [is_primary_xml], [has_dependent_fk], [is_replicated]
 																				FROM @tmpTableToAlterIndexes
@@ -267,14 +267,15 @@ BEGIN TRY
 											begin
 												--get all enabled non-clustered/xml/spatial indexes for current table
 												SET @queryToRun = N''
-												SET @queryToRun = @queryToRun + N'SELECT  si.[name]
+												SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+																			SELECT  si.[name]
 																				, CASE WHEN xi.[type]=3 AND xi.[using_xml_index_id] IS NULL THEN 1 ELSE 0 END AS [is_primary_xml]
-																			FROM [' + @dbName + '].[sys].[indexes]				si
-																			INNER JOIN [' + @dbName + '].[sys].[objects]		so ON  si.[object_id] = so.[object_id]
-																			INNER JOIN [' + @dbName + '].[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
-																			LEFT  JOIN [' + @dbName + '].[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id] AND si.[type]=3
-																			WHERE	so.[name] = ''' + @crtTableName + '''
-																					AND sch.[name] = ''' + @crtTableSchema + ''' 
+																			FROM [sys].[indexes]			si
+																			INNER JOIN [sys].[objects]		so ON  si.[object_id] = so.[object_id]
+																			INNER JOIN [sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
+																			LEFT  JOIN [sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id] AND si.[type]=3
+																			WHERE	so.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'sql') + '''
+																					AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'sql') + ''' 
 																					AND si.[type] in (2,3,4)
 																					AND si.[is_disabled] = 0'
 												SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
@@ -326,13 +327,14 @@ BEGIN TRY
 												begin
 													--get all enabled secondary xml indexes for current table
 													SET @queryToRun = N''
-													SET @queryToRun = @queryToRun + N'SELECT  si.[name]
-																				FROM [' + @dbName + '].[sys].[indexes]				si
-																				INNER JOIN [' + @dbName + '].[sys].[objects]		so ON  si.[object_id] = so.[object_id]
-																				INNER JOIN [' + @dbName + '].[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
-																				INNER JOIN [' + @dbName + '].[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id]
-																				WHERE	so.[name] = ''' + @crtTableName + '''
-																						AND sch.[name] = ''' + @crtTableSchema + ''' 
+													SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+																				SELECT  si.[name]
+																				FROM [sys].[indexes]			si
+																				INNER JOIN [sys].[objects]		so ON  si.[object_id] = so.[object_id]
+																				INNER JOIN [sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
+																				INNER JOIN .[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id]
+																				WHERE	so.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'sql') + '''
+																						AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'sql') + ''' 
 																						AND si.[type] = 3
 																						AND xi.[using_xml_index_id] = ''' + CAST(@crtIndexID AS [sysname]) + '''
 																						AND si.[is_disabled] = 0'
@@ -424,7 +426,7 @@ BEGIN TRY
 								SET @queryToRun = N''
 
 								SET @queryToRun = @queryToRun + N'SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, NULL) + ' ON [' + @crtTableSchema + '].[' + @crtTableName + '] REBUILD'
+								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL) + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, NULL) + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL) + ' REBUILD'
 					
 								--rebuild options
 								SET @queryToRun = @queryToRun + N' WITH (SORT_IN_TEMPDB = ON' + CASE WHEN ISNULL(@maxDOP, 0) <> 0 THEN N', MAXDOP = ' + CAST(@maxDOP AS [nvarchar]) ELSE N'' END + 
@@ -444,7 +446,7 @@ BEGIN TRY
 										EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
 									end
 
-								SET @objectName = '[' + @crtTableSchema + '].[' + @crtTableName + ']'
+								SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL)
 								SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, NULL)
 								SET @nestedExecutionLevel = @executionLevel + 1
 
@@ -558,7 +560,7 @@ BEGIN TRY
 								begin
 									SET @queryToRun = N''
 									SET @queryToRun = @queryToRun + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-									SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, NULL) + ' ON [' + @crtTableSchema + '].[' + @crtTableName + '] REORGANIZE'
+									SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL) + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, NULL) + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL) + ' REORGANIZE'
 				
 									--  1  - Compact large objects (LOB) (default)
 									IF @flgOptions & 1 = 1
@@ -571,7 +573,7 @@ BEGIN TRY
 									IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 
-									SET @objectName = '[' + @crtTableSchema + '].[' + @crtTableName + ']'
+									SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL)
 									SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, NULL)
 									SET @nestedExecutionLevel = @executionLevel + 1
 
@@ -599,11 +601,11 @@ BEGIN TRY
 							begin
 								SET @queryToRun = N''
 								SET @queryToRun = @queryToRun + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @crtTableSchema + '].[' + @crtTableName + ']'') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, NULL) + ' ON [' + @crtTableSchema + '].[' + @crtTableName + '] DISABLE'
+								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL) + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, NULL) + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL) + ' DISABLE'
 				
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-								SET @objectName = '[' + @crtTableSchema + '].[' + @crtTableName + ']'
+								SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL)
 								SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, NULL)
 								SET @nestedExecutionLevel = @executionLevel + 1
 
@@ -636,7 +638,7 @@ BEGIN TRY
 			end
 
 		SET @affectedDependentObjects=N''
-		SELECT @affectedDependentObjects = @affectedDependentObjects + N'[' + [index_name] + N'];'
+		SELECT @affectedDependentObjects = @affectedDependentObjects + [dbo].[ufn_getObjectQuoteName]([index_name], NULL) + N';'
 		FROM @DependentIndexes
 END TRY
 

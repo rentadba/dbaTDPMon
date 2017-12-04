@@ -179,6 +179,7 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@serverVersionNum		= @serverVersionNum OUT,
 										@executionLevel			= @nestedExecutionLevel,
 										@debugMode				= @debugMode
+
 ---------------------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------------------------
@@ -224,9 +225,9 @@ CREATE TABLE #databaseCompatibility
 
 SET @queryToRun = N''
 IF @serverVersionNum >= 9
-	SET @queryToRun = @queryToRun + N'SELECT [compatibility_level] FROM sys.databases WHERE [name] = ''' + @dbName + N''''
+	SET @queryToRun = @queryToRun + N'SELECT [compatibility_level] FROM sys.databases WHERE [name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
 ELSE
-	SET @queryToRun = @queryToRun + N'SELECT [cmptlevel] FROM master.dbo.sysdatabases WHERE [name] = ''' + @dbName + N''''
+	SET @queryToRun = @queryToRun + N'SELECT [cmptlevel] FROM master.dbo.sysdatabases WHERE [name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
 
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -357,14 +358,15 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 	begin
 		SET @analyzeIndexType=N'0'
 
-		SET @queryToRun=N'Create list of heap tables to be analyzed...' + @dbName
+		SET @queryToRun=N'Create list of heap tables to be analyzed...' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		SET @queryToRun = N''				
 
 		SET @queryToRun = @queryToRun + 
-							N'SELECT DISTINCT 
-										DB_ID(''' + @dbName + ''') AS [database_id]
+							N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+							SELECT DISTINCT 
+									  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 									, si.[object_id]
 									, sc.[name] AS [table_schema]
 									, ob.[name] AS [table_name]
@@ -372,23 +374,23 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 									, si.[name] AS [index_name]
 									, si.[type] AS [index_type]
 									, CASE WHEN si.[fill_factor] = 0 THEN 100 ELSE si.[fill_factor] END AS [fill_factor]
-							FROM [' + @dbName + '].[sys].[indexes]				si
-							INNER JOIN [' + @dbName + '].[sys].[objects]		ob	ON ob.[object_id] = si.[object_id]
-							INNER JOIN [' + @dbName + '].[sys].[schemas]		sc	ON sc.[schema_id] = ob.[schema_id]' +
+							FROM [sys].[indexes]			si
+							INNER JOIN [sys].[objects]		ob	ON ob.[object_id] = si.[object_id]
+							INNER JOIN [sys].[schemas]		sc	ON sc.[schema_id] = ob.[schema_id]' +
 							CASE WHEN @flgOptions & 32768 = 32768 
 								THEN N'
 							INNER JOIN
 									(
 											SELECT   [object_id]
 												, SUM([reserved_page_count]) as [reserved_page_count]
-											FROM [' + @dbName + '].sys.dm_db_partition_stats
+											FROM sys.dm_db_partition_stats
 											GROUP BY [object_id]
 											HAVING SUM([reserved_page_count]) >=' + CAST(@pageThreshold AS [nvarchar](32)) + N'
 									) ps ON ps.[object_id] = ob.[object_id]'
 								ELSE N''
 								END + N'
-							WHERE	ob.[name] LIKE ''' + @tableName + '''
-									AND sc.[name] LIKE ''' + @tableSchema + '''
+							WHERE	ob.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+									AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
 									AND si.[type] IN (' + @analyzeIndexType + N')
 									AND ob.[type] IN (''U'', ''V'')' + 
 									CASE WHEN @skipObjectsList IS NOT NULL  THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))
@@ -437,10 +439,11 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 		FETCH NEXT FROM crsObjectsWithIndexes INTO @DatabaseID, @ObjectID, @CurrentTableSchema, @CurrentTableName, @IndexID, @IndexName, @IndexType, @IndexFillFactor
 		WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 			begin
-				SET @queryToRun='[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']' + CASE WHEN @IndexName IS NOT NULL THEN N' - [' + @IndexName + ']' ELSE N' (heap)' END
+				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + CASE WHEN @IndexName IS NOT NULL THEN N' - ' + [dbo].[ufn_getObjectQuoteName](@IndexName, NULL)  ELSE N' (heap)' END
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
-				SET @queryToRun=N'SELECT	 OBJECT_NAME(ips.[object_id])	AS [table_name]
+				SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+									SELECT	 OBJECT_NAME(ips.[object_id])	AS [table_name]
 											, ips.[object_id]
 											, si.[name] as index_name
 											, ips.[index_id]
@@ -451,10 +454,10 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 											, ips.[avg_record_size_in_bytes]
 											, ips.[avg_page_space_used_in_percent]
 											, ips.[ghost_record_count]
-									FROM [' + @dbName + '].sys.dm_db_index_physical_stats (' + CAST(@DatabaseID AS [nvarchar](4000)) + N', ' + CAST(@ObjectID AS [nvarchar](4000)) + N', ' + CAST(@IndexID AS [nvarchar](4000)) + N' , NULL, ''' + 
+									FROM sys.dm_db_index_physical_stats (' + CAST(@DatabaseID AS [nvarchar](4000)) + N', ' + CAST(@ObjectID AS [nvarchar](4000)) + N', ' + CAST(@IndexID AS [nvarchar](4000)) + N' , NULL, ''' + 
 													'DETAILED'
 											+ ''') ips
-									INNER JOIN [' + @dbName + '].sys.indexes si ON ips.[object_id]=si.[object_id] AND ips.[index_id]=si.[index_id]
+									INNER JOIN sys.indexes si ON ips.[object_id]=si.[object_id] AND ips.[index_id]=si.[index_id]
 									WHERE	si.[type] IN (' + @analyzeIndexType + N')'
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
@@ -506,7 +509,7 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName, @CurrentFragmentation, @CurrentPageCount, @CurentPageDensityDeviation, @CurrentForwardedRecordsPercent
 		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 			begin
-				SET @objectName = '[' + @CurrentTableSchema + '].[' + RTRIM(@CurrentTableName) + ']'
+				SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), NULL)
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 		   		SET @queryToRun=N'Current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density deviation = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar])
@@ -565,15 +568,16 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 	begin
 		SET @analyzeIndexType=N'1,2,3,4'		
 
-		SET @queryToRun=N'Create list of indexes to be analyzed...' + @dbName
+		SET @queryToRun=N'Create list of indexes to be analyzed...' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		SET @queryToRun = N''				
 
 		IF @serverVersionNum >= 9
 			SET @queryToRun = @queryToRun + 
-								N'SELECT DISTINCT 
-										  DB_ID(''' + @dbName + ''') AS [database_id]
+								N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+								SELECT DISTINCT 
+										  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 										, si.[object_id]
 										, sc.[name] AS [table_schema]
 										, ob.[name] AS [table_name]
@@ -581,23 +585,23 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 										, si.[name] AS [index_name]
 										, si.[type] AS [index_type]
 										, CASE WHEN si.[fill_factor] = 0 THEN 100 ELSE si.[fill_factor] END AS [fill_factor]
-								FROM [' + @dbName + '].[sys].[indexes]				si
-								INNER JOIN [' + @dbName + '].[sys].[objects]		ob	ON ob.[object_id] = si.[object_id]
-								INNER JOIN [' + @dbName + '].[sys].[schemas]		sc	ON sc.[schema_id] = ob.[schema_id]' +
+								FROM [sys].[indexes]			si
+								INNER JOIN [sys].[objects]		ob	ON ob.[object_id] = si.[object_id]
+								INNER JOIN [sys].[schemas]		sc	ON sc.[schema_id] = ob.[schema_id]' +
 								CASE WHEN @flgOptions & 32768 = 32768 
 									THEN N'
 								INNER JOIN
 										(
 											 SELECT   [object_id]
 													, SUM([reserved_page_count]) as [reserved_page_count]
-											 FROM [' + @dbName + '].sys.dm_db_partition_stats
+											 FROM sys.dm_db_partition_stats
 											 GROUP BY [object_id]
 											 HAVING SUM([reserved_page_count]) >=' + CAST(@pageThreshold AS [nvarchar](32)) + N'
 										) ps ON ps.[object_id] = ob.[object_id]'
 									ELSE N''
 									END + N'
-								WHERE	ob.[name] LIKE ''' + @tableName + '''
-										AND sc.[name] LIKE ''' + @tableSchema + '''
+								WHERE	ob.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+										AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
 										AND si.[type] IN (' + @analyzeIndexType + N')
 										AND si.[is_disabled]=0
 										AND ob.[type] IN (''U'', ''V'')' + 
@@ -605,9 +609,9 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 																						AND si.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
 																				ELSE N'' END
 		ELSE
-			SET @queryToRun = @queryToRun + 
-								N'SELECT DISTINCT 
-									  DB_ID(''' + @dbName + ''') AS [database_id]
+			SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+								SELECT DISTINCT 
+									  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 									, si.[id] AS [object_id]
 									, sc.[name] AS [table_schema]
 									, ob.[name] AS [table_name]
@@ -615,11 +619,11 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 									, si.[name] AS [index_name]
 									, CASE WHEN si.[indid]=1 THEN 1 ELSE 2 END AS [index_type]
 									, CASE WHEN ISNULL(si.[OrigFillFactor], 0) = 0 THEN 100 ELSE si.[OrigFillFactor] END AS [fill_factor]
-								FROM [' + @dbName + ']..sysindexes si
-								INNER JOIN [' + @dbName + ']..sysobjects ob	ON ob.[id] = si.[id]
-								INNER JOIN [' + @dbName + ']..sysusers sc	ON sc.[uid] = ob.[uid]
-								WHERE	ob.[name] LIKE ''' + @tableName + '''
-										AND sc.[name] LIKE ''' + @tableSchema + '''
+								FROM sysindexes si
+								INNER JOIN sysobjects ob	ON ob.[id] = si.[id]
+								INNER JOIN sysusers sc	ON sc.[uid] = ob.[uid]
+								WHERE	ob.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+										AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
 										AND si.[status] & 64 = 0 
 										AND si.[status] & 8388608 = 0 
 										AND si.[status] & 16777216 = 0 
@@ -663,7 +667,7 @@ UPDATE #databaseObjectsWithIndexList
 --------------------------------------------------------------------------------------------------
 IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 	begin
-		SET @queryToRun=N'Create list of statistics to be analyzed...' + @dbName
+		SET @queryToRun=N'Create list of statistics to be analyzed...' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		SET @queryToRun = N''				
@@ -673,8 +677,8 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				IF (@serverVersionNum >= 10.504000 AND @serverVersionNum < 11) OR @serverVersionNum >= 11.03000
 					/* starting with SQL Server 2008 R2 SP2 / SQL Server 2012 SP1 */
 					SET @queryToRun = @queryToRun + 
-										N'USE [' + @dbName + ']; SELECT DISTINCT 
-												  DB_ID(''' + @dbName + ''') AS [database_id]
+										N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; SELECT DISTINCT 
+												  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 												, ss.[object_id]
 												, sc.[name] AS [table_schema]
 												, ob.[name] AS [table_name]
@@ -685,12 +689,12 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 												, sp.[rows]
 												, ABS(sp.[modification_counter]) AS [modification_counter]
 												, (ABS(sp.[modification_counter]) * 100. / CAST(sp.[rows] AS [float])) AS [percent_changes]
-										FROM [' + @dbName + '].sys.stats ss
-										INNER JOIN [' + @dbName + '].sys.objects ob	ON ob.[object_id] = ss.[object_id]
-										INNER JOIN [' + @dbName + '].sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]' + N'
-										CROSS APPLY [' + @dbName + '].sys.dm_db_stats_properties(ss.object_id, ss.stats_id) AS sp
-										WHERE	ob.[name] LIKE ''' + @tableName + '''
-												AND sc.[name] LIKE ''' + @tableSchema + '''
+										FROM sys.stats ss
+										INNER JOIN sys.objects ob	ON ob.[object_id] = ss.[object_id]
+										INNER JOIN sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]' + N'
+										CROSS APPLY sys.dm_db_stats_properties(ss.object_id, ss.stats_id) AS sp
+										WHERE	ob.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+												AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
 												AND ob.[type] <> ''S''
 												AND sp.[rows] > 0
 												AND (    (    DATEDIFF(dd, sp.[last_updated], GETDATE()) >= ' + CAST(@statsAgeDays AS [nvarchar](32)) + N' 
@@ -709,8 +713,8 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				ELSE
 					/* SQL Server 2005 up to SQL Server 2008 R2 SP 2*/
 					SET @queryToRun = @queryToRun + 
-										N'USE [' + @dbName + ']; SELECT DISTINCT 
-												  DB_ID(''' + @dbName + ''') AS [database_id]
+										N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; SELECT DISTINCT 
+												  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 												, ss.[object_id]
 												, sc.[name] AS [table_schema]
 												, ob.[name] AS [table_name]
@@ -721,12 +725,12 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 												, si.[rowcnt] AS [rows]
 												, ABS(si.[rowmodctr]) AS [modification_counter]
 												, (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) AS [percent_changes]
-										FROM [' + @dbName + '].sys.stats ss
-										INNER JOIN [' + @dbName + '].sys.objects ob	ON ob.[object_id] = ss.[object_id]
-										INNER JOIN [' + @dbName + '].sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]
-										INNER JOIN [' + @dbName + ']..sysindexes si ON si.[id] = ob.[object_id] AND si.[name] = ss.[name]' + N'
-										WHERE	ob.[name] LIKE ''' + @tableName + '''
-												AND sc.[name] LIKE ''' + @tableSchema + '''
+										FROM sys.stats ss
+										INNER JOIN sys.objects ob	ON ob.[object_id] = ss.[object_id]
+										INNER JOIN sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]
+										INNER JOIN sysindexes  si	ON si.[id] = ob.[object_id] AND si.[name] = ss.[name]' + N'
+										WHERE	ob.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+												AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
 												AND ob.[type] <> ''S''
 												AND si.[rowcnt] > 0
 												AND (    (    DATEDIFF(dd, STATS_DATE(si.[id], si.[indid]), GETDATE()) >= ' + CAST(@statsAgeDays AS [nvarchar](32)) + N'
@@ -747,8 +751,8 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 		ELSE
 			/* SQL Server 2000 */
 			SET @queryToRun = @queryToRun + 
-								N'USE [' + @dbName + ']; SELECT DISTINCT 
-										  DB_ID(''' + @dbName + ''') AS [database_id]
+								N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; SELECT DISTINCT 
+										  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 										, si.[id] AS [object_id]
 										, sc.[name] AS [table_schema]
 										, ob.[name] AS [table_name]
@@ -759,11 +763,11 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 										, si.[rowcnt] AS [rows]
 										, ABS(si.[rowmodctr]) AS [modification_counter]
 										, (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) AS [percent_changes]
-									FROM [' + @dbName + ']..sysindexes si
-									INNER JOIN [' + @dbName + ']..sysobjects ob	ON ob.[id] = si.[id]
-									INNER JOIN [' + @dbName + ']..sysusers sc	ON sc.[uid] = ob.[uid]
-									WHERE	ob.[name] LIKE ''' + @tableName + '''
-											AND sc.[name] LIKE ''' + @tableSchema + '''
+									FROM sysindexes si
+									INNER JOIN sysobjects ob	ON ob.[id] = si.[id]
+									INNER JOIN sysusers   sc	ON sc.[uid] = ob.[uid]
+									WHERE	ob.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+											AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
 											AND si.[indid] > 0 
 											AND si.[indid] < 255
 											AND ob.[xtype] <> ''S''
@@ -783,7 +787,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 																				   ELSE N'' END
 
 		IF @sqlServerName<>@@SERVERNAME
-			SET @queryToRun = N'SELECT x.* FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC [' + @dbName + N']..sp_executesql N''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''''')x'
+			SET @queryToRun = N'SELECT x.* FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'..sp_executesql N''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''''')x'
 
 
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -832,15 +836,15 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AN
 		FETCH NEXT FROM crsObjectsWithIndexes INTO @DatabaseID, @ObjectID, @CurrentTableSchema, @CurrentTableName, @IndexID, @IndexName, @IndexType, @IndexFillFactor
 		WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 			begin
-				SET @queryToRun='[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']' + CASE WHEN @IndexName IS NOT NULL THEN N' - [' + @IndexName + ']' ELSE N' (heap)' END
+				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + CASE WHEN @IndexName IS NOT NULL THEN N' - ' + [dbo].[ufn_getObjectQuoteName](@IndexName, NULL) ELSE N' (heap)' END
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				IF @serverVersionNum < 9	/* SQL 2000 */
 					begin
 						IF @sqlServerName=@@SERVERNAME
-							SET @queryToRun='USE [' + @dbName + N']; IF OBJECT_ID(''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'') IS NOT NULL DBCC SHOWCONTIG (''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'', ''' + @IndexName + ''' ) WITH ' + CASE WHEN @flgOptions & 1024 = 1024 THEN '' ELSE 'FAST,' END + ' TABLERESULTS, NO_INFOMSGS'
+							SET @queryToRun='USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'; IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + ''') IS NOT NULL DBCC SHOWCONTIG (''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + ''', ''' + [dbo].[ufn_getObjectQuoteName](@IndexName, NULL) + ''' ) WITH ' + CASE WHEN @flgOptions & 1024 = 1024 THEN '' ELSE 'FAST,' END + ' TABLERESULTS, NO_INFOMSGS'
 						ELSE
-							SET @queryToRun='SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC [' + @dbName + N'].dbo.sp_executesql N''''IF OBJECT_ID(''''''''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'''''''') IS NOT NULL DBCC SHOWCONTIG (''''''''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'''''''', ''''''''' + @IndexName + ''''''''' ) WITH ' + CASE WHEN @flgOptions & 1024 = 1024 THEN '' ELSE 'FAST,' END + ' TABLERESULTS, NO_INFOMSGS'''''')x'
+							SET @queryToRun='SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'.dbo.sp_executesql N''''IF OBJECT_ID(''''''''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + ''''''''') IS NOT NULL DBCC SHOWCONTIG (''''''''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + ''''''''', ''''''''' + [dbo].[ufn_getObjectQuoteName](@IndexName, NULL) + ''''''''' ) WITH ' + CASE WHEN @flgOptions & 1024 = 1024 THEN '' ELSE 'FAST,' END + ' TABLERESULTS, NO_INFOMSGS'''''')x'
 
 						IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 						INSERT	INTO #CurrentIndexFragmentationStats([ObjectName], [ObjectId], [IndexName], [IndexId], [Level], [Pages], [Rows], [MinimumRecordSize], [MaximumRecordSize], [AverageRecordSize], [ForwardedRecords], [Extents], [ExtentSwitches], [AverageFreeBytes], [AveragePageDensity], [ScanDensity], [BestCount], [ActualCount], [LogicalFragmentation], [ExtentFragmentation])
@@ -848,7 +852,8 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AN
 					end
 				ELSE
 					begin
-						SET @queryToRun=N'SELECT	 OBJECT_NAME(ips.[object_id])	AS [table_name]
+						SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+											SELECT	 OBJECT_NAME(ips.[object_id])	AS [table_name]
 													, ips.[object_id]
 													, si.[name] as index_name
 													, ips.[index_id]
@@ -859,10 +864,10 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AN
 													, ips.[avg_record_size_in_bytes]
 													, ips.[avg_page_space_used_in_percent]
 													, ips.[ghost_record_count]
-											FROM [' + @dbName + '].sys.dm_db_index_physical_stats (' + CAST(@DatabaseID AS [nvarchar](4000)) + N', ' + CAST(@ObjectID AS [nvarchar](4000)) + N', ' + CAST(@IndexID AS [nvarchar](4000)) + N' , NULL, ''' + 
+											FROM sys.dm_db_index_physical_stats (' + CAST(@DatabaseID AS [nvarchar](4000)) + N', ' + CAST(@ObjectID AS [nvarchar](4000)) + N', ' + CAST(@IndexID AS [nvarchar](4000)) + N' , NULL, ''' + 
 															CASE WHEN @flgOptions & 1024 = 1024 THEN 'DETAILED' ELSE 'LIMITED' END 
 													+ ''') ips
-											INNER JOIN [' + @dbName + '].sys.indexes si ON ips.[object_id]=si.[object_id] AND ips.[index_id]=si.[index_id]
+											INNER JOIN sys.indexes si ON ips.[object_id]=si.[object_id] AND ips.[index_id]=si.[index_id]
 											WHERE	si.[type] IN (' + @analyzeIndexType + N')
 													AND si.[is_disabled]=0'
 						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
@@ -936,7 +941,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
 		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 			begin
-				SET @queryToRun=N'[' + @CurrentTableSchema+ '].[' + @CurrentTableName + ']'
+				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL)
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				DECLARE crsIndexesToDegfragment CURSOR LOCAL FAST_FORWARD FOR 	SELECT	DISTINCT doil.[index_name], doil.[index_type], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[object_id], doil.[index_id], doil.[page_density_deviation], doil.[fill_factor]
@@ -980,10 +985,10 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 															WHEN 3 THEN 'XML'
 															WHEN 4 THEN 'Spatial' 
 											END
-   						SET @queryToRun=N'[' + @IndexName + ']: Current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
+   						SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@IndexName, NULL) + ': Current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 
-						SET @objectName = '[' + @CurrentTableSchema + '].[' + RTRIM(@CurrentTableName) + ']'
+						SET @objectName =  [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), NULL)
 						SET @childObjectName = QUOTENAME(@IndexName)
 
 						--------------------------------------------------------------------------------------------------
@@ -1030,7 +1035,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 						ELSE
 							begin
 								SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; '
-								SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'') IS NOT NULL DBCC INDEXDEFRAG (0, ' + RTRIM(@ObjectID) + ', ' + RTRIM(@IndexID) + ') WITH NO_INFOMSGS'
+								SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + ''') IS NOT NULL DBCC INDEXDEFRAG (0, ' + RTRIM(@ObjectID) + ', ' + RTRIM(@IndexID) + ') WITH NO_INFOMSGS'
 								IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								SET @nestedExecutionLevel = @executionLevel + 1
@@ -1088,7 +1093,7 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
 		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 			begin
-				SET @queryToRun=N'[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'
+				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL)
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				SET @ClusteredRebuildNonClustered = 0
@@ -1130,10 +1135,10 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 																	WHEN 3 THEN 'XML'
 																	WHEN 4 THEN 'Spatial' 
 													END
-		   						SET @queryToRun=N'[' + @IndexName + ']: Current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) +  ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
+		   						SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@IndexName, NULL) + ': Current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) +  ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 
-								SET @objectName = '[' + @CurrentTableSchema + '].[' + RTRIM(@CurrentTableName) + ']'
+								SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), NULL)
 								SET @childObjectName = QUOTENAME(@IndexName)
 
 								--------------------------------------------------------------------------------------------------
@@ -1211,7 +1216,7 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 								ELSE
 									begin
 										SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; '
-										SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'') IS NOT NULL DBCC DBREINDEX (''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']' + ''', ''' + RTRIM(@IndexName) + ''') WITH NO_INFOMSGS'
+										SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + ''') IS NOT NULL DBCC DBREINDEX (''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + '' + ''', ''' + [dbo].[ufn_getObjectQuoteName](RTRIM(@IndexName), NULL) + ''') WITH NO_INFOMSGS'
 										IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 										SET @nestedExecutionLevel = @executionLevel + 1
@@ -1282,7 +1287,7 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 				FETCH NEXT FROM crsClusteredIndexes INTO @CurrentTableSchema, @CurrentTableName, @IndexName
 				WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 					begin
-						SET @queryToRun=N'[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'
+						SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL)
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 	
 						--mark indexes as rebuilt
@@ -1341,16 +1346,16 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 											END
 
 						--analyze curent object
-						SET @queryToRun=N'[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'
+						SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL)
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
-		   				SET @queryToRun=N'[' + @IndexName + ']: Current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
+		   				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@IndexName, NULL) + ': Current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 
 						--------------------------------------------------------------------------------------------------
 						--log index fragmentation information
-						SET @objectName = '[' + @CurrentTableSchema + '].[' + RTRIM(@CurrentTableName) + ']'
-						SET @childObjectName = QUOTENAME(@IndexName)
+						SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), NULL)
+						SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@IndexName, NULL)
 
 						SET @eventData='<index-fragmentation><detail>' + 
 											'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
@@ -1419,10 +1424,10 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 						ELSE
 							begin
 								SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; '
-								SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'') IS NOT NULL DBCC DBREINDEX (''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']' + ''', ''' + RTRIM(@IndexName) + ''') WITH NO_INFOMSGS'
+								SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + ''') IS NOT NULL DBCC DBREINDEX (''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + '' + ''', ''' + [dbo].[ufn_getObjectQuoteName](RTRIM(@IndexName), NULL) + ''') WITH NO_INFOMSGS'
 								IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 								
-								SET @objectName = '[' + @CurrentTableSchema + '].[' + RTRIM(@CurrentTableName) + ']'
+								SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), NULL)
 								SET @childObjectName = QUOTENAME(@IndexName)
 								SET @nestedExecutionLevel = @executionLevel + 1
 
@@ -1499,7 +1504,8 @@ IF (@serverVersionNum >= 9.04035 AND @flgOptions & 65536 = 65536) AND (GETDATE()
 					SET @queryToRun='sp_clean_db_free_space (ghost records cleanup)...'
 					EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-					EXEC sp_clean_db_free_space @dbName
+					SET @objectName = [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')
+					EXEC sp_clean_db_free_space @objectName
 				end
 
 
@@ -1556,8 +1562,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 		FETCH NEXT FROM crsTableList2 INTO @CurrentTableSchema, @CurrentTableName, @statsCount
 		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 			begin
-				SET @CurrentTableName = REPLACE(@CurrentTableName, '''', '''''')
-				SET @queryToRun=N'[' + @CurrentTableSchema+ '].[' + @CurrentTableName + ']'
+				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL)
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				SET @IndexID=1
@@ -1571,13 +1576,13 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				FETCH NEXT FROM crsTableStatsList INTO @IndexName, @statsAutoCreated, @tableRows, @statsModificationCounter, @lastUpdated, @percentChanges, @statsAge
 				WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 					begin
-						SET @queryToRun=CAST(@IndexID AS [nvarchar](64)) + '/' + CAST(@statsCount AS [nvarchar](64)) + ' - [' + @IndexName+ '] / age = ' + CAST(@statsAge AS [varchar](32)) + ' days / rows = ' + CAST(@tableRows AS [varchar](32)) + ' / changes = ' + CAST(@statsModificationCounter AS [varchar](32))
+						SET @queryToRun=CAST(@IndexID AS [nvarchar](64)) + '/' + CAST(@statsCount AS [nvarchar](64)) + ' - ' + [dbo].[ufn_getObjectQuoteName](@IndexName, NULL) + ' / age = ' + CAST(@statsAge AS [varchar](32)) + ' days / rows = ' + CAST(@tableRows AS [varchar](32)) + ' / changes = ' + CAST(@statsModificationCounter AS [varchar](32))
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 
 						--------------------------------------------------------------------------------------------------
 						--log statistics information
-						SET @objectName = '[' + @CurrentTableSchema + '].[' + RTRIM(@CurrentTableName) + ']'
-						SET @childObjectName = QUOTENAME(@IndexName)
+						SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), NULL)
+						SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@IndexName, NULL)
 
 						SET @eventData='<statistics-health><detail>' + 
 											'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
@@ -1602,7 +1607,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 
 						--------------------------------------------------------------------------------------------------
 						SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-						SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''[' + @CurrentTableSchema + '].[' + @CurrentTableName + ']'') IS NOT NULL UPDATE STATISTICS [' + @CurrentTableSchema + '].[' + @CurrentTableName + '](' + dbo.ufn_getObjectQuoteName(@IndexName, NULL) + ') WITH '
+						SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + ''') IS NOT NULL UPDATE STATISTICS ' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + '(' + dbo.ufn_getObjectQuoteName(@IndexName, NULL) + ') WITH '
 								
 						IF @statsSamplePercent<100
 							SET @queryToRun=@queryToRun + N'SAMPLE ' + CAST(@statsSamplePercent AS [nvarchar]) + ' PERCENT'

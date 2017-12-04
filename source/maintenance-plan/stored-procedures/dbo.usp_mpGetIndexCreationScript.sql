@@ -103,7 +103,8 @@ BEGIN TRY
 
 		--get current index properties
 		SET @queryToRun = N''
-		SET @queryToRun = @queryToRun + N'SELECT  idx.[name]
+		SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+									SELECT  idx.[name]
 										, idx.[type]
 										, idx.[fill_factor]
 										, dSp.[name] AS [file_group_name]
@@ -112,25 +113,25 @@ BEGIN TRY
 										, idx.[allow_row_locks]
 										, idx.[allow_page_locks]
 										, idx.[ignore_dup_key]
-									FROM [' + @dbName + '].[sys].[indexes]				idx
-									INNER JOIN [' + @dbName + '].[sys].[objects]		obj ON  idx.[object_id] = obj.[object_id]
-									INNER JOIN [' + @dbName + '].[sys].[schemas]		sch ON	sch.[schema_id] = obj.[schema_id]
-									INNER JOIN [' + @dbName + '].[sys].[data_spaces]	dSp	ON  idx.[data_space_id] = dSp.[data_space_id]
-									WHERE	obj.[name] = ''' + @tableName + '''
-											AND sch.[name] = ''' + @tableSchema + '''' + 
+									FROM [sys].[indexes]			idx
+									INNER JOIN [sys].[objects]		obj ON  idx.[object_id] = obj.[object_id]
+									INNER JOIN [sys].[schemas]		sch ON	sch.[schema_id] = obj.[schema_id]
+									INNER JOIN [sys].[data_spaces]	dSp	ON  idx.[data_space_id] = dSp.[data_space_id]
+									WHERE	obj.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+											AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''' + 
 											CASE	WHEN @indexName IS NOT NULL 
-													THEN ' AND idx.[name] = ''' + @indexName + ''''
+													THEN ' AND idx.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@indexName, 'sql') + ''''
 													ELSE ' AND idx.[index_id] = ' + CAST(@indexID AS [nvarchar])
 											END + 
 											CASE WHEN @flgOptions & 1 <> 1
 												 THEN '	AND NOT EXISTS	(
 																			SELECT 1
-																			FROM [' + @dbName + '].[INFORMATION_SCHEMA].[TABLE_CONSTRAINTS]
+																			FROM [INFORMATION_SCHEMA].[TABLE_CONSTRAINTS]
 																			WHERE [CONSTRAINT_TYPE]=''PRIMARY KEY''
-																					AND [CONSTRAINT_CATALOG]=''' + @dbName + '''
-																					AND [TABLE_NAME]=''' + @tableName + '''
-																					AND [TABLE_SCHEMA] = ''' + @tableSchema + '''
-																					AND [CONSTRAINT_NAME]=''' + @indexName + '''
+																					AND [CONSTRAINT_CATALOG]=''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + '''
+																					AND [TABLE_NAME]=''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+																					AND [TABLE_SCHEMA] = ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
+																					AND [CONSTRAINT_NAME]=''' + [dbo].[ufn_getObjectQuoteName](@indexName, 'sql') + '''
 																		)'
 												ELSE ''
 											END
@@ -155,34 +156,35 @@ BEGIN TRY
 		
 		--get current index key columns and include columns and their properties
 		SET @queryToRun = N''
-		SET @queryToRun = @queryToRun + N'SELECT    
+		SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+								SELECT    
 										  idxCol.[key_ordinal]
 										, idxCol.[index_column_id]
 										, idxCol.[is_included_column]
 										, idxCol.[is_descending_key]
 										, col.[name] AS [column_name]
-								FROM [' + @dbName + '].[sys].[indexes] idx
-								INNER JOIN [' + @dbName + '].[sys].[index_columns] idxCol ON	idx.[object_id] = idxCol.[object_id]
+								FROM [sys].[indexes] idx
+								INNER JOIN [sys].[index_columns] idxCol ON	idx.[object_id] = idxCol.[object_id]
 																								AND idx.[index_id] = idxCol.[index_id]
-								INNER JOIN [' + @dbName + '].[sys].[columns]		 col	ON	idxCol.[object_id] = col.[object_id]
+								INNER JOIN [sys].[columns]		 col	ON	idxCol.[object_id] = col.[object_id]
 																								AND idxCol.[column_id] = col.[column_id]
-								INNER JOIN [' + @dbName + '].[sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
-								INNER JOIN [' + @dbName + '].[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
-								WHERE	obj.[name] = ''' + @tableName + '''
-										AND sch.[name] = ''' + @tableSchema + '''' + 
+								INNER JOIN [sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
+								INNER JOIN [sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
+								WHERE	obj.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+										AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''' + 
 										CASE	WHEN @indexName IS NOT NULL 
-												THEN ' AND idx.[name] = ''' + @indexName + ''''
+												THEN ' AND idx.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@indexName, 'sql') + ''''
 												ELSE ' AND idx.[index_id] = ' + CAST(@indexID AS [nvarchar])
 										END + 
 										CASE WHEN @flgOptions & 1 <> 1
 											 THEN '	AND NOT EXISTS	(
 																		SELECT 1
-																		FROM [' + @dbName + '].[INFORMATION_SCHEMA].[TABLE_CONSTRAINTS]
+																		FROM [INFORMATION_SCHEMA].[TABLE_CONSTRAINTS]
 																		WHERE [CONSTRAINT_TYPE]=''PRIMARY KEY''
-																				AND [CONSTRAINT_CATALOG]=''' + @dbName + '''
-																				AND [TABLE_NAME]=''' + @tableName + '''
-																				AND [TABLE_SCHEMA]=''' + @tableSchema + '''
-																				AND [CONSTRAINT_NAME]=''' + @indexName + '''
+																				AND [CONSTRAINT_CATALOG]=''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + '''
+																				AND [TABLE_NAME]=''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+																				AND [TABLE_SCHEMA]=''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
+																				AND [CONSTRAINT_NAME]=''' + [dbo].[ufn_getObjectQuoteName](@indexName, 'sql') + '''
 																	)'
 											ELSE ''
 										END
@@ -219,27 +221,10 @@ BEGIN TRY
 																THEN ' CLUSTERED' 
 																ELSE ''
 														 END 
-				SET @sqlIndexCreate = @sqlIndexCreate +	 ' INDEX [' + @crtIndexName + '] ON [' + @tableSchema + '].[' + @tableName + '] ('
-				--index key columns
-				/*
-				DECLARE crsIndexKey CURSOR LOCAL FAST_FORWARD FOR	SELECT [ColumnName], [IsDescendingKey]
-																	FROM @IndexColumnDetails
-																	WHERE [IsIncludedColumn] = 0
-																	ORDER BY [KeyOrdinal]
-				OPEN crsIndexKey
-				FETCH NEXT FROM crsIndexKey INTO @ColumnName, @IsDescendingKey
-				WHILE @@FETCH_STATUS=0
-					begin
-						SET @sqlIndexCreate = @sqlIndexCreate + '[' + @ColumnName + ']' + 
-												CASE WHEN @IsDescendingKey=1	THEN ' DESC'
-																				ELSE '' END + ', '
-						FETCH NEXT FROM crsIndexKey INTO @ColumnName, @IsDescendingKey
-					end
-				CLOSE  crsIndexKey
-				DEALLOCATE crsIndexKey
-				*/
+				SET @sqlIndexCreate = @sqlIndexCreate +	 ' INDEX ' + [dbo].[ufn_getObjectQuoteName](@crtIndexName, NULL) + ' ON ' + [dbo].[ufn_getObjectQuoteName](@tableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@tableName, NULL) + ' ('
 
-				SELECT @sqlIndexCreate = @sqlIndexCreate + '[' + [ColumnName] + ']' + 
+				--index key columns
+				SELECT @sqlIndexCreate = @sqlIndexCreate + '' + [dbo].[ufn_getObjectQuoteName]([ColumnName], NULL) + '' + 
 										CASE WHEN [IsDescendingKey]=1	THEN ' DESC'
 																		ELSE '' END + ', '
 				FROM @IndexColumnDetails
@@ -251,22 +236,7 @@ BEGIN TRY
 
 				--index include columns
 				SET @sqlIndexInclude = N''
-				/*
-				DECLARE crsIndexInclude CURSOR LOCAL FAST_FORWARD FOR	SELECT [ColumnName]
-																		FROM @IndexColumnDetails
-																		WHERE [IsIncludedColumn] = 1
-																		ORDER BY [IndexColumnID]
-				OPEN crsIndexInclude
-				FETCH NEXT FROM crsIndexInclude INTO @ColumnName
-				WHILE @@FETCH_STATUS=0
-					begin
-						SET @sqlIndexInclude = @sqlIndexInclude + '[' + @ColumnName + '], '
-						FETCH NEXT FROM crsIndexInclude INTO @ColumnName
-					end
-				CLOSE  crsIndexInclude
-				DEALLOCATE crsIndexInclude
-				*/
-				SELECT @sqlIndexInclude = @sqlIndexInclude + '[' + [ColumnName] + '], '
+				SELECT @sqlIndexInclude = @sqlIndexInclude + '' + [dbo].[ufn_getObjectQuoteName]([ColumnName], NULL) + ', '
 				FROM @IndexColumnDetails
 				WHERE [IsIncludedColumn] = 1
 				ORDER BY [IndexColumnID]
@@ -342,7 +312,7 @@ BEGIN TRY
 										CASE WHEN LEN(@sqlIndexWithClause)>0
 											 THEN N' WITH (' + @sqlIndexWithClause + ')'
 											 ELSE ''
-										END + N' ON [' + @FileGroupName + ']'
+										END + N' ON ' + [dbo].[ufn_getObjectQuoteName](@FileGroupName, NULL)
 			end
 END TRY
 

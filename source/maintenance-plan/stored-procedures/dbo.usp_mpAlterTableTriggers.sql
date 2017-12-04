@@ -72,10 +72,12 @@ BEGIN TRY
 					[table_name]	[sysname]
 				)
 
-		SET @queryToRun = N'SELECT TABLE_SCHEMA, TABLE_NAME FROM [' + @dbName + N'].INFORMATION_SCHEMA.TABLES
+		SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+						SELECT TABLE_SCHEMA, TABLE_NAME 
+						FROM INFORMATION_SCHEMA.TABLES
 						WHERE	TABLE_TYPE = ''BASE TABLE'' 
-								AND TABLE_NAME LIKE ''' + @tableName + N''' 
-								AND TABLE_SCHEMA LIKE ''' + @tableSchema + N''''
+								AND TABLE_NAME LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + N''' 
+								AND TABLE_SCHEMA LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + N''''
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
@@ -101,20 +103,21 @@ BEGIN TRY
 					begin
 						SET @queryToRun= CASE WHEN @flgAction=1  THEN 'Enable'
 																ELSE 'Disable'
-										END + ' triggers for: [' + @crtTableSchema + N'].[' + @crtTableName + ']'
+										END + ' triggers for: ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + N'.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL)
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 						--if current action is to disable triggers, will get only enabled triggers
 						--if current action is to enable triggers, will get only disabled triggers
-						SET @queryToRun=N'SELECT DISTINCT st.[name]
-									FROM [' + @dbName + '].[sys].[triggers] st
-									INNER JOIN [' + @dbName + '].[sys].[objects] so ON so.[object_id] = st.[parent_id] 
-									INNER JOIN [' + @dbName + '].[sys].[schemas] sch ON sch.[schema_id] = so.[schema_id] 
-									WHERE	so.[name]=''' + @crtTableName + '''
-											AND sch.[name] = ''' + @crtTableSchema + '''
+						SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+									SELECT DISTINCT st.[name]
+									FROM [sys].[triggers] st
+									INNER JOIN [sys].[objects] so ON so.[object_id] = st.[parent_id] 
+									INNER JOIN [sys].[schemas] sch ON sch.[schema_id] = so.[schema_id] 
+									WHERE	so.[name]=''' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'sql') + '''
+											AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'sql') + '''
 											AND st.[is_disabled]=' + CAST(@flgAction AS [varchar]) + '
 											AND st.[is_ms_shipped] = 0
-											AND st.[name] LIKE ''' + @triggerName + ''''
+											AND st.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@triggerName, 'sql') + ''''
 						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
@@ -132,15 +135,15 @@ BEGIN TRY
 								SET @queryToRun= @crtTriggerName
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
-								SET @queryToRun=N'ALTER TABLE [' + @dbName + N'].[' + @crtTableSchema + N'].[' + @crtTableName + '] ' + 
+								SET @queryToRun=N'ALTER TABLE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'.' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + N'.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL) + 
 													CASE WHEN @flgAction=1  THEN N'ENABLE'
 																			ELSE N'DISABLE'
-													END + N' TRIGGER [' + @crtTriggerName + ']'
+													END + N' TRIGGER ' + [dbo].[ufn_getObjectQuoteName](@crtTriggerName, NULL)
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 								--
-								SET @objectName = '[' + @crtTableSchema + '].[' + @crtTableName + ']'
-								SET @childObjectName = QUOTENAME(@crtTriggerName)
+								SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL)
+								SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtTriggerName, NULL)
 								SET @nestedExecutionLevel = @executionLevel + 1
 
 								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,

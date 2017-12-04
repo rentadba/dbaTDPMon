@@ -91,14 +91,15 @@ IF (@partitionNumber <> 1)
 /* disabled indexes / XML, spatial indexes, columnstore, hash */
 -----------------------------------------------------------------------------------------
 SET @queryToRun = N''
-SET @queryToRun = @queryToRun + N'SELECT DISTINCT idx.[name]
-						FROM [' + @dbName + '].[sys].[indexes] idx
-						INNER JOIN [' + @dbName + '].[sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
-						INNER JOIN [' + @dbName + '].[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
-						WHERE	obj.[name] = ''' + @tableName + '''
-								AND sch.[name] = ''' + @tableSchema + '''' + 
+SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+						SELECT DISTINCT idx.[name]
+						FROM [sys].[indexes]		idx
+						INNER JOIN [sys].[objects]	obj	ON  idx.[object_id] = obj.[object_id]
+						INNER JOIN [sys].[schemas]	sch	ON	sch.[schema_id] = obj.[schema_id]
+						WHERE	obj.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+								AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''' + 
 								CASE	WHEN @indexName IS NOT NULL 
-										THEN ' AND idx.[name] = ''' + @indexName	 + ''''
+										THEN ' AND idx.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@indexName, 'sql')	 + ''''
 										ELSE ' AND idx.[index_id] = ' + CAST(@indexID AS [nvarchar])
 								END + N'
 								AND (   idx.[is_disabled] = 1
@@ -124,19 +125,20 @@ IF (SELECT COUNT(*) FROM @onlineConstraintCheck) > 0
 IF @serverVersionNum < 11
 	begin
 		SET @queryToRun = N''
-		SET @queryToRun = @queryToRun + N'SELECT DISTINCT idx.[name]
-								FROM [' + @dbName + '].[sys].[indexes] idx
-								INNER JOIN [' + @dbName + '].[sys].[index_columns] idxCol ON	idx.[object_id] = idxCol.[object_id]
-																								AND idx.[index_id] = idxCol.[index_id]
-								INNER JOIN [' + @dbName + '].[sys].[columns]		 col	ON	idxCol.[object_id] = col.[object_id]
-																								AND idxCol.[column_id] = col.[column_id]
-								INNER JOIN [' + @dbName + '].[sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
-								INNER JOIN [' + @dbName + '].[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
-								INNER JOIN [' + @dbName + '].[sys].[types]			 st		ON  col.[system_type_id] = st.[system_type_id]
-								WHERE	obj.[name] = ''' + @tableName + '''
-										AND sch.[name] = ''' + @tableSchema + '''' + 
+		SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+								SELECT DISTINCT idx.[name]
+								FROM [sys].[indexes]			idx
+								INNER JOIN [sys].[index_columns] idxCol ON	idx.[object_id] = idxCol.[object_id]
+																			AND idx.[index_id] = idxCol.[index_id]
+								INNER JOIN [sys].[columns]		 col	ON	idxCol.[object_id] = col.[object_id]
+																			AND idxCol.[column_id] = col.[column_id]
+								INNER JOIN [sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
+								INNER JOIN [sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
+								INNER JOIN [sys].[types]		 st		ON  col.[system_type_id] = st.[system_type_id]
+								WHERE	obj.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+										AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''' + 
 										CASE	WHEN @indexName IS NOT NULL 
-												THEN ' AND idx.[name] = ''' + @indexName + ''''
+												THEN ' AND idx.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@indexName, 'sql') + ''''
 												ELSE ' AND idx.[index_id] = ' + CAST(@indexID AS [nvarchar])
 										END + N'
 										AND (    st.[name] IN (''text'', ''ntext'', ''image''' + CASE WHEN @serverVersionNum < 11 THEN N', ''filestream'', ''xml''' ELSE N'' END + N')
@@ -164,13 +166,14 @@ IF @serverVersionNum < 11
 		IF @indexID IS NULL
 			begin
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'SELECT DISTINCT idx.[index_id]
-										FROM [' + @dbName + '].[sys].[indexes] idx
-										INNER JOIN [' + @dbName + '].[sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
-										INNER JOIN [' + @dbName + '].[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
-										WHERE	obj.[name] = ''' + @tableName + '''
-												AND sch.[name] = ''' + @tableSchema + '''
-												AND idx.[name] = ''' + @indexName + ''''
+				SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+										SELECT DISTINCT idx.[index_id]
+										FROM [sys].[indexes] idx
+										INNER JOIN [sys].[objects]	 obj ON idx.[object_id] = obj.[object_id]
+										INNER JOIN [sys].[schemas]	 sch ON	sch.[schema_id] = obj.[schema_id]
+										WHERE	obj.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+												AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
+												AND idx.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@indexName, 'sql') + ''''
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
@@ -184,13 +187,14 @@ IF @serverVersionNum < 11
 		IF @indexID=1
 			begin
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'SELECT DISTINCT obj.[name]
-										FROM  [' + @dbName + '].[sys].[objects]				 obj
-										INNER JOIN [' + @dbName + '].[sys].[columns]		 col	ON  col.[object_id] = obj.[object_id]
-										INNER JOIN [' + @dbName + '].[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
-										INNER JOIN [' + @dbName + '].[sys].[types]			 st		ON  col.[system_type_id] = st.[system_type_id]
-										WHERE	obj.[name] = ''' + @tableName + '''
-												AND sch.[name] = ''' + @tableSchema + '''
+				SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+										SELECT DISTINCT obj.[name]
+										FROM  [sys].[objects]		 obj
+										INNER JOIN [sys].[columns]	 col ON col.[object_id] = obj.[object_id]
+										INNER JOIN [sys].[schemas]	 sch ON	sch.[schema_id] = obj.[schema_id]
+										INNER JOIN [sys].[types]	 st	 ON col.[system_type_id] = st.[system_type_id]
+										WHERE	obj.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+												AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
 												AND (    st.[name] IN (''text'', ''ntext'', ''image'', ''filestream'', ''xml'')
 														OR (st.[name] IN (''varchar'', ''nvarchar'', ''varbinary'') AND col.[max_length]=-1)
 													)'

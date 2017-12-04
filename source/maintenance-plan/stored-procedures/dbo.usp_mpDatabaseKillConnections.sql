@@ -97,7 +97,7 @@ BEGIN TRY
 												WHERE	req_spid=-2
 														and req_transactionuow <> ''00000000-0000-0000-0000-000000000000''
 											 )x
-										WHERE [name] LIKE ''' + CASE WHEN @dbName IS NULL THEN '%' ELSE @dbName END + ''''
+										WHERE [name] LIKE ''' + CASE WHEN @dbName IS NULL THEN '%' ELSE [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') END + ''''
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -119,7 +119,7 @@ BEGIN TRY
 							LEFT JOIN [master].sys.dm_exec_requests	er on	ec.connection_id = er.connection_id 
 							LEFT JOIN [master].sys.dm_tran_locks	tl on	tl.request_session_id = ec.session_id 
 																			and resource_type=''DATABASE''
-							WHERE	DB_NAME(ISNULL(resource_database_id,1)) = ''' + @databaseName + '''
+							WHERE	DB_NAME(ISNULL(resource_database_id,1)) = ''' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'sql') + '''
 									AND ec.session_id <> @@SPID
 									AND (   (ec.session_id<>-2 and ' + CAST(@flgOptions AS [nvarchar](max)) + N' & 1 = 1)
 										 or (ec.session_id=-2  and ' + CAST(@flgOptions AS [nvarchar](max)) + N' & 2 = 2)
@@ -140,7 +140,7 @@ BEGIN TRY
 							FROM (
 									SELECT DISTINCT req_transactionuow
 									FROM [master].dbo.syslockinfo
-									WHERE	rsc_dbid=DB_ID(''' + @databaseName + ''')
+									WHERE	rsc_dbid=DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'sql') + ''')
 											AND req_spid=-2
 											AND req_transactionuow <> ''00000000-0000-0000-0000-000000000000''
 								 )y'
@@ -162,7 +162,7 @@ BEGIN TRY
 								
 								IF @flgOptions & 1 = 1
 									begin
-										SET @queryToRun= 'Get connections for database: [' + @databaseName + ']'
+										SET @queryToRun= 'Get connections for database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, NULL)
 										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 																			
 										------------------------------------------------------------------------------
@@ -175,7 +175,7 @@ BEGIN TRY
 															LEFT JOIN [master].sys.dm_exec_requests	er on	ec.connection_id = er.connection_id 
 															LEFT JOIN [master].sys.dm_tran_locks	tl on	tl.request_session_id = ec.session_id 
 																											and resource_type=''DATABASE''
-															WHERE	DB_NAME(ISNULL(resource_database_id,1)) = ''' + @databaseName + '''
+															WHERE	DB_NAME(ISNULL(resource_database_id,1)) = ''' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'sql') + '''
 																	AND ec.session_id <> @@SPID
 																	AND ec.session_id<>-2'
 
@@ -188,7 +188,7 @@ BEGIN TRY
 
 								IF @flgOptions & 2 = 2
 									begin									
-										SET @queryToRun= 'Get orphan connections for database: [' + @databaseName + '] (sys.dm_tran_locks)'
+										SET @queryToRun= 'Get orphan connections for database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, NULL) + ' (sys.dm_tran_locks)'
 										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 									
@@ -202,7 +202,7 @@ BEGIN TRY
 															LEFT JOIN [master].sys.dm_exec_requests	er on	ec.connection_id = er.connection_id 
 															LEFT JOIN [master].sys.dm_tran_locks	tl on	tl.request_session_id = ec.session_id 
 																											and resource_type=''DATABASE''
-															WHERE	DB_NAME(ISNULL(resource_database_id,1)) = ''' + @databaseName + '''
+															WHERE	DB_NAME(ISNULL(resource_database_id,1)) = ''' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'sql') + '''
 																	AND ec.session_id=-2'
 
 										SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
@@ -217,7 +217,7 @@ BEGIN TRY
 							begin
 								IF @flgOptions & 2 = 2
 									begin									
-										SET @queryToRun= 'Get orphan connections for database: [' + @databaseName + '] (syslockinfo)'
+										SET @queryToRun= 'Get orphan connections for database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, NULL) + ' (syslockinfo)'
 										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 										------------------------------------------------------------------------------
@@ -229,7 +229,7 @@ BEGIN TRY
 															FROM (
 																	SELECT DISTINCT req_transactionuow
 																	FROM [master].dbo.syslockinfo
-																	WHERE	rsc_dbid=DB_ID(''' + @databaseName + ''')
+																	WHERE	rsc_dbid=DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'sql') + ''')
 																			AND req_spid=-2
 																			AND req_transactionuow <> ''00000000-0000-0000-0000-000000000000''
 																 )x'
@@ -247,7 +247,7 @@ BEGIN TRY
 								------------------------------------------------------------------------------
 								--kill connections to database
 								------------------------------------------------------------------------------
-								SET @queryToRun= 'Kill connections for database: [' + @databaseName + ']'
+								SET @queryToRun= 'Kill connections for database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, NULL)
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 								
 								DECLARE crsSPIDList CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT [spid] FROM @SessionDetails WHERE [spid] IS NOT NULL
@@ -278,7 +278,7 @@ BEGIN TRY
 								------------------------------------------------------------------------------
 								--kill orphan connections to database
 								------------------------------------------------------------------------------
-								SET @queryToRun= 'Kill orphan connections for database: [' + @databaseName + ']'
+								SET @queryToRun= 'Kill orphan connections for database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, NULL)
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 								
 								DECLARE crsUOWList CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT [uow] FROM @SessionDetails WHERE [uow] IS NOT NULL
@@ -312,7 +312,7 @@ BEGIN TRY
 									LEFT JOIN [master].sys.dm_exec_requests	er on	ec.connection_id = er.connection_id 
 									LEFT JOIN [master].sys.dm_tran_locks	tl on	tl.request_session_id = ec.session_id 
 																					and resource_type=''DATABASE''
-									WHERE	DB_NAME(ISNULL(resource_database_id,1)) = ''' + @databaseName + '''
+									WHERE	DB_NAME(ISNULL(resource_database_id,1)) = ''' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'sql') + '''
 											AND ec.session_id <> @@SPID
 											AND (   (ec.session_id<>-2 and ' + CAST(@flgOptions AS [nvarchar](max)) + N' & 1 = 1)
 												 or (ec.session_id=-2  and ' + CAST(@flgOptions AS [nvarchar](max)) + N' & 2 = 2)
@@ -333,7 +333,7 @@ BEGIN TRY
 									FROM (
 											SELECT DISTINCT req_transactionuow
 											FROM [master].dbo.syslockinfo
-											WHERE	rsc_dbid=DB_ID(''' + @databaseName + ''')
+											WHERE	rsc_dbid=DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'sql') + ''')
 													AND req_spid=-2
 													AND req_transactionuow <> ''00000000-0000-0000-0000-000000000000''
 										 )y'
@@ -351,13 +351,13 @@ BEGIN TRY
 				--check if all connections have been killed
 				IF @ConnectionsLeft>0 
 					begin 
-						SET @queryToRun= 'Cannot kill all connections to database [' +  @databaseName + ']. There are ' + CAST(@ConnectionsLeft AS VARCHAR) + ' active connection(s) left. Operation failed.'
+						SET @queryToRun= 'Cannot kill all connections to database ' +  [dbo].[ufn_getObjectQuoteName](@databaseName, NULL) + '. There are ' + CAST(@ConnectionsLeft AS VARCHAR) + ' active connection(s) left. Operation failed.'
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 					end
 				IF @LocksLeft>0 
 					begin 
-						SET @queryToRun= 'Cannot kill all connections to database [' +  @databaseName + ']. There are ' + CAST(@LocksLeft AS VARCHAR) + ' active lock(s) left. Operation failed.'
+						SET @queryToRun= 'Cannot kill all connections to database ' +  [dbo].[ufn_getObjectQuoteName](@databaseName, NULL) + '. There are ' + CAST(@LocksLeft AS VARCHAR) + ' active lock(s) left. Operation failed.'
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 					end
 
@@ -372,7 +372,7 @@ BEGIN TRY
 					FROM (
 							SELECT DISTINCT req_transactionuow
 							FROM [master].dbo.syslockinfo
-							WHERE	rsc_dbid=DB_ID(''' + @databaseName + ''')
+							WHERE	rsc_dbid=DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'sql') + ''')
 									AND req_spid=-2
 									AND req_transactionuow = ''00000000-0000-0000-0000-000000000000''
 						 )y'

@@ -78,11 +78,12 @@ BEGIN TRY
 					[table_name] [sysname]
 				)
 
-		SET @queryToRun = N'SELECT TABLE_SCHEMA, TABLE_NAME 
-						FROM [' + @dbName + '].INFORMATION_SCHEMA.TABLES 
+		SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+						SELECT TABLE_SCHEMA, TABLE_NAME 
+						FROM INFORMATION_SCHEMA.TABLES 
 						WHERE	TABLE_TYPE = ''BASE TABLE'' 
-								AND TABLE_NAME LIKE ''' + @tableName + ''' 
-								AND TABLE_SCHEMA LIKE ''' + @tableSchema + ''''
+								AND TABLE_NAME LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + ''' 
+								AND TABLE_SCHEMA LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + ''''
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -109,7 +110,7 @@ BEGIN TRY
 					begin
 						SET @queryToRun= CASE WHEN @flgAction=1	THEN 'Enable'
 																ELSE 'Disable'
-										END + ' foreign key constraints for: [' + @crtTableSchema + '].[' + @crtTableName + ']'
+										END + ' foreign key constraints for: ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL)
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 						--if current action is to disable foreign key constraint, will get only enabled constraints
@@ -117,16 +118,17 @@ BEGIN TRY
 						IF (@flgOptions & 1 = 1)
 							begin
 								--list all tables that have foreign key constraints that reffers current table					
-								SET @queryToRun=N'SELECT DISTINCT sch.[name] AS [schema_name], so.[name] AS [table_name], sfk.[name] AS [constraint_name]
-												FROM [' + @dbName + '].[sys].[objects] so
-												INNER JOIN [' + @dbName + '].[sys].[schemas]		sch  ON sch.[schema_id] = so.[schema_id]
-												INNER JOIN [' + @dbName + '].[sys].[foreign_keys]	sfk  ON so.[object_id] = sfk.[parent_object_id]
-												INNER JOIN [' + @dbName + '].[sys].[objects]		so2  ON sfk.[referenced_object_id] = so2.[object_id]
-												INNER JOIN [' + @dbName + '].[sys].[schemas]		sch2 ON sch2.[schema_id] = so2.[schema_id]
-												WHERE	so2.[name]=''' + @crtTableName + '''
-														AND sch2.[name] = ''' + @crtTableSchema + '''
+								SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+												SELECT DISTINCT sch.[name] AS [schema_name], so.[name] AS [table_name], sfk.[name] AS [constraint_name]
+												FROM [sys].[objects] so
+												INNER JOIN [sys].[schemas]		sch  ON sch.[schema_id] = so.[schema_id]
+												INNER JOIN [sys].[foreign_keys]	sfk  ON so.[object_id] = sfk.[parent_object_id]
+												INNER JOIN [sys].[objects]		so2  ON sfk.[referenced_object_id] = so2.[object_id]
+												INNER JOIN [sys].[schemas]		sch2 ON sch2.[schema_id] = so2.[schema_id]
+												WHERE	so2.[name]=''' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'sql') + '''
+														AND sch2.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'sql') + '''
 														AND sfk.[is_disabled]=' + CAST(@flgAction AS [varchar]) + '
-														AND sfk.[name] LIKE ''' + @constraintName + ''''
+														AND sfk.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@constraintName, 'sql') + ''''
 								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -137,16 +139,17 @@ BEGIN TRY
 						IF (@flgOptions & 2 = 2)
 							begin
 								--list all tables that current table foreign key constraints reffers 
-								SET @queryToRun='SELECT DISTINCT sch2.[name] AS [schema_name], so2.[name] AS [table_name], sfk.[name] AS [constraint_name]
-												FROM [' + @dbName + '].[sys].[objects] so
-												INNER JOIN [' + @dbName + '].[sys].[schemas]		sch  ON sch.[schema_id] = so.[schema_id]
-												INNER JOIN [' + @dbName + '].[sys].[foreign_keys]	sfk ON so.[object_id] = sfk.[referenced_object_id]
-												INNER JOIN [' + @dbName + '].[sys].[objects]		so2 ON sfk.[parent_object_id] = so2.[object_id]
-												INNER JOIN [' + @dbName + '].[sys].[schemas]		sch2 ON sch.[schema_id] = so2.[schema_id]
-												WHERE	so2.[name]=''' + @crtTableName + '''
-														AND sch2.[name] = ''' + @crtTableSchema + '''
+								SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+												SELECT DISTINCT sch2.[name] AS [schema_name], so2.[name] AS [table_name], sfk.[name] AS [constraint_name]
+												FROM [sys].[objects] so
+												INNER JOIN [sys].[schemas]		sch  ON sch.[schema_id] = so.[schema_id]
+												INNER JOIN [sys].[foreign_keys]	sfk ON so.[object_id] = sfk.[referenced_object_id]
+												INNER JOIN [sys].[objects]		so2 ON sfk.[parent_object_id] = so2.[object_id]
+												INNER JOIN [sys].[schemas]		sch2 ON sch.[schema_id] = so2.[schema_id]
+												WHERE	so2.[name]=''' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'sql') + '''
+														AND sch2.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'sql') + '''
 														AND sfk.[is_disabled]=' + CAST(@flgAction AS [varchar])+ '
-														AND sfk.[name] LIKE ''' + @constraintName + ''''
+														AND sfk.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@constraintName, 'sql') + ''''
 
 								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
@@ -162,23 +165,23 @@ BEGIN TRY
 						FETCH NEXT FROM crsTableToAlterConstraints INTO @tmpSchemaName, @tmpTableName, @tmpConstraintName
 						WHILE @@FETCH_STATUS=0
 							begin
-								SET @queryToRun= '[' + @tmpSchemaName + '].[' + @tmpTableName + ']'
+								SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@tmpSchemaName, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@tmpTableName, NULL)
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 								--enable/disable foreign key constraints
-								SET @queryToRun='ALTER TABLE [' + @dbName + '].[' + @tmpSchemaName + '].[' + @tmpTableName + ']' + 
+								SET @queryToRun='ALTER TABLE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '.' + [dbo].[ufn_getObjectQuoteName](@tmpSchemaName, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@tmpTableName, NULL) +  
 												CASE WHEN @flgAction=1	
 													 THEN ' WITH ' + 
 															CASE WHEN @flgOptions & 4 = 4	THEN 'NOCHECK'
 																							ELSE 'CHECK'
 															END + ' CHECK '	
 													 ELSE ' NOCHECK '
-												END + 'CONSTRAINT [' + @tmpConstraintName + ']'
+												END + 'CONSTRAINT ' + [dbo].[ufn_getObjectQuoteName](@tmpConstraintName, NULL)
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								--
-								SET @objectName = '[' + @tmpSchemaName + '].[' + @tmpTableName + ']'
-								SET @childObjectName = QUOTENAME(@tmpConstraintName)
+								SET @objectName = [dbo].[ufn_getObjectQuoteName](@tmpSchemaName, NULL) + '.' + [dbo].[ufn_getObjectQuoteName]( @tmpTableName, NULL)
+								SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@tmpConstraintName, NULL)
 								SET @nestedExecutionLevel = @executionLevel + 1
 
 								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
