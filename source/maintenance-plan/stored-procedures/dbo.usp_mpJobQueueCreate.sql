@@ -596,6 +596,12 @@ WHILE @@FETCH_STATUS=0
 											)
 									  )
 
+				/* manage special characters in database names -> job names */
+				UPDATE [dbo].[jobExecutionQueue]
+					SET [job_name] = REPLACE(REPLACE([job_name], '%', '_'), '''', '_')
+				WHERE	CHARINDEX('%', [job_name]) <> 0
+						OR CHARINDEX('''', [job_name]) <> 0
+
 				FETCH NEXT FROM crsCollectorDescriptor INTO @codeDescriptor
 			end
 		CLOSE crsCollectorDescriptor

@@ -583,5 +583,5 @@
 /* November 2017 new features & fixes
 /*----------------------------------------------------------------------*/
 /* 27.10.2017 */	
-	- threat special characters in database name, for backup operation: '!@#$%^&()-={};:'"<>.,\/[[]
+	- threat special characters in database name, for backup operation: '!@#$%^&()-={};:`"<>.,\/[[ ]
 	
