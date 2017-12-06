@@ -545,36 +545,39 @@ WHILE @@FETCH_STATUS=0
 				------------------------------------------------------------------------------------------------------------------------------------------
 
 				IF @recreateMode = 0
-					UPDATE jeq
-						SET   jeq.[execution_date] = NULL
-							, jeq.[running_time_sec] = NULL
-							, jeq.[log_message] = NULL
-							, jeq.[status] = -1
-							, jeq.[event_date_utc] = GETUTCDATE()
-					FROM [dbo].[jobExecutionQueue] jeq
-					INNER JOIN @jobExecutionQueue S ON		jeq.[instance_id] = S.[instance_id]
-														AND jeq.[project_id] = S.[project_id]
-														AND jeq.[module] = S.[module]
-														AND jeq.[descriptor] = S.[descriptor]
-														AND jeq.[for_instance_id] = S.[for_instance_id]
-														AND jeq.[job_name] = S.[job_name]
-														AND jeq.[job_step_name] = S.[job_step_name]
-														AND jeq.[job_database_name] = S.[job_database_name]
-					WHERE (     @skipDatabasesList IS NULL
-							OR (    @skipDatabasesList IS NOT NULL	
-									AND (
-										SELECT COUNT(*)
-										FROM [dbo].[ufn_getTableFromStringList](@skipDatabasesList, ',') X
-										WHERE S.[job_name] LIKE (DB_NAME() + ' - ' + S.[descriptor] + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + REPLACE(@@SERVERNAME, '\', '$') + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
-									) = 0
-								)
-						  )
+						UPDATE jeq
+							SET   jeq.[execution_date] = NULL
+								, jeq.[running_time_sec] = NULL
+								, jeq.[log_message] = NULL
+								, jeq.[status] = -1
+								, jeq.[event_date_utc] = GETUTCDATE()
+								, jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_')	/* manage special characters in job names */
+						FROM [dbo].[jobExecutionQueue] jeq
+						INNER JOIN @jobExecutionQueue S ON		jeq.[instance_id] = S.[instance_id]
+															AND jeq.[project_id] = S.[project_id]
+															AND jeq.[module] = S.[module]
+															AND jeq.[descriptor] = S.[descriptor]
+															AND jeq.[for_instance_id] = S.[for_instance_id]
+															AND (jeq.[job_name] = S.[job_name] OR jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_'))
+															AND jeq.[job_step_name] = S.[job_step_name]
+															AND jeq.[job_database_name] = S.[job_database_name]
+						WHERE (     @skipDatabasesList IS NULL
+								OR (    @skipDatabasesList IS NOT NULL	
+										AND (
+											SELECT COUNT(*)
+											FROM [dbo].[ufn_getTableFromStringList](@skipDatabasesList, ',') X
+											WHERE S.[job_name] LIKE (DB_NAME() + ' - ' + S.[descriptor] + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + REPLACE(@@SERVERNAME, '\', '$') + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
+										) = 0
+									)
+							  )
 
 				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 														, [for_instance_id], [job_name], [job_step_name], [job_database_name]
 														, [job_command])
 						SELECT	  S.[instance_id], S.[project_id], S.[module], S.[descriptor]
-								, S.[for_instance_id], S.[job_name], S.[job_step_name], S.[job_database_name]
+								, S.[for_instance_id]
+								, REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_')	/* manage special characters in job names */
+								, S.[job_step_name], S.[job_database_name]
 								, S.[job_command]
 						FROM @jobExecutionQueue S
 						LEFT JOIN [dbo].[jobExecutionQueue] jeq ON		jeq.[instance_id] = S.[instance_id]
@@ -582,7 +585,7 @@ WHILE @@FETCH_STATUS=0
 																	AND jeq.[module] = S.[module]
 																	AND jeq.[descriptor] = S.[descriptor]
 																	AND jeq.[for_instance_id] = S.[for_instance_id]
-																	AND jeq.[job_name] = S.[job_name]
+																	AND (jeq.[job_name] = S.[job_name] OR jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_'))
 																	AND jeq.[job_step_name] = S.[job_step_name]
 																	AND jeq.[job_database_name] = S.[job_database_name]
 						WHERE	jeq.[job_name] IS NULL
@@ -595,12 +598,6 @@ WHILE @@FETCH_STATUS=0
 												) = 0
 											)
 									  )
-
-				/* manage special characters in database names -> job names */
-				UPDATE [dbo].[jobExecutionQueue]
-					SET [job_name] = REPLACE(REPLACE([job_name], '%', '_'), '''', '_')
-				WHERE	CHARINDEX('%', [job_name]) <> 0
-						OR CHARINDEX('''', [job_name]) <> 0
 
 				FETCH NEXT FROM crsCollectorDescriptor INTO @codeDescriptor
 			end
