@@ -60,16 +60,16 @@ echo Detected SQL Server version %product_version%
 set run2kmode=false
 if "%engine_version%"=="8" (
 	set run2kmode=true
-	if not %module% == "maintenance-plan" (
+	if not "%module%" == "maintenance-plan" (
 		echo Only maintenance-plan module is supported on SQL Server 2000. Will install it.
 		SET module="maintenance-plan"
 		)
 	)
 
-if %module%=="all" goto common
-if %module%=="health-check" goto common
-if %module%=="maintenance-plan" goto common
-if %module%=="monitoring" goto common
+if "%module%"=="all" goto common
+if "%module%"=="health-check" goto common
+if "%module%"=="maintenance-plan" goto common
+if "%module%"=="monitoring" goto common
 goto help
 
      
@@ -267,11 +267,10 @@ if errorlevel 1 goto install_err
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "EXEC dbo.usp_refreshMachineCatalogs DEFAULT, @@SERVERNAME;" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-
-if %module%=="all" goto mp
-if %module%=="health-check" goto hc
-if %module%=="maintenance-plan" goto mp
-if %module%=="monitoring" goto mon
+if "%module%"=="all" goto mp
+if "%module%"=="health-check" goto hc
+if "%module%"=="maintenance-plan" goto mp
+if "%module%"=="monitoring" goto mon
 goto help
 
 
@@ -401,7 +400,7 @@ if errorlevel 1 goto install_err
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Log - Parallel.sql" -d msdb -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
-if %module%=="all" goto hc
+if "%module%"=="all" goto hc
 goto done
 
 :hc
@@ -521,7 +520,7 @@ echo *--------------------------------------------------------------------------
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\job-scripts\job-script-dbaTDPMon - Discovery & Health Check.sql" -d msdb -v dbName=%dbname% projectCode=%project% -b -r 1
 if errorlevel 1 goto install_err
 
-if %module%=="all" goto mon
+if "%module%"=="all" goto mon
 goto done
 
 
@@ -591,7 +590,7 @@ if errorlevel 1 goto install_err
 
 
 
-if %module%=="all" goto done
+if "%module%"=="all" goto done
 goto done
 
 :done
