@@ -208,13 +208,13 @@ WHILE @@FETCH_STATUS=0
 		FETCH NEXT FROM crsActiveDatabases INTO @catalogDatabaseID, @databaseID, @databaseName
 		WHILE @@FETCH_STATUS=0
 			begin
-				SET @strMessage='--		database: ' + @databaseName
-				RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+				SET @strMessage='database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted')
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
 
 				/* get space allocated / used details */
 				IF @sqlServerName <> @@SERVERNAME
 					SET @queryToRun = N'SELECT *
-										FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC(''''USE [' + @databaseName + N']; 
+										FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC(''''USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
 												SELECT    [drive]
 														, CAST([is_logfile]		AS [bit]) AS [is_logfile]
 														, SUM([size_kb])		AS [size_mb]
@@ -229,12 +229,12 @@ WHILE @@FETCH_STATUS=0
 																			THEN N'CASE WHEN ([maxsize]=-1 AND [groupid]<>0) OR ([maxsize]=-1 AND [groupid]=0) OR ([maxsize]=268435456 AND [groupid]=0) THEN 0 ELSE 1 END ' 
 																			ELSE N'CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END '
 																	 END + N' AS [is_growth_limited]
-														FROM [' + @databaseName + N'].' + CASE WHEN @SQLMajorVersion <=8 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + N'
+														FROM ' + CASE WHEN @SQLMajorVersion <=8 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + N'
 													)sf
 												GROUP BY [drive], [is_logfile]
 										'''')'')x'
 				ELSE
-					SET @queryToRun = N'USE [' + @databaseName + N']; 
+					SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
 										SELECT    [drive]
 												, CAST([is_logfile]		AS [bit]) AS [is_logfile]
 												, SUM([size_kb])		AS [size_mb]
@@ -249,7 +249,7 @@ WHILE @@FETCH_STATUS=0
 																	THEN N'CASE WHEN ([maxsize]=-1 AND [groupid]<>0) OR ([maxsize]=-1 AND [groupid]=0) OR ([maxsize]=268435456 AND [groupid]=0) THEN 0 ELSE 1 END ' 
 																	ELSE N'CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END '
 																END + N' AS [is_growth_limited]
-												FROM [' + @databaseName + N'].' + CASE WHEN @SQLMajorVersion <=8 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + N'
+												FROM ' + CASE WHEN @SQLMajorVersion <=8 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + N'
 											)sf
 										GROUP BY [drive], [is_logfile]'			
 				IF @debugMode = 1 PRINT @queryToRun
@@ -267,7 +267,7 @@ WHILE @@FETCH_STATUS=0
 								  , @projectID
 								  , GETUTCDATE()
 								  , 'dbo.usp_hcCollectDatabaseDetails'
-								  , '[' + @databaseName + ']:' + @strMessage
+								  , [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ':' + @strMessage
 				END CATCH
 
 				/* get last date for dbcc checkdb, only for 2k5+ */
@@ -277,18 +277,19 @@ WHILE @@FETCH_STATUS=0
 							begin
 								IF @SQLMajorVersion < 11
 									SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
-														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @databaseName + N']) WITH TABLERESULTS'''')'')x
+														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS'''')'')x
 														WHERE [Field]=''dbi_dbccLastKnownGood'''
 								ELSE
 									SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
-														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO ([' + @databaseName + N']) WITH TABLERESULTS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
+														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
 														WHERE [Field]=''dbi_dbccLastKnownGood'''
 							end
 						ELSE
 							begin							
 								BEGIN TRY
+									SET @queryToRun = N'DBCC DBINFO (''' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'sql') + N''') WITH TABLERESULTS'
 									INSERT INTO #dbccDBINFO
-											EXEC ('DBCC DBINFO (''' + @databaseName + N''') WITH TABLERESULTS')
+											EXEC (@queryToRun)
 								END TRY
 								BEGIN CATCH
 									SET @strMessage = ERROR_MESSAGE()
@@ -299,7 +300,7 @@ WHILE @@FETCH_STATUS=0
 												  , @projectID
 												  , GETUTCDATE()
 												  , 'dbo.usp_hcCollectDatabaseDetails'
-												  , '[' + @databaseName + ']:' + @strMessage
+												  , [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ':' + @strMessage
 								END CATCH
 
 								SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_dbccLastKnownGood'''											
@@ -321,7 +322,7 @@ WHILE @@FETCH_STATUS=0
 										  , @projectID
 										  , GETUTCDATE()
 										  , 'dbo.usp_hcCollectDatabaseDetails'
-										  , '[' + @databaseName + ']:' + @strMessage
+										  , [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ':' + @strMessage
 						END CATCH
 
 						BEGIN TRY
