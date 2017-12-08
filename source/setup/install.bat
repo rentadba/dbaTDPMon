@@ -24,6 +24,8 @@ set log_files_path=%6
 set userid=%7
 set password=%8
 
+set module=%module:"=%
+
 if !%4==! set project="DEFAULT"
 if !%5==! set data_files_path=""
 if !%6==! set log_files_path=""

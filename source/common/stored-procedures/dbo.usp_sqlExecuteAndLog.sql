@@ -89,7 +89,7 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@debugMode				= @debugMode
 
 --------------------------------------------------------------------------------------------------
-SET @tmpServer= [dbo].[ufn_getObjectQuoteName](@sqlServerName, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](ISNULL(@dbName, 'master'), NULL) + '.[dbo].[sp_executesql]'
+SET @tmpServer= '[' + @sqlServerName + '].' + [dbo].[ufn_getObjectQuoteName](ISNULL(@dbName, 'master'), 'quoted') + '.[dbo].[sp_executesql]'
 
 IF @serverVersionNum >= 9
 	SET @tmpSQL = N'DECLARE @startTime [datetime]

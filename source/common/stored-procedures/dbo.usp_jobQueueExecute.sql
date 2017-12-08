@@ -157,7 +157,7 @@ IF RIGHT(@defaultLogFileLocation, 1)<>'\' SET @defaultLogFileLocation = @default
 ------------------------------------------------------------------------------------------------------------------------------------------
 --create folder on disk
 DECLARE @queryToRun nvarchar(1024)
-SET @queryToRun = N'EXEC [' + DB_NAME() + '].[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @@SERVERNAME + N''',
+SET @queryToRun = N'EXEC ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @@SERVERNAME + N''',
 																			@folderName		= ''' + @defaultLogFileLocation + N''',
 																			@executionLevel	= 1,
 																			@debugMode		= ' + CAST(@debugMode AS [nvarchar]) 

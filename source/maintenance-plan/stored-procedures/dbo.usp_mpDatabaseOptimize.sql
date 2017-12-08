@@ -358,13 +358,13 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 	begin
 		SET @analyzeIndexType=N'0'
 
-		SET @queryToRun=N'Create list of heap tables to be analyzed...' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')
+		SET @queryToRun=N'Create list of heap tables to be analyzed...' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		SET @queryToRun = N''				
 
 		SET @queryToRun = @queryToRun + 
-							N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+							N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 							SELECT DISTINCT 
 									  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 									, si.[object_id]
@@ -393,8 +393,8 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 									AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
 									AND si.[type] IN (' + @analyzeIndexType + N')
 									AND ob.[type] IN (''U'', ''V'')' + 
-									CASE WHEN @skipObjectsList IS NOT NULL  THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))
-																					AND (si.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) OR si.[name] IS NULL)'  
+									CASE WHEN @skipObjectsList IS NOT NULL  THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))
+																					AND (si.[name] NOT IN (SELECT [value] FROM ' +  [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) OR si.[name] IS NULL)'  
 																			ELSE N'' END
 
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
@@ -439,10 +439,10 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 		FETCH NEXT FROM crsObjectsWithIndexes INTO @DatabaseID, @ObjectID, @CurrentTableSchema, @CurrentTableName, @IndexID, @IndexName, @IndexType, @IndexFillFactor
 		WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 			begin
-				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + CASE WHEN @IndexName IS NOT NULL THEN N' - ' + [dbo].[ufn_getObjectQuoteName](@IndexName, NULL)  ELSE N' (heap)' END
+				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + CASE WHEN @IndexName IS NOT NULL THEN N' - ' + [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted')  ELSE N' (heap)' END
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
-				SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+				SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 									SELECT	 OBJECT_NAME(ips.[object_id])	AS [table_name]
 											, ips.[object_id]
 											, si.[name] as index_name
@@ -509,7 +509,7 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName, @CurrentFragmentation, @CurrentPageCount, @CurentPageDensityDeviation, @CurrentForwardedRecordsPercent
 		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 			begin
-				SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), NULL)
+				SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'quoted')
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 		   		SET @queryToRun=N'Current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density deviation = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar])
@@ -568,14 +568,14 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 	begin
 		SET @analyzeIndexType=N'1,2,3,4'		
 
-		SET @queryToRun=N'Create list of indexes to be analyzed...' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')
+		SET @queryToRun=N'Create list of indexes to be analyzed...' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		SET @queryToRun = N''				
 
 		IF @serverVersionNum >= 9
 			SET @queryToRun = @queryToRun + 
-								N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+								N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 								SELECT DISTINCT 
 										  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 										, si.[object_id]
@@ -605,11 +605,11 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 										AND si.[type] IN (' + @analyzeIndexType + N')
 										AND si.[is_disabled]=0
 										AND ob.[type] IN (''U'', ''V'')' + 
-										CASE WHEN @skipObjectsList IS NOT NULL	THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
-																						AND si.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
+										CASE WHEN @skipObjectsList IS NOT NULL	THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
+																						AND si.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
 																				ELSE N'' END
 		ELSE
-			SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+			SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 								SELECT DISTINCT 
 									  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 									, si.[id] AS [object_id]
@@ -630,8 +630,8 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 										AND si.[indid] > 0
 										AND si.[reserved] <> 0
 										AND ob.[xtype] IN (''U'', ''V'')'+
-										CASE WHEN @skipObjectsList IS NOT NULL	THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
-																						AND si.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
+										CASE WHEN @skipObjectsList IS NOT NULL	THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
+																						AND si.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
 																				ELSE N'' END
 
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
@@ -667,7 +667,7 @@ UPDATE #databaseObjectsWithIndexList
 --------------------------------------------------------------------------------------------------
 IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 	begin
-		SET @queryToRun=N'Create list of statistics to be analyzed...' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')
+		SET @queryToRun=N'Create list of statistics to be analyzed...' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		SET @queryToRun = N''				
@@ -677,7 +677,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				IF (@serverVersionNum >= 10.504000 AND @serverVersionNum < 11) OR @serverVersionNum >= 11.03000
 					/* starting with SQL Server 2008 R2 SP2 / SQL Server 2012 SP1 */
 					SET @queryToRun = @queryToRun + 
-										N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; SELECT DISTINCT 
+										N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; SELECT DISTINCT 
 												  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 												, ss.[object_id]
 												, sc.[name] AS [table_schema]
@@ -707,13 +707,13 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 														  AND (ABS(sp.[modification_counter]) * 100. / CAST(sp.[rows] AS [float])) >= ' + CAST(@statsChangePercent AS [nvarchar](32)) + N'
 														 )
 													)'+
-												CASE WHEN @skipObjectsList IS NOT NULL	THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
-																								AND ss.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
+												CASE WHEN @skipObjectsList IS NOT NULL	THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
+																								AND ss.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
 																						ELSE N'' END
 				ELSE
 					/* SQL Server 2005 up to SQL Server 2008 R2 SP 2*/
 					SET @queryToRun = @queryToRun + 
-										N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; SELECT DISTINCT 
+										N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; SELECT DISTINCT 
 												  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 												, ss.[object_id]
 												, sc.[name] AS [table_schema]
@@ -743,15 +743,15 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 														  AND (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) >= ' + CAST(@statsChangePercent AS [nvarchar](32)) + N'
 														)
 												)' +
-												CASE WHEN @skipObjectsList IS NOT NULL THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
-																								AND ss.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))
-																								AND si.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
+												CASE WHEN @skipObjectsList IS NOT NULL THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
+																								AND ss.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))
+																								AND si.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
 																					   ELSE N'' END
 			end
 		ELSE
 			/* SQL Server 2000 */
 			SET @queryToRun = @queryToRun + 
-								N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; SELECT DISTINCT 
+								N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; SELECT DISTINCT 
 										  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 										, si.[id] AS [object_id]
 										, sc.[name] AS [table_schema]
@@ -782,12 +782,12 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 													  AND (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) >= ' + CAST(@statsChangePercent AS [nvarchar](32)) + N'
 													)
 											)' + 
-											CASE WHEN @skipObjectsList IS NOT NULL THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
-																							AND si.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
+											CASE WHEN @skipObjectsList IS NOT NULL THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
+																							AND si.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
 																				   ELSE N'' END
 
 		IF @sqlServerName<>@@SERVERNAME
-			SET @queryToRun = N'SELECT x.* FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'..sp_executesql N''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''''')x'
+			SET @queryToRun = N'SELECT x.* FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sp_executesql N''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''''')x'
 
 
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -836,15 +836,15 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AN
 		FETCH NEXT FROM crsObjectsWithIndexes INTO @DatabaseID, @ObjectID, @CurrentTableSchema, @CurrentTableName, @IndexID, @IndexName, @IndexType, @IndexFillFactor
 		WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 			begin
-				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + CASE WHEN @IndexName IS NOT NULL THEN N' - ' + [dbo].[ufn_getObjectQuoteName](@IndexName, NULL) ELSE N' (heap)' END
+				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + CASE WHEN @IndexName IS NOT NULL THEN N' - ' + [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') ELSE N' (heap)' END
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				IF @serverVersionNum < 9	/* SQL 2000 */
 					begin
 						IF @sqlServerName=@@SERVERNAME
-							SET @queryToRun='USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'; IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + ''') IS NOT NULL DBCC SHOWCONTIG (''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + ''', ''' + [dbo].[ufn_getObjectQuoteName](@IndexName, NULL) + ''' ) WITH ' + CASE WHEN @flgOptions & 1024 = 1024 THEN '' ELSE 'FAST,' END + ' TABLERESULTS, NO_INFOMSGS'
+							SET @queryToRun='USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'; IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''') IS NOT NULL DBCC SHOWCONTIG (''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''', ''' + [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') + ''' ) WITH ' + CASE WHEN @flgOptions & 1024 = 1024 THEN '' ELSE 'FAST,' END + ' TABLERESULTS, NO_INFOMSGS'
 						ELSE
-							SET @queryToRun='SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'.dbo.sp_executesql N''''IF OBJECT_ID(''''''''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + ''''''''') IS NOT NULL DBCC SHOWCONTIG (''''''''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + ''''''''', ''''''''' + [dbo].[ufn_getObjectQuoteName](@IndexName, NULL) + ''''''''' ) WITH ' + CASE WHEN @flgOptions & 1024 = 1024 THEN '' ELSE 'FAST,' END + ' TABLERESULTS, NO_INFOMSGS'''''')x'
+							SET @queryToRun='SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'.dbo.sp_executesql N''''IF OBJECT_ID(''''''''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''''''''') IS NOT NULL DBCC SHOWCONTIG (''''''''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''''''''', ''''''''' + [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') + ''''''''' ) WITH ' + CASE WHEN @flgOptions & 1024 = 1024 THEN '' ELSE 'FAST,' END + ' TABLERESULTS, NO_INFOMSGS'''''')x'
 
 						IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 						INSERT	INTO #CurrentIndexFragmentationStats([ObjectName], [ObjectId], [IndexName], [IndexId], [Level], [Pages], [Rows], [MinimumRecordSize], [MaximumRecordSize], [AverageRecordSize], [ForwardedRecords], [Extents], [ExtentSwitches], [AverageFreeBytes], [AveragePageDensity], [ScanDensity], [BestCount], [ActualCount], [LogicalFragmentation], [ExtentFragmentation])
@@ -852,7 +852,7 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AN
 					end
 				ELSE
 					begin
-						SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+						SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 											SELECT	 OBJECT_NAME(ips.[object_id])	AS [table_name]
 													, ips.[object_id]
 													, si.[name] as index_name
@@ -941,7 +941,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
 		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 			begin
-				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL)
+				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted')
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				DECLARE crsIndexesToDegfragment CURSOR LOCAL FAST_FORWARD FOR 	SELECT	DISTINCT doil.[index_name], doil.[index_type], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[object_id], doil.[index_id], doil.[page_density_deviation], doil.[fill_factor]
@@ -985,10 +985,10 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 															WHEN 3 THEN 'XML'
 															WHEN 4 THEN 'Spatial' 
 											END
-   						SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@IndexName, NULL) + ': Current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
+   						SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') + ': Current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 
-						SET @objectName =  [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), NULL)
+						SET @objectName =  [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'quoted')
 						SET @childObjectName = QUOTENAME(@IndexName)
 
 						--------------------------------------------------------------------------------------------------
@@ -1035,7 +1035,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 						ELSE
 							begin
 								SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; '
-								SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + ''') IS NOT NULL DBCC INDEXDEFRAG (0, ' + RTRIM(@ObjectID) + ', ' + RTRIM(@IndexID) + ') WITH NO_INFOMSGS'
+								SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''') IS NOT NULL DBCC INDEXDEFRAG (0, ' + RTRIM(@ObjectID) + ', ' + RTRIM(@IndexID) + ') WITH NO_INFOMSGS'
 								IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								SET @nestedExecutionLevel = @executionLevel + 1
@@ -1093,7 +1093,7 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
 		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 			begin
-				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL)
+				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted')
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				SET @ClusteredRebuildNonClustered = 0
@@ -1135,10 +1135,10 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 																	WHEN 3 THEN 'XML'
 																	WHEN 4 THEN 'Spatial' 
 													END
-		   						SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@IndexName, NULL) + ': Current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) +  ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
+		   						SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') + ': Current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) +  ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 
-								SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), NULL)
+								SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'quoted')
 								SET @childObjectName = QUOTENAME(@IndexName)
 
 								--------------------------------------------------------------------------------------------------
@@ -1216,7 +1216,7 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 								ELSE
 									begin
 										SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; '
-										SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + ''') IS NOT NULL DBCC DBREINDEX (''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + '' + ''', ''' + [dbo].[ufn_getObjectQuoteName](RTRIM(@IndexName), NULL) + ''') WITH NO_INFOMSGS'
+										SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''') IS NOT NULL DBCC DBREINDEX (''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + '' + ''', ''' + [dbo].[ufn_getObjectQuoteName](RTRIM(@IndexName), 'quoted') + ''') WITH NO_INFOMSGS'
 										IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 										SET @nestedExecutionLevel = @executionLevel + 1
@@ -1287,7 +1287,7 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 				FETCH NEXT FROM crsClusteredIndexes INTO @CurrentTableSchema, @CurrentTableName, @IndexName
 				WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 					begin
-						SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL)
+						SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted')
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 	
 						--mark indexes as rebuilt
@@ -1346,16 +1346,16 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 											END
 
 						--analyze curent object
-						SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL)
+						SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted')
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
-		   				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@IndexName, NULL) + ': Current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
+		   				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') + ': Current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 
 						--------------------------------------------------------------------------------------------------
 						--log index fragmentation information
-						SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), NULL)
-						SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@IndexName, NULL)
+						SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'quoted')
+						SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted')
 
 						SET @eventData='<index-fragmentation><detail>' + 
 											'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
@@ -1424,10 +1424,10 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 						ELSE
 							begin
 								SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; '
-								SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + ''') IS NOT NULL DBCC DBREINDEX (''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + '' + ''', ''' + [dbo].[ufn_getObjectQuoteName](RTRIM(@IndexName), NULL) + ''') WITH NO_INFOMSGS'
+								SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''') IS NOT NULL DBCC DBREINDEX (''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + '' + ''', ''' + [dbo].[ufn_getObjectQuoteName](RTRIM(@IndexName), 'quoted') + ''') WITH NO_INFOMSGS'
 								IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 								
-								SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), NULL)
+								SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'quoted')
 								SET @childObjectName = QUOTENAME(@IndexName)
 								SET @nestedExecutionLevel = @executionLevel + 1
 
@@ -1504,7 +1504,7 @@ IF (@serverVersionNum >= 9.04035 AND @flgOptions & 65536 = 65536) AND (GETDATE()
 					SET @queryToRun='sp_clean_db_free_space (ghost records cleanup)...'
 					EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-					SET @objectName = [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')
+					SET @objectName = [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')
 					EXEC sp_clean_db_free_space @objectName
 				end
 
@@ -1562,7 +1562,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 		FETCH NEXT FROM crsTableList2 INTO @CurrentTableSchema, @CurrentTableName, @statsCount
 		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 			begin
-				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL)
+				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted')
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				SET @IndexID=1
@@ -1576,13 +1576,13 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				FETCH NEXT FROM crsTableStatsList INTO @IndexName, @statsAutoCreated, @tableRows, @statsModificationCounter, @lastUpdated, @percentChanges, @statsAge
 				WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 					begin
-						SET @queryToRun=CAST(@IndexID AS [nvarchar](64)) + '/' + CAST(@statsCount AS [nvarchar](64)) + ' - ' + [dbo].[ufn_getObjectQuoteName](@IndexName, NULL) + ' / age = ' + CAST(@statsAge AS [varchar](32)) + ' days / rows = ' + CAST(@tableRows AS [varchar](32)) + ' / changes = ' + CAST(@statsModificationCounter AS [varchar](32))
+						SET @queryToRun=CAST(@IndexID AS [nvarchar](64)) + '/' + CAST(@statsCount AS [nvarchar](64)) + ' - ' + [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') + ' / age = ' + CAST(@statsAge AS [varchar](32)) + ' days / rows = ' + CAST(@tableRows AS [varchar](32)) + ' / changes = ' + CAST(@statsModificationCounter AS [varchar](32))
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 
 						--------------------------------------------------------------------------------------------------
 						--log statistics information
-						SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), NULL)
-						SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@IndexName, NULL)
+						SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'quoted')
+						SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted')
 
 						SET @eventData='<statistics-health><detail>' + 
 											'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
@@ -1607,7 +1607,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 
 						--------------------------------------------------------------------------------------------------
 						SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-						SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + ''') IS NOT NULL UPDATE STATISTICS ' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL) + '(' + dbo.ufn_getObjectQuoteName(@IndexName, NULL) + ') WITH '
+						SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''') IS NOT NULL UPDATE STATISTICS ' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + '(' + dbo.ufn_getObjectQuoteName(@IndexName, 'quoted') + ') WITH '
 								
 						IF @statsSamplePercent<100
 							SET @queryToRun=@queryToRun + N'SAMPLE ' + CAST(@statsSamplePercent AS [nvarchar]) + ' PERCENT'

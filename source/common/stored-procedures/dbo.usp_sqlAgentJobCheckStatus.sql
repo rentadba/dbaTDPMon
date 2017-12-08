@@ -91,7 +91,7 @@ SET	@runningTimeSec		= NULL
 ---------------------------------------------------------------------------------------------
 SET @ReturnValue	= 5 --Unknown
 
-SET @queryToRun=N'SELECT  CAST([job_id] AS [varchar](255)) AS [job_id] FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + @jobName + ''''
+SET @queryToRun=N'SELECT  CAST([job_id] AS [varchar](255)) AS [job_id] FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + [dbo].[ufn_getObjectQuoteName](@jobName, 'sql') + ''''
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 IF @debugMode = 1 PRINT @queryToRun
 
@@ -100,7 +100,7 @@ INSERT INTO #tmpCheck EXEC (@queryToRun)
 ------------------------------------------------------------------------------------------------------------------------------------------
 IF (SELECT COUNT(*) FROM #tmpCheck)=0
 	begin
-		SET @strMessage='--SQL Server Agent: The specified job name [' + @jobName + '] does not exists on this server [' + @sqlServerName + ']'
+		SET @strMessage='--SQL Server Agent: The specified job name ' + [dbo].[ufn_getObjectQuoteName](@jobName, 'quoted') + ' does not exists on this server [' + @sqlServerName + ']'
 		IF @debugMode=1
 			RAISERROR(@strMessage, 10, 1) WITH NOWAIT
 		SET @currentRunning = 0
@@ -134,14 +134,14 @@ ELSE
 								   ) sp
 							) sp
 						INNER JOIN [msdb].[dbo].[sysjobs] sj ON sj.[job_id] = sp.[job_id]
-						WHERE sj.[name]= ''' + @jobName + N'''
+						WHERE sj.[name]= ''' + [dbo].[ufn_getObjectQuoteName](@jobName, 'sql') + N'''
 						UNION
 						SELECT DISTINCT sjs.[step_id], sj.[job_id], sp.[spid]
 						FROM [master].[dbo].[sysprocesses] sp
 						INNER JOIN [msdb].[dbo].[sysjobs]		sj  ON sj.[name] = sp.[program_name]
 						INNER JOIN [msdb].[dbo].[sysjobsteps]	sjs ON sjs.[job_id] = sj.[job_id]
 						INNER JOIN [msdb].[dbo].[sysjobhistory] sjh ON sjh.[job_id] = sj.[job_id] AND sjh.[step_id] = sjs.[step_id] AND sjh.[run_status] = 4
-						WHERE sj.[name]= ''' + @jobName + N''''
+						WHERE sj.[name]= ''' + [dbo].[ufn_getObjectQuoteName](@jobName, 'sql') + N''''
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode = 1 PRINT @queryToRun
 		INSERT	INTO #runningSQLAgentJobsProcess([step_id], [job_id], [session_id])
@@ -381,7 +381,7 @@ ELSE
 				--SET @RunDuration=SUBSTRING(@RunDuration, 1,2) + ':' + SUBSTRING(@RunDuration, 3,2) + ':' + SUBSTRING(@RunDuration, 5,2)
 				SET @RunDuration=SUBSTRING(@RunDuration, 1, LEN(@RunDuration) - 4) + ':' + SUBSTRING(RIGHT(@RunDuration, 4), 1, 2) + ':' + SUBSTRING(RIGHT(@RunDuration, 4), 3, 2)
 				
-				SET @strMessage='--The specified job [' + @sqlServerName + '].[' + @jobName + '] is not currently running.'
+				SET @strMessage='--The specified job [' + @sqlServerName + '].' + [dbo].[ufn_getObjectQuoteName](@jobName, 'quoted') + ' is not currently running.'
 				IF @RunStatus<>'Unknown'
 					begin
 						SET @strMessage=@strMessage + CHAR(13) + '--Last execution step			: [' + ISNULL(CAST(@StepID AS varchar), '') + '] - [' + ISNULL(@StepName, '') + ']'

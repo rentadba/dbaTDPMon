@@ -103,7 +103,7 @@ BEGIN TRY
 
 		--get current index properties
 		SET @queryToRun = N''
-		SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+		SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 									SELECT  idx.[name]
 										, idx.[type]
 										, idx.[fill_factor]
@@ -156,7 +156,7 @@ BEGIN TRY
 		
 		--get current index key columns and include columns and their properties
 		SET @queryToRun = N''
-		SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+		SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 								SELECT    
 										  idxCol.[key_ordinal]
 										, idxCol.[index_column_id]
@@ -221,10 +221,10 @@ BEGIN TRY
 																THEN ' CLUSTERED' 
 																ELSE ''
 														 END 
-				SET @sqlIndexCreate = @sqlIndexCreate +	 ' INDEX ' + [dbo].[ufn_getObjectQuoteName](@crtIndexName, NULL) + ' ON ' + [dbo].[ufn_getObjectQuoteName](@tableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@tableName, NULL) + ' ('
+				SET @sqlIndexCreate = @sqlIndexCreate +	 ' INDEX ' + [dbo].[ufn_getObjectQuoteName](@crtIndexName, 'quoted') + ' ON ' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@tableName, 'quoted') + ' ('
 
 				--index key columns
-				SELECT @sqlIndexCreate = @sqlIndexCreate + '' + [dbo].[ufn_getObjectQuoteName]([ColumnName], NULL) + '' + 
+				SELECT @sqlIndexCreate = @sqlIndexCreate + '' + [dbo].[ufn_getObjectQuoteName]([ColumnName], 'quoted') + '' + 
 										CASE WHEN [IsDescendingKey]=1	THEN ' DESC'
 																		ELSE '' END + ', '
 				FROM @IndexColumnDetails
@@ -236,7 +236,7 @@ BEGIN TRY
 
 				--index include columns
 				SET @sqlIndexInclude = N''
-				SELECT @sqlIndexInclude = @sqlIndexInclude + '' + [dbo].[ufn_getObjectQuoteName]([ColumnName], NULL) + ', '
+				SELECT @sqlIndexInclude = @sqlIndexInclude + '' + [dbo].[ufn_getObjectQuoteName]([ColumnName], 'quoted') + ', '
 				FROM @IndexColumnDetails
 				WHERE [IsIncludedColumn] = 1
 				ORDER BY [IndexColumnID]
@@ -312,7 +312,7 @@ BEGIN TRY
 										CASE WHEN LEN(@sqlIndexWithClause)>0
 											 THEN N' WITH (' + @sqlIndexWithClause + ')'
 											 ELSE ''
-										END + N' ON ' + [dbo].[ufn_getObjectQuoteName](@FileGroupName, NULL)
+										END + N' ON ' + [dbo].[ufn_getObjectQuoteName](@FileGroupName, 'quoted')
 			end
 END TRY
 

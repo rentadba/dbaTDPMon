@@ -185,7 +185,7 @@ IF @startJob=1
 				RETURN 1
 			end
 	
-		SET @queryToRun='SELECT CAST([job_id] AS varchar(255)) FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' +  @jobName + ''''
+		SET @queryToRun='SELECT CAST([job_id] AS varchar(255)) FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' +  [dbo].[ufn_getObjectQuoteName](@jobName, 'sql') + ''''
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode = 1 PRINT @queryToRun
 
@@ -284,10 +284,10 @@ IF @startJob=1
 
 								IF @stepName IS NOT NULL
 									begin
-										SET @strMessage='--Starting job: ' + @jobName
+										SET @strMessage='--Starting job: ' + [dbo].[ufn_getObjectQuoteName](@jobName, 'quoted')
 										RAISERROR(@strMessage,10,1) WITH NOWAIT
 
-										SET @queryToRun='[' + @sqlServerName + '].[msdb].[dbo].[sp_start_job] @job_id=''' + @jobID + ''', @step_name=''' + @stepName + ''''
+										SET @queryToRun='[' + @sqlServerName + '].[msdb].[dbo].[sp_start_job] @job_id=''' + @jobID + ''', @step_name=''' + [dbo].[ufn_getObjectQuoteName](@stepName, 'sql') + ''''
 										IF @debugMode = 1 PRINT @queryToRun
 
 										EXEC (@queryToRun)

@@ -87,7 +87,7 @@ IF RIGHT(@psFileLocation, 1)<>'\' SET @psFileLocation = @psFileLocation + '\'
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --create folder on disk
-SET @queryToRun = N'EXEC [' + DB_NAME() + '].[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @@SERVERNAME + N''',
+SET @queryToRun = N'EXEC ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @@SERVERNAME + N''',
 																			@folderName		= ''' + @psFileLocation + N''',
 																			@executionLevel	= 1,
 																			@debugMode		= ' + CAST(@debugMode AS [nvarchar]) 
@@ -358,7 +358,7 @@ WHILE @@FETCH_STATUS=0
 					begin
 						-- save powershell script
 						SET @psFileName = 'GetOSSystemEvents_' + REPLACE(@machineName, '\', '$') + '_' + @psLogTypeName + '.ps1'
-						SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [message] FROM [' + DB_NAME() + '].[dbo].[logAnalysisMessages] WHERE [descriptor]=''''' + @eventDescriptor + ''''' AND [instance_id]=' + CAST(@instanceID AS [varchar]) + ' AND [project_id]=' + CAST(@projectID AS [varchar]) + '" queryout "' + @psFileLocation + @psFileName + '" -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'', no_output'
+						SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [message] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[dbo].[logAnalysisMessages] WHERE [descriptor]=''''' + @eventDescriptor + ''''' AND [instance_id]=' + CAST(@instanceID AS [varchar]) + ' AND [project_id]=' + CAST(@projectID AS [varchar]) + '" queryout "' + @psFileLocation + @psFileName + '" -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'', no_output'
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
 
 						EXEC (@queryToRun) 

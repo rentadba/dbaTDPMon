@@ -162,7 +162,7 @@ BEGIN TRY
 								
 								IF @flgOptions & 1 = 1
 									begin
-										SET @queryToRun= 'Get connections for database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, NULL)
+										SET @queryToRun= 'Get connections for database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted')
 										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 																			
 										------------------------------------------------------------------------------
@@ -188,7 +188,7 @@ BEGIN TRY
 
 								IF @flgOptions & 2 = 2
 									begin									
-										SET @queryToRun= 'Get orphan connections for database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, NULL) + ' (sys.dm_tran_locks)'
+										SET @queryToRun= 'Get orphan connections for database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ' (sys.dm_tran_locks)'
 										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 									
@@ -217,7 +217,7 @@ BEGIN TRY
 							begin
 								IF @flgOptions & 2 = 2
 									begin									
-										SET @queryToRun= 'Get orphan connections for database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, NULL) + ' (syslockinfo)'
+										SET @queryToRun= 'Get orphan connections for database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ' (syslockinfo)'
 										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 										------------------------------------------------------------------------------
@@ -247,7 +247,7 @@ BEGIN TRY
 								------------------------------------------------------------------------------
 								--kill connections to database
 								------------------------------------------------------------------------------
-								SET @queryToRun= 'Kill connections for database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, NULL)
+								SET @queryToRun= 'Kill connections for database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted')
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 								
 								DECLARE crsSPIDList CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT [spid] FROM @SessionDetails WHERE [spid] IS NOT NULL
@@ -278,7 +278,7 @@ BEGIN TRY
 								------------------------------------------------------------------------------
 								--kill orphan connections to database
 								------------------------------------------------------------------------------
-								SET @queryToRun= 'Kill orphan connections for database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, NULL)
+								SET @queryToRun= 'Kill orphan connections for database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted')
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 								
 								DECLARE crsUOWList CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT [uow] FROM @SessionDetails WHERE [uow] IS NOT NULL
@@ -351,13 +351,13 @@ BEGIN TRY
 				--check if all connections have been killed
 				IF @ConnectionsLeft>0 
 					begin 
-						SET @queryToRun= 'Cannot kill all connections to database ' +  [dbo].[ufn_getObjectQuoteName](@databaseName, NULL) + '. There are ' + CAST(@ConnectionsLeft AS VARCHAR) + ' active connection(s) left. Operation failed.'
+						SET @queryToRun= 'Cannot kill all connections to database ' +  [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + '. There are ' + CAST(@ConnectionsLeft AS VARCHAR) + ' active connection(s) left. Operation failed.'
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 					end
 				IF @LocksLeft>0 
 					begin 
-						SET @queryToRun= 'Cannot kill all connections to database ' +  [dbo].[ufn_getObjectQuoteName](@databaseName, NULL) + '. There are ' + CAST(@LocksLeft AS VARCHAR) + ' active lock(s) left. Operation failed.'
+						SET @queryToRun= 'Cannot kill all connections to database ' +  [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + '. There are ' + CAST(@LocksLeft AS VARCHAR) + ' active lock(s) left. Operation failed.'
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 					end
 

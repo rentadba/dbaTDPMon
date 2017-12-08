@@ -36,18 +36,19 @@ DECLARE @tableRowCount TABLE ([row_count] [int])
 
 
 SET @queryToRun=N''
-SET @queryToRun=@queryToRun + N'SELECT rc.[row_count]
-								FROM [' + @databaseName + N'].[sys].[objects] so
-								INNER JOIN [' + @databaseName + N'].[sys].[schemas] sch ON sch.[schema_id] = so.[schema_id]
+SET @queryToRun=@queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + '; 
+								SELECT rc.[row_count]
+								FROM [sys].[objects] so
+								INNER JOIN [sys].[schemas] sch ON sch.[schema_id] = so.[schema_id]
 								LEFT JOIN
 										(
 											SELECT   ps.[object_id]
 													, SUM (CASE WHEN (ps.[index_id] < 2) THEN [row_count] ELSE 0 END) AS [row_count]
-											FROM [' + @databaseName + N'].sys.dm_db_partition_stats ps with (readpast)
+											FROM sys.dm_db_partition_stats ps with (readpast)
 											GROUP BY ps.[object_id]
 										) AS rc ON rc.[object_id] = so.[object_id]
-								WHERE so.[name]=''' + @tableName + N'''
-									AND sch.[name]=''' + @schemaName + N''''
+								WHERE so.[name]=''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + N'''
+									AND sch.[name]=''' + [dbo].[ufn_getObjectQuoteName](@schemaName, 'sql') + N''''
 
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0

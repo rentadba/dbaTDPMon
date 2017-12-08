@@ -391,7 +391,7 @@ IF LEN(@backupLocation) >= @maxPATHLength
 	begin
 		SET @eventData='<alert><detail>' + 
 							'<severity>critical</severity>' + 
-							'<instance_name>' + [dbo].[ufn_getObjectQuoteName](@sqlServerName, 'xml') + '</instance_name>' + 
+							'<instance_name>' + @sqlServerName + '</instance_name>' + 
 							'<name>database backup</name>' + 
 							'<type>' + @backupType + '</type>' + 
 							'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
@@ -418,7 +418,7 @@ IF LEN(@backupLocation) >= @maxPATHLength
 	end
 ELSE
 	begin
-		SET @queryToRun = N'EXEC [' + DB_NAME() + '].[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @sqlServerName + N''',
+		SET @queryToRun = N'EXEC ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @sqlServerName + N''',
 																					@folderName		= ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + N''',
 																					@executionLevel	= ' + CAST(@nestedExecutionLevel AS [nvarchar]) + N',
 																					@debugMode		= ' + CAST(@debugMode AS [nvarchar]) 
@@ -547,7 +547,7 @@ IF @optionForceChangeBackupType=1
 			begin
 				SET @eventData='<alert><detail>' + 
 									'<severity>critical</severity>' + 
-									'<instance_name>' + [dbo].[ufn_getObjectQuoteName](@sqlServerName, 'xml') + '</instance_name>' + 
+									'<instance_name>' + @sqlServerName + '</instance_name>' + 
 									'<name>database backup</name>' + 
 									'<type>' + @backupType + '</type>' + 
 									'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
@@ -574,7 +574,7 @@ IF @optionForceChangeBackupType=1
 			end
 		ELSE
 			begin
-				SET @queryToRun	= N'BACKUP DATABASE '+ [dbo].[ufn_getObjectQuoteName](@dbName, NULL) + N' TO DISK = ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH STATS = 10, NAME = ''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
+				SET @queryToRun	= N'BACKUP DATABASE '+ [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N' TO DISK = ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH STATS = 10, NAME = ''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
@@ -597,17 +597,17 @@ ELSE
 
 IF @flgActions & 1 = 1 
 	begin
-		SET @queryToRun	= N'BACKUP DATABASE '+ [dbo].[ufn_getObjectQuoteName](@dbName, NULL) + N' TO DISK = ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH STATS = 10, NAME = ''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
+		SET @queryToRun	= N'BACKUP DATABASE '+ [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N' TO DISK = ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH STATS = 10, NAME = ''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
 	end
 
 IF @flgActions & 2 = 2
 	begin
-		SET @queryToRun	= N'BACKUP DATABASE '+ [dbo].[ufn_getObjectQuoteName](@dbName, NULL) + N' TO DISK = ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH DIFFERENTIAL, STATS = 10, NAME=''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
+		SET @queryToRun	= N'BACKUP DATABASE '+ [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N' TO DISK = ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH DIFFERENTIAL, STATS = 10, NAME=''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
 	end
 
 IF @flgActions & 4 = 4
 	begin
-		SET @queryToRun	= N'BACKUP LOG '+ [dbo].[ufn_getObjectQuoteName](@dbName, NULL) + N' TO DISK = ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH STATS = 10, NAME=''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
+		SET @queryToRun	= N'BACKUP LOG '+ [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N' TO DISK = ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH STATS = 10, NAME=''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
 	end
 
 --check for maximum length of the file path
@@ -616,7 +616,7 @@ IF LEN(@backupLocation + @backupFileName) > @maxPATHLength
 	begin
 		SET @eventData='<alert><detail>' + 
 							'<severity>critical</severity>' + 
-							'<instance_name>' + [dbo].[ufn_getObjectQuoteName](@sqlServerName, 'xml') + '</instance_name>' + 
+							'<instance_name>' + @sqlServerName + '</instance_name>' + 
 							'<name>database backup</name>' + 
 							'<type>' + @backupType + '</type>' + 
 							'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 

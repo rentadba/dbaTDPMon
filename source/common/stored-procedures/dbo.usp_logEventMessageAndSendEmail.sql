@@ -54,7 +54,6 @@ DECLARE @projectID					[smallint],
 		@isFloodControl				[bit],
 		@HTMLBody					[nvarchar](max),
 		@emailSubject				[nvarchar](256),
-		@queryToRun					[nvarchar](max),
 		@ReturnValue				[int],
 		@clientName					[nvarchar](260),
 		@eventData					[varchar](8000),
@@ -584,7 +583,7 @@ IF @alertSent=0
 									WHEN @eventType=6 THEN N'alert'
 								END	 
 							+ N' on ' + N'[' +  @sqlServerName + ']: ' 
-							+ CASE WHEN @dbName IS NOT NULL THEN QUOTENAME(@dbName) + N' - ' ELSE N'' END 
+							+ CASE WHEN @dbName IS NOT NULL THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N' - ' ELSE N'' END 
 							+ CASE	WHEN @eventType=1 THEN N'[error] - '
 									WHEN @eventType IN (2, 5) THEN 
 											CASE	WHEN @additionalOption=0 

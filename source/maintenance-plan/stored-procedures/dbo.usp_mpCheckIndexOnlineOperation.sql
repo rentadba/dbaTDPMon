@@ -91,7 +91,7 @@ IF (@partitionNumber <> 1)
 /* disabled indexes / XML, spatial indexes, columnstore, hash */
 -----------------------------------------------------------------------------------------
 SET @queryToRun = N''
-SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 						SELECT DISTINCT idx.[name]
 						FROM [sys].[indexes]		idx
 						INNER JOIN [sys].[objects]	obj	ON  idx.[object_id] = obj.[object_id]
@@ -125,7 +125,7 @@ IF (SELECT COUNT(*) FROM @onlineConstraintCheck) > 0
 IF @serverVersionNum < 11
 	begin
 		SET @queryToRun = N''
-		SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+		SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 								SELECT DISTINCT idx.[name]
 								FROM [sys].[indexes]			idx
 								INNER JOIN [sys].[index_columns] idxCol ON	idx.[object_id] = idxCol.[object_id]
@@ -166,7 +166,7 @@ IF @serverVersionNum < 11
 		IF @indexID IS NULL
 			begin
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+				SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 										SELECT DISTINCT idx.[index_id]
 										FROM [sys].[indexes] idx
 										INNER JOIN [sys].[objects]	 obj ON idx.[object_id] = obj.[object_id]
@@ -187,7 +187,7 @@ IF @serverVersionNum < 11
 		IF @indexID=1
 			begin
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+				SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 										SELECT DISTINCT obj.[name]
 										FROM  [sys].[objects]		 obj
 										INNER JOIN [sys].[columns]	 col ON col.[object_id] = obj.[object_id]

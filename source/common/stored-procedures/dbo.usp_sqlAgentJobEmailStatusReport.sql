@@ -40,7 +40,7 @@ DECLARE @eventMessageData			[varchar](max),
 -----------------------------------------------------------------------------------------------------
 --get job id
 SET @queryToRun = N''
-SET @queryToRun = @queryToRun + N'SELECT [job_id] FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + @jobName + ''''
+SET @queryToRun = @queryToRun + N'SELECT [job_id] FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + [dbo].[ufn_getObjectQuoteName](@jobName, 'sql') + ''''
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 
 SET @queryToRun = N'SELECT @jobID = [job_id] FROM (' + @queryToRun + N')inq'

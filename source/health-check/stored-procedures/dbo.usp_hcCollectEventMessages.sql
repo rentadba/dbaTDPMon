@@ -131,7 +131,7 @@ WHILE @@FETCH_STATUS=0
 				SET @queryToRun=@queryToRun + N'SELECT    lem.[id], lem.[event_date_utc], lem.[module], lem.[parameters], lem.[event_name]
 														, lem.[database_name], lem.[object_name], lem.[child_object_name], lem.[message]
 														, lem.[send_email_to], lem.[event_type], lem.[is_email_sent], lem.[flood_control]
-									FROM [' + DB_NAME() + N'].dbo.logEventMessages lem
+									FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.dbo.logEventMessages lem
 									WHERE lem.[id] > ' + CAST(ISNULL(@maxRemoteEventID, 0) AS [nvarchar](32))
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 

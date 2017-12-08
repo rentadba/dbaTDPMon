@@ -210,8 +210,8 @@ IF @flgActions & 2 = 2 OR @flgActions & 16 = 16 OR @flgActions & 64 = 64 OR @flg
 			SET @queryToRun = @queryToRun + N'SELECT DISTINCT ob.[table_schema], ob.[table_name], ob.[type]
 FROM (
 		SELECT obj.[object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name], obj.[type]
-		FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'.sys.objects obj WITH (READPAST)
-		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'.sys.schemas sch WITH (READPAST) ON sch.[schema_id] = obj.[schema_id]
+		FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'.sys.objects obj WITH (READPAST)
+		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'.sys.schemas sch WITH (READPAST) ON sch.[schema_id] = obj.[schema_id]
 		WHERE obj.[type] IN (''S'', ''U'')
 				AND obj.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + N'''
 				AND sch.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + N'''
@@ -224,9 +224,9 @@ FROM (
 		UNION ALL
 
 		SELECT DISTINCT obj.[object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name], obj.[type]
-		FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'.sys.indexes idx WITH (READPAST)
-		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'.sys.objects obj WITH (READPAST) ON obj.[object_id] = idx.[object_id]
-		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'.sys.schemas sch WITH (READPAST) ON sch.[schema_id] = obj.[schema_id]
+		FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'.sys.indexes idx WITH (READPAST)
+		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'.sys.objects obj WITH (READPAST) ON obj.[object_id] = idx.[object_id]
+		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'.sys.schemas sch WITH (READPAST) ON sch.[schema_id] = obj.[schema_id]
 		WHERE obj.[type]= ''V''
 				AND obj.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + N'''
 				AND sch.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + N'''
@@ -242,11 +242,11 @@ INNER JOIN
 		FROM (
 				SELECT	ps.[object_id]
 						, SUM (ps.[reserved_page_count]) AS [reserved_page_count]
-				FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'.sys.dm_db_partition_stats ps WITH (READPAST)
+				FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'.sys.dm_db_partition_stats ps WITH (READPAST)
 				GROUP BY ps.[object_id]
 			) AS ps
-		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'.sys.objects so  WITH (READPAST) ON so.[object_id] = ps.[object_id] 
-		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'.sys.schemas sch WITH (READPAST) ON sch.[schema_id] = so.[schema_id]
+		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'.sys.objects so  WITH (READPAST) ON so.[object_id] = ps.[object_id] 
+		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'.sys.schemas sch WITH (READPAST) ON sch.[schema_id] = so.[schema_id]
 		WHERE	so.[type] in (''S'', ''U'', ''V'')
 			AND ps.[reserved_page_count] > 0
 	)ps ON ob.[object_id] = ps.[object_id]'
@@ -254,8 +254,8 @@ INNER JOIN
 			SET @queryToRun = @queryToRun + N'SELECT ob.[table_schema], ob.[table_name], ob.[type]
 FROM (
 		SELECT DISTINCT obj.[id] AS [object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name], obj.[type]
-		FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'..sysobjects obj
-		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'..sysusers sch ON sch.[uid] = obj.[uid]
+		FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sysobjects obj
+		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sysusers sch ON sch.[uid] = obj.[uid]
 		WHERE obj.[type] IN (''S'', ''U'')
 				AND obj.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + N'''
 				AND sch.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + N'''' + 
@@ -267,9 +267,9 @@ FROM (
 		UNION ALL			
 
 		SELECT DISTINCT obj.[id] AS [object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name], obj.[type]
-		FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'..sysindexes idx
-		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'..sysobjects obj ON obj.[id] = idx.[id]
-		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'..sysusers sch ON sch.[uid] = obj.[uid]
+		FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sysindexes idx
+		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sysobjects obj ON obj.[id] = idx.[id]
+		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sysusers sch ON sch.[uid] = obj.[uid]
 		WHERE obj.[type]= ''V''
 				AND obj.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + N'''
 				AND sch.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + N''''
@@ -278,14 +278,14 @@ FROM (
 INNER JOIN
 	(
 		SELECT si.[id] AS [object_id], sch.[name] AS [table_schema], so.[name] AS [table_name]
-		FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'..sysobjects so
-		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'..sysindexes si on so.[id] = si.[id]
-		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'..sysusers sch ON sch.[uid] = so.[uid]
+		FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sysobjects so
+		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sysindexes si on so.[id] = si.[id]
+		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sysusers sch ON sch.[uid] = so.[uid]
 		WHERE si.[reserved]<>0
 	)ps ON ob.[object_id] = ps.[object_id]'
 
 		SET @queryToRun = @queryToRun + CASE WHEN @skipObjectsList IS NOT NULL  
-											 THEN N'	WHERE ob.[table_name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
+											 THEN N'	WHERE ob.[table_name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
 											 ELSE N'' 
 										END
 
@@ -329,11 +329,11 @@ IF @flgActions & 1 = 1 AND @serverVersionNum >= 9 AND @flgOptions & 1 = 0
 			begin
 				IF @serverVersionNum < 11
 					SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
-										FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N') WITH TABLERESULTS'''')'')x
+										FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N') WITH TABLERESULTS'''')'')x
 										WHERE [Field]=''dbi_dbccFlags'''
 				ELSE
 					SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
-										FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N') WITH TABLERESULTS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
+										FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N') WITH TABLERESULTS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
 										WHERE [Field]=''dbi_dbccFlags'''
 			end
 		ELSE
@@ -365,7 +365,7 @@ IF @flgActions & 1 = 1
 	begin
 		IF @executionLevel=0 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		SET @queryToRun=N'Database consistency check ' + CASE WHEN @flgOptions & 1 = 1 THEN '(PHYSICAL_ONLY)' ELSE '' END + '... ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') 
+		SET @queryToRun=N'Database consistency check ' + CASE WHEN @flgOptions & 1 = 1 THEN '(PHYSICAL_ONLY)' ELSE '' END + '... ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') 
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		SET @queryToRun = N''
@@ -400,7 +400,7 @@ IF @flgActions & 2 = 2
 	begin
 		IF @executionLevel=0 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		SET @queryToRun=N'Tables/views consistency check ' + CASE WHEN @flgOptions & 1 = 1 THEN '(PHYSICAL_ONLY)' ELSE '' END + CASE WHEN @flgOptions & 2 = 2 THEN '(NOINDEX)' ELSE '' END + '... ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') 
+		SET @queryToRun=N'Tables/views consistency check ' + CASE WHEN @flgOptions & 1 = 1 THEN '(PHYSICAL_ONLY)' ELSE '' END + CASE WHEN @flgOptions & 2 = 2 THEN '(NOINDEX)' ELSE '' END + '... ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') 
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [table_schema], [table_name] 
@@ -410,7 +410,7 @@ IF @flgActions & 2 = 2
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
 		WHILE @@FETCH_STATUS = 0
 			begin
-				SET @objectName=[dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL)
+				SET @objectName=[dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted')
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				SET @queryToRun = N''
@@ -451,7 +451,7 @@ IF @flgActions & 4 = 4
 	begin
 		IF @executionLevel=0 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		SET @queryToRun=N'Allocation structures consistency check ... ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') 
+		SET @queryToRun=N'Allocation structures consistency check ... ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') 
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		SET @queryToRun = N''
@@ -476,7 +476,7 @@ IF @flgActions & 8 = 8
 	begin
 		IF @executionLevel=0 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		SET @queryToRun=N'Catalogs consistency check ... ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') 
+		SET @queryToRun=N'Catalogs consistency check ... ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') 
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		SET @queryToRun = N''
@@ -501,7 +501,7 @@ IF @flgActions & 16 = 16
 	begin
 		IF @executionLevel=0 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		SET @queryToRun=N'Table constraints consistency check ... ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') 
+		SET @queryToRun=N'Table constraints consistency check ... ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') 
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 		
 		DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [table_schema], [table_name] 
@@ -511,7 +511,7 @@ IF @flgActions & 16 = 16
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
 		WHILE @@FETCH_STATUS = 0
 			begin
-				SET @objectName= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL)
+				SET @objectName= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted')
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				SET @queryToRun = N''
@@ -560,7 +560,7 @@ IF @flgActions & 32 = 32
 			begin
 				IF @executionLevel=0 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-				SET @queryToRun=N'Table identity value consistency check ... ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') 
+				SET @queryToRun=N'Table identity value consistency check ... ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') 
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 		
 				---------------------------------------------------------------------------------------------
@@ -583,26 +583,26 @@ IF @flgActions & 32 = 32
 						IF @serverVersionNum >= 13
 							/* excluding memory optimized tables for SQL 2014 onwardss*/
 							SET @queryToRun = @queryToRun + N'	SELECT DISTINCT sch.[name] AS [table_schema], obj.[name] AS [table_name]
-														FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')  + '.sys.objects obj
-														INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')  + '.sys.schemas sch ON sch.[schema_id] = obj.[schema_id]
-														INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')  + '.sys.tables tbl ON tbl.[object_id] = obj.[object_id]
+														FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.objects obj
+														INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.schemas sch ON sch.[schema_id] = obj.[schema_id]
+														INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.tables tbl ON tbl.[object_id] = obj.[object_id]
 														WHERE obj.[type] IN (''U'')
 																AND tbl.[is_memory_optimized] = 0
 																AND obj.[object_id] IN (
 																					SELECT [object_id]
-																					FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')  + '.sys.columns
+																					FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.columns
 																					WHERE [is_identity] = 1
 																					)
 																AND obj.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
 																AND sch.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + ''''
 						ELSE
 							SET @queryToRun = @queryToRun + N'	SELECT DISTINCT sch.[name] AS [table_schema], obj.[name] AS [table_name]
-														FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')  + '.sys.objects obj
-														INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')  + '.sys.schemas sch ON sch.[schema_id] = obj.[schema_id]
+														FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.objects obj
+														INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.schemas sch ON sch.[schema_id] = obj.[schema_id]
 														WHERE obj.[type] IN (''U'')
 																AND obj.[object_id] IN (
 																					SELECT [object_id]
-																					FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')  + '.sys.columns
+																					FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.columns
 																					WHERE [is_identity] = 1
 																					)
 																AND obj.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
@@ -610,19 +610,19 @@ IF @flgActions & 32 = 32
 					end
 				ELSE
 					SET @queryToRun = @queryToRun + N'SELECT DISTINCT sch.[name] AS [table_schema], obj.[name] AS [table_name]
-												FROM  ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')  + '..sysobjects obj
-												INNER JOIN  ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')  + '..sysusers sch ON sch.[uid] = obj.[uid]
+												FROM  ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '..sysobjects obj
+												INNER JOIN  ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '..sysusers sch ON sch.[uid] = obj.[uid]
 												WHERE obj.[type] IN (''U'')
 														AND obj.[id] IN (
 																		SELECT [id]
-																		FROM  ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')  + '..syscolumns
+																		FROM  ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '..syscolumns
 																		WHERE [autoval] is not null
 																		)
 														AND obj.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
 														AND sch.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + ''''			
 
 				SET @queryToRun = @queryToRun + CASE WHEN @skipObjectsList IS NOT NULL  
-													 THEN N'	AND obj.[name] NOT IN (SELECT [value] FROM [' + DB_NAME() + N'].[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
+													 THEN N'	AND obj.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
 													 ELSE N'' 
 												END
 				
@@ -647,7 +647,7 @@ IF @flgActions & 32 = 32
 				FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
 				WHILE @@FETCH_STATUS = 0
 					begin
-						SET @objectName=[dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL)
+						SET @objectName=[dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted')
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 						SET @queryToRun = N''
@@ -681,7 +681,7 @@ IF @flgActions & 64 = 64
 	begin
 		IF @executionLevel=0 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		SET @queryToRun=N'Update space usage... ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') 
+		SET @queryToRun=N'Update space usage... ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') 
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		IF @tableName='%' 
@@ -709,7 +709,7 @@ IF @flgActions & 64 = 64
 				FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
 				WHILE @@FETCH_STATUS = 0
 					begin
-						SET @objectName= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL)
+						SET @objectName= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted')
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 						SET @queryToRun = N''
@@ -752,7 +752,7 @@ IF @flgActions & 128 = 128
 	begin
 		IF @executionLevel=0 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		SET @queryToRun=N'Cleaning wasted space in variable length columns... ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') 
+		SET @queryToRun=N'Cleaning wasted space in variable length columns... ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') 
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [table_schema], [table_name] 
@@ -764,7 +764,7 @@ IF @flgActions & 128 = 128
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
 		WHILE @@FETCH_STATUS = 0
 			begin
-				SET @objectName= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, NULL)
+				SET @objectName= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted')
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				SET @queryToRun = N''

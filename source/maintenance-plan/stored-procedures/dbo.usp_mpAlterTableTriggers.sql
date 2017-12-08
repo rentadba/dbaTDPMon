@@ -72,7 +72,7 @@ BEGIN TRY
 					[table_name]	[sysname]
 				)
 
-		SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+		SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 						SELECT TABLE_SCHEMA, TABLE_NAME 
 						FROM INFORMATION_SCHEMA.TABLES
 						WHERE	TABLE_TYPE = ''BASE TABLE'' 
@@ -103,12 +103,12 @@ BEGIN TRY
 					begin
 						SET @queryToRun= CASE WHEN @flgAction=1  THEN 'Enable'
 																ELSE 'Disable'
-										END + ' triggers for: ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + N'.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL)
+										END + ' triggers for: ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + N'.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted')
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 						--if current action is to disable triggers, will get only enabled triggers
 						--if current action is to enable triggers, will get only disabled triggers
-						SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+						SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 									SELECT DISTINCT st.[name]
 									FROM [sys].[triggers] st
 									INNER JOIN [sys].[objects] so ON so.[object_id] = st.[parent_id] 
@@ -135,15 +135,15 @@ BEGIN TRY
 								SET @queryToRun= @crtTriggerName
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
-								SET @queryToRun=N'ALTER TABLE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'.' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + N'.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL) + 
+								SET @queryToRun=N'ALTER TABLE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'.' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + N'.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + 
 													CASE WHEN @flgAction=1  THEN N'ENABLE'
 																			ELSE N'DISABLE'
-													END + N' TRIGGER ' + [dbo].[ufn_getObjectQuoteName](@crtTriggerName, NULL)
+													END + N' TRIGGER ' + [dbo].[ufn_getObjectQuoteName](@crtTriggerName, 'quoted')
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 								--
-								SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL)
-								SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtTriggerName, NULL)
+								SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted')
+								SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtTriggerName, 'quoted')
 								SET @nestedExecutionLevel = @executionLevel + 1
 
 								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,

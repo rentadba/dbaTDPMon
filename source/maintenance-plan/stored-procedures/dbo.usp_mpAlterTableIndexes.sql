@@ -127,7 +127,7 @@ BEGIN TRY
 					[table_name] [sysname]
 				)
 
-		SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+		SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 						SELECT TABLE_SCHEMA, TABLE_NAME 
 						FROM INFORMATION_SCHEMA.TABLES 
 						WHERE	TABLE_TYPE = ''BASE TABLE'' 
@@ -149,7 +149,7 @@ BEGIN TRY
 				FETCH NEXT FROM crsTableList INTO @crtTableSchema, @crtTableName
 				WHILE @@FETCH_STATUS=0
 					begin
-						SET @strMessage=N'Alter indexes ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL) + ' : ' + 
+						SET @strMessage=N'Alter indexes ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ' : ' + 
 											CASE @flgAction WHEN 1 THEN 'REBUILD'
 															WHEN 2 THEN 'REORGANIZE'
 															WHEN 4 THEN 'DISABLE'
@@ -160,7 +160,7 @@ BEGIN TRY
 						--if current action is to disable/reorganize indexes, will get only enabled indexes
 						--if current action is to rebuild, will get both enabled/disabled indexes
 						SET @queryToRun = N''
-						SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+						SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 													SELECT  si.[index_id]
 														, si.[name]
 														, si.[type]
@@ -213,7 +213,7 @@ BEGIN TRY
 				FETCH NEXT FROM crsTableToAlterIndexes INTO @crtIndexID, @crtIndexName, @crtIndexType, @crtIndexAllowPageLocks, @crtIndexIsDisabled, @crtIndexIsPrimaryXML, @crtIndexHasDependentFK, @crtTableIsReplicated
 				WHILE @@FETCH_STATUS=0
 					begin
-						SET @strMessage= [dbo].[ufn_getObjectQuoteName](@crtIndexName, NULL)
+						SET @strMessage= [dbo].[ufn_getObjectQuoteName](@crtIndexName, 'quoted')
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 						SET @sqlScriptOnline=N''
@@ -267,7 +267,7 @@ BEGIN TRY
 											begin
 												--get all enabled non-clustered/xml/spatial indexes for current table
 												SET @queryToRun = N''
-												SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+												SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 																			SELECT  si.[name]
 																				, CASE WHEN xi.[type]=3 AND xi.[using_xml_index_id] IS NULL THEN 1 ELSE 0 END AS [is_primary_xml]
 																			FROM [sys].[indexes]			si
@@ -327,7 +327,7 @@ BEGIN TRY
 												begin
 													--get all enabled secondary xml indexes for current table
 													SET @queryToRun = N''
-													SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+													SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 																				SELECT  si.[name]
 																				FROM [sys].[indexes]			si
 																				INNER JOIN [sys].[objects]		so ON  si.[object_id] = so.[object_id]
@@ -426,7 +426,7 @@ BEGIN TRY
 								SET @queryToRun = N''
 
 								SET @queryToRun = @queryToRun + N'SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL) + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, NULL) + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL) + ' REBUILD'
+								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, 'quoted') + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ' REBUILD'
 					
 								--rebuild options
 								SET @queryToRun = @queryToRun + N' WITH (SORT_IN_TEMPDB = ON' + CASE WHEN ISNULL(@maxDOP, 0) <> 0 THEN N', MAXDOP = ' + CAST(@maxDOP AS [nvarchar]) ELSE N'' END + 
@@ -446,8 +446,8 @@ BEGIN TRY
 										EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
 									end
 
-								SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL)
-								SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, NULL)
+								SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted')
+								SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, 'quoted')
 								SET @nestedExecutionLevel = @executionLevel + 1
 
 								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
@@ -560,7 +560,7 @@ BEGIN TRY
 								begin
 									SET @queryToRun = N''
 									SET @queryToRun = @queryToRun + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-									SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL) + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, NULL) + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL) + ' REORGANIZE'
+									SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, 'quoted') + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ' REORGANIZE'
 				
 									--  1  - Compact large objects (LOB) (default)
 									IF @flgOptions & 1 = 1
@@ -573,8 +573,8 @@ BEGIN TRY
 									IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 
-									SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL)
-									SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, NULL)
+									SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted')
+									SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, 'quoted')
 									SET @nestedExecutionLevel = @executionLevel + 1
 
 									EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
@@ -601,12 +601,12 @@ BEGIN TRY
 							begin
 								SET @queryToRun = N''
 								SET @queryToRun = @queryToRun + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL) + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, NULL) + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL) + ' DISABLE'
+								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, 'quoted') + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ' DISABLE'
 				
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-								SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL)
-								SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, NULL)
+								SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted')
+								SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, 'quoted')
 								SET @nestedExecutionLevel = @executionLevel + 1
 
 								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
@@ -638,7 +638,7 @@ BEGIN TRY
 			end
 
 		SET @affectedDependentObjects=N''
-		SELECT @affectedDependentObjects = @affectedDependentObjects + [dbo].[ufn_getObjectQuoteName]([index_name], NULL) + N';'
+		SELECT @affectedDependentObjects = @affectedDependentObjects + [dbo].[ufn_getObjectQuoteName]([index_name], 'quoted') + N';'
 		FROM @DependentIndexes
 END TRY
 

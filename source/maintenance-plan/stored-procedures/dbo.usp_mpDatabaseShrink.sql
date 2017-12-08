@@ -160,10 +160,10 @@ WHILE @@FETCH_STATUS=0
 		--shrink database
 		IF @flgActions & 2 = 2
 			begin
-				SET @queryToRun= 'Shrinking database...' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')
+				SET @queryToRun= 'Shrinking database...' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-				SET @queryToRun = N'DBCC SHRINKDATABASE(' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + N'' + CASE WHEN @flgOptions & 1 = 1 THEN N', TRUNCATEONLY' ELSE N'' END + N') WITH NO_INFOMSGS'
+				SET @queryToRun = N'DBCC SHRINKDATABASE(' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'' + CASE WHEN @flgOptions & 1 = 1 THEN N', TRUNCATEONLY' ELSE N'' END + N') WITH NO_INFOMSGS'
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				SET @nestedExecutionLevel = @executionLevel + 1
@@ -182,12 +182,12 @@ WHILE @@FETCH_STATUS=0
 		--shrink log file
 		IF @flgActions & 1 = 1
 			begin
-				SET @queryToRun= 'Shrinking database log files...' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter')
+				SET @queryToRun= 'Shrinking database log files...' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				DELETE FROM #databaseFiles
 
-				SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; SELECT [name] FROM sysfiles WHERE [status] & 0x40 = 0x40'
+				SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; SELECT [name] FROM sysfiles WHERE [status] & 0x40 = 0x40'
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 				
@@ -199,7 +199,7 @@ WHILE @@FETCH_STATUS=0
 				FETCH NEXT FROM crsLogFile INTO @logName
 				WHILE @@FETCH_STATUS=0
 					begin
-						SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'filter') + '; DBCC SHRINKFILE(' + [dbo].[ufn_getObjectQuoteName](@logName, NULL) + CASE WHEN @flgOptions & 1 = 1 THEN N', TRUNCATEONLY' ELSE N'' END + N') WITH NO_INFOMSGS'
+						SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + '; DBCC SHRINKFILE(' + [dbo].[ufn_getObjectQuoteName](@logName, 'quoted') + CASE WHEN @flgOptions & 1 = 1 THEN N', TRUNCATEONLY' ELSE N'' END + N') WITH NO_INFOMSGS'
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 						SET @nestedExecutionLevel = @executionLevel + 1

@@ -132,7 +132,7 @@ IF @backupLocation IS NULL
 		SET @backupLocation = @backupLocation + @sqlServerName + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
 	end
 
-SET @backupLocation = [dbo].[ufn_getObjectQuoteName](@backupLocation, 'folder')
+SET @backupLocation = [dbo].[ufn_getObjectQuoteName](@backupLocation, 'filepath')
 
 -----------------------------------------------------------------------------------------
 --changing backup expiration date from RetentionDays to full/diff database backup count
@@ -441,7 +441,7 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 		FETCH NEXT FROM crsCleanupBackupFiles INTO @backupFileName
 		WHILE @@FETCH_STATUS=0
 			begin
-				SET @queryToRun = N'EXEC [' + DB_NAME() + '].[dbo].[usp_mpDeleteFileOnDisk]	@sqlServerName	= ''' + [dbo].[ufn_getObjectQuoteName](@sqlServerName, 'sql') + N''',
+				SET @queryToRun = N'EXEC ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted')+ '.[dbo].[usp_mpDeleteFileOnDisk]	@sqlServerName	= ''' + @sqlServerName + N''',
 																							@fileName		= ''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''',
 																							@executionLevel	= ' + CAST(@nestedExecutionLevel AS [nvarchar]) + N',
 																							@debugMode		= ' + CAST(@debugMode AS [nvarchar]) 

@@ -78,7 +78,7 @@ BEGIN TRY
 					[table_name] [sysname]
 				)
 
-		SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+		SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 						SELECT TABLE_SCHEMA, TABLE_NAME 
 						FROM INFORMATION_SCHEMA.TABLES 
 						WHERE	TABLE_TYPE = ''BASE TABLE'' 
@@ -110,7 +110,7 @@ BEGIN TRY
 					begin
 						SET @queryToRun= CASE WHEN @flgAction=1	THEN 'Enable'
 																ELSE 'Disable'
-										END + ' foreign key constraints for: ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, NULL)
+										END + ' foreign key constraints for: ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted')
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 						--if current action is to disable foreign key constraint, will get only enabled constraints
@@ -118,7 +118,7 @@ BEGIN TRY
 						IF (@flgOptions & 1 = 1)
 							begin
 								--list all tables that have foreign key constraints that reffers current table					
-								SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+								SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 												SELECT DISTINCT sch.[name] AS [schema_name], so.[name] AS [table_name], sfk.[name] AS [constraint_name]
 												FROM [sys].[objects] so
 												INNER JOIN [sys].[schemas]		sch  ON sch.[schema_id] = so.[schema_id]
@@ -139,7 +139,7 @@ BEGIN TRY
 						IF (@flgOptions & 2 = 2)
 							begin
 								--list all tables that current table foreign key constraints reffers 
-								SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '; 
+								SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 												SELECT DISTINCT sch2.[name] AS [schema_name], so2.[name] AS [table_name], sfk.[name] AS [constraint_name]
 												FROM [sys].[objects] so
 												INNER JOIN [sys].[schemas]		sch  ON sch.[schema_id] = so.[schema_id]
@@ -165,23 +165,23 @@ BEGIN TRY
 						FETCH NEXT FROM crsTableToAlterConstraints INTO @tmpSchemaName, @tmpTableName, @tmpConstraintName
 						WHILE @@FETCH_STATUS=0
 							begin
-								SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@tmpSchemaName, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@tmpTableName, NULL)
+								SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@tmpSchemaName, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@tmpTableName, 'quoted')
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 								--enable/disable foreign key constraints
-								SET @queryToRun='ALTER TABLE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'filter') + '.' + [dbo].[ufn_getObjectQuoteName](@tmpSchemaName, NULL) + '.' + [dbo].[ufn_getObjectQuoteName](@tmpTableName, NULL) +  
+								SET @queryToRun='ALTER TABLE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@tmpSchemaName, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@tmpTableName, 'quoted') +  
 												CASE WHEN @flgAction=1	
 													 THEN ' WITH ' + 
 															CASE WHEN @flgOptions & 4 = 4	THEN 'NOCHECK'
 																							ELSE 'CHECK'
 															END + ' CHECK '	
 													 ELSE ' NOCHECK '
-												END + 'CONSTRAINT ' + [dbo].[ufn_getObjectQuoteName](@tmpConstraintName, NULL)
+												END + 'CONSTRAINT ' + [dbo].[ufn_getObjectQuoteName](@tmpConstraintName, 'quoted')
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								--
-								SET @objectName = [dbo].[ufn_getObjectQuoteName](@tmpSchemaName, NULL) + '.' + [dbo].[ufn_getObjectQuoteName]( @tmpTableName, NULL)
-								SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@tmpConstraintName, NULL)
+								SET @objectName = [dbo].[ufn_getObjectQuoteName](@tmpSchemaName, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName]( @tmpTableName, 'quoted')
+								SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@tmpConstraintName, 'quoted')
 								SET @nestedExecutionLevel = @executionLevel + 1
 
 								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
