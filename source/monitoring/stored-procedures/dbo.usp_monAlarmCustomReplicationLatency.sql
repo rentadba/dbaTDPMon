@@ -186,7 +186,7 @@ OPEN crsInactiveSubscriptions
 FETCH NEXT FROM crsInactiveSubscriptions INTO @publicationName, @publicationServer, @publisherDB, @subcriptionServer, @subscriptionDB, @subscriptionArticles, @distributorServer
 WHILE @@FETCH_STATUS=0
 	begin
-		SET @queryToRun = 'Publication: [' + @publicationName + '] / Subscriber [' + @subcriptionServer + '].[' + @subscriptionDB + '] / Publisher: [' + @publicationServer + '].[' + @publisherDB + '] / Distributor: [' + @distributorServer + '] / Articles: ' + CAST(@subscriptionArticles as [nvarchar])
+		SET @queryToRun = 'Publication: ' + [dbo].[ufn_getObjectQuoteName](@publicationName, 'quoted') + ' / Subscriber ' + [dbo].[ufn_getObjectQuoteName](@subcriptionServer, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@subscriptionDB, 'quoted') + ' / Publisher: ' + [dbo].[ufn_getObjectQuoteName](@publicationServer, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@publisherDB, 'quoted') + ' / Distributor: ' + [dbo].[ufn_getObjectQuoteName](@distributorServer, 'quoted') + ' / Articles: ' + CAST(@subscriptionArticles as [nvarchar])
 		RAISERROR(@queryToRun, 10, 1) WITH NOWAIT
 
 		SET @eventMessageData = '<alert><detail>' + 
@@ -240,7 +240,7 @@ OPEN crsInactiveSubscriptions
 FETCH NEXT FROM crsInactiveSubscriptions INTO @publicationName, @publicationServer, @publisherDB, @subcriptionServer, @subscriptionDB, @subscriptionArticles, @distributorServer
 WHILE @@FETCH_STATUS=0
 	begin
-		SET @queryToRun = 'Publication: [' + @publicationName + '] / Subscriber [' + @subcriptionServer + '].[' + @subscriptionDB + '] / Publisher: [' + @publicationServer + '].[' + @publisherDB + '] / Distributor: [' + @distributorServer + '] / Articles: ' + CAST(@subscriptionArticles as [nvarchar])
+		SET @queryToRun = 'Publication: ' + [dbo].[ufn_getObjectQuoteName](@publicationName, 'quoted') + ' / Subscriber ' + [dbo].[ufn_getObjectQuoteName](@subcriptionServer, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@subscriptionDB, 'quoted') + ' / Publisher: ' + [dbo].[ufn_getObjectQuoteName](@publicationServer, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@publisherDB, 'quoted') + ' / Distributor: ' + [dbo].[ufn_getObjectQuoteName](@distributorServer, 'quoted') + ' / Articles: ' + CAST(@subscriptionArticles as [nvarchar])
 		RAISERROR(@queryToRun, 10, 1) WITH NOWAIT
 
 		SET @eventMessageData = '<alert><detail>' + 
@@ -517,7 +517,7 @@ WHILE @@FETCH_STATUS=0
 			begin
 
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'EXEC [' + @publicationServer + '].tempdb.dbo.usp_monGetReplicationLatency @publisherDB = ''' + @publisherDB + N''', @publicationName = ''' + @publicationName + N''', @replicationDelay = ' + CAST(@alertThresholdCriticalReplicationLatencySec AS [nvarchar]) + N', @operationDelay = ''' + @operationDelay + N''';'
+				SET @queryToRun = @queryToRun + N'EXEC [' + @publicationServer + '].tempdb.dbo.usp_monGetReplicationLatency @publisherDB = ''' + [dbo].[ufn_getObjectQuoteName](@publisherDB, 'sql') + N''', @publicationName = ''' + [dbo].[ufn_getObjectQuoteName](@publicationName, 'sql') + N''', @replicationDelay = ' + CAST(@alertThresholdCriticalReplicationLatencySec AS [nvarchar]) + N', @operationDelay = ''' + @operationDelay + N''';'
 
 				INSERT	INTO [dbo].[jobExecutionQueue](	[instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id],
 														[job_name], [job_step_name], [job_database_name], [job_command])
@@ -584,7 +584,9 @@ WHILE @@FETCH_STATUS=0
 		WHILE @@FETCH_STATUS=0
 			begin
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'SELECT * FROM tempdb.[dbo].[replicationTokenResults] WHERE [publication]=''' + @publicationName + N''' AND [publisher_db] = ''' + @publisherDB + N''''
+				SET @queryToRun = @queryToRun + N'SELECT * FROM tempdb.[dbo].[replicationTokenResults] 
+													WHERE [publication]=''' + [dbo].[ufn_getObjectQuoteName](@publicationName, 'sql') + N''' 
+														  AND [publisher_db] = ''' + [dbo].[ufn_getObjectQuoteName](@publisherDB, 'sql') + N''''
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@publicationServer, @queryToRun)
 
 				SET @queryToRun = N'UPDATE srl
@@ -605,8 +607,8 @@ WHILE @@FETCH_STATUS=0
 													AND srl.[subscriber_server] = x.[subscriber] 
 													AND srl.[subscriber_db] = x.[subscriber_db]
 													AND srl.[publisher_server] = ''' + @publicationServer + N'''
-									WHERE srl.[publisher_db]=''' + @publisherDB + N'''
-										AND srl.[publication_name]=''' + @publicationName + N''''
+									WHERE srl.[publisher_db]=''' + [dbo].[ufn_getObjectQuoteName](@publisherDB, 'sql') + N'''
+										AND srl.[publication_name]=''' + [dbo].[ufn_getObjectQuoteName](@publicationName, 'sql') + N''''
 
 				SET @queryToRun = N'SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; ' + @queryToRun
 		

@@ -31,8 +31,6 @@ SET NOCOUNT ON
 DECLARE   @sqlServerName		[sysname]
 		, @projectID			[smallint]
 		, @strMessage			[nvarchar](512)
-		, @queryToRun			[nvarchar](max)
-		, @serverToRun			[nvarchar](512)
 		, @eventMessageData		[nvarchar](max)
 		, @executionLevel		[tinyint]
 

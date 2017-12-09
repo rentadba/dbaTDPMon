@@ -87,10 +87,10 @@ FETCH NEXT FROM crsFrequentlyFragmentedIndexes INTO @instanceName, @databaseName
 WHILE @@FETCH_STATUS=0
 	begin
 		--analyze curent object
-		SET @queryToRun=N'instance=[' + @instanceName + '], database=[' + @databaseName + '], table-name=[' + @tableSchema + '].[' + @tableName + ']'
+		SET @queryToRun=N'instance=[' + @instanceName + '], database=' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ', table-name=' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'qouted') + '.' + [dbo].[ufn_getObjectQuoteName](@tableName, 'quoted')
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
-		SET @queryToRun=N'index-name=[' + @indexName + '], type=[' + @indexType + '], current fill-factor= ' + CAST(@fillFactor AS [nvarchar])
+		SET @queryToRun=N'index-name=' + [dbo].[ufn_getObjectQuoteName](@indexName, 'quoted') + ', type=' + [dbo].[ufn_getObjectQuoteName](@indexType, 'quoted') + ' current fill-factor= ' + CAST(@fillFactor AS [nvarchar])
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 			
 		SET @newFillFactor = @fillFactor-@dropFillFactorByPercent
@@ -137,11 +137,11 @@ WHILE @@FETCH_STATUS=0
 				ELSE
 					begin
 						SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; '
-						SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''[' + @tableSchema + '].[' + @tableName + ']'') IS NOT NULL DBCC DBREINDEX (''[' + @tableSchema + '].[' + @tableName + ']' + ''', ''' + RTRIM(@indexName) + ''', ' + CAST(@newFillFactor AS [nvarchar]) + N') WITH NO_INFOMSGS'
+						SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@tableName, 'quoted') + ''') IS NOT NULL DBCC DBREINDEX (''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@tableName, 'quoted') + ''', ''' + RTRIM(@indexName) + ''', ' + CAST(@newFillFactor AS [nvarchar]) + N') WITH NO_INFOMSGS'
 						IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-						SET @objectName = '[' + @tableSchema + '].[' + RTRIM(@tableName) + ']'
-						SET @childObjectName = QUOTENAME(@indexName)
+						SET @objectName = [dbo].[ufn_getObjectQuoteName](@tableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@tableName), 'quoted')
+						SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@indexName, 'quoted')
 
 						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @instanceName,
 																		@dbName			= @databaseName,

@@ -88,7 +88,7 @@ IF RIGHT(@psFileLocation, 1)<>'\' SET @psFileLocation = @psFileLocation + '\'
 ------------------------------------------------------------------------------------------------------------------------------------------
 --create folder on disk
 SET @queryToRun = N'EXEC ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @@SERVERNAME + N''',
-																			@folderName		= ''' + @psFileLocation + N''',
+																			@folderName		= ''' + [dbo].[ufn_getObjectQuoteName](@psFileLocation, 'sql') + N''',
 																			@executionLevel	= 1,
 																			@debugMode		= ' + CAST(@debugMode AS [nvarchar]) 
 
@@ -371,7 +371,7 @@ WHILE @@FETCH_STATUS=0
 						SET @strMessage=N'running powershell script - get OS events...'
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
 
-						SET @queryToRun='master.dbo.xp_cmdshell N''@PowerShell -File "' + @psFileLocation + @psFileName + '"'''
+						SET @queryToRun='master.dbo.xp_cmdshell N''@PowerShell -File "' + [dbo].[ufn_getObjectQuoteName](@psFileLocation + @psFileName, 'sql') + '"'''
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
 
 						TRUNCATE TABLE #psOutput
@@ -392,7 +392,7 @@ WHILE @@FETCH_STATUS=0
 						END CATCH
 
 						BEGIN TRY
-							SET @queryToRun=N'master.dbo.xp_cmdshell ''del "' + @psFileLocation + @psFileName + '"'', no_output'
+							SET @queryToRun=N'master.dbo.xp_cmdshell ''del "' + [dbo].[ufn_getObjectQuoteName](@psFileLocation + @psFileName, 'sql') + '"'', no_output'
 							IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
 							EXEC (@queryToRun) 
 						END TRY

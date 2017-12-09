@@ -77,7 +77,7 @@ DECLARE   @HTMLReport							[nvarchar](max)
 		, @ErrMessage							[nvarchar](256)
 		, @idx									[int]
 
-DECLARE   @queryToRun							[nvarchar](max)
+DECLARE   @								[nvarchar](max)
 
 DECLARE   @reportID								[int]
 		, @HTMLReportFileName					[nvarchar](260)
@@ -3811,7 +3811,7 @@ BEGIN TRY
 													, @debugMode	 = 0
 
 	/* save report using bcp */	
-	SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [html_content] FROM [' + DB_NAME() + '].[report].[htmlContent] WHERE [id]=' + CAST(@reportID AS [varchar]) + '" queryout ' + @reportFilePath + ' -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'''
+	SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [html_content] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[report].[htmlContent] WHERE [id]=' + CAST(@reportID AS [varchar]) + '" queryout ' + @reportFilePath + ' -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'''
 	EXEC (@queryToRun)
 	
 	/* disable xp_cmdshell configuration option */

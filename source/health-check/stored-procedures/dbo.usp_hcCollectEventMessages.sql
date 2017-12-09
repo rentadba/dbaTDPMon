@@ -99,7 +99,7 @@ WHILE @@FETCH_STATUS=0
 
 		--check if destination server has event messages feature
 		SET @queryToRun=N''
-		SET @queryToRun=@queryToRun + N'SELECT OBJECT_ID(''' + DB_NAME() + N'.dbo.logEventMessages'', ''U'') AS [object_id]'
+		SET @queryToRun=@queryToRun + N'SELECT OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.dbo.logEventMessages'', ''U'') AS [object_id]'
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	PRINT @queryToRun
 
