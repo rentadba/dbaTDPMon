@@ -589,5 +589,4 @@
 /* December 2017 new features & fixes
 /*----------------------------------------------------------------------*/
 /* 09.12.2017 */	
-	- threat special characters for all object names, excluding instance name: '!@#$%^&()-={};:`"<>.,\/[[ ]~
-	
+	- threat special characters for all object names, excluding instance name: '!@#$%^&()-={};:`"<>.,\/[[ ]~ by enclose all object names using a custom quote function: [dbo].[ufn_getObjectQuoteName]
