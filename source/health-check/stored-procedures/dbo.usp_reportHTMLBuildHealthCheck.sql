@@ -156,12 +156,12 @@ BEGIN TRY
 	IF @projectID IS NULL
 		begin
 			SET @ErrMessage=N'The value specifief for Project Code is not valid.'
-			RAISERROR(@ErrMessage, 16, 1) WITH NOWAIT
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		end
 			
 	-----------------------------------------------------------------------------------------------------
 	SET @ErrMessage='Building Daily Health Check Report for: [' + @projectCode + ']'
-	RAISERROR(@ErrMessage, 10, 1) WITH NOWAIT
+	EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 
 	-----------------------------------------------------------------------------------------------------
@@ -738,7 +738,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	--report header
 	-----------------------------------------------------------------------------------------------------
-	RAISERROR('	...Build Report: Header', 10, 1) WITH NOWAIT
+	SET @ErrMessage ='Build Report: Header'
+	EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 	SET @HTMLReport = N''	
 	SET @HTMLReport = @HTMLReport + N'<html><head>
@@ -1098,7 +1099,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 1 = 1) AND (@flgOptions & 1 = 1)
 		begin
-			RAISERROR('	...Build Report: Instance Availability - Offline', 10, 1) WITH NOWAIT
+			SET @ErrMessage='Build Report: Instance Availability - Offline'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -1176,7 +1178,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 1 = 1) AND (@flgOptions & 2 = 2)
 		begin
-			RAISERROR('	...Build Report: Instance Availability - Online', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Instance Availability - Online'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -1311,7 +1314,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2) AND (@flgOptions & 256 = 256)
 		begin
-			RAISERROR('	...Build Report: Databases Status - Permission Errors', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Databases Status - Permission Errors'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @messageCount=0
 
@@ -1428,7 +1432,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2) AND (@flgOptions & 4 = 4)
 		begin
-			RAISERROR('	...Build Report: Databases Status - Issues Detected', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Databases Status - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -1502,7 +1507,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 4 = 4) AND (@flgOptions & 64 = 64)
 		begin
-			RAISERROR('	...Build Report: SQL Server Agent Jobs Status - Permission Errors', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: SQL Server Agent Jobs Status - Permission Errors'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -1572,7 +1578,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 4 = 4) AND (@flgOptions & 16 = 16)
 		begin
-			RAISERROR('	...Build Report: SQL Server Agent Jobs Status - Issues Detected', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: SQL Server Agent Jobs Status - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -1662,7 +1669,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 4 = 4) AND (@flgOptions & 33554432 = 33554432)
 		begin
-			RAISERROR('	...Build Report: Long Running SQL Agent Jobs - Issues Detected', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Long Running SQL Agent Jobs - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -1750,7 +1758,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 8 = 8) AND (@flgOptions & 131072 = 131072)
 		begin
-			RAISERROR('	...Build Report: Low Free Disk Space - Permission Errors', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Low Free Disk Space - Permission Errors'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @messageCount=0
 
@@ -1863,7 +1872,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 8 = 8) AND (@flgOptions & 262144 = 262144)
 		begin
-			RAISERROR('	...Build Report: Low Free Disk Space - Issues Detected', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Low Free Disk Space - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -1956,7 +1966,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2) AND (@flgOptions & 128 = 128)
 		begin
-			RAISERROR('	...Build Report: System Databases Size - Issues Detected', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: System Databases Size - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -2032,7 +2043,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2) AND (@flgOptions & 512 = 512)
 		begin
-			RAISERROR('	...Build Report: Databases with Auto Close / Shrink - Issues Detected', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Databases with Auto Close / Shrink - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -2109,7 +2121,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2) AND (@flgOptions & 1024 = 1024)
 		begin
-			RAISERROR('	...Build Report: Big Size for Database Log files - Issues Detected', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Big Size for Database Log files - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -2186,7 +2199,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2) AND (@flgOptions & 2048 = 2048)
 		begin
-			RAISERROR('	...Build Report: Low Usage of Data Space - Issues Detected', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Low Usage of Data Space - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -2274,7 +2288,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2) AND (@flgOptions & 32768 = 32768)
 		begin
-			RAISERROR('	...Build Report: High Usage of Log Space - Issues Detected', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: High Usage of Log Space - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -2362,7 +2377,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2) AND (@flgOptions & 4096 = 4096)
 		begin
-			RAISERROR('	...Build Report: Log vs. Data - Allocated Size - Issues Detected', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Log vs. Data - Allocated Size - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -2454,7 +2470,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2) AND (@flgOptions & 4194304 = 4194304)
 		begin
-			RAISERROR('	...Databases with Fixed File(s) Size - Issues Detected', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Databases with Fixed File(s) Size - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -2533,7 +2550,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2) AND (@flgOptions & 8388608 = 8388608)
 		begin
-			RAISERROR('	...Databases with Improper Page Verify Option - Issues Detected', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Databases with Improper Page Verify Option - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -2622,7 +2640,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2) AND (@flgOptions & 16777216 = 16777216)
 		begin
-			RAISERROR('	...Frequently Fragmented Indexes - Issues Detected', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Frequently Fragmented Indexes - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 			DECLARE @indexAnalyzedCount						[int],
 					@indexesPerInstance						[int],
@@ -2689,7 +2708,8 @@ BEGIN TRY
 			SET @idx=1		
 
 			-----------------------------------------------------------------------------------------------------
-			RAISERROR('		...analyzing fragmentation logs', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'analyzing fragmentation logs'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 
 			IF OBJECT_ID('tempdb..#filteredStatsIndexesFrequentlyFragmented]') IS NOT NULL
 				DROP TABLE #filteredStatsIndexesFrequentlyFragmented
@@ -2707,7 +2727,9 @@ BEGIN TRY
 
 			CREATE INDEX IX_filteredStatsIndexesFrequentlyFragmented_InstanceName ON #filteredStatsIndexesFrequentlyFragmented([instance_name])
 
-			RAISERROR('		...done', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'done'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
+
 			-----------------------------------------------------------------------------------------------------
 			SET @indexAnalyzedCount=0
 
@@ -2784,7 +2806,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2) AND (@flgOptions & 8192 = 8192)
 		begin
-			RAISERROR('	...Build Report: Outdated Backup for Databases - Issues Detected', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Outdated Backup for Databases - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -2898,7 +2921,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2) AND (@flgOptions & 16384 = 16384)
 		begin
-			RAISERROR('	...Build Report: Outdated DBCC CHECKDB Databases - Issues Detected', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Outdated DBCC CHECKDB Databases - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -2993,7 +3017,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 16 = 16) AND (@flgOptions & 524288 = 524288)
 		begin
-			RAISERROR('	...Build Report: Errorlog Messages - Permission Errors', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Errorlog Messages - Permission Errors'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -3063,7 +3088,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 16 = 16) AND (@flgOptions & 1048576 = 1048576)
 		begin
-			RAISERROR('	...Build Report: Errorlog Messages - Issues Detected', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Errorlog Messages - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -3084,7 +3110,8 @@ BEGIN TRY
 			SET @idx=1		
 
 			-----------------------------------------------------------------------------------------------------
-			RAISERROR('		...analyzing errorlog messages', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'analyzing errorlog messages'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 
 			IF OBJECT_ID('tempdb..#filteredStatsSQLServerErrorlogDetail') IS NOT NULL
 				DROP TABLE #filteredStatsSQLServerErrorlogDetail
@@ -3117,7 +3144,8 @@ BEGIN TRY
 			
 			CREATE INDEX IX_filteredStatsSQLServerErrorlogDetail_InstanceName ON #filteredStatsSQLServerErrorlogDetail([instance_name])
 
-			RAISERROR('		...done', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'done'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 
 			-----------------------------------------------------------------------------------------------------
 			SET @issuesDetectedCount = 0 
@@ -3187,7 +3215,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2) AND (@flgOptions & 8 = 8)
 		begin
-			RAISERROR('	...Build Report: Databases Status - Complete Details', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Databases Status - Complete Details'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 			DECLARE   @dbCount		[int]
 			
@@ -3301,7 +3330,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 4 = 4) AND (@flgOptions & 32 = 32)
 		begin
-			RAISERROR('	...Build Report: SQL Server Agent Jobs Status - Complete Details', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: SQL Server Agent Jobs Status - Complete Details'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			DECLARE @jobCount [int]
 
@@ -3400,7 +3430,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 8 = 8) AND (@flgOptions & 65536 = 65536)
 		begin
-			RAISERROR('	...Build Report: Disk Space Information - Complete Details', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Disk Space Information - Complete Details'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 			DECLARE   @volumeCount		[int]
 			
@@ -3506,7 +3537,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 16 = 16) AND (@flgOptions & 2097152 = 2097152)
 		begin
-			RAISERROR('	...Build Report: Errorlog Messages - Complete Details', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: Errorlog Messages - Complete Details'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 			SET @idx=1		
 			
@@ -3600,7 +3632,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 32 = 32) AND (@flgOptions & 67108864 = 67108864)
 		begin
-			RAISERROR('	...Build Report: OS Event Messages - Permission Errors', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: OS Event Messages - Permission Errors'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -3670,7 +3703,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 32 = 32) AND (@flgOptions & 134217728 = 134217728)
 		begin
-			RAISERROR('	...Build Report: OS Event messages - Complete Details', 10, 1) WITH NOWAIT
+			SET @ErrMessage = 'Build Report: OS Event messages - Complete Details'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
@@ -3861,7 +3895,7 @@ BEGIN TRY
 	IF (@sendReportAsAttachment=1) OR (@HTTPAddress IS NULL)
 		begin
 			SET @file_attachments	= REPLACE(@reportFilePath, '"', '')
-			PRINT @reportFilePath
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @reportFilePath, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= @projectCode,
 															@sqlServerName			= @@SERVERNAME,

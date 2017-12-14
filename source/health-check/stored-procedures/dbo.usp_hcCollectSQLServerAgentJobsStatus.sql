@@ -80,14 +80,15 @@ WHERE [code] = @projectCode
 IF @projectID IS NULL
 	begin
 		SET @strMessage=N'The value specifief for Project Code is not valid.'
-		RAISERROR(@strMessage, 16, 1) WITH NOWAIT
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 	end
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --A. get servers jobs status informations
 -------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Step 1: Delete existing information....', 10, 1) WITH NOWAIT
+SET @strMessage = 'Step 1: Delete existing information....'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 DELETE ssajh
 FROM [health-check].[statsSQLAgentJobsHistory]		ssajh
@@ -104,8 +105,8 @@ WHERE cin.[project_id] = @projectID
 
 
 -------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Step 2: Get Jobs Status Information....', 10, 1) WITH NOWAIT
-
+SET @strMessage = 'Step 2: Get Jobs Status Information....'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		
 DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name]
 															FROM	[dbo].[vw_catalogInstanceNames] cin
@@ -116,14 +117,14 @@ OPEN crsActiveInstances
 FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName
 WHILE @@FETCH_STATUS=0
 	begin
-		SET @strMessage='--	Analyzing server: ' + @sqlServerName
-		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+		SET @strMessage='Analyzing server: ' + @sqlServerName
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 		
 		TRUNCATE TABLE #msdbSysJobs
 		BEGIN TRY
 			SET @queryToRun='SELECT [name] FROM msdb.dbo.sysjobs WHERE [name] LIKE ''' + @jobNameFilter + ''' ORDER BY [name]'
 			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-			IF @debugMode = 1 PRINT @queryToRun		
+			IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 			INSERT INTO #msdbSysJobs EXEC (@queryToRun)
 		END TRY

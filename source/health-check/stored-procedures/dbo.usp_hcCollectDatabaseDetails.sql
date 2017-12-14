@@ -125,14 +125,15 @@ WHERE [code] = @projectCode
 IF @projectID IS NULL
 	begin
 		SET @strMessage=N'The value specifief for Project Code is not valid.'
-		RAISERROR(@strMessage, 16, 1) WITH NOWAIT
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 	end
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --A. get databases informations
 -------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Step 1: Delete existing information....', 10, 1) WITH NOWAIT
+SET @strMessage = '--Step 1: Delete existing information....'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 INSERT	INTO [health-check].[statsDatabaseUsageHistory]([catalog_database_id], [instance_id], 
 									  				 [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], 
@@ -172,7 +173,8 @@ WHERE cin.[project_id] = @projectID
 		AND cdb.[name] LIKE @databaseNameFilter
 
 -------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Step 2: Get Database Details Information....', 10, 1) WITH NOWAIT
+SET @strMessage='--Step 2: Get Database Details Information....'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		
 DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
 															FROM	[dbo].[vw_catalogInstanceNames] cin
@@ -184,8 +186,8 @@ OPEN crsActiveInstances
 FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
 WHILE @@FETCH_STATUS=0
 	begin
-		SET @strMessage='--	Analyzing server: ' + @sqlServerName
-		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+		SET @strMessage='Analyzing server: ' + @sqlServerName
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 
 		TRUNCATE TABLE #statsDatabaseDetails
 
@@ -252,7 +254,7 @@ WHILE @@FETCH_STATUS=0
 												FROM ' + CASE WHEN @SQLMajorVersion <=8 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + N'
 											)sf
 										GROUP BY [drive], [is_logfile]'			
-				IF @debugMode = 1 PRINT @queryToRun
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 				
 				TRUNCATE TABLE #databaseSpaceInfo
 				BEGIN TRY
@@ -261,7 +263,8 @@ WHILE @@FETCH_STATUS=0
 				END TRY
 				BEGIN CATCH
 					SET @strMessage = ERROR_MESSAGE()
-					PRINT @strMessage
+					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
 							SELECT  @instanceID
 								  , @projectID
@@ -277,23 +280,23 @@ WHILE @@FETCH_STATUS=0
 							begin
 								IF @SQLMajorVersion < 11
 									SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
-														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS'''')'')x
+														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''')'')x
 														WHERE [Field]=''dbi_dbccLastKnownGood'''
 								ELSE
 									SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
-														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
+														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
 														WHERE [Field]=''dbi_dbccLastKnownGood'''
 							end
 						ELSE
 							begin							
 								BEGIN TRY
-									SET @queryToRun = N'DBCC DBINFO (''' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'sql') + N''') WITH TABLERESULTS'
+									SET @queryToRun = N'DBCC DBINFO (''' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'sql') + N''') WITH TABLERESULTS, NO_INFOMSGS'
 									INSERT INTO #dbccDBINFO
 											EXEC (@queryToRun)
 								END TRY
 								BEGIN CATCH
 									SET @strMessage = ERROR_MESSAGE()
-									PRINT @strMessage
+									EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 									INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
 											SELECT  @instanceID
@@ -306,7 +309,7 @@ WHILE @@FETCH_STATUS=0
 								SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_dbccLastKnownGood'''											
 							end
 
-						IF @debugMode = 1 PRINT @queryToRun
+						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 				
 						TRUNCATE TABLE #dbccLastKnownGood
 						BEGIN TRY
@@ -315,7 +318,7 @@ WHILE @@FETCH_STATUS=0
 						END TRY
 						BEGIN CATCH
 							SET @strMessage = ERROR_MESSAGE()
-							PRINT @strMessage
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 							INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
 									SELECT  @instanceID
@@ -410,7 +413,7 @@ WHILE @@FETCH_STATUS=0
 							END + N'
 								)bkp'
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode = 1 PRINT @queryToRun
+		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		
 		BEGIN TRY
 			INSERT	INTO #statsDatabaseDetails([query_type], [database_id], [last_backup_time], [is_auto_close], [is_auto_shrink], [recovery_model], [page_verify_option], [compatibility_level])
@@ -418,7 +421,7 @@ WHILE @@FETCH_STATUS=0
 		END TRY
 		BEGIN CATCH
 			SET @strMessage = ERROR_MESSAGE()
-			PRINT @strMessage
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 			INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
 					SELECT  @instanceID
@@ -459,7 +462,7 @@ WHILE @@FETCH_STATUS=0
 									INNER JOIN agDatabaseDetails b ON	a.[cluster_name]=b.[cluster_name] AND a.[ag_name]=b.[ag_name] 
 																		AND a.[database_name]=b.[database_name] AND b.[role_desc]=''PRIMARY'''
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		
 				BEGIN TRY
 					INSERT	INTO #statsDatabaseAlwaysOnDetails([cluster_name], [ag_name], [host_name], [instance_name], [database_name], [role_desc], [synchronization_health_desc], [synchronization_state_desc], [data_loss_sec])
@@ -467,7 +470,7 @@ WHILE @@FETCH_STATUS=0
 				END TRY
 				BEGIN CATCH
 					SET @strMessage = ERROR_MESSAGE()
-					PRINT @strMessage
+					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
 							SELECT  @instanceID

@@ -381,7 +381,7 @@ WHILE @@FETCH_STATUS=0
 						END TRY
 						BEGIN CATCH
 							SET @strMessage = ERROR_MESSAGE()
-							PRINT @strMessage
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 							INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
 									SELECT  @instanceID
@@ -398,7 +398,7 @@ WHILE @@FETCH_STATUS=0
 						END TRY
 						BEGIN CATCH
 							SET @strMessage = ERROR_MESSAGE()
-							PRINT @strMessage
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 							INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
 									SELECT  @instanceID

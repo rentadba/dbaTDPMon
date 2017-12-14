@@ -329,16 +329,16 @@ IF @flgActions & 1 = 1 AND @serverVersionNum >= 9 AND @flgOptions & 1 = 0
 			begin
 				IF @serverVersionNum < 11
 					SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
-										FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N') WITH TABLERESULTS'''')'')x
+										FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''')'')x
 										WHERE [Field]=''dbi_dbccFlags'''
 				ELSE
 					SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
-										FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N') WITH TABLERESULTS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
+										FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
 										WHERE [Field]=''dbi_dbccFlags'''
 			end
 		ELSE
 			begin							
-				SET @queryToRun='DBCC DBINFO (''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''') WITH TABLERESULTS'
+				SET @queryToRun='DBCC DBINFO (''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''') WITH TABLERESULTS, NO_INFOMSGS'
 				INSERT	INTO #dbccDBINFO
 						EXEC (@queryToRun)
 

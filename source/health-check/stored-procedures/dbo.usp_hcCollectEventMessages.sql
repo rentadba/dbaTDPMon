@@ -64,14 +64,15 @@ WHERE [code] = @projectCode
 IF @projectID IS NULL
 	begin
 		SET @strMessage=N'The value specifief for Project Code is not valid.'
-		RAISERROR(@strMessage, 16, 1) WITH NOWAIT
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 	end
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --A. get databases informations
 -------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Step 1: Delete existing information....', 10, 1) WITH NOWAIT
+SET @strMessage='Step 1: Delete existing information....'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 DELETE lsam
 FROM [dbo].[logAnalysisMessages]	lsam
@@ -81,8 +82,9 @@ WHERE cin.[project_id] = @projectID
 		AND lsam.[descriptor]='dbo.usp_hcCollectEventMessages'
 
 -------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Step 2: Copy Event Messages Information....', 10, 1) WITH NOWAIT
-		
+SET @strMessage='Step 2: Copy Event Messages Information....'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
 															FROM	[dbo].[vw_catalogInstanceNames] cin
 															WHERE 	cin.[project_id] = @projectID
@@ -94,14 +96,14 @@ OPEN crsActiveInstances
 FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
 WHILE @@FETCH_STATUS=0
 	begin
-		SET @strMessage='--	Analyzing server: ' + @sqlServerName
-		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+		SET @strMessage='Analyzing server: ' + @sqlServerName
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 
 		--check if destination server has event messages feature
 		SET @queryToRun=N''
 		SET @queryToRun=@queryToRun + N'SELECT OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.dbo.logEventMessages'', ''U'') AS [object_id]'
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode=1	PRINT @queryToRun
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 		BEGIN TRY
 			TRUNCATE TABLE #checkIfObjectExists
@@ -110,7 +112,7 @@ WHILE @@FETCH_STATUS=0
 		END TRY
 		BEGIN CATCH
 			SET @strMessage = ERROR_MESSAGE()
-			PRINT @strMessage
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
 					SELECT  @instanceID
 							, @projectID
@@ -142,7 +144,7 @@ WHILE @@FETCH_STATUS=0
 										, x.[database_name], x.[object_name], x.[child_object_name], x.[message]
 										, x.[send_email_to], x.[event_type], x.[is_email_sent], x.[flood_control]
 									FROM (' + @queryToRun + N')x'
-				IF @debugMode=1	PRINT @queryToRun
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				BEGIN TRY
 					INSERT	INTO [dbo].[logEventMessages]([remote_event_id], [project_id], [instance_id], [event_date_utc], [module], [parameters], [event_name], [database_name], [object_name], [child_object_name], [message], [send_email_to], [event_type], [is_email_sent], [flood_control])
@@ -150,7 +152,8 @@ WHILE @@FETCH_STATUS=0
 				END TRY
 				BEGIN CATCH
 					SET @strMessage = ERROR_MESSAGE()
-					PRINT @strMessage
+					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
 							SELECT  @instanceID
 									, @projectID

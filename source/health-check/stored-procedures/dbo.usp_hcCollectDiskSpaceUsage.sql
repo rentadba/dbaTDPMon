@@ -93,14 +93,15 @@ WHERE [code] = @projectCode
 IF @projectID IS NULL
 	begin
 		SET @strMessage=N'The value specifief for Project Code is not valid.'
-		RAISERROR(@strMessage, 16, 1) WITH NOWAIT
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 	end
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --
 -------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Step 1: Delete existing information....', 10, 1) WITH NOWAIT
+SET @strMessage='Step 1: Delete existing information....'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 DELETE dsi
 FROM [health-check].[statsDiskSpaceInfo]		dsi
@@ -116,7 +117,8 @@ WHERE cin.[project_id] = @projectID
 		AND lsam.[descriptor]='dbo.usp_hcCollectDiskSpaceUsage'
 
 -------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Step 2: Get Instance Details Information....', 10, 1) WITH NOWAIT
+SET @strMessage='Step 2: Get Instance Details Information....'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		
 DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
 															FROM	[dbo].[vw_catalogInstanceNames] cin
@@ -128,8 +130,8 @@ OPEN crsActiveInstances
 FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
 WHILE @@FETCH_STATUS=0
 	begin
-		SET @strMessage='--	Analyzing server: ' + @sqlServerName
-		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+		SET @strMessage='Analyzing server: ' + @sqlServerName
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 
 		TRUNCATE TABLE #diskSpaceInfo
 		TRUNCATE TABLE #xp_cmdshell
@@ -157,7 +159,7 @@ WHILE @@FETCH_STATUS=0
 												FROM sys.master_files AS f
 												CROSS APPLY sys.dm_os_volume_stats(f.[database_id], f.[file_id])'
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode=1	PRINT @queryToRun
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				TRUNCATE TABLE #diskSpaceInfo
 				BEGIN TRY
@@ -167,7 +169,11 @@ WHILE @@FETCH_STATUS=0
 						SET @runxpFixedDrives=0
 				END TRY
 				BEGIN CATCH
-					IF @debugMode=1 PRINT 'An error occured. It will be ignored: ' + ERROR_MESSAGE()					
+					IF @debugMode=1 
+						begin 
+							SET @strMessage='An error occured. It will be ignored: ' + ERROR_MESSAGE()					
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+						end
 				END CATCH
 			end
 
@@ -200,7 +206,7 @@ WHILE @@FETCH_STATUS=0
 			
 								IF @sqlServerName<>@@SERVERNAME
 									SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
-								IF @debugMode = 1 PRINT @queryToRun
+								IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 								INSERT	INTO #xpCMDShellOutput([output])
 										EXEC (@queryToRun)
@@ -241,7 +247,11 @@ WHILE @@FETCH_STATUS=0
 								SET @runxpFixedDrives=0
 						END TRY
 						BEGIN CATCH
-							IF @debugMode=1 PRINT 'An error occured. It will be ignored: ' + ERROR_MESSAGE()					
+							IF @debugMode=1 
+								begin
+									SET @strMessage = 'An error occured. It will be ignored: ' + ERROR_MESSAGE()					
+									EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+								end
 						END CATCH
 					end
 
@@ -263,7 +273,7 @@ WHILE @@FETCH_STATUS=0
 						ELSE
 							SET @queryToRun = @queryToRun + N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_fixeddrives WITH RESULT SETS(([drive] [sysname], [MB free] [bigint]))'')x'
 
-						IF @debugMode=1	PRINT @queryToRun
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 						TRUNCATE TABLE #diskSpaceInfo
 						BEGIN TRY
@@ -272,7 +282,7 @@ WHILE @@FETCH_STATUS=0
 						END TRY
 						BEGIN CATCH
 							SET @strMessage = ERROR_MESSAGE()
-							PRINT @strMessage
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 							INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
 									SELECT  @instanceID
 											, @projectID
@@ -290,7 +300,7 @@ WHILE @@FETCH_STATUS=0
 						END TRY
 						BEGIN CATCH
 							SET @strMessage = ERROR_MESSAGE()
-							PRINT @strMessage
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 							INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
 									SELECT  @instanceID
