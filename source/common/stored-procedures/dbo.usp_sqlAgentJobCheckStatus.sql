@@ -58,7 +58,7 @@ CREATE TABLE #tmpCheck (Result varchar(1024))
 
 IF ISNULL(@sqlServerName, '')=''
 	begin
-		SET @queryToRun=N'--	ERROR: The specified value for SOURCE server is not valid.'
+		SET @queryToRun=N'ERROR: The specified value for SOURCE server is not valid.'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		RETURN 1
 	end
@@ -75,7 +75,7 @@ TRUNCATE TABLE #tmpCheck
 INSERT INTO #tmpCheck EXEC (@queryToRun)
 IF (SELECT count(*) FROM #tmpCheck)=0
 	begin
-		SET @queryToRun=N'--	ERROR: SOURCE server [' + @sqlServerName + '] is not defined as linked server on THIS server [' + @sqlServerName + '].'
+		SET @queryToRun=N'ERROR: SOURCE server [' + @sqlServerName + '] is not defined as linked server on THIS server [' + @sqlServerName + '].'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		RETURN 1
 	end
@@ -101,7 +101,7 @@ INSERT INTO #tmpCheck EXEC (@queryToRun)
 ------------------------------------------------------------------------------------------------------------------------------------------
 IF (SELECT COUNT(*) FROM #tmpCheck)=0
 	begin
-		SET @strMessage='--SQL Server Agent: The specified job name ' + [dbo].[ufn_getObjectQuoteName](@jobName, 'quoted') + ' does not exists on this server [' + @sqlServerName + ']'
+		SET @strMessage='SQL Server Agent: The specified job name ' + [dbo].[ufn_getObjectQuoteName](@jobName, 'quoted') + ' does not exists on this server [' + @sqlServerName + ']'
 		IF @debugMode=1
 			EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		SET @currentRunning = 0
@@ -382,7 +382,7 @@ ELSE
 				--SET @RunDuration=SUBSTRING(@RunDuration, 1,2) + ':' + SUBSTRING(@RunDuration, 3,2) + ':' + SUBSTRING(@RunDuration, 5,2)
 				SET @RunDuration=SUBSTRING(@RunDuration, 1, LEN(@RunDuration) - 4) + ':' + SUBSTRING(RIGHT(@RunDuration, 4), 1, 2) + ':' + SUBSTRING(RIGHT(@RunDuration, 4), 3, 2)
 				
-				SET @strMessage='--The specified job [' + @sqlServerName + '].' + [dbo].[ufn_getObjectQuoteName](@jobName, 'quoted') + ' is not currently running.'
+				SET @strMessage='The specified job [' + @sqlServerName + '].' + [dbo].[ufn_getObjectQuoteName](@jobName, 'quoted') + ' is not currently running.'
 				IF @RunStatus<>'Unknown'
 					begin
 						SET @strMessage=@strMessage + CHAR(13) + '--Last execution step			: [' + ISNULL(CAST(@StepID AS varchar), '') + '] - [' + ISNULL(@StepName, '') + ']'

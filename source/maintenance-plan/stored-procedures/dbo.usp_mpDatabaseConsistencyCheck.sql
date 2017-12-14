@@ -345,7 +345,7 @@ IF @flgActions & 1 = 1 AND @serverVersionNum >= 9 AND @flgOptions & 1 = 0
 				SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_dbccFlags'''											
 			end
 
-		IF @debugMode = 1 PRINT @queryToRun
+		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 				
 		TRUNCATE TABLE #dbi_dbccFlags
 		INSERT	INTO #dbi_dbccFlags([Value])

@@ -132,7 +132,7 @@ IF @projectID IS NULL
 ------------------------------------------------------------------------------------------------------------------------------------------
 --A. get databases informations
 -------------------------------------------------------------------------------------------------------------------------
-SET @strMessage = '--Step 1: Delete existing information....'
+SET @strMessage = 'Step 1: Delete existing information....'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 INSERT	INTO [health-check].[statsDatabaseUsageHistory]([catalog_database_id], [instance_id], 
@@ -173,7 +173,7 @@ WHERE cin.[project_id] = @projectID
 		AND cdb.[name] LIKE @databaseNameFilter
 
 -------------------------------------------------------------------------------------------------------------------------
-SET @strMessage='--Step 2: Get Database Details Information....'
+SET @strMessage='Step 2: Get Database Details Information....'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		
 DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]

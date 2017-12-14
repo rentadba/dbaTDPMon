@@ -590,7 +590,7 @@ BEGIN TRY
 								end
 							ELSE
 								begin
-									SET @strMessage=N'--	index cannot be REORGANIZE because ALLOW_PAGE_LOCKS is set to OFF. Skipping...'
+									SET @strMessage=N'index cannot be REORGANIZE because ALLOW_PAGE_LOCKS is set to OFF. Skipping...'
 									EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 								end
 

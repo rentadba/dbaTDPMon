@@ -46,7 +46,7 @@ IF RIGHT(@logFileLocation, 1)<>'\' SET @logFileLocation = @logFileLocation + '\'
 ---------------------------------------------------------------------------------------------------
 /* setting the job name & job log location */
 ---------------------------------------------------------------------------------------------------
-SET @databaseName = 'dbaTDPMon'--N'$(dbName)'
+SET @databaseName = N'$(dbName)'
 SET @job_name = @databaseName + N' - Database Backup - Log - Parallel'
 SET @logFileLocation = @logFileLocation + N'job-' + @job_name + N'.log'
 

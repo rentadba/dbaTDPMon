@@ -109,8 +109,8 @@ OPEN crsActiveInstances
 FETCH NEXT FROM crsActiveInstances INTO @forInstanceID, @forSQLServerName
 WHILE @@FETCH_STATUS=0
 	begin
-		SET @strMessage='--	Analyzing server: ' + @forSQLServerName
-		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+		SET @strMessage='Analyzing server: ' + @forSQLServerName
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 		--refresh current server information on internal metadata tables
 		EXEC [dbo].[usp_refreshMachineCatalogs]	@projectCode	= @projectCode,

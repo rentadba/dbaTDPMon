@@ -147,7 +147,7 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 								/* removing job */
 								IF @debugMode=1 
 									begin
-										SET @strMessage='--Debug info: @lastExecutionStatus = ' + CAST(@lastExecutionStatus AS varchar) + '; @currentRunning=' + CAST(@currentRunning AS varchar)
+										SET @strMessage='Debug info: @lastExecutionStatus = ' + CAST(@lastExecutionStatus AS varchar) + '; @currentRunning=' + CAST(@currentRunning AS varchar)
 										EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 									end
 
@@ -238,7 +238,7 @@ IF @minJobToRunBeforeExit=0
 						/* removing job */
 						IF @debugMode=1 
 							begin
-								SET @strMessage='--Debug info: @lastExecutionStatus = ' + CAST(@lastExecutionStatus AS varchar) + '; @currentRunning=' + CAST(@currentRunning AS varchar)
+								SET @strMessage='Debug info: @lastExecutionStatus = ' + CAST(@lastExecutionStatus AS varchar) + '; @currentRunning=' + CAST(@currentRunning AS varchar)
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 							end
 		

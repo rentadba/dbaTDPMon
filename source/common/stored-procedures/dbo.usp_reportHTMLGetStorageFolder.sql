@@ -41,9 +41,6 @@ SET NOCOUNT ON
 BEGIN TRY
 	SET @ReturnValue=1
 
-	SET @errMessage = '------------------------------------------------------------------------'
-	EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-	
 	-----------------------------------------------------------------------------------------------------
 	SELECT    @projectName = [name]
 	FROM [dbo].[catalogProjects]
