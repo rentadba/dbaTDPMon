@@ -530,8 +530,6 @@ IF @eventType IN (5) AND @eventMessageXML IS NOT NULL
 			WHERE [error_code]<>0
 	end
 
-
---SET @eventMessage = [dbo].[ufn_getObjectQuoteName](@eventMessage, 'undo-xml')
 SET @HTMLBody = [dbo].[ufn_getObjectQuoteName](@HTMLBody, 'undo-xml')
 
 
