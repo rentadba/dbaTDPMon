@@ -52,7 +52,7 @@ WHERE [code] = @projectCode
 IF @projectID IS NULL
 	begin
 		SET @strMessage=N'The value specifief for Project Code is not valid.'
-		RAISERROR(@strMessage, 16, 1) WITH NOWAIT
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 	end
 
 ------------------------------------------------------------------------------------------------------------------------------------------
@@ -86,7 +86,9 @@ WHERE	[name] = 'Default lock timeout (ms)'
 		AND [module] = 'common'
 				
 ------------------------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Delete existing information....', 10, 1) WITH NOWAIT
+SET @strMessage = 'Delete existing information....'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 
 DELETE srl
 FROM [monitoring].[statsReplicationLatency]		srl
@@ -95,7 +97,9 @@ WHERE srl.[project_id] = @projectID
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Get Publications & Subscriptions Information....', 10, 1) WITH NOWAIT
+SET @strMessage='Get Publications & Subscriptions Information....'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 SET @runStartTime = GETUTCDATE()
 
 --replication distribution servers
@@ -109,8 +113,8 @@ OPEN crsReplicationDistributorServers
 FETCH NEXT FROM crsReplicationDistributorServers INTO @sqlServerName
 WHILE @@FETCH_STATUS=0
 	begin
-		SET @strMessage='--	Analyzing server: ' + @sqlServerName
-		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+		SET @strMessage='	Analyzing server: ' + @sqlServerName
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 
 		--publications and subscriptions
 		SET @queryToRun = N''
@@ -147,7 +151,8 @@ WHILE @@FETCH_STATUS=0
 					EXEC (@queryToRun)
 		END TRY
 		BEGIN CATCH
-			PRINT ERROR_MESSAGE()
+			SET @strMessage = ERROR_MESSAGE()
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		END CATCH
 
 		FETCH NEXT FROM crsReplicationDistributorServers INTO @sqlServerName
@@ -159,7 +164,8 @@ DEALLOCATE crsReplicationDistributorServers
 ------------------------------------------------------------------------------------------------------------------------------------------
 --generate 21074 errors: The subscription(s) have been marked inactive and must be reinitialized.
 ------------------------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Generate 21074 errors: The subscription(s) have been marked inactive and must be reinitialized.....', 10, 1) WITH NOWAIT
+SET @strMessage = 'Generate 21074 errors: The subscription(s) have been marked inactive and must be reinitialized.....'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 DECLARE   @publicationName		[sysname]
 		, @publicationServer	[sysname]
@@ -187,7 +193,7 @@ FETCH NEXT FROM crsInactiveSubscriptions INTO @publicationName, @publicationServ
 WHILE @@FETCH_STATUS=0
 	begin
 		SET @queryToRun = 'Publication: ' + [dbo].[ufn_getObjectQuoteName](@publicationName, 'quoted') + ' / Subscriber ' + [dbo].[ufn_getObjectQuoteName](@subcriptionServer, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@subscriptionDB, 'quoted') + ' / Publisher: ' + [dbo].[ufn_getObjectQuoteName](@publicationServer, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@publisherDB, 'quoted') + ' / Distributor: ' + [dbo].[ufn_getObjectQuoteName](@distributorServer, 'quoted') + ' / Articles: ' + CAST(@subscriptionArticles as [nvarchar])
-		RAISERROR(@queryToRun, 10, 1) WITH NOWAIT
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 
 		SET @eventMessageData = '<alert><detail>' + 
 								'<error_code>21074</error_code>' + 
@@ -220,8 +226,8 @@ DEALLOCATE crsInactiveSubscriptions
 ------------------------------------------------------------------------------------------------------------------------------------------
 -- Subscribed but not active subscriptions
 ------------------------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Check for subscribed but not active subscriptions....', 10, 1) WITH NOWAIT
-
+SET @strMessage='Check for subscribed but not active subscriptions....'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 DECLARE crsInactiveSubscriptions CURSOR LOCAL FAST_FORWARD FOR	SELECT    srl.[publication_name], srl.[publisher_server], srl.[publisher_db], srl.[subscriber_server]
 																		, srl.[subscriber_db], srl.[subscription_articles], srl.[distributor_server]
@@ -241,7 +247,7 @@ FETCH NEXT FROM crsInactiveSubscriptions INTO @publicationName, @publicationServ
 WHILE @@FETCH_STATUS=0
 	begin
 		SET @queryToRun = 'Publication: ' + [dbo].[ufn_getObjectQuoteName](@publicationName, 'quoted') + ' / Subscriber ' + [dbo].[ufn_getObjectQuoteName](@subcriptionServer, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@subscriptionDB, 'quoted') + ' / Publisher: ' + [dbo].[ufn_getObjectQuoteName](@publicationServer, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@publisherDB, 'quoted') + ' / Distributor: ' + [dbo].[ufn_getObjectQuoteName](@distributorServer, 'quoted') + ' / Articles: ' + CAST(@subscriptionArticles as [nvarchar])
-		RAISERROR(@queryToRun, 10, 1) WITH NOWAIT
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 
 		SET @eventMessageData = '<alert><detail>' + 
 								'<error_code>21488</error_code>' + 
@@ -271,7 +277,8 @@ CLOSE crsInactiveSubscriptions
 DEALLOCATE crsInactiveSubscriptions
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Deploy temporary objects for Replication Latency analysis...', 10, 1) WITH NOWAIT
+SET @strMessage='Deploy temporary objects for Replication Latency analysis...'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 DECLARE crsActivePublications CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT srl.[publisher_server]
 															FROM [monitoring].[statsReplicationLatency] srl
@@ -291,8 +298,8 @@ OPEN crsActivePublications
 FETCH NEXT FROM crsActivePublications INTO @publicationServer
 WHILE @@FETCH_STATUS=0
 	begin
-		SET @strMessage='--	running on server: ' + @publicationServer
-		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+		SET @strMessage='running on server: ' + @publicationServer
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 
 		IF @publicationServer<>@@SERVERNAME
 			SET @serverToRun = '[' + @publicationServer + '].tempdb.dbo.sp_executesql'
@@ -310,7 +317,8 @@ WHILE @@FETCH_STATUS=0
 			EXEC @serverToRun @queryToRun
 		END TRY
 		BEGIN CATCH
-			PRINT ERROR_MESSAGE()
+			SET @strMessage = ERROR_MESSAGE()
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		END CATCH
 
 		SET @queryToRun = N''
@@ -446,7 +454,8 @@ WHILE @@FETCH_STATUS=0
 			EXEC @serverToRun @queryToRun
 		END TRY
 		BEGIN CATCH
-			PRINT ERROR_MESSAGE()
+			SET @strMessage = ERROR_MESSAGE()
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		END CATCH
 
 
@@ -457,7 +466,8 @@ DEALLOCATE crsActivePublications
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Generate Replication Latency check internal jobs..', 10, 1) WITH NOWAIT
+SET @strMessage='Generate Replication Latency check internal jobs..'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 ------------------------------------------------------------------------------------------------------------------------------------------
 
 DECLARE   @publisherInstanceID	[int]
@@ -501,8 +511,8 @@ OPEN crsActivePublishers
 FETCH NEXT FROM crsActivePublishers INTO @publisherInstanceID, @publicationServer
 WHILE @@FETCH_STATUS=0
 	begin
-		SET @strMessage='--	Analyzing server: ' + @publicationServer
-		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+		SET @strMessage='Analyzing server: ' + @publicationServer
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 
 		DECLARE crsActivePublications CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [publication_name], [publisher_db]
 																	FROM	[monitoring].[statsReplicationLatency] srl																		
@@ -536,7 +546,9 @@ DEALLOCATE crsActivePublishers
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Running jobs to compute replication latency..', 10, 1) WITH NOWAIT
+SET @strMessage='Running jobs to compute replication latency..'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 ------------------------------------------------------------------------------------------------------------------------------------------
 EXEC dbo.usp_jobQueueExecute	@projectCode		= @projectCode,
 								@moduleFilter		= 'monitoring',
@@ -555,7 +567,8 @@ WHERE	jeq.[module] = 'monitoring'
 		AND jeq.[status] = 1 /* succedded */
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Generate Replication Latency getdata internal jobs..', 10, 1) WITH NOWAIT
+SET @strMessage='Generate Replication Latency getdata internal jobs..'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 ------------------------------------------------------------------------------------------------------------------------------------------
 
 DECLARE crsActivePublishers	CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT cin.[id], [publisher_server]
@@ -570,8 +583,8 @@ OPEN crsActivePublishers
 FETCH NEXT FROM crsActivePublishers INTO @publisherInstanceID, @publicationServer
 WHILE @@FETCH_STATUS=0
 	begin
-		SET @strMessage='--	Analyzing server: ' + @publicationServer
-		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+		SET @strMessage='Analyzing server: ' + @publicationServer
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 		
 		DECLARE crsActivePublications CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [publication_name], [publisher_db]
 																	FROM	[monitoring].[statsReplicationLatency] srl																		
@@ -629,7 +642,8 @@ DEALLOCATE crsActivePublishers
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Running GetData jobs..', 10, 1) WITH NOWAIT
+SET @strMessage='Running GetData jobs..'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 ------------------------------------------------------------------------------------------------------------------------------------------
 EXEC dbo.usp_jobQueueExecute	@projectCode		= @projectCode,
 								@moduleFilter		= 'monitoring',
@@ -653,7 +667,8 @@ WHERE	jeq.[module] = 'monitoring'
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--Perform cleanup...', 10, 1) WITH NOWAIT
+SET @strMessage='Perform cleanup...'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 DECLARE crsActivePublications CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT srl.[publisher_server], srl.[publication_name], srl.[publisher_db]
 															FROM [monitoring].[statsReplicationLatency] srl
@@ -673,8 +688,8 @@ OPEN crsActivePublications
 FETCH NEXT FROM crsActivePublications INTO @publicationServer, @publicationName, @publisherDB
 WHILE @@FETCH_STATUS=0
 	begin
-		SET @strMessage='--	running on server: ' + @publicationServer
-		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+		SET @strMessage='running on server: ' + @publicationServer
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 
 		IF @publicationServer<>@@SERVERNAME
 			SET @serverToRun = '[' + @publicationServer + '].tempdb.dbo.sp_executesql'
@@ -692,7 +707,8 @@ WHILE @@FETCH_STATUS=0
 			EXEC @serverToRun @queryToRun
 		END TRY
 		BEGIN CATCH
-			PRINT ERROR_MESSAGE()
+			SET @strMessage = ERROR_MESSAGE()
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		END CATCH
 
 		/*
@@ -714,7 +730,8 @@ DEALLOCATE crsActivePublications
 ------------------------------------------------------------------------------------------------------------------------------------------
 --generate alerts: Replication latency exceeds thresold
 ------------------------------------------------------------------------------------------------------------------------------------------
-RAISERROR('--generate alerts: Replication latency exceeds thresold...', 10, 1) WITH NOWAIT
+SET @strMessage='generate alerts: Replication latency exceeds thresold...'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 DECLARE   @instanceName		[sysname]
 		, @objectName		[nvarchar](512)

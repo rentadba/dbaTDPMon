@@ -49,7 +49,7 @@ WHERE [code] = @projectCode
 IF @projectID IS NULL
 	begin
 		SET @ErrMessage=N'The value specifief for Project Code is not valid.'
-		RAISERROR(@ErrMessage, 16, 1) WITH NOWAIT
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 	end
 
 -----------------------------------------------------------------------------------------------------

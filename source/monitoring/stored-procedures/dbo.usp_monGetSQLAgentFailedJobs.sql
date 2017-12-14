@@ -72,14 +72,14 @@ WHERE [code] = @projectCode
 IF @projectID IS NULL
 	begin
 		SET @strMessage=N'The value specifief for Project Code is not valid.'
-		RAISERROR(@strMessage, 16, 1) WITH NOWAIT
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 	end
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --
 -------------------------------------------------------------------------------------------------------------------------
-SET @strMessage='--Step 1: Delete existing information...'
+SET @strMessage='Step 1: Delete existing information...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 DELETE lsam
@@ -91,7 +91,7 @@ WHERE cin.[project_id] = @projectID
 
 
 -------------------------------------------------------------------------------------------------------------------------
-SET @strMessage='--Step 2: Get Instance Details Information...'
+SET @strMessage='Step 2: Get Instance Details Information...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 		
 DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
@@ -170,7 +170,8 @@ WHILE @@FETCH_STATUS=0
 				END TRY
 				BEGIN CATCH
 					SET @strMessage = ERROR_MESSAGE()
-					PRINT @strMessage
+					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
 							SELECT  @instanceID
 									, @projectID
@@ -203,7 +204,9 @@ WHILE @@FETCH_STATUS=0
 																			@debugMode				= @debugMode
 						END TRY
 						BEGIN CATCH
-							PRINT ERROR_MESSAGE()
+							SET @strMessage = ERROR_MESSAGE()
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 						END CATCH
 						FETCH NEXT FROM crsFailedJobs INTO @jobName
 					end

@@ -54,7 +54,7 @@ IF @projectID IS NULL
 	end
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-SET @strMessage='--Generate internal jobs..'
+SET @strMessage='Generate internal jobs..'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 ------------------------------------------------------------------------------------------------------------------------------------------
@@ -97,7 +97,7 @@ INSERT	INTO [dbo].[jobExecutionQueue](	[instance_id], [project_id], [module], [d
 						AND cin.[project_id] = @projectID
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-SET @strMessage='--Running internal jobs..'
+SET @strMessage='Running internal jobs..'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 ------------------------------------------------------------------------------------------------------------------------------------------
 EXEC dbo.usp_jobQueueExecute	@projectCode		= @projectCode,
