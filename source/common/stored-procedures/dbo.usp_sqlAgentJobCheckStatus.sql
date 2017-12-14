@@ -59,13 +59,14 @@ CREATE TABLE #tmpCheck (Result varchar(1024))
 IF ISNULL(@sqlServerName, '')=''
 	begin
 		SET @queryToRun=N'--	ERROR: The specified value for SOURCE server is not valid.'
-		RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		RETURN 1
 	end
 
 IF LEN(@jobName)=0 OR ISNULL(@jobName, '')=''
 	begin
-		RAISERROR('--ERROR: Must specify a job name.', 10, 1) WITH NOWAIT
+		SET @queryToRun = 'ERROR: Must specify a job name.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		RETURN 1
 	end
 
@@ -75,7 +76,7 @@ INSERT INTO #tmpCheck EXEC (@queryToRun)
 IF (SELECT count(*) FROM #tmpCheck)=0
 	begin
 		SET @queryToRun=N'--	ERROR: SOURCE server [' + @sqlServerName + '] is not defined as linked server on THIS server [' + @sqlServerName + '].'
-		RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		RETURN 1
 	end
 
@@ -93,7 +94,7 @@ SET @ReturnValue	= 5 --Unknown
 
 SET @queryToRun=N'SELECT  CAST([job_id] AS [varchar](255)) AS [job_id] FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + [dbo].[ufn_getObjectQuoteName](@jobName, 'sql') + ''''
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-IF @debugMode = 1 PRINT @queryToRun
+IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 TRUNCATE TABLE #tmpCheck
 INSERT INTO #tmpCheck EXEC (@queryToRun)
@@ -102,7 +103,7 @@ IF (SELECT COUNT(*) FROM #tmpCheck)=0
 	begin
 		SET @strMessage='--SQL Server Agent: The specified job name ' + [dbo].[ufn_getObjectQuoteName](@jobName, 'quoted') + ' does not exists on this server [' + @sqlServerName + ']'
 		IF @debugMode=1
-			RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		SET @currentRunning = 0
 		SET @ReturnValue = -5 --Unknown
 	end
@@ -143,7 +144,7 @@ ELSE
 						INNER JOIN [msdb].[dbo].[sysjobhistory] sjh ON sjh.[job_id] = sj.[job_id] AND sjh.[step_id] = sjs.[step_id] AND sjh.[run_status] = 4
 						WHERE sj.[name]= ''' + [dbo].[ufn_getObjectQuoteName](@jobName, 'sql') + N''''
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode = 1 PRINT @queryToRun
+		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		INSERT	INTO #runningSQLAgentJobsProcess([step_id], [job_id], [session_id])
 				EXEC (@queryToRun)
 
@@ -162,7 +163,7 @@ ELSE
 			begin
 				SET @queryToRun=N'SELECT [step_name] FROM [msdb].[dbo].[sysjobsteps] WHERE [step_id]=' + CAST(@StepID AS [nvarchar]) + ' AND [job_id]=''' + @JobID + ''''
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				TRUNCATE TABLE #tmpCheck
 				INSERT INTO #tmpCheck EXEC (@queryToRun)
@@ -170,7 +171,7 @@ ELSE
 
 				SET @lastExecutionStatus=4 -- in progress
 				IF @debugMode=1
-					RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 				SET @ReturnValue=4
 
 				--get job start date/time
@@ -199,7 +200,7 @@ ELSE
 																)
 								ORDER BY h.[instance_id] ASC'
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				INSERT	INTO #jobStartInfo([start_date], [start_time], [run_status], [event_time])
 						EXEC (@queryToRun)
@@ -236,7 +237,7 @@ ELSE
 												WHERE [spid] = ' + CAST(@JobSessionID AS [nvarchar])
 							end
 						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-						IF @debugMode = 1 PRINT @queryToRun
+						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 						INSERT	INTO #jobStartInfo([start_date], [start_time], [run_status], [event_time])
 								EXEC (@queryToRun)
@@ -293,7 +294,7 @@ ELSE
 										AND h.[step_name] <> ''(Job outcome)''
 								ORDER BY h.[instance_id] DESC'
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				INSERT	INTO #jobLastRunDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
 						EXEC (@queryToRun)
@@ -322,7 +323,7 @@ ELSE
 										AND [step_name] =''(Job outcome)''
 								ORDER BY [instance_id] DESC'
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				TRUNCATE TABLE #jobLastRunDetails
 				INSERT	INTO #jobLastRunDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
@@ -345,7 +346,7 @@ ELSE
 											AND h.[run_status]=0
 									ORDER BY h.[instance_id] DESC'
 						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-						IF @debugMode = 1 PRINT @queryToRun
+						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 						TRUNCATE TABLE #jobLastRunDetails
 						INSERT	INTO #jobLastRunDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
@@ -467,7 +468,7 @@ ELSE
 											ORDER BY h.[instance_id]'
 
 					SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-					IF @debugMode = 1 PRINT @queryToRun
+					IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 					TRUNCATE TABLE #jobRunStepDetails
 					INSERT	INTO #jobRunStepDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
@@ -531,13 +532,18 @@ ELSE
 				begin
 					SET @strMessage=@strMessage + CHAR(13) + '--Job execution return this message: ' + ISNULL(@Message, '')
 					IF @debugMode=1
-						print '--Job execution return this message: ' + ISNULL(@Message, '')
+						begin
+							SET @queryToRun = 'Job execution return this message: ' + ISNULL(@Message, '')
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+						end
+
 				end
 	end
 
 SET @lastExecutionStatus = ISNULL(@lastExecutionStatus, 5) --Unknown
 IF @debugMode=1
-	print @strMessage
+	EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 SET @ReturnValue=ISNULL(@ReturnValue, 0)
 IF @selectResult=1
 	SELECT @strMessage AS StrMessage, @currentRunning AS CurrentRunning, @lastExecutionStatus AS LastExecutionStatus, @lastExecutionDate AS LastExecutionDate, @lastExecutionTime AS LastExecutionTime, @runningTimeSec AS RunningTimeSec

@@ -77,7 +77,7 @@ DECLARE   @HTMLReport							[nvarchar](max)
 		, @ErrMessage							[nvarchar](256)
 		, @idx									[int]
 
-DECLARE   @								[nvarchar](max)
+DECLARE   @queryToRun							[nvarchar](max)
 
 DECLARE   @reportID								[int]
 		, @HTMLReportFileName					[nvarchar](260)

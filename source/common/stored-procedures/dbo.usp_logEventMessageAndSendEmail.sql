@@ -185,8 +185,6 @@ IF @alertSent < @maxAlertCountPer5Min
 -----------------------------------------------------------------------------------------------------
 --processing the xml message
 -----------------------------------------------------------------------------------------------------
---PRINT @eventMessage
---SET @eventMessage = [dbo].[ufn_getObjectQuoteName](@eventMessage, 'xml')
 SET @eventMessageXML = CAST(@eventMessage AS [xml])
 SET @HTMLBody = N''
 

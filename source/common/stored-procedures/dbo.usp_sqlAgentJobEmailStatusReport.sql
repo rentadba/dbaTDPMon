@@ -46,7 +46,7 @@ SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @que
 SET @queryToRun = N'SELECT @jobID = [job_id] FROM (' + @queryToRun + N')inq'
 SET @queryParams = '@jobID [uniqueidentifier] OUTPUT'
 
-IF @debugMode=1	PRINT @queryToRun
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 EXEC sp_executesql @queryToRun, @queryParams, @jobID = @jobID OUTPUT
 
 -----------------------------------------------------------------------------------------------------
@@ -62,7 +62,7 @@ SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @que
 SET @queryToRun = N'SELECT @lastCompletionInstanceID = [instance_id] FROM (' + @queryToRun + N')inq'
 SET @queryParams = '@lastCompletionInstanceID [int] OUTPUT'
 
-IF @debugMode=1	PRINT @queryToRun
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 EXEC sp_executesql @queryToRun, @queryParams, @lastCompletionInstanceID = @lastCompletionInstanceID OUTPUT
 
 SET @lastCompletionInstanceID = ISNULL(@lastCompletionInstanceID, 0)
@@ -184,7 +184,7 @@ ELSE
 
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 
-IF @debugMode=1	PRINT @queryToRun
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 INSERT	INTO #jobHistory([step_id], [step_name], [run_status], [run_date], [run_time], [duration], [message], [log_filename])
 		EXEC (@queryToRun)
 

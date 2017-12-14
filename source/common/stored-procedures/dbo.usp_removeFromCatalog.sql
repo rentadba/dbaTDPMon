@@ -63,7 +63,7 @@ BEGIN TRY
 	IF @instanceID IS NULL
 		begin
 			SET @errMessage=N'The value specifief for SQL Server Instance Name is not valid.'
-			RAISERROR(@errMessage, 16, 1) WITH NOWAIT
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		end
 
 	BEGIN TRANSACTION

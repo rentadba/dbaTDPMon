@@ -234,7 +234,9 @@ WHILE @@FETCH_STATUS=0
 
 		IF @jobCurrentRunning=1
 			begin
-				RAISERROR('--Job is still running. Stopping...', 10, 1) WITH NOWAIT
+				SET @queryToRun = 'Job is still running. Stopping...'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 				SET @retryAttempts = 1
 				WHILE @jobCurrentRunning = 1 AND @retryAttempts <= @configMaxNumberOfRetries
 					begin

@@ -47,8 +47,9 @@ BEGIN TRY
 	SET @returnValue=1
 
 	-----------------------------------------------------------------------------------------------------
-	SET @errMessage=N'--Getting Instance information: [' + @sqlServerName + '] / project: [' + @projectCode + ']'
-	RAISERROR(@errMessage, 10, 1) WITH NOWAIT
+	SET @errMessage=N'Getting Instance information: [' + @sqlServerName + '] / project: [' + @projectCode + ']'
+	EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 	SET @errMessage=N''
 	-----------------------------------------------------------------------------------------------------
 
@@ -57,8 +58,11 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (SELECT count(*) FROM sys.sysservers WHERE srvname=@sqlServerName)=0
 		begin
-			PRINT N'Specified instance name is not defined as local or linked server: ' + @sqlServerName
-			PRINT N'Create a new linked server.'
+			SET @errMessage= N'Specified instance name is not defined as local or linked server: ' + @sqlServerName
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+			SET @errMessage= N'Create a new linked server.'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 			/* create a linked server for the instance found */
 			EXEC [dbo].[usp_addLinkedSQLServer] @ServerName = @sqlServerName
@@ -146,7 +150,7 @@ BEGIN TRY
 									 , CAST(SERVERPROPERTY(''ComputerNamePhysicalNetBIOS'') AS [sysname]) AS [machine_name]
 							 )X'
 	SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-	IF @debugMode = 1 PRINT @queryToRun
+	IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 	BEGIN TRY
 		INSERT	INTO #catalogInstanceNames([name], [version], [edition], [machine_name])
@@ -156,7 +160,7 @@ BEGIN TRY
 	BEGIN CATCH
 		SET @errMessage=ERROR_MESSAGE()
 		SET @errDescriptor = 'dbo.usp_refreshMachineCatalogs - Offline'
-		RAISERROR(@errMessage, 10, 1) WITH NOWAIT
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 		SET @isActive=0
 	END CATCH
@@ -202,14 +206,18 @@ BEGIN TRY
 			ELSE
 				SET @queryToRun = N'SELECT [NodeName] FROM sys.dm_os_cluster_nodes'
 			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-			IF @debugMode = 1 PRINT @queryToRun
+			IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			BEGIN TRY
 				INSERT	INTO #catalogMachineNames([name])
 						EXEC (@queryToRun)		
 			END TRY
 			BEGIN CATCH
-				IF @debugMode=1 PRINT 'An error occured. It will be ignored: ' + ERROR_MESSAGE()
+				IF @debugMode=1 
+					begin
+						SET @errMessage = 'An error occured. It will be ignored: ' + ERROR_MESSAGE()
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+					end
 			END CATCH
 	
 			IF (SELECT COUNT(*) FROM #catalogMachineNames)=0
@@ -225,7 +233,7 @@ BEGIN TRY
 												SELECT CAST(SERVERPROPERTY(''MachineName'') AS [sysname]) AS [machine_name]
 											)Y'
 					SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-					IF @debugMode = 1 PRINT @queryToRun
+					IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 					BEGIN TRY
 						INSERT	INTO #catalogMachineNames([name])
@@ -234,7 +242,8 @@ BEGIN TRY
 					BEGIN CATCH
 						SET @errMessage=ERROR_MESSAGE()
 						SET @errDescriptor = 'dbo.usp_refreshMachineCatalogs'
-						RAISERROR(@errMessage, 16, 1) WITH NOWAIT
+
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 					END CATCH
 				end
 			ELSE
@@ -276,7 +285,7 @@ BEGIN TRY
 									FROM sys.databases sdb
 									WHERE [is_in_standby] = 1'
 			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-			IF @debugMode = 1 PRINT @queryToRun
+			IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 			BEGIN TRY
 				INSERT	INTO #catalogDatabaseNames([database_id], [name], [state], [state_desc])
@@ -285,7 +294,8 @@ BEGIN TRY
 			BEGIN CATCH
 				SET @errMessage=ERROR_MESSAGE()
 				SET @errDescriptor = 'dbo.usp_refreshMachineCatalogs'
-				RAISERROR(@errMessage, 16, 1) WITH NOWAIT
+
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 			END CATCH
 
 			/*-------------------------------------------------------------------------------------------------------------------------------*/
@@ -311,7 +321,7 @@ BEGIN TRY
 			
 							IF @sqlServerName<>@@SERVERNAME
 								SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
-							IF @debugMode = 1 PRINT @queryToRun
+							IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 							INSERT	INTO #xpCMDShellOutput([output])
 									EXEC (@queryToRun)
@@ -331,7 +341,7 @@ BEGIN TRY
 							SET @queryToRun = @queryToRun + N'SELECT DEFAULT_DOMAIN()';
 							IF @sqlServerName<>@@SERVERNAME
 							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
-							IF @debugMode = 1 PRINT @queryToRun
+							IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 							INSERT	INTO #xpCMDShellOutput([output])
 									EXEC (@queryToRun)
 							SELECT TOP 1 @domainName = LOWER([output])
@@ -351,7 +361,8 @@ BEGIN TRY
 					end
 			END TRY
 			BEGIN CATCH
-				PRINT ERROR_MESSAGE()
+				SET @errMessage = ERROR_MESSAGE()
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			END CATCH
 		end
 

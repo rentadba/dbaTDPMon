@@ -183,12 +183,12 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 IF @minJobToRunBeforeExit=0
 	begin
 		SET @strMessage='Performing cleanup...'
-		RAISERROR(@strMessage, 10, 1) WITH NOWAIT
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 
 		SET @queryToRun = N''
 		SET @queryToRun = 'SELECT [name] FROM [msdb].[dbo].[sysjobs]'
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode = 1 PRINT @queryToRun
+		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 		IF OBJECT_ID('tempdb..#existingSQLAgentJobs') IS NOT NULL DROP TABLE #existingSQLAgentJobs
 		CREATE TABLE #existingSQLAgentJobs

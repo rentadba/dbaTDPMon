@@ -42,8 +42,8 @@ BEGIN TRY
 	SET @ReturnValue=1
 
 	SET @errMessage = '------------------------------------------------------------------------'
-	RAISERROR(@errMessage, 10, 1) WITH NOWAIT
-
+	EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+	
 	-----------------------------------------------------------------------------------------------------
 	SELECT    @projectName = [name]
 	FROM [dbo].[catalogProjects]
@@ -52,7 +52,7 @@ BEGIN TRY
 	IF @projectName IS NULL
 		begin
 			SET @errMessage=N'The value specified for Project ID is not valid.'
-			RAISERROR(@errMessage, 16, 1) WITH NOWAIT
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		end
 
 	-----------------------------------------------------------------------------------------------------
@@ -66,7 +66,7 @@ BEGIN TRY
 																																 THEN ' - [' + @instanceName + '][' + CAST(@instanceID AS VARCHAR) + ']'
 																																 ELSE ''
 																															END
-	RAISERROR(@errMessage, 10, 1) WITH NOWAIT
+	EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 	-----------------------------------------------------------------------------------------------------
 	SELECT	@localStoragePath=[value] 

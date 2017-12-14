@@ -56,32 +56,33 @@ CREATE TABLE #tmpCheckParameters (Result varchar(1024))
 
 IF ISNULL(@sqlServerName, '')=''
 	begin
-		SET @queryToRun='--	ERROR: The specified value for SOURCE server is not valid.'
-		RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
+		SET @queryToRun='ERROR: The specified value for SOURCE server is not valid.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		RETURN 1
 	end
 
 IF LEN(@jobName)=0 OR ISNULL(@jobName, '')=''
 	begin
-		RAISERROR('--ERROR: Must specify a job name.', 10, 1) WITH NOWAIT
+		SET @queryToRun = 'ERROR: Must specify a job name.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		RETURN 1
 	end
 
 SET @queryToRun='SELECT [srvid] FROM master.dbo.sysservers WHERE [srvname]=''' + @sqlServerName + ''''
-IF @debugMode = 1 PRINT @queryToRun
+IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 TRUNCATE TABLE #tmpCheckParameters
 INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
 IF (SELECT count(*) FROM #tmpCheckParameters)=0
 	begin
-		SET @queryToRun='--	ERROR: SOURCE server [' + @sqlServerName + '] is not defined as linked server on THIS server [' + @sqlServerName + '].'
-		RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
+		SET @queryToRun='ERROR: SOURCE server [' + @sqlServerName + '] is not defined as linked server on THIS server [' + @sqlServerName + '].'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		RETURN 1
 	end
 
 SET @queryToRun='SELECT [srvid] FROM master.dbo.sysservers WHERE [srvname]=''' + @sqlServerName + ''''
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-IF @debugMode = 1 PRINT @queryToRun
+IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 SET @tmpServer='[' + @sqlServerName + '].master.dbo.sp_executesql'
 
@@ -89,8 +90,8 @@ TRUNCATE TABLE #tmpCheckParameters
 INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
 IF (SELECT count(*) FROM #tmpCheckParameters)=0
 	begin
-		SET @queryToRun='--	ERROR: THIS server [' + @sqlServerName + '] is not defined as linked server on SOURCE server [' + @sqlServerName + '].'
-		RAISERROR(@queryToRun, 16, 1) WITH NOWAIT
+		SET @queryToRun='ERROR: THIS server [' + @sqlServerName + '] is not defined as linked server on SOURCE server [' + @sqlServerName + '].'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		RETURN 1
 	end
 
@@ -114,7 +115,7 @@ WHILE @currentRunning<>0
 				IF ISNULL(@strMessage,'')<>ISNULL(@lastMessage, '')
 					begin
 						IF @watchJob=1
-							RAISERROR(@strMessage,10,1) WITH NOWAIT
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 						SET @lastMessage=@strMessage
 					end
 				IF @jobWasRunning=0
@@ -126,7 +127,6 @@ WHILE @currentRunning<>0
 			end
 		ELSE
 			begin
-				--RAISERROR(@strMessage,10,1) WITH NOWAIT
 				--job-ul s-a terminat sau nu s-a executat.
 				IF @lastExecutionStatus=0
 					begin
@@ -134,14 +134,18 @@ WHILE @currentRunning<>0
 						IF @jobWasRunning=1
 							begin
 								--ultima executie a job-ului a fost cu eroare
-								print @strMessage
-								RAISERROR('--Execution failed. Please notify your Database Administrator.',16,1) WITH NOWAIT
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+								
+								SET @strMessage = 'Execution failed. Please notify your Database Administrator.'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+								
 								SET @currentRunning=0
 								SET @returnValue=1	--1=eroare, 0=succes
 							end
 						ELSE
 							begin
-								RAISERROR('--Warning: Last job execution failed.',10,1) WITH NOWAIT
+								SET @strMessage = 'Warning: Last job execution failed.'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 								IF @startJobIfPrevisiousErrorOcured=1
 									SET @startJob=1
 							end
@@ -159,7 +163,8 @@ WHILE @currentRunning<>0
 										IF ABS(DATEDIFF(minute, GetDate(), CONVERT(datetime, @strMessage, 120)))<@dontRunIfLastExecutionSuccededLast
 											begin
 												SET @currentRunning=0
-												RAISERROR('--Job was previosly executed with a succes closing state.',10,1) WITH NOWAIT
+												SET @strMessage = 'Job was previosly executed with a succes closing state.'
+												EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 												SET @returnValue=0
 											end
 										end
@@ -180,14 +185,14 @@ IF @startJob=1
 	begin
 		IF @stepToStart > @stepToStop
 			begin
-				SET @strMessage = '--The Start Step cannot be greater than the Stop Step when watching a job!'
-				RAISERROR(@strMessage,16,1) WITH NOWAIT
+				SET @strMessage = 'The Start Step cannot be greater than the Stop Step when watching a job!'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 				RETURN 1
 			end
 	
 		SET @queryToRun='SELECT CAST([job_id] AS varchar(255)) FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' +  [dbo].[ufn_getObjectQuoteName](@jobName, 'sql') + ''''
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode = 1 PRINT @queryToRun
+		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 		TRUNCATE TABLE #tmpCheckParameters
 		INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
@@ -199,34 +204,43 @@ IF @startJob=1
 				--verific existenta primului pas trimis ca parametru
 				SET @queryToRun='SELECT MIN([step_id]) FROM [msdb].[dbo].[sysjobsteps] WHERE [job_id]=''' + @jobID + ''''
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				TRUNCATE TABLE #tmpCheckParameters
 				INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
 				
 				IF (SELECT CAST(Result AS numeric) FROM #tmpCheckParameters)>@stepToStart
 					begin
-						RAISERROR('--The specified Start Step is not defined for this job.', 10, 1) WITH NOWAIT
-						RAISERROR('--Setting Start Step the job''s first defined step.', 10, 1) WITH NOWAIT
+						SET @strMessage='The specified Start Step is not defined for this job.'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+						
+						SET @strMessage='Setting Start Step the job''s first defined step.'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+						
 						SELECT @stepToStart=CAST(Result AS numeric) FROM #tmpCheckParameters
 					end
 				
 				--verific existenta ultimului pas trimis ca parametru
 				SET @queryToRun='SELECT MAX([step_id]) FROM [msdb].[dbo].[sysjobsteps] WHERE [job_id]=''' + @jobID + ''''
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				TRUNCATE TABLE #tmpCheckParameters
 				INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
 				
 				IF (SELECT CAST(Result AS numeric) FROM #tmpCheckParameters)<@stepToStop
 					begin
-						RAISERROR('--The specified Stop Step is not defined for this job.', 10, 1) WITH NOWAIT
-						RAISERROR('--Setting Stop Step the job''s last defined step.', 10, 1) WITH NOWAIT
+						SET @strMessage='The specified Stop Step is not defined for this job.'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+						SET @strMessage='Setting Stop Step the job''s last defined step.'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 						SELECT @stepToStop=CAST(Result AS numeric) FROM #tmpCheckParameters
 					end
-		 		SET @strMessage='--Setting execution Start Step: [' + CAST(@stepToStart AS varchar) + ']'
- 				RAISERROR(@strMessage,10,1) WITH NOWAIT
+		 		SET @strMessage='Setting execution Start Step: [' + CAST(@stepToStart AS varchar) + ']'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 				
 				--incerc sa modific starea ultimul pas de executie. determinare stare curenta
 				SET @lastStepSuccesAction=NULL
@@ -234,7 +248,7 @@ IF @startJob=1
 
 				SET @queryToRun='SELECT [on_success_action] FROM [msdb].[dbo].[sysjobsteps] WHERE [job_id]=''' + @jobID + ''' AND [step_id]=' + CAST(@stepToStop AS varchar)
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				TRUNCATE TABLE #tmpCheckParameters
 				INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
@@ -242,7 +256,7 @@ IF @startJob=1
 
 				SET @queryToRun='SELECT [on_fail_action] FROM [msdb].[dbo].[sysjobsteps] WHERE [job_id]=''' + @jobID + ''' AND [step_id]=' + CAST(@stepToStop AS varchar)
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 PRINT @queryToRun
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				TRUNCATE TABLE #tmpCheckParameters
 				INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
@@ -250,33 +264,38 @@ IF @startJob=1
 
 				IF (@lastStepSuccesAction IS NULL) OR (@lastStepFailureAction IS NULL)
 					begin
-						RAISERROR('--Cannot read job''s Start Step informations.', 16, 1) WITH NOWAIT
+						SET @strMessage = 'Cannot read job''s Start Step informations.'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+						
 						IF OBJECT_ID('#tmpCheckParameters') IS NOT NULL DROP TABLE #tmpCheckParameters
 						RETURN 1
 					end			
 				ELSE
 					begin
-						SET @strMessage='--Setting execution Stop Step : [' + CAST(@stepToStop AS varchar) + ']'
-						RAISERROR(@strMessage,10,1) WITH NOWAIT
+						SET @strMessage='Setting execution Stop Step : [' + CAST(@stepToStop AS varchar) + ']'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+						
 						--modific ultimul pas important
-						--print @stepToStop
 						SET @queryToRun='[' + @sqlServerName + '].[msdb].[dbo].[sp_update_jobstep] @job_id = ''' + @jobID + ''', @step_id = ' + CAST(@stepToStop AS varchar) + ', @on_success_action = 1, @on_fail_action=2'
-						IF @debugMode = 1 PRINT @queryToRun
+						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 						EXEC (@queryToRun)
 
 						SET @queryToRun='[' + @sqlServerName + '].[msdb].[dbo].[sp_update_jobstep] @job_id = ''' + @jobID + ''', @step_id = ' + CAST(@stepToStop AS varchar) + ', @on_success_action = 1, @on_fail_action=2'
-						IF @debugMode = 1 PRINT @queryToRun
+						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 						EXEC (@queryToRun)
 
 						IF @@Error<>0
-							RAISERROR('--Failed in modifying job''s execution Stop Step.', 16, 1) WITH NOWAIT
+							begin
+								SET @strMessage = 'Failed in modifying job''s execution Stop Step.'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+							end
 						ELSE
 							begin
 								--extrag numele pasului de start
 								SET @stepName=NULL
 								SET @queryToRun='SELECT [step_name] FROM [msdb].[dbo].[sysjobsteps] WHERE [job_id]=''' + @jobID + ''' AND [step_id]=' + CAST(@stepToStart AS varchar)
 								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-								IF @debugMode = 1 PRINT @queryToRun
+								IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 								TRUNCATE TABLE #tmpCheckParameters
 								INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
@@ -284,15 +303,18 @@ IF @startJob=1
 
 								IF @stepName IS NOT NULL
 									begin
-										SET @strMessage='--Starting job: ' + [dbo].[ufn_getObjectQuoteName](@jobName, 'quoted')
-										RAISERROR(@strMessage,10,1) WITH NOWAIT
+										SET @strMessage='Starting job: ' + [dbo].[ufn_getObjectQuoteName](@jobName, 'quoted')
+										EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 										SET @queryToRun='[' + @sqlServerName + '].[msdb].[dbo].[sp_start_job] @job_id=''' + @jobID + ''', @step_name=''' + [dbo].[ufn_getObjectQuoteName](@stepName, 'sql') + ''''
-										IF @debugMode = 1 PRINT @queryToRun
+										IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 										EXEC (@queryToRun)
 										IF @@Error<>0
-											RAISERROR('--Failed in starting job.', 16, 1) WITH NOWAIT
+											begin
+												SET @strMessage = 'Failed in starting job.'
+												EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+											end
 										ELSE
 											begin
 												--monitorizare job
@@ -314,7 +336,7 @@ IF @startJob=1
 																IF ISNULL(@strMessage,'')<>ISNULL(@lastMessage, '')
 																	begin
 																		IF @watchJob=1
-																			RAISERROR(@strMessage,10,1) WITH NOWAIT
+																			EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 																		SET @lastMessage=@strMessage
 																	end
 																IF @jobWasRunning=0
@@ -324,11 +346,14 @@ IF @startJob=1
 																ELSE
 																	WAITFOR DELAY @waitForDelay
 															end
-													end											end
+													end											
+											end
 									end
 								ELSE
 									begin
-										RAISERROR('--Cannot read the name of the job''s last important step.', 16, 1) WITH NOWAIT
+										SET @strMessage = 'Cannot read the name of the job''s last important step.'
+										EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+
 										IF OBJECT_ID('#tmpCheckParameters') IS NOT NULL DROP TABLE #tmpCheckParameters
 										RETURN 1
 									end
@@ -336,12 +361,14 @@ IF @startJob=1
 
 						--modific ultimul pas important (refacere)
 						SET @queryToRun='[' + @sqlServerName + '].[msdb].[dbo].[sp_update_jobstep] @job_id = ''' + @jobID + ''', @step_id = ' + CAST(@stepToStop AS varchar) + ', @on_success_action = ' + CAST(@lastStepSuccesAction AS varchar) + ', @on_fail_action=' + CAST(@lastStepFailureAction AS varchar)
-						IF @debugMode = 1 PRINT @queryToRun
+						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 						EXEC(@queryToRun)
 						IF @@Error<>0
 							begin
-								RAISERROR('--Failed in modifying back job''s execution Stop Step.',16,1) WITH NOWAIT
+								SET @strMessage = 'Failed in modifying back job''s execution Stop Step.'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+
 								IF OBJECT_ID('#tmpCheckParameters') IS NOT NULL DROP TABLE #tmpCheckParameters
 								RETURN 1
 							end
@@ -349,22 +376,28 @@ IF @startJob=1
 			end
 		ELSE
 			begin
-				RAISERROR('--Cannot find the Job ID for the specified Job Name.',16,1) WITH NOWAIT		
+				SET @strMessage='Cannot find the Job ID for the specified Job Name.'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+
 				IF OBJECT_ID('#tmpCheckParameters') IS NOT NULL DROP TABLE #tmpCheckParameters
 				RETURN 1
 			end
 		IF @@Error <> 0
 			begin
-				RAISERROR('--Execution failed. Please notify your Database Administrator.',10,1) WITH NOWAIT
+				SET @strMessage= 'Execution failed. Please notify your Database Administrator.'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 				SET @returnValue=1
 			end
 	end	
 --afisez mesaje despre starea de executie a job-ului 
 EXEC [dbo].[usp_sqlAgentJobCheckStatus] @sqlServerName, @jobName, @strMessage OUT, @currentRunning OUT, @lastExecutionStatus OUT, @lastExecutionDate OUT, @lastExecutionTime OUT, @runningTimeSec OUT, 0, 0, 0
-print @strMessage
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 IF @lastExecutionStatus=0
 	begin
-		RAISERROR('--Execution failed. Please notify your Database Administrator.',10,1) WITH NOWAIT
+		SET @strMessage = 'Execution failed. Please notify your Database Administrator.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 		SET @returnValue=1
 	end
 IF @watchJob=1
@@ -376,7 +409,9 @@ IF @watchJob=1
 		SET @lastExecutionStep=CAST(@queryToRun as int)
 		IF @lastExecutionStep<>@stepToStop
 			begin
-				RAISERROR('--The LAST EXECUTED STEP is DIFFERENT from the DEFINED STOP STEP. Please notify your Database Administrator.',10,1) WITH NOWAIT
+				SET @strMessage = 'The LAST EXECUTED STEP is DIFFERENT from the DEFINED STOP STEP. Please notify your Database Administrator.'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+
 				SET @returnValue=1
 			end
 	end

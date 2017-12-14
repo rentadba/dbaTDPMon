@@ -54,11 +54,13 @@ WHERE [code] = @projectCode
 IF @projectID IS NULL
 	begin
 		SET @errMessage=N'The value specifief for Project Code is not valid.'
-		RAISERROR(@errMessage, 16, 1) WITH NOWAIT
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=1
 	end
 
 -----------------------------------------------------------------------------------------------------
-RAISERROR('--Step 1: Delete existing information....', 10, 1) WITH NOWAIT
+SET @errMessage=N'Step 1: Delete existing information....'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 
 DELETE lam 
 FROM [dbo].[logAnalysisMessages] lam 
@@ -84,7 +86,9 @@ IF @runDiscovery=1
 		/*-------------------------------------------------------------------------------------------------------------------------------*/
 		/* perform discovery																											 */
 		/*-------------------------------------------------------------------------------------------------------------------------------*/
-		RAISERROR('Performing SQL Server instance discovery...', 10, 1) WITH NOWAIT
+		SET @errMessage = 'Performing SQL Server instance discovery...'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 
 		SET @queryToRun='sqlcmd -L'
 		INSERT	INTO #xp_cmdshell([output])
@@ -130,7 +134,7 @@ IF @runDiscovery=1
 		WHILE @@FETCH_STATUS=0
 			begin
 				SET @errMessage = 'New SQL Server Instance found: [' + @sqlServerName + ']'
-				RAISERROR(@errMessage, 10, 1) WITH NOWAIT
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 		
 				IF @existingServerID IS NULL
 					begin
