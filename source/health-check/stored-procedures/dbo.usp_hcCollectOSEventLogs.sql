@@ -84,6 +84,7 @@ IF @psFileLocation IS NULL
 
 SET @psFileLocation = ISNULL(@psFileLocation, N'C:\')
 IF RIGHT(@psFileLocation, 1)<>'\' SET @psFileLocation = @psFileLocation + '\'
+SET @psFileLocation = [dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, @psFileLocation)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --create folder on disk

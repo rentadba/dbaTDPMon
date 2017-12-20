@@ -175,7 +175,7 @@ BEGIN TRY
 							+ '_' + LEFT(REPLACE(CONVERT([varchar](8),@reportBuildStartTime, 108), ':', ''), 4)
 	
 	SET @HTMLReportFileName = REPLACE(@HTMLReportFileName, ' ', '_')
-
+	
 	IF @localStoragePath IS NULL
 		EXEC [dbo].[usp_reportHTMLGetStorageFolder]	@projectID					= @projectID,
 													@instanceID					= NULL,

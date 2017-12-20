@@ -593,3 +593,6 @@
 
 /* 14.12.2017 */	
 	- code review: use a custom logging stored procedure: [dbo].[usp_logPrintMessage]
+
+/* 20.12.2017 */	
+	- tested maintenance-plan module under SQL Server 2017 on Linux; add support for Linux OS

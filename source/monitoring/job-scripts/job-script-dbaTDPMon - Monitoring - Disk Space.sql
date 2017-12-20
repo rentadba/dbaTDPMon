@@ -47,6 +47,7 @@ SET @projectCode  = N'$(projectCode)'	/* add local project code here */
 SET @databaseName = N'$(dbName)'
 SET @job_name = @databaseName + N' - Monitoring - Disk Space'
 SET @logFileLocation = @logFileLocation + N'job-' + @job_name + N'.log'
+SET @logFileLocation = [$(dbName)].[dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, @logFileLocation)
 
 
 ---------------------------------------------------------------------------------------------------

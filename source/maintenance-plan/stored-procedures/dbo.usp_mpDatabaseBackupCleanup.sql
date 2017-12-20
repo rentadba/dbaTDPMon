@@ -133,6 +133,7 @@ IF @backupLocation IS NULL
 	end
 
 SET @backupLocation = [dbo].[ufn_getObjectQuoteName](@backupLocation, 'filepath')
+SET @backupLocation = [dbo].[ufn_formatPlatformSpecificPath](@sqlServerName, @backupLocation)
 
 -----------------------------------------------------------------------------------------
 --changing backup expiration date from RetentionDays to full/diff database backup count

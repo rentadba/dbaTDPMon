@@ -39,7 +39,6 @@ IF @logFileLocation IS NULL
 SET @logFileLocation = ISNULL(@logFileLocation, N'C:\')
 IF RIGHT(@logFileLocation, 1)<>'\' SET @logFileLocation = @logFileLocation + '\'
 
-
 ---------------------------------------------------------------------------------------------------
 /* setting the job name & job log location */
 ---------------------------------------------------------------------------------------------------
@@ -48,6 +47,7 @@ SET @projectCode  = N'$(projectCode)'	/* add local project code here */
 SET @databaseName = N'$(dbName)'
 SET @job_name = @databaseName + N' - Monitoring - TransactionStatus'
 SET @logFileLocation = @logFileLocation + N'job-' + @job_name + N'.log'
+SET @logFileLocation = [$(dbName)].[dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, @logFileLocation)
 
 
 ---------------------------------------------------------------------------------------------------

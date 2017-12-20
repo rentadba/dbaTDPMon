@@ -49,6 +49,7 @@ IF RIGHT(@logFileLocation, 1)<>'\' SET @logFileLocation = @logFileLocation + '\'
 SET @databaseName = N'$(dbName)'
 SET @job_name = @databaseName + N' - Database Backup - Log - Parallel'
 SET @logFileLocation = @logFileLocation + N'job-' + @job_name + N'.log'
+SET @logFileLocation = [$(dbName)].[dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, @logFileLocation)
 
 ---------------------------------------------------------------------------------------------------
 /* dropping job if exists */

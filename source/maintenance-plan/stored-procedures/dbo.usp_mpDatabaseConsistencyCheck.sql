@@ -515,7 +515,7 @@ IF @flgActions & 16 = 16
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'DBCC CHECKCONSTRAINTS(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'sql') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql') + ''') WITH ALL_ERRORMSGS'
+				SET @queryToRun = @queryToRun + N'DBCC CHECKCONSTRAINTS(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'sql') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql') + ''') WITH ALL_ERRORMSGS, NO_INFOMSGS'
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
@@ -651,7 +651,7 @@ IF @flgActions & 32 = 32
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 						SET @queryToRun = N''
-						SET @queryToRun = @queryToRun + N'DBCC CHECKIDENT(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'sql') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql') + ''', RESEED)'
+						SET @queryToRun = @queryToRun + N'DBCC CHECKIDENT(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'sql') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql') + ''', RESEED) WITH NO_INFOMSGS'
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
@@ -713,7 +713,7 @@ IF @flgActions & 64 = 64
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 						SET @queryToRun = N''
-						SET @queryToRun = @queryToRun + N'DBCC UPDATEUSAGE(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql')  + ''', ''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'sql') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql') + ''')'
+						SET @queryToRun = @queryToRun + N'DBCC UPDATEUSAGE(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql')  + ''', ''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'sql') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql') + ''') WITH NO_INFOMSGS'
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
@@ -768,7 +768,7 @@ IF @flgActions & 128 = 128
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'DBCC CLEANTABLE(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql')  + ''', ''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'sql') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql') + ''', ' + CAST(@DBCCCheckTableBatchSize AS [nvarchar]) + ')'
+				SET @queryToRun = @queryToRun + N'DBCC CLEANTABLE(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql')  + ''', ''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'sql') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql') + ''', ' + CAST(@DBCCCheckTableBatchSize AS [nvarchar]) + ') WITH NO_INFOMSGS'
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,

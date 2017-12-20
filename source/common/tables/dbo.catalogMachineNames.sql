@@ -22,6 +22,7 @@ CREATE TABLE [dbo].[catalogMachineNames]
 	[name]					[sysname]		NOT NULL,
 	[domain]				[sysname]			NULL,
 	[type]					[varchar](32)	NOT NULL CONSTRAINT [DF_catalogMachineNames_Type] DEFAULT ('SQLServer'),
+	[host_platform]			[sysname]			NULL,
 	CONSTRAINT [PK_catalogMachineNames] PRIMARY KEY  CLUSTERED 
 	(
 		[id],

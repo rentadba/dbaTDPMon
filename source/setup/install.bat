@@ -152,6 +152,9 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_catalogInstanceNames.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_formatPlatformSpecificPath.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_catalogDatabaseNames.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -269,6 +272,16 @@ if errorlevel 1 goto install_err
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "EXEC dbo.usp_refreshMachineCatalogs DEFAULT, @@SERVERNAME;" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = [dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, [value]) WHERE [name] = 'Local storage path for HTML reports' AND [module] = 'common';" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = [dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, [value]) WHERE [name] = 'Default folder for logs' AND [module] = 'common';" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = [dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, [value]) WHERE [name] = 'Default backup location' AND [module] = 'maintenance-plan';" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+	
 if "%module%"=="all" goto mp
 if "%module%"=="health-check" goto hc
 if "%module%"=="maintenance-plan" goto mp

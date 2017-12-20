@@ -41,6 +41,7 @@ DECLARE   @queryToRun			[nvarchar](max)	-- used for dynamic statements
 		, @instanceID			[smallint]
 		, @domainName			[sysname]
 		, @optionXPValue		[int]
+		, @hostPlatform			[sysname]
 
 -- { sql_statement | statement_block }
 BEGIN TRY
@@ -92,7 +93,8 @@ BEGIN TRY
 	CREATE TABLE #catalogMachineNames
 	(
 		[name]					[sysname]		NULL,
-		[domain]				[sysname]		NULL
+		[domain]				[sysname]		NULL,
+		[host_platform]			[sysname]		NULL
 	)
 
 	-----------------------------------------------------------------------------------------------------
@@ -344,8 +346,9 @@ BEGIN TRY
 							IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 							INSERT	INTO #xpCMDShellOutput([output])
 									EXEC (@queryToRun)
+
 							SELECT TOP 1 @domainName = LOWER([output])
-								FROM #xpCMDShellOutput
+							FROM #xpCMDShellOutput
 						END CATCH
 
 						UPDATE #catalogMachineNames SET [domain] = @domainName
@@ -362,41 +365,56 @@ BEGIN TRY
 			END TRY
 			BEGIN CATCH
 				SET @errMessage = ERROR_MESSAGE()
+				SET @errDescriptor = 'dbo.usp_refreshMachineCatalogs'
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			END CATCH
+
+			-----------------------------------------------------------------------------------------------------
+			--discover platform type: windows/linux
+			-----------------------------------------------------------------------------------------------------
+			IF @SQLMajorVersion>=14
+				begin
+					SET @queryToRun = N'SELECT [host_platform] FROM sys.dm_os_host_info'
+					SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+					IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+					BEGIN TRY
+						TRUNCATE TABLE #xpCMDShellOutput
+						INSERT	INTO #xpCMDShellOutput([output])
+								EXEC (@queryToRun)
+
+						SELECT @hostPlatform = LOWER([output])
+						FROM #xpCMDShellOutput
+
+						UPDATE #catalogMachineNames SET [host_platform] = @hostPlatform
+					END TRY
+					BEGIN CATCH
+						SET @errMessage = ERROR_MESSAGE()
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+					END CATCH
+
+				end
 		end
 
 
 	-----------------------------------------------------------------------------------------------------
 	--upsert catalog tables
 	-----------------------------------------------------------------------------------------------------
-/*
-	MERGE INTO [dbo].[catalogMachineNames] AS dest
-	USING (	
-			SELECT [name], [domain]
-			FROM #catalogMachineNames
-		  ) AS src([name], [domain])
-		ON dest.[name] = src.[name] AND dest.[project_id] = @projectID
-	WHEN NOT MATCHED BY TARGET THEN
-		INSERT ([project_id], [name], [domain]) 
-		VALUES (@projectID, src.[name], src.[domain]) 
-	WHEN MATCHED THEN
-		UPDATE SET dest.[domain]=src.[domain];
-*/
 	UPDATE dest
-		SET dest.[domain]=src.[domain]
+		SET   dest.[domain]=src.[domain]
+			, dest.[host_platform] = src.[host_platform]			
 	FROM [dbo].[catalogMachineNames] AS dest
 	INNER JOIN 
 			(	
-			 SELECT [name], [domain]
+			 SELECT [name], [domain], [host_platform]
 			 FROM #catalogMachineNames
 			) src ON dest.[name] = src.[name] AND dest.[project_id] = @projectID;
 
-	INSERT	INTO [dbo].[catalogMachineNames] ([project_id], [name], [domain]) 
-			SELECT @projectID, src.[name], src.[domain]
+	INSERT	INTO [dbo].[catalogMachineNames] ([project_id], [name], [domain], [host_platform]) 
+			SELECT @projectID, src.[name], src.[domain], src.[host_platform]
 			FROM 
 				(	
-					 SELECT [name], [domain]
+					 SELECT [name], [domain], [host_platform]
 					 FROM #catalogMachineNames
 				) src 
 			LEFT JOIN [dbo].[catalogMachineNames] AS dest ON dest.[name] = src.[name] AND dest.[project_id] = @projectID			
@@ -471,31 +489,6 @@ BEGIN TRY
 	INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = cdn.[instance_id] AND cin.[project_id] = cdn.[project_id]
 	INNER JOIN #catalogInstanceNames	srcIN ON cin.[name] = srcIN.[name]
 	WHERE cin.[project_id] = @projectID
-
-	/*
-	MERGE INTO [dbo].[catalogDatabaseNames] AS dest
-	USING (	
-			SELECT  cin.[id] AS [instance_id]
-				  , src.[name]
-				  , src.[database_id]
-				  , src.[state]
-				  , src.[state_desc]
-			FROM  #catalogDatabaseNames src
-			INNER JOIN #catalogMachineNames srcMn ON 1=1
-			INNER JOIN #catalogInstanceNames srcIN ON 1=1
-			INNER JOIN [dbo].[catalogMachineNames] cmn ON cmn.[name] = srcMn.[name] AND cmn.[project_id]=@projectID
-			INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[name] = srcIN.[name] AND cin.[machine_id] = cmn.[id]
-		  ) AS src([instance_id], [name], [database_id], [state], [state_desc])
-		ON dest.[instance_id] = src.[instance_id] AND dest.[name] = src.[name]
-	WHEN NOT MATCHED BY TARGET THEN
-		INSERT ([instance_id], [project_id], [database_id], [name], [state], [state_desc], [active])
-		VALUES (src.[instance_id], @projectID, src.[database_id], src.[name], src.[state], src.[state_desc], 1)
-	WHEN MATCHED THEN
-		UPDATE SET	dest.[database_id] = src.[database_id]
-				  , dest.[state] = src.[state]
-				  , dest.[state_desc] = src.[state_desc]
-				  , dest.[active] = 1;
-	*/
 
 	UPDATE dest
 		SET	dest.[database_id] = src.[database_id]

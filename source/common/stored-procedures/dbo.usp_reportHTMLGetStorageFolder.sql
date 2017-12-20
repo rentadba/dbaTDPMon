@@ -95,6 +95,8 @@ BEGIN TRY
 	SET @localStoragePath = @localStoragePath + CASE WHEN RIGHT(@localStoragePath, 1) <> '\' THEN N'\' ELSE N'' END
 	SET @localStoragePath = @localStoragePath + @relativeStoragePath
 	
+	SET @localStoragePath = [dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, @localStoragePath)
+
 	IF @flgCreateOutputFolder=1	
 		begin
 			SET @queryToRun = N'EXEC ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @@SERVERNAME + N''',

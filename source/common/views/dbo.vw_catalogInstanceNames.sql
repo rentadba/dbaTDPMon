@@ -32,6 +32,7 @@ SELECT 	  cp.[id]				AS [project_id]
 		, cin.[active]			AS [instance_active]
 		, cmnA.[id]				AS [cluster_node_machine_id]
 		, cmnA.[name]			AS [cluster_node_machine_name]
+		, cmn.[host_platform]
 		, cin.[last_refresh_date_utc]
 FROM [dbo].[catalogProjects]			cp
 INNER JOIN [dbo].[catalogMachineNames]	cmn ON cp.[id] = cmn.[project_id]

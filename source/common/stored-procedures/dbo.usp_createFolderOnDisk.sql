@@ -61,6 +61,8 @@ IF RIGHT(@folderName, 1)<>'\' SET @folderName = @folderName + N'\'
 --checking for invalid characters <>:"'
 SET @folderName = [dbo].[ufn_getObjectQuoteName](@folderName, 'filepath')
 
+SET @folderName = [dbo].[ufn_formatPlatformSpecificPath](@sqlServerName, @folderName)
+
 SET @queryToRun= 'Creating destination folder: "' + @folderName + '"'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 

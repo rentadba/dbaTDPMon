@@ -154,6 +154,8 @@ IF @defaultLogFileLocation IS NULL
 SET @defaultLogFileLocation = ISNULL(@defaultLogFileLocation, N'C:\')
 IF RIGHT(@defaultLogFileLocation, 1)<>'\' SET @defaultLogFileLocation = @defaultLogFileLocation + '\'
 
+SET @defaultLogFileLocation = [dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, @defaultLogFileLocation)
+
 ------------------------------------------------------------------------------------------------------------------------------------------
 --create folder on disk
 DECLARE @queryToRun nvarchar(1024)

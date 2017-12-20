@@ -385,6 +385,8 @@ ELSE
 	SET @backupLocation = @backupLocation + REPLACE(@agName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
 SET @backupLocation = SUBSTRING(@backupLocation, 1, 2) + REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING(@backupLocation, 3, LEN(@backupLocation)), '<', '_'), '>', '_'), ':', '_'), '"', '_')
 
+SET @backupLocation = [dbo].[ufn_formatPlatformSpecificPath](@sqlServerName, @backupLocation)
+
 --check for maximum length of the file path
 --https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
 IF LEN(@backupLocation) >= @maxPATHLength
