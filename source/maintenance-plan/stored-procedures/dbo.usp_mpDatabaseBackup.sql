@@ -66,6 +66,7 @@ DECLARE		@backupFileName					[nvarchar](1024),
 			@serverEdition					[sysname],
 			@serverVersionStr				[sysname],
 			@serverVersionNum				[numeric](9,6),
+			@hostPlatform					[sysname],
 			@errorCode						[int],
 			@currentDate					[datetime],
 			@databaseStatus					[int],
@@ -132,6 +133,11 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName		= @sqlServerName,
 										@serverVersionNum	= @serverVersionNum OUT,
 										@executionLevel		= @executionLevel,
 										@debugMode			= @debugMode
+
+--get OS platform
+SELECT	@hostPlatform = [host_platform]
+FROM	[dbo].[vw_catalogInstanceNames]
+WHERE	[instance_name] = @sqlServerName
 
 SET @nestedExecutionLevel = @executionLevel + 1
 
@@ -377,67 +383,71 @@ IF @flgActions & 4 = 4
 	end
 	
 --------------------------------------------------------------------------------------------------
---create destination path: <@backupLocation>\@sqlServerName\@dbName
-IF RIGHT(@backupLocation, 1)<>'\' SET @backupLocation = @backupLocation + N'\'
-IF @agName IS NULL
-	SET @backupLocation = @backupLocation + REPLACE(@sqlServerName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
-ELSE
-	SET @backupLocation = @backupLocation + REPLACE(@agName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
-SET @backupLocation = SUBSTRING(@backupLocation, 1, 2) + REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING(@backupLocation, 3, LEN(@backupLocation)), '<', '_'), '>', '_'), ':', '_'), '"', '_')
-
-SET @backupLocation = [dbo].[ufn_formatPlatformSpecificPath](@sqlServerName, @backupLocation)
-
---check for maximum length of the file path
---https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
-IF LEN(@backupLocation) >= @maxPATHLength
+--as XP is not yet available on Linux, custom folder structure creation won't be possible
+IF NOT (@serverVersionNum >= 14 AND @hostPlatform='linux' )
 	begin
-		SET @eventData='<alert><detail>' + 
-							'<severity>critical</severity>' + 
-							'<instance_name>' + @sqlServerName + '</instance_name>' + 
-							'<name>database backup</name>' + 
-							'<type>' + @backupType + '</type>' + 
-							'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
-							'<reason>Msg 3057, Level 16: The length of the device name provided exceeds supported limit (maximum length is:' + CAST(@maxPATHLength AS [nvarchar]) + ')</reason>' + 
-							'<path>' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'xml') + '</path>' + 
-							'<event_date_utc>' + CONVERT([varchar](24), GETDATE(), 121) + '</event_date_utc>' + 
-						'</detail></alert>'
+		--create destination path: <@backupLocation>\@sqlServerName\@dbName
+		IF RIGHT(@backupLocation, 1)<>'\' SET @backupLocation = @backupLocation + N'\'
+		IF @agName IS NULL
+			SET @backupLocation = @backupLocation + REPLACE(@sqlServerName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
+		ELSE
+			SET @backupLocation = @backupLocation + REPLACE(@agName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
+		SET @backupLocation = SUBSTRING(@backupLocation, 1, 2) + REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING(@backupLocation, 3, LEN(@backupLocation)), '<', '_'), '>', '_'), ':', '_'), '"', '_')
 
-		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= NULL,
-														@sqlServerName			= @sqlServerName,
-														@dbName					= @dbName,
-														@objectName				= 'critical',
-														@childObjectName		= 'dbo.usp_mpDatabaseBackup',
-														@module					= 'maintenance-plan',
-														@eventName				= 'database backup',
-														@parameters				= NULL,	
-														@eventMessage			= @eventData,
-														@dbMailProfileName		= NULL,
-														@recipientsList			= NULL,
-														@eventType				= 6,	/* 6 - alert-custom */
-														@additionalOption		= 0
+		SET @backupLocation = [dbo].[ufn_formatPlatformSpecificPath](@sqlServerName, @backupLocation)
 
-		SET @errorCode = -1
-	end
-ELSE
-	begin
-		SET @queryToRun = N'EXEC ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @sqlServerName + N''',
-																					@folderName		= ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + N''',
-																					@executionLevel	= ' + CAST(@nestedExecutionLevel AS [nvarchar]) + N',
-																					@debugMode		= ' + CAST(@debugMode AS [nvarchar]) 
+		--check for maximum length of the file path
+		--https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
+		IF LEN(@backupLocation) >= @maxPATHLength
+			begin
+				SET @eventData='<alert><detail>' + 
+									'<severity>critical</severity>' + 
+									'<instance_name>' + @sqlServerName + '</instance_name>' + 
+									'<name>database backup</name>' + 
+									'<type>' + @backupType + '</type>' + 
+									'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+									'<reason>Msg 3057, Level 16: The length of the device name provided exceeds supported limit (maximum length is:' + CAST(@maxPATHLength AS [nvarchar]) + ')</reason>' + 
+									'<path>' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'xml') + '</path>' + 
+									'<event_date_utc>' + CONVERT([varchar](24), GETDATE(), 121) + '</event_date_utc>' + 
+								'</detail></alert>'
 
-		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @@SERVERNAME,
-														@dbName			= NULL,
-														@module			= 'dbo.usp_mpDatabaseBackup',
-														@eventName		= 'create folder on disk',
-														@queryToRun  	= @queryToRun,
-														@flgOptions		= @flgOptions,
-														@executionLevel	= @nestedExecutionLevel,
-														@debugMode		= @debugMode
-	end
+				EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= NULL,
+																@sqlServerName			= @sqlServerName,
+																@dbName					= @dbName,
+																@objectName				= 'critical',
+																@childObjectName		= 'dbo.usp_mpDatabaseBackup',
+																@module					= 'maintenance-plan',
+																@eventName				= 'database backup',
+																@parameters				= NULL,	
+																@eventMessage			= @eventData,
+																@dbMailProfileName		= NULL,
+																@recipientsList			= NULL,
+																@eventType				= 6,	/* 6 - alert-custom */
+																@additionalOption		= 0
 
-IF @errorCode<>0 
-	begin
-		RETURN @errorCode
+				SET @errorCode = -1
+			end
+		ELSE
+			begin
+				SET @queryToRun = N'EXEC ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @sqlServerName + N''',
+																							@folderName		= ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + N''',
+																							@executionLevel	= ' + CAST(@nestedExecutionLevel AS [nvarchar]) + N',
+																							@debugMode		= ' + CAST(@debugMode AS [nvarchar]) 
+
+				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @@SERVERNAME,
+																@dbName			= NULL,
+																@module			= 'dbo.usp_mpDatabaseBackup',
+																@eventName		= 'create folder on disk',
+																@queryToRun  	= @queryToRun,
+																@flgOptions		= @flgOptions,
+																@executionLevel	= @nestedExecutionLevel,
+																@debugMode		= @debugMode
+			end
+
+		IF @errorCode<>0 
+			begin
+				RETURN @errorCode
+			end
 	end
 
 --------------------------------------------------------------------------------------------------
@@ -725,21 +735,26 @@ IF @errorCode = 0
 	end
 
 --------------------------------------------------------------------------------------------------
---performing backup cleanup
-IF @errorCode = 0 AND ISNULL(@retentionDays,0) <> 0
+--as XP is not yet available on Linux, custom file deletion is not possible
+IF NOT (@serverVersionNum >= 14 AND @hostPlatform='linux' )
 	begin
-		SELECT	@backupType = SUBSTRING(@backupFileName, LEN(@backupFileName)-CHARINDEX('.', REVERSE(@backupFileName))+2, CHARINDEX('.', REVERSE(@backupFileName)))
+		--performing backup cleanup
+		IF @errorCode = 0 AND ISNULL(@retentionDays,0) <> 0
+			begin
 
-		SET @nestedExecutionLevel = @executionLevel + 1
+				SELECT	@backupType = SUBSTRING(@backupFileName, LEN(@backupFileName)-CHARINDEX('.', REVERSE(@backupFileName))+2, CHARINDEX('.', REVERSE(@backupFileName)))
 
-		EXEC [dbo].[usp_mpDatabaseBackupCleanup]	@sqlServerName			= @sqlServerName,
-													@dbName					= @dbName,
-													@backupLocation			= @backupLocation,
-													@backupFileExtension	= @backupType,
-													@flgOptions				= @flgOptions,
-													@retentionDays			= @retentionDays,
-													@executionLevel			= @nestedExecutionLevel,
-													@debugMode				= @debugMode
+				SET @nestedExecutionLevel = @executionLevel + 1
+
+				EXEC [dbo].[usp_mpDatabaseBackupCleanup]	@sqlServerName			= @sqlServerName,
+															@dbName					= @dbName,
+															@backupLocation			= @backupLocation,
+															@backupFileExtension	= @backupType,
+															@flgOptions				= @flgOptions,
+															@retentionDays			= @retentionDays,
+															@executionLevel			= @nestedExecutionLevel,
+															@debugMode				= @debugMode
+			end
 	end
 
 RETURN @errorCode
