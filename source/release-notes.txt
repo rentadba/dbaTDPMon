@@ -598,3 +598,4 @@
 	- tested maintenance-plan module under SQL Server 2017 on Linux; add support for Linux OS
 	- custom backup path creation and backup cleanup/retention policy features are disabled on Linux OS
 	- fix maintenance-plan log backup issue, when switching recovery model from simple to full and back
+	- fix bug when running dbo.usp_hcCollectDatabaseDetails for databases over 2 TB in size (reported by Razvan Puscasu)

@@ -51,8 +51,8 @@ CREATE TABLE #databaseSpaceInfo
 (
 	[drive]					[varchar](2)		NULL,
 	[is_log_file]			[bit]				NULL,
-	[size_kb]				[int]				NULL,
-	[space_used_kb]			[int]				NULL,
+	[size_mb]				[numeric](20,3)		NULL,
+	[space_used_mb]			[numeric](20,3)		NULL,
 	[is_growth_limited]		[bit]				NULL
 )
 
@@ -219,12 +219,13 @@ WHILE @@FETCH_STATUS=0
 										FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC(''''USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
 												SELECT    [drive]
 														, CAST([is_logfile]		AS [bit]) AS [is_logfile]
-														, SUM([size_kb])		AS [size_mb]
-														, SUM([space_used_kb])	AS [space_used_mb]
+														, SUM([size_mb])		AS [size_mb]
+														, SUM([space_used_mb])	AS [space_used_mb]
 														, MAX(CAST([is_growth_limited] AS [tinyint])) AS [is_growth_limited]
 												FROM (		
-														SELECT    [name], CAST([size] AS [int]) * 8 AS [size_kb]
-																, CAST(FILEPROPERTY([name], ''''''''SpaceUsed'''''''') AS [int]) * 8	AS [space_used_kb]
+														SELECT    [name]
+																, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
+																, CAST(FILEPROPERTY([name], ''''''''SpaceUsed'''''''') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
 																, CAST(FILEPROPERTY([name], ''''''''IsLogFile'''''''') AS [bit])		AS [is_logfile]
 																, REPLACE(LEFT([' + CASE WHEN @SQLMajorVersion <=8 THEN N'filename' ELSE N'physical_name' END + N'], 2), '''''''':'''''''', '''''''''''''''') AS [drive]
 																, ' + CASE	WHEN @SQLMajorVersion <= 8 
@@ -239,12 +240,13 @@ WHILE @@FETCH_STATUS=0
 					SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
 										SELECT    [drive]
 												, CAST([is_logfile]		AS [bit]) AS [is_logfile]
-												, SUM([size_kb])		AS [size_mb]
-												, SUM([space_used_kb])	AS [space_used_mb]
+												, SUM([size_mb])		AS [size_mb]
+												, SUM([space_used_mb])	AS [space_used_mb]
 												, MAX(CAST([is_growth_limited] AS [tinyint])) AS [is_growth_limited]
 										FROM (		
-												SELECT    [name], [size] * 8 as [size_kb]
-														, CAST(FILEPROPERTY([name], ''SpaceUsed'') AS [int]) * 8	AS [space_used_kb]
+												SELECT    [name]
+														, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
+														, CAST(FILEPROPERTY([name], ''SpaceUsed'') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
 														, CAST(FILEPROPERTY([name], ''IsLogFile'') AS [bit])		AS [is_logfile]
 														, REPLACE(LEFT([' + CASE WHEN @SQLMajorVersion <=8 THEN N'filename' ELSE N'physical_name' END + N'], 2), '':'', '''') AS [drive]	
 														, ' + CASE	WHEN @SQLMajorVersion <= 8 
@@ -258,7 +260,7 @@ WHILE @@FETCH_STATUS=0
 				
 				TRUNCATE TABLE #databaseSpaceInfo
 				BEGIN TRY
-						INSERT	INTO #databaseSpaceInfo([drive], [is_log_file], [size_kb], [space_used_kb], [is_growth_limited])
+						INSERT	INTO #databaseSpaceInfo([drive], [is_log_file], [size_mb], [space_used_mb], [is_growth_limited])
 							EXEC (@queryToRun)
 				END TRY
 				BEGIN CATCH
@@ -340,18 +342,18 @@ WHILE @@FETCH_STATUS=0
 				/* compute database statistics */
 				INSERT	INTO #statsDatabaseDetails([query_type], [database_id], [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], [physical_drives], [last_dbcc checkdb_time], [is_growth_limited])
 						SELECT    1, @databaseID
-								, CAST([data_size_kb] / 1024. AS [numeric](20,3)) AS [data_size_mb]
-								, CAST(CASE WHEN [data_size_kb] <>0 THEN [data_space_used_kb] * 100. / [data_size_kb] ELSE 0 END AS [numeric](6,2)) AS [data_used_percent]
-								, CAST([log_size_kb] / 1024. AS [numeric](20,3)) AS [log_size_mb]
-								, CAST(CASE WHEN [log_size_kb] <>0 THEN [log_space_used_kb] * 100. / [log_size_kb] ELSE 0 END AS [numeric](6,2)) AS [log_used_percent]
+								, CAST([data_size_mb] AS [numeric](20,3)) AS [data_size_mb]
+								, CAST(CASE WHEN [data_size_mb] <>0 THEN [data_space_used_mb] * 100. / [data_size_mb] ELSE 0 END AS [numeric](6,2)) AS [data_used_percent]
+								, CAST([log_size_mb] AS [numeric](20,3)) AS [log_size_mb]
+								, CAST(CASE WHEN [log_size_mb] <>0 THEN [log_space_used_mb] * 100. / [log_size_mb] ELSE 0 END AS [numeric](6,2)) AS [log_used_percent]
 								, [drives]
 								, @dbccLastKnownGood
 								, [is_growth_limited]
 						FROM (
-								SELECT    SUM(CASE WHEN [is_log_file] = 0 THEN dsi.[size_kb] ELSE 0 END)		AS [data_size_kb]
-										, SUM(CASE WHEN [is_log_file] = 0 THEN dsi.[space_used_kb] ELSE 0 END) 	AS [data_space_used_kb]
-										, SUM(CASE WHEN [is_log_file] = 1 THEN dsi.[size_kb] ELSE 0 END) 		AS [log_size_kb]
-										, SUM(CASE WHEN [is_log_file] = 1 THEN dsi.[space_used_kb] ELSE 0 END) 	AS [log_space_used_kb]
+								SELECT    SUM(CASE WHEN [is_log_file] = 0 THEN dsi.[size_mb] ELSE 0 END)		AS [data_size_mb]
+										, SUM(CASE WHEN [is_log_file] = 0 THEN dsi.[space_used_mb] ELSE 0 END) 	AS [data_space_used_mb]
+										, SUM(CASE WHEN [is_log_file] = 1 THEN dsi.[size_mb] ELSE 0 END) 		AS [log_size_mb]
+										, SUM(CASE WHEN [is_log_file] = 1 THEN dsi.[space_used_mb] ELSE 0 END) 	AS [log_space_used_mb]
 										, MAX(x.[drives]) [drives]
 										, MAX(CAST([is_growth_limited] AS [tinyint])) [is_growth_limited]
 								FROM #databaseSpaceInfo dsi
