@@ -146,7 +146,6 @@ IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'
 										INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.[media_set_id] = bmf.[media_set_id]
 										WHERE	bs.[type] IN (''D'', ''I'')
 												AND bs.[database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
-												AND CHARINDEX(''' + @backupLocation + ''', mf.[physical_device_name]
 												AND CHARINDEX(''' + @backupLocation + ''', bmf.[physical_device_name]) <> 0
 										ORDER BY bs.[backup_start_date] DESC
 										SET ROWCOUNT 0'

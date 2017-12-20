@@ -526,6 +526,67 @@ IF @flgOptions & 8 = 8 AND 	(@agName IS NULL OR (@agName IS NOT NULL AND @agInst
 								SET @optionForceChangeBackupType=1 
 							end
 					end
+
+				/* check for database header: dbi_dbbackupLSN */
+				IF @differentialBaseLSN IS NOT NULL AND @serverVersionNum >= 9 AND @optionForceChangeBackupType = 0
+					begin
+						DECLARE @dbi_dbbackupLSN [sysname]
+
+						IF object_id('tempdb..#dbi_dbbackupLSN') IS NOT NULL DROP TABLE #dbi_dbbackupLSN
+						CREATE TABLE #dbi_dbbackupLSN
+						(
+							[Value]					[sysname]			NULL
+						)
+
+						IF object_id('tempdb..#dbccDBINFO') IS NOT NULL DROP TABLE #dbccDBINFO
+						CREATE TABLE #dbccDBINFO
+							(
+								[id]				[int] IDENTITY(1,1),
+								[ParentObject]		[varchar](255) NULL,
+								[Object]			[varchar](255) NULL,
+								[Field]				[varchar](255) NULL,
+								[Value]				[varchar](255) NULL
+							)
+	
+						IF @sqlServerName <> @@SERVERNAME
+							begin
+								IF @serverVersionNum < 11
+									SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
+														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''')'')x
+														WHERE [Field]=''dbi_dbbackupLSN'''
+								ELSE
+									SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
+														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
+														WHERE [Field]=''dbi_dbbackupLSN'''
+							end
+						ELSE
+							begin							
+								SET @queryToRun='DBCC DBINFO (''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''') WITH TABLERESULTS, NO_INFOMSGS'
+								IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+								INSERT	INTO #dbccDBINFO([ParentObject], [Object], [Field], [Value])
+										EXEC (@queryToRun)
+
+								SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_dbbackupLSN'''											
+							end
+
+						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+				
+						INSERT	INTO #dbi_dbbackupLSN([Value])
+								EXEC (@queryToRun)
+
+						SELECT @dbi_dbbackupLSN = ISNULL([Value], 0)
+						FROM #dbi_dbbackupLSN
+		
+						SET @dbi_dbbackupLSN = ISNULL(@dbi_dbbackupLSN, 0)
+						IF CHARINDEX('0:0:0', @dbi_dbbackupLSN) <> 0
+								begin
+									SET @queryToRun = 'WARNING: The database header does not contain any backup information. A full database backup will be taken before the requested backup type.'
+									EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+									SET @optionForceChangeBackupType=1 
+								end
+					end
 			end			
 	end
 
