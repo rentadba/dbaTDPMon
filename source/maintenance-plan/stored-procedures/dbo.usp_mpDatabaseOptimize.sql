@@ -362,7 +362,6 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		SET @queryToRun = N''				
-
 		SET @queryToRun = @queryToRun + 
 							N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 							SELECT DISTINCT 
@@ -1646,29 +1645,95 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				SET @queryToRun=N'Creating statistics for all tables / index columns only ...'
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'sp_createstats @indexonly = ''indexonly'''
+				DECLARE @missingColumnStatsCounter [int]
 
-				--256  - Create statistics using default sample scan. Default behaviour is to create statistics using fullscan mode
-				IF @flgOptions & 256 = 256
-					SET @queryToRun = @queryToRun + N', @fullscan = ''NO'''
+				/* detect if sp_createstats should be executed: check for columns without histograms */
+				IF @serverVersionNum >= 9
+					begin
+						IF object_id('tempdb..#checkMissingColumnStatistics') IS NOT NULL 
+						DROP TABLE #checkMissingColumnStatistics
+
+						CREATE TABLE #checkMissingColumnStatistics
+							(
+								[counter]		[int]
+							)
+
+						SET @queryToRun = N''				
+						SET @queryToRun = @queryToRun + 
+											N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+											SELECT COUNT(*) AS MissingColumnStats
+											FROM (
+													SELECT DISTINCT so.[name] AS [table_name], sc.[name] AS [schema_name]
+													FROM sys.objects so WITH (READPAST)
+													INNER JOIN sys.columns sc WITH (READPAST) ON sc.[object_id] = so.[object_id] 
+													INNER JOIN sys.indexes si WITH (READPAST) ON si.[object_id] = so.[object_id] 
+													INNER JOIN sys.index_columns sic WITH (READPAST) ON sic.[object_id] = so.[object_id] AND sc.[column_id] = sic.[column_id] AND sic.[index_id] = si.[index_id]
+													LEFT JOIN 
+														(
+														 SELECT [object_id], [column_id]
+														 FROM	sys.stats_columns WITH (READPAST)
+														 WHERE	[stats_column_id] = 1
+														)ssc ON ssc.[object_id] = so.[object_id] AND sc.[column_id] = ssc.[column_id]
+													WHERE  so.[type] IN (''U'', ''IT'')
+														AND not (si.[is_disabled] = 1 OR si.[type] IN (5,6))
+														AND sic.[key_ordinal] <> 1
+														AND sic.[is_included_column] = 0
+														AND (TYPE_NAME(sc.[system_type_id]) NOT IN (''xml''))  
+														AND (OBJECTPROPERTY(so.[object_id], ''tablehascolumnset'') = 0 or sc.[is_sparse]=0)  
+														AND (sc.[is_filestream] = 0)  
+														AND (	sc.[is_computed] = 0  
+															 OR (	 sc.[is_computed] = 1   
+																 AND COLUMNPROPERTY(so.[object_id], sc.[name], ''isdeterministic'') = 1 
+																 AND COLUMNPROPERTY(so.[object_id], sc.[name], ''isprecise'') = 1
+																)
+															)  
+														AND ssc.[object_id] IS NULL
+														AND so.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + N'''
+														AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + N'''' + 
+														CASE WHEN @skipObjectsList IS NOT NULL  
+															 THEN N'	AND so.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'  
+															 ELSE N'' 
+														END + N'
+												 )X'
+
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+				
+						INSERT	INTO #checkMissingColumnStatistics([counter])
+								EXEC (@queryToRun)
+				
+						SELECT @missingColumnStatsCounter = [counter] 
+						FROM #checkMissingColumnStatistics
+					end
 				ELSE
-					SET @queryToRun = @queryToRun + N', @fullscan = ''fullscan'''
+					SET @missingColumnStatsCounter = 1
 
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+				IF @missingColumnStatsCounter > 0
+					begin
+						SET @queryToRun = N''
+						SET @queryToRun = @queryToRun + N'sp_createstats @indexonly = ''indexonly'''
 
-				SET @nestedExecutionLevel = @executionLevel + 1
+						--256  - Create statistics using default sample scan. Default behaviour is to create statistics using fullscan mode
+						IF @flgOptions & 256 = 256
+							SET @queryToRun = @queryToRun + N', @fullscan = ''NO'''
+						ELSE
+							SET @queryToRun = @queryToRun + N', @fullscan = ''fullscan'''
 
-				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
-																@dbName			= @dbName,
-																@objectName		= @objectName,
-																@childObjectName= @childObjectName,
-																@module			= 'dbo.usp_mpDatabaseOptimize',
-																@eventName		= 'database maintenance - create statistics',
-																@queryToRun  	= @queryToRun,
-																@flgOptions		= @flgOptions,
-																@executionLevel	= @nestedExecutionLevel,
-																@debugMode		= @debugMode
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+						SET @nestedExecutionLevel = @executionLevel + 1
+
+						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+																		@dbName			= @dbName,
+																		@objectName		= @objectName,
+																		@childObjectName= @childObjectName,
+																		@module			= 'dbo.usp_mpDatabaseOptimize',
+																		@eventName		= 'database maintenance - create statistics',
+																		@queryToRun  	= @queryToRun,
+																		@flgOptions		= @flgOptions,
+																		@executionLevel	= @nestedExecutionLevel,
+																		@debugMode		= @debugMode
+					end
 			end
 	end
 	
