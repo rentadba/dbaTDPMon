@@ -76,7 +76,7 @@ DECLARE		@backupStartDate				[datetime],
 			@backupDurationSec				[int],
 			@backupSizeBytes				[bigint],
 			@eventData						[varchar](8000),
-			@maxPATHLength					[smallint]=259
+			@maxPATHLength					[smallint]
 
 -----------------------------------------------------------------------------------------
 SET NOCOUNT ON
@@ -383,6 +383,7 @@ IF @flgActions & 4 = 4
 	end
 	
 --------------------------------------------------------------------------------------------------
+SET @maxPATHLength = 259
 --as XP is not yet available on Linux, custom folder structure creation won't be possible
 IF NOT (@serverVersionNum >= 14 AND @hostPlatform='linux' )
 	begin
