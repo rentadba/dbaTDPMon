@@ -303,7 +303,7 @@ IF @startJob=1
 
 								IF @stepName IS NOT NULL
 									begin
-										SET @strMessage='Starting job: ' + [dbo].[ufn_getObjectQuoteName](@jobName, 'quoted')
+										SET @strMessage='Starting job: ' + @jobName
 										EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 										SET @queryToRun='[' + @sqlServerName + '].[msdb].[dbo].[sp_start_job] @job_id=''' + @jobID + ''', @step_name=''' + [dbo].[ufn_getObjectQuoteName](@stepName, 'sql') + ''''

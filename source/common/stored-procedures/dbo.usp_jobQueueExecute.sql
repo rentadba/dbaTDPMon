@@ -217,7 +217,7 @@ WHILE @@FETCH_STATUS=0
 
 		---------------------------------------------------------------------------------------------------
 		/* setting the job name & job log location */	
-		SET @logFileLocation = @defaultLogFileLocation + N'job-' + @jobName + N'.log'
+		SET @logFileLocation = @defaultLogFileLocation + [dbo].[ufn_getObjectQuoteName](N'job-' + @jobName + N'.log', 'filename')
 
 		---------------------------------------------------------------------------------------------------
 		/* check if job is running and stop it */

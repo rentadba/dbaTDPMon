@@ -64,7 +64,7 @@ if "%engine_version%"=="8" (
 	set run2kmode=true
 	if not "%module%" == "maintenance-plan" (
 		echo Only maintenance-plan module is supported on SQL Server 2000. Will install it.
-		SET module="maintenance-plan"
+		SET module=maintenance-plan
 		)
 	)
 
@@ -181,7 +181,7 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_formatSQLQueryForLinkedServer.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_getTableFromStringList.sql" -d %dbname%  -b -r 1
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_getTableFromStringList.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_getMilisecondsBetweenDates.sql" -d %dbname%  -b -r 1

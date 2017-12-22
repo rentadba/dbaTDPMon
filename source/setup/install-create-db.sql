@@ -43,13 +43,6 @@ SET @queryToRun = N'CREATE DATABASE [$(dbName)] ON  PRIMARY
 EXEC (@queryToRun)
 GO
 
-
-IF (1 = FULLTEXTSERVICEPROPERTY('IsFullTextInstalled'))
-begin
-EXEC [$(dbName)].[dbo].[sp_fulltext_database] @action = 'disable'
-end
-GO
-
 ALTER DATABASE [$(dbName)] SET ANSI_NULL_DEFAULT OFF 
 GO
 
