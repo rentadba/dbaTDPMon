@@ -20,6 +20,7 @@ DECLARE   @job_name			[sysname]
 		, @queryToRun2		[varchar](8000)
 		, @queryParameters	[nvarchar](512)
 		, @databaseName		[sysname]
+		, @jobEnabled		[tinyint]
 
 DECLARE @SQLMajorVersion [int]
 
@@ -74,9 +75,14 @@ BEGIN TRANSACTION
 	END
 
 	---------------------------------------------------------------------------------------------------
+	IF @SQLMajorVersion > 8
+		SET @jobEnabled = 0
+	ELSE
+		SET @jobEnabled = 1
+
 	DECLARE @jobId BINARY(16)
 	EXEC @ReturnCode =  msdb.dbo.sp_add_job @job_name=@job_name, 
-											@enabled=0, 
+											@enabled=@jobEnabled, 
 											@notify_level_eventlog=0, 
 											@notify_level_email=0, 
 											@notify_level_netsend=0, 

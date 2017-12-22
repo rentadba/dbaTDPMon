@@ -284,7 +284,7 @@ INNER JOIN
 		WHERE si.[reserved]<>0
 	)ps ON ob.[object_id] = ps.[object_id]'
 
-		SET @queryToRun = @queryToRun + CASE WHEN @skipObjectsList IS NOT NULL  
+		SET @queryToRun = @queryToRun + CASE WHEN @skipObjectsList IS NOT NULL AND @serverVersionNum >= 9
 											 THEN N'	WHERE ob.[table_name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
 											 ELSE N'' 
 										END
@@ -621,7 +621,7 @@ IF @flgActions & 32 = 32
 														AND obj.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
 														AND sch.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + ''''			
 
-				SET @queryToRun = @queryToRun + CASE WHEN @skipObjectsList IS NOT NULL  
+				SET @queryToRun = @queryToRun + CASE WHEN @skipObjectsList IS NOT NULL AND @serverVersionNum >= 9
 													 THEN N'	AND obj.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
 													 ELSE N'' 
 												END

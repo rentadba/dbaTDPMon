@@ -392,9 +392,10 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 									AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
 									AND si.[type] IN (' + @analyzeIndexType + N')
 									AND ob.[type] IN (''U'', ''V'')' + 
-									CASE WHEN @skipObjectsList IS NOT NULL  THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))
-																					AND (si.[name] NOT IN (SELECT [value] FROM ' +  [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) OR si.[name] IS NULL)'  
-																			ELSE N'' END
+									CASE WHEN @skipObjectsList IS NOT NULL AND @serverVersionNum >= 9
+										 THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))
+													AND (si.[name] NOT IN (SELECT [value] FROM ' +  [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) OR si.[name] IS NULL)'  
+									ELSE N'' END
 
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -604,9 +605,10 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 										AND si.[type] IN (' + @analyzeIndexType + N')
 										AND si.[is_disabled]=0
 										AND ob.[type] IN (''U'', ''V'')' + 
-										CASE WHEN @skipObjectsList IS NOT NULL	THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
-																						AND si.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
-																				ELSE N'' END
+										CASE WHEN @skipObjectsList IS NOT NULL AND @serverVersionNum >= 9
+											 THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
+														AND si.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
+										ELSE N'' END
 		ELSE
 			SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
 								SELECT DISTINCT 
@@ -629,9 +631,10 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 										AND si.[indid] > 0
 										AND si.[reserved] <> 0
 										AND ob.[xtype] IN (''U'', ''V'')'+
-										CASE WHEN @skipObjectsList IS NOT NULL	THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
-																						AND si.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
-																				ELSE N'' END
+										CASE WHEN @skipObjectsList IS NOT NULL AND @serverVersionNum >= 9
+											 THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
+														AND si.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
+										ELSE N'' END
 
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -640,17 +643,20 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 				EXEC (@queryToRun)
 
 		--delete entries which should be excluded from current maintenance actions, as they are part of [maintenance-plan].[vw_objectSkipList]
-		DELETE dtl
-		FROM #databaseObjectsWithIndexList dtl
-		INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																AND dtl.[table_name] = osl.[object_name]
-		WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]
+		IF @serverVersionNum >= 9
+			begin
+				DELETE dtl
+				FROM #databaseObjectsWithIndexList dtl
+				INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
+																		AND dtl.[table_name] = osl.[object_name]
+				WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]
 
-		DELETE dtl
-		FROM #databaseObjectsWithIndexList dtl
-		INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																AND dtl.[index_name] = osl.[object_name]
-		WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]
+				DELETE dtl
+				FROM #databaseObjectsWithIndexList dtl
+				INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
+																		AND dtl.[index_name] = osl.[object_name]
+				WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]
+			end
 	end
 
 
@@ -706,9 +712,10 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 														  AND (ABS(sp.[modification_counter]) * 100. / CAST(sp.[rows] AS [float])) >= ' + CAST(@statsChangePercent AS [nvarchar](32)) + N'
 														 )
 													)'+
-												CASE WHEN @skipObjectsList IS NOT NULL	THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
-																								AND ss.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
-																						ELSE N'' END
+												CASE WHEN @skipObjectsList IS NOT NULL AND @serverVersionNum >= 9
+													 THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
+																AND ss.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
+												ELSE N'' END
 				ELSE
 					/* SQL Server 2005 up to SQL Server 2008 R2 SP 2*/
 					SET @queryToRun = @queryToRun + 
@@ -742,10 +749,11 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 														  AND (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) >= ' + CAST(@statsChangePercent AS [nvarchar](32)) + N'
 														)
 												)' +
-												CASE WHEN @skipObjectsList IS NOT NULL THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
-																								AND ss.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))
-																								AND si.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
-																					   ELSE N'' END
+												CASE WHEN @skipObjectsList IS NOT NULL AND @serverVersionNum >= 9
+													 THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
+																AND ss.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))
+																AND si.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
+												ELSE N'' END
 			end
 		ELSE
 			/* SQL Server 2000 */
@@ -781,9 +789,10 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 													  AND (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) >= ' + CAST(@statsChangePercent AS [nvarchar](32)) + N'
 													)
 											)' + 
-											CASE WHEN @skipObjectsList IS NOT NULL THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
-																							AND si.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
-																				   ELSE N'' END
+											CASE WHEN @skipObjectsList IS NOT NULL AND @serverVersionNum >= 9
+												 THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
+															AND si.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
+											ELSE N'' END
 
 		IF @sqlServerName<>@@SERVERNAME
 			SET @queryToRun = N'SELECT x.* FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sp_executesql N''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''''')x'
@@ -1678,7 +1687,9 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 														AND not (si.[is_disabled] = 1 OR si.[type] IN (5,6))
 														AND sic.[key_ordinal] <> 1
 														AND sic.[is_included_column] = 0
-														AND (TYPE_NAME(sc.[system_type_id]) NOT IN (''xml''))  
+														AND (TYPE_NAME(sc.[system_type_id]) NOT IN (''xml'')) ' + 
+													CASE WHEN @serverVersionNum >= 10 
+														THEN '
 														AND (OBJECTPROPERTY(so.[object_id], ''tablehascolumnset'') = 0 or sc.[is_sparse]=0)  
 														AND (sc.[is_filestream] = 0)  
 														AND (	sc.[is_computed] = 0  
@@ -1686,11 +1697,13 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 																 AND COLUMNPROPERTY(so.[object_id], sc.[name], ''isdeterministic'') = 1 
 																 AND COLUMNPROPERTY(so.[object_id], sc.[name], ''isprecise'') = 1
 																)
-															)  
+															) '
+														ELSE ''
+													END + N'
 														AND ssc.[object_id] IS NULL
 														AND so.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + N'''
 														AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + N'''' + 
-														CASE WHEN @skipObjectsList IS NOT NULL  
+														CASE WHEN @skipObjectsList IS NOT NULL AND @serverVersionNum >= 9
 															 THEN N'	AND so.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'  
 															 ELSE N'' 
 														END + N'
