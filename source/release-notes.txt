@@ -602,3 +602,7 @@
 
 /* 21.12.2017 */
 	- check for missing single column histograms before running sp_createstats 'indexonly'
+
+/* 22.12.2017 */
+	- fix issue when a job failed and it was reported as "in progress" instead of "failed" (parallel maintenance-plan)
+	- full testing cycle on SQL Server 2000 up to SQL Server 2017
