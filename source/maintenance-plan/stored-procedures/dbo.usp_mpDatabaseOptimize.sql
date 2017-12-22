@@ -86,6 +86,7 @@ AS
 -----------------------------------------------------------------------------------------
 
 DECLARE		@queryToRun    					[nvarchar](4000),
+			@queryParameters				[nvarchar](512),
 			@CurrentTableSchema				[sysname],
 			@CurrentTableName 				[sysname],
 			@objectName						[nvarchar](512),
@@ -404,17 +405,25 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 				EXEC (@queryToRun)
 
 		--delete entries which should be excluded from current maintenance actions, as they are part of [maintenance-plan].[vw_objectSkipList]
-		DELETE dtl
-		FROM #databaseObjectsWithIndexList dtl
-		INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																AND dtl.[table_name] = osl.[object_name]
-		WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]
+		SET @queryToRun = N''
+		SET @queryToRun = @queryToRun + N'
+						DELETE dtl
+						FROM #databaseObjectsWithIndexList dtl
+						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
+																				AND dtl.[table_name] = osl.[object_name]
+						WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]'
+		SET @queryParameters = '@flgActions [int]'
+		EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
 
-		DELETE dtl
-		FROM #databaseObjectsWithIndexList dtl
-		INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																AND dtl.[index_name] = osl.[object_name]
-		WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]
+		SET @queryToRun = N''
+		SET @queryToRun = @queryToRun + N'
+						DELETE dtl
+						FROM #databaseObjectsWithIndexList dtl
+						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
+																				AND dtl.[index_name] = osl.[object_name]
+						WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]'
+		SET @queryParameters = '@flgActions [int]'
+		EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
 	end
 
 
@@ -645,17 +654,25 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 		--delete entries which should be excluded from current maintenance actions, as they are part of [maintenance-plan].[vw_objectSkipList]
 		IF @serverVersionNum >= 9
 			begin
-				DELETE dtl
-				FROM #databaseObjectsWithIndexList dtl
-				INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																		AND dtl.[table_name] = osl.[object_name]
-				WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]
+				SET @queryToRun = N''
+				SET @queryToRun = @queryToRun + N'
+								DELETE dtl
+								FROM #databaseObjectsWithIndexList dtl
+								INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
+																						AND dtl.[table_name] = osl.[object_name]
+								WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]'
+				SET @queryParameters = '@flgActions [int]'
+				EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
 
-				DELETE dtl
-				FROM #databaseObjectsWithIndexList dtl
-				INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																		AND dtl.[index_name] = osl.[object_name]
-				WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]
+				SET @queryToRun = N''
+				SET @queryToRun = @queryToRun + N'
+								DELETE dtl
+								FROM #databaseObjectsWithIndexList dtl
+								INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
+																						AND dtl.[index_name] = osl.[object_name]
+								WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]'
+				SET @queryParameters = '@flgActions [int]'
+				EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
 			end
 	end
 
@@ -804,17 +821,28 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				EXEC (@queryToRun)
 
 		--delete entries which should be excluded from current maintenance actions, as they are part of [maintenance-plan].[vw_objectSkipList]
-		DELETE dtl
-		FROM #databaseObjectsWithStatisticsList dtl
-		INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																AND dtl.[table_name] = osl.[object_name]
-		WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]
+		IF (@serverVersionNum >= 9)
+			begin
+				SET @queryToRun = N''
+				SET @queryToRun = @queryToRun + N'
+								DELETE dtl
+								FROM #databaseObjectsWithStatisticsList dtl
+								INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
+																						AND dtl.[table_name] = osl.[object_name]
+								WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]'
+				SET @queryParameters = '@flgActions [int]'
+				EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
 
-		DELETE dtl
-		FROM #databaseObjectsWithStatisticsList dtl
-		INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																AND dtl.[stats_name] = osl.[object_name]
-		WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]
+				SET @queryToRun = N''
+				SET @queryToRun = @queryToRun + N'
+								DELETE dtl
+								FROM #databaseObjectsWithStatisticsList dtl
+								INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
+																						AND dtl.[stats_name] = osl.[object_name]
+								WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]'
+				SET @queryParameters = '@flgActions [int]'
+				EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
+			end
 	end
 
 UPDATE #databaseObjectsWithStatisticsList 
@@ -850,9 +878,9 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AN
 				IF @serverVersionNum < 9	/* SQL 2000 */
 					begin
 						IF @sqlServerName=@@SERVERNAME
-							SET @queryToRun='USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'; IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''') IS NOT NULL DBCC SHOWCONTIG (''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''', ''' + [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') + ''' ) WITH ' + CASE WHEN @flgOptions & 1024 = 1024 THEN '' ELSE 'FAST,' END + ' TABLERESULTS, NO_INFOMSGS'
+							SET @queryToRun='USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'; IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''') IS NOT NULL DBCC SHOWCONTIG (''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''', ''' + [dbo].[ufn_getObjectQuoteName](@IndexName, 'sql') + ''' ) WITH ' + CASE WHEN @flgOptions & 1024 = 1024 THEN '' ELSE 'FAST,' END + ' TABLERESULTS, NO_INFOMSGS'
 						ELSE
-							SET @queryToRun='SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'.dbo.sp_executesql N''''IF OBJECT_ID(''''''''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''''''''') IS NOT NULL DBCC SHOWCONTIG (''''''''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''''''''', ''''''''' + [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') + ''''''''' ) WITH ' + CASE WHEN @flgOptions & 1024 = 1024 THEN '' ELSE 'FAST,' END + ' TABLERESULTS, NO_INFOMSGS'''''')x'
+							SET @queryToRun='SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'.dbo.sp_executesql N''''IF OBJECT_ID(''''''''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''''''''') IS NOT NULL DBCC SHOWCONTIG (''''''''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''''''''', ''''''''' + [dbo].[ufn_getObjectQuoteName](@IndexName, 'sql') + ''''''''' ) WITH ' + CASE WHEN @flgOptions & 1024 = 1024 THEN '' ELSE 'FAST,' END + ' TABLERESULTS, NO_INFOMSGS'''''')x'
 
 						IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 						INSERT	INTO #CurrentIndexFragmentationStats([ObjectName], [ObjectId], [IndexName], [IndexId], [Level], [Pages], [Rows], [MinimumRecordSize], [MaximumRecordSize], [AverageRecordSize], [ForwardedRecords], [Extents], [ExtentSwitches], [AverageFreeBytes], [AveragePageDensity], [ScanDensity], [BestCount], [ActualCount], [LogicalFragmentation], [ExtentFragmentation])

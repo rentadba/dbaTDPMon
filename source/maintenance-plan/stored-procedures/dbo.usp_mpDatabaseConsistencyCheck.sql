@@ -73,6 +73,7 @@ AS
 */
 
 DECLARE		@queryToRun  					[nvarchar](2048),
+			@queryParameters				[nvarchar](512),
 			@CurrentTableSchema				[sysname],
 			@CurrentTableName 				[sysname],
 			@objectName						[nvarchar](512),
@@ -297,11 +298,18 @@ INNER JOIN
 				EXEC (@queryToRun)
 
 		--delete entries which should be excluded from current maintenance actions, as they are part of [maintenance-plan].[vw_objectSkipList]
-		DELETE dtl
-		FROM #databaseTableList dtl
-		INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																AND dtl.[table_name] = osl.[object_name]
-		WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]
+		IF @serverVersionNum >= 9
+			begin
+				SET @queryToRun = N''
+				SET @queryToRun = @queryToRun + N'
+								DELETE dtl
+								FROM #databaseTableList dtl
+								INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
+																						AND dtl.[table_name] = osl.[object_name]
+								WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]'
+				SET @queryParameters = '@flgActions [int]'
+				EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
+			end
 	end
 
 --------------------------------------------------------------------------------------------------
@@ -634,11 +642,18 @@ IF @flgActions & 32 = 32
 						EXEC (@queryToRun)
 
 				--delete entries which should be excluded from current maintenance actions, as they are part of [maintenance-plan].[vw_objectSkipList]
-				DELETE dtl
-				FROM #databaseTableListIdent dtl
-				INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																		AND dtl.[table_name] = osl.[object_name]
-				WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]
+				IF @serverVersionNum >= 9
+					begin
+						SET @queryToRun = N''
+						SET @queryToRun = @queryToRun + N'
+										DELETE dtl
+										FROM #databaseTableListIdent dtl
+										INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
+																								AND dtl.[table_name] = osl.[object_name]
+										WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]'
+						SET @queryParameters = '@flgActions [int]'
+						EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
+					end
 
 				DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [table_schema], [table_name] 
 																	FROM #databaseTableListIdent	
