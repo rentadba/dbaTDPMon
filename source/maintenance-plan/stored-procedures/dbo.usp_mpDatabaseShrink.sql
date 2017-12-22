@@ -187,7 +187,8 @@ WHILE @@FETCH_STATUS=0
 
 				DELETE FROM #databaseFiles
 
-				SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; SELECT [name] FROM sysfiles WHERE [status] & 0x40 = 0x40'
+				SET @queryToRun = CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
+								 SELECT [name] FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '..' ELSE N'' END + N'sysfiles WHERE [status] & 0x40 = 0x40'
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 				
@@ -199,7 +200,7 @@ WHILE @@FETCH_STATUS=0
 				FETCH NEXT FROM crsLogFile INTO @logName
 				WHILE @@FETCH_STATUS=0
 					begin
-						SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + '; DBCC SHRINKFILE(' + [dbo].[ufn_getObjectQuoteName](@logName, 'quoted') + CASE WHEN @flgOptions & 1 = 1 THEN N', TRUNCATEONLY' ELSE N'' END + N') WITH NO_INFOMSGS'
+						SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; DBCC SHRINKFILE(' + [dbo].[ufn_getObjectQuoteName](@logName, 'quoted') + CASE WHEN @flgOptions & 1 = 1 THEN N', TRUNCATEONLY' ELSE N'' END + N') WITH NO_INFOMSGS'
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 						SET @nestedExecutionLevel = @executionLevel + 1

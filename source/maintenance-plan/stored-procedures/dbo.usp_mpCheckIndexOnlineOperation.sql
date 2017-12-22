@@ -91,11 +91,11 @@ IF (@partitionNumber <> 1)
 /* disabled indexes / XML, spatial indexes, columnstore, hash */
 -----------------------------------------------------------------------------------------
 SET @queryToRun = N''
-SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+SET @queryToRun = @queryToRun + CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 						SELECT DISTINCT idx.[name]
-						FROM [sys].[indexes]		idx
-						INNER JOIN [sys].[objects]	obj	ON  idx.[object_id] = obj.[object_id]
-						INNER JOIN [sys].[schemas]	sch	ON	sch.[schema_id] = obj.[schema_id]
+						FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[indexes]		idx
+						INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects]	obj	ON  idx.[object_id] = obj.[object_id]
+						INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]	sch	ON	sch.[schema_id] = obj.[schema_id]
 						WHERE	obj.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
 								AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''' + 
 								CASE	WHEN @indexName IS NOT NULL 
@@ -125,16 +125,16 @@ IF (SELECT COUNT(*) FROM @onlineConstraintCheck) > 0
 IF @serverVersionNum < 11
 	begin
 		SET @queryToRun = N''
-		SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+		SET @queryToRun = @queryToRun + CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 								SELECT DISTINCT idx.[name]
-								FROM [sys].[indexes]			idx
-								INNER JOIN [sys].[index_columns] idxCol ON	idx.[object_id] = idxCol.[object_id]
+								FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[indexes]			idx
+								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[index_columns] idxCol ON	idx.[object_id] = idxCol.[object_id]
 																			AND idx.[index_id] = idxCol.[index_id]
-								INNER JOIN [sys].[columns]		 col	ON	idxCol.[object_id] = col.[object_id]
+								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[columns]		 col	ON	idxCol.[object_id] = col.[object_id]
 																			AND idxCol.[column_id] = col.[column_id]
-								INNER JOIN [sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
-								INNER JOIN [sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
-								INNER JOIN [sys].[types]		 st		ON  col.[system_type_id] = st.[system_type_id]
+								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
+								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
+								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[types]		 st		ON  col.[system_type_id] = st.[system_type_id]
 								WHERE	obj.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
 										AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''' + 
 										CASE	WHEN @indexName IS NOT NULL 
@@ -166,11 +166,11 @@ IF @serverVersionNum < 11
 		IF @indexID IS NULL
 			begin
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+				SET @queryToRun = @queryToRun + CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 										SELECT DISTINCT idx.[index_id]
-										FROM [sys].[indexes] idx
-										INNER JOIN [sys].[objects]	 obj ON idx.[object_id] = obj.[object_id]
-										INNER JOIN [sys].[schemas]	 sch ON	sch.[schema_id] = obj.[schema_id]
+										FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[indexes] idx
+										INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects]	 obj ON idx.[object_id] = obj.[object_id]
+										INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]	 sch ON	sch.[schema_id] = obj.[schema_id]
 										WHERE	obj.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
 												AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
 												AND idx.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@indexName, 'sql') + ''''
@@ -187,12 +187,12 @@ IF @serverVersionNum < 11
 		IF @indexID=1
 			begin
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+				SET @queryToRun = @queryToRun + CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 										SELECT DISTINCT obj.[name]
-										FROM  [sys].[objects]		 obj
-										INNER JOIN [sys].[columns]	 col ON col.[object_id] = obj.[object_id]
-										INNER JOIN [sys].[schemas]	 sch ON	sch.[schema_id] = obj.[schema_id]
-										INNER JOIN [sys].[types]	 st	 ON col.[system_type_id] = st.[system_type_id]
+										FROM  ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects]		 obj
+										INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[columns]	 col ON col.[object_id] = obj.[object_id]
+										INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]	 sch ON	sch.[schema_id] = obj.[schema_id]
+										INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[types]	 st	 ON col.[system_type_id] = st.[system_type_id]
 										WHERE	obj.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
 												AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
 												AND (    st.[name] IN (''text'', ''ntext'', ''image'', ''filestream'', ''xml'')

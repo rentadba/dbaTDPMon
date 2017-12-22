@@ -72,9 +72,9 @@ BEGIN TRY
 					[table_name]	[sysname]
 				)
 
-		SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+		SET @queryToRun = CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 						SELECT TABLE_SCHEMA, TABLE_NAME 
-						FROM INFORMATION_SCHEMA.TABLES
+						FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'INFORMATION_SCHEMA.TABLES
 						WHERE	TABLE_TYPE = ''BASE TABLE'' 
 								AND TABLE_NAME LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + N''' 
 								AND TABLE_SCHEMA LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + N''''
@@ -108,11 +108,11 @@ BEGIN TRY
 
 						--if current action is to disable triggers, will get only enabled triggers
 						--if current action is to enable triggers, will get only disabled triggers
-						SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+						SET @queryToRun=CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 									SELECT DISTINCT st.[name]
-									FROM [sys].[triggers] st
-									INNER JOIN [sys].[objects] so ON so.[object_id] = st.[parent_id] 
-									INNER JOIN [sys].[schemas] sch ON sch.[schema_id] = so.[schema_id] 
+									FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[triggers] st
+									INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects] so ON so.[object_id] = st.[parent_id] 
+									INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas] sch ON sch.[schema_id] = so.[schema_id] 
 									WHERE	so.[name]=''' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'sql') + '''
 											AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'sql') + '''
 											AND st.[is_disabled]=' + CAST(@flgAction AS [varchar]) + '

@@ -364,7 +364,7 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 
 		SET @queryToRun = N''				
 		SET @queryToRun = @queryToRun + 
-							N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+							CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 							SELECT DISTINCT 
 									  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 									, si.[object_id]
@@ -374,16 +374,16 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 									, si.[name] AS [index_name]
 									, si.[type] AS [index_type]
 									, CASE WHEN si.[fill_factor] = 0 THEN 100 ELSE si.[fill_factor] END AS [fill_factor]
-							FROM [sys].[indexes]			si
-							INNER JOIN [sys].[objects]		ob	ON ob.[object_id] = si.[object_id]
-							INNER JOIN [sys].[schemas]		sc	ON sc.[schema_id] = ob.[schema_id]' +
+							FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[indexes]			si
+							INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects]		ob	ON ob.[object_id] = si.[object_id]
+							INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]		sc	ON sc.[schema_id] = ob.[schema_id]' +
 							CASE WHEN @flgOptions & 32768 = 32768 
 								THEN N'
 							INNER JOIN
 									(
 											SELECT   [object_id]
 												, SUM([reserved_page_count]) as [reserved_page_count]
-											FROM sys.dm_db_partition_stats
+											FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.dm_db_partition_stats
 											GROUP BY [object_id]
 											HAVING SUM([reserved_page_count]) >=' + CAST(@pageThreshold AS [nvarchar](32)) + N'
 									) ps ON ps.[object_id] = ob.[object_id]'
@@ -451,7 +451,7 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + CASE WHEN @IndexName IS NOT NULL THEN N' - ' + [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted')  ELSE N' (heap)' END
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
-				SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+				SET @queryToRun=CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 									SELECT	 OBJECT_NAME(ips.[object_id])	AS [table_name]
 											, ips.[object_id]
 											, si.[name] as index_name
@@ -463,10 +463,10 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 											, ips.[avg_record_size_in_bytes]
 											, ips.[avg_page_space_used_in_percent]
 											, ips.[ghost_record_count]
-									FROM sys.dm_db_index_physical_stats (' + CAST(@DatabaseID AS [nvarchar](4000)) + N', ' + CAST(@ObjectID AS [nvarchar](4000)) + N', ' + CAST(@IndexID AS [nvarchar](4000)) + N' , NULL, ''' + 
+									FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.dm_db_index_physical_stats (' + CAST(@DatabaseID AS [nvarchar](4000)) + N', ' + CAST(@ObjectID AS [nvarchar](4000)) + N', ' + CAST(@IndexID AS [nvarchar](4000)) + N' , NULL, ''' + 
 													'DETAILED'
 											+ ''') ips
-									INNER JOIN sys.indexes si ON ips.[object_id]=si.[object_id] AND ips.[index_id]=si.[index_id]
+									INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.indexes si ON ips.[object_id]=si.[object_id] AND ips.[index_id]=si.[index_id]
 									WHERE	si.[type] IN (' + @analyzeIndexType + N')'
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
@@ -584,7 +584,7 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 
 		IF @serverVersionNum >= 9
 			SET @queryToRun = @queryToRun + 
-								N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+								CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 								SELECT DISTINCT 
 										  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 										, si.[object_id]
@@ -594,16 +594,16 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 										, si.[name] AS [index_name]
 										, si.[type] AS [index_type]
 										, CASE WHEN si.[fill_factor] = 0 THEN 100 ELSE si.[fill_factor] END AS [fill_factor]
-								FROM [sys].[indexes]			si
-								INNER JOIN [sys].[objects]		ob	ON ob.[object_id] = si.[object_id]
-								INNER JOIN [sys].[schemas]		sc	ON sc.[schema_id] = ob.[schema_id]' +
+								FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[indexes]			si
+								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects]		ob	ON ob.[object_id] = si.[object_id]
+								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]		sc	ON sc.[schema_id] = ob.[schema_id]' +
 								CASE WHEN @flgOptions & 32768 = 32768 
 									THEN N'
 								INNER JOIN
 										(
 											 SELECT   [object_id]
 													, SUM([reserved_page_count]) as [reserved_page_count]
-											 FROM sys.dm_db_partition_stats
+											 FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.dm_db_partition_stats
 											 GROUP BY [object_id]
 											 HAVING SUM([reserved_page_count]) >=' + CAST(@pageThreshold AS [nvarchar](32)) + N'
 										) ps ON ps.[object_id] = ob.[object_id]'
@@ -619,7 +619,7 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 														AND si.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
 										ELSE N'' END
 		ELSE
-			SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+			SET @queryToRun = @queryToRun + CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 								SELECT DISTINCT 
 									  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 									, si.[id] AS [object_id]
@@ -629,9 +629,9 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 									, si.[name] AS [index_name]
 									, CASE WHEN si.[indid]=1 THEN 1 ELSE 2 END AS [index_type]
 									, CASE WHEN ISNULL(si.[OrigFillFactor], 0) = 0 THEN 100 ELSE si.[OrigFillFactor] END AS [fill_factor]
-								FROM sysindexes si
-								INNER JOIN sysobjects ob	ON ob.[id] = si.[id]
-								INNER JOIN sysusers sc	ON sc.[uid] = ob.[uid]
+								FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '..' ELSE N'' END + N'sysindexes si
+								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '..' ELSE N'' END + N'sysobjects ob	ON ob.[id] = si.[id]
+								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '..' ELSE N'' END + N'sysusers sc	ON sc.[uid] = ob.[uid]
 								WHERE	ob.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
 										AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
 										AND si.[status] & 64 = 0 
@@ -699,7 +699,8 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				IF (@serverVersionNum >= 10.504000 AND @serverVersionNum < 11) OR @serverVersionNum >= 11.03000
 					/* starting with SQL Server 2008 R2 SP2 / SQL Server 2012 SP1 */
 					SET @queryToRun = @queryToRun + 
-										N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; SELECT DISTINCT 
+										CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
+										SELECT DISTINCT
 												  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 												, ss.[object_id]
 												, sc.[name] AS [table_schema]
@@ -711,10 +712,10 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 												, sp.[rows]
 												, ABS(sp.[modification_counter]) AS [modification_counter]
 												, (ABS(sp.[modification_counter]) * 100. / CAST(sp.[rows] AS [float])) AS [percent_changes]
-										FROM sys.stats ss
-										INNER JOIN sys.objects ob	ON ob.[object_id] = ss.[object_id]
-										INNER JOIN sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]' + N'
-										CROSS APPLY sys.dm_db_stats_properties(ss.object_id, ss.stats_id) AS sp
+										FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.stats ss
+										INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.objects ob	ON ob.[object_id] = ss.[object_id]
+										INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]' + N'
+										CROSS APPLY ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.dm_db_stats_properties(ss.object_id, ss.stats_id) AS sp
 										WHERE	ob.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
 												AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
 												AND ob.[type] <> ''S''
@@ -736,7 +737,8 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				ELSE
 					/* SQL Server 2005 up to SQL Server 2008 R2 SP 2*/
 					SET @queryToRun = @queryToRun + 
-										N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; SELECT DISTINCT 
+										CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
+										SELECT DISTINCT
 												  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 												, ss.[object_id]
 												, sc.[name] AS [table_schema]
@@ -748,10 +750,10 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 												, si.[rowcnt] AS [rows]
 												, ABS(si.[rowmodctr]) AS [modification_counter]
 												, (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) AS [percent_changes]
-										FROM sys.stats ss
-										INNER JOIN sys.objects ob	ON ob.[object_id] = ss.[object_id]
-										INNER JOIN sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]
-										INNER JOIN sysindexes  si	ON si.[id] = ob.[object_id] AND si.[name] = ss.[name]' + N'
+										FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.stats ss
+										INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.objects ob	ON ob.[object_id] = ss.[object_id]
+										INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]
+										INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '..' ELSE N'' END + N'sysindexes  si	ON si.[id] = ob.[object_id] AND si.[name] = ss.[name]' + N'
 										WHERE	ob.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
 												AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
 												AND ob.[type] <> ''S''
@@ -775,7 +777,8 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 		ELSE
 			/* SQL Server 2000 */
 			SET @queryToRun = @queryToRun + 
-								N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; SELECT DISTINCT 
+								CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
+									SELECT DISTINCT
 										  DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') AS [database_id]
 										, si.[id] AS [object_id]
 										, sc.[name] AS [table_schema]
@@ -787,9 +790,9 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 										, si.[rowcnt] AS [rows]
 										, ABS(si.[rowmodctr]) AS [modification_counter]
 										, (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) AS [percent_changes]
-									FROM sysindexes si
-									INNER JOIN sysobjects ob	ON ob.[id] = si.[id]
-									INNER JOIN sysusers   sc	ON sc.[uid] = ob.[uid]
+									FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '..' ELSE N'' END + N'sysindexes si
+									INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '..' ELSE N'' END + N'sysobjects ob	ON ob.[id] = si.[id]
+									INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '..' ELSE N'' END + N'sysusers   sc	ON sc.[uid] = ob.[uid]
 									WHERE	ob.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
 											AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
 											AND si.[indid] > 0 
@@ -888,7 +891,7 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AN
 					end
 				ELSE
 					begin
-						SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+						SET @queryToRun=CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 											SELECT	 OBJECT_NAME(ips.[object_id])	AS [table_name]
 													, ips.[object_id]
 													, si.[name] as index_name
@@ -900,10 +903,10 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AN
 													, ips.[avg_record_size_in_bytes]
 													, ips.[avg_page_space_used_in_percent]
 													, ips.[ghost_record_count]
-											FROM sys.dm_db_index_physical_stats (' + CAST(@DatabaseID AS [nvarchar](4000)) + N', ' + CAST(@ObjectID AS [nvarchar](4000)) + N', ' + CAST(@IndexID AS [nvarchar](4000)) + N' , NULL, ''' + 
+											FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.dm_db_index_physical_stats (' + CAST(@DatabaseID AS [nvarchar](4000)) + N', ' + CAST(@ObjectID AS [nvarchar](4000)) + N', ' + CAST(@IndexID AS [nvarchar](4000)) + N' , NULL, ''' + 
 															CASE WHEN @flgOptions & 1024 = 1024 THEN 'DETAILED' ELSE 'LIMITED' END 
 													+ ''') ips
-											INNER JOIN sys.indexes si ON ips.[object_id]=si.[object_id] AND ips.[index_id]=si.[index_id]
+											INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.indexes si ON ips.[object_id]=si.[object_id] AND ips.[index_id]=si.[index_id]
 											WHERE	si.[type] IN (' + @analyzeIndexType + N')
 													AND si.[is_disabled]=0'
 						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
@@ -1252,7 +1255,7 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 								ELSE
 									begin
 										SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; '
-										SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''') IS NOT NULL DBCC DBREINDEX (''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + '' + ''', ''' + [dbo].[ufn_getObjectQuoteName](RTRIM(@IndexName), 'quoted') + ''') WITH NO_INFOMSGS'
+										SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''') IS NOT NULL DBCC DBREINDEX (''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + '' + ''', ''' + [dbo].[ufn_getObjectQuoteName](RTRIM(@IndexName), 'sql') + ''') WITH NO_INFOMSGS'
 										IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 										SET @nestedExecutionLevel = @executionLevel + 1
@@ -1460,7 +1463,7 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 						ELSE
 							begin
 								SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; '
-								SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''') IS NOT NULL DBCC DBREINDEX (''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + '' + ''', ''' + [dbo].[ufn_getObjectQuoteName](RTRIM(@IndexName), 'quoted') + ''') WITH NO_INFOMSGS'
+								SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''') IS NOT NULL DBCC DBREINDEX (''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + '' + ''', ''' + [dbo].[ufn_getObjectQuoteName](RTRIM(@IndexName), 'sql') + ''') WITH NO_INFOMSGS'
 								IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 								
 								SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'quoted')
@@ -1697,18 +1700,18 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 
 						SET @queryToRun = N''				
 						SET @queryToRun = @queryToRun + 
-											N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+											CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 											SELECT COUNT(*) AS MissingColumnStats
 											FROM (
 													SELECT DISTINCT so.[name] AS [table_name], sc.[name] AS [schema_name]
-													FROM sys.objects so WITH (READPAST)
-													INNER JOIN sys.columns sc WITH (READPAST) ON sc.[object_id] = so.[object_id] 
-													INNER JOIN sys.indexes si WITH (READPAST) ON si.[object_id] = so.[object_id] 
-													INNER JOIN sys.index_columns sic WITH (READPAST) ON sic.[object_id] = so.[object_id] AND sc.[column_id] = sic.[column_id] AND sic.[index_id] = si.[index_id]
+													FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.objects so WITH (READPAST)
+													INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.columns sc WITH (READPAST) ON sc.[object_id] = so.[object_id] 
+													INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.indexes si WITH (READPAST) ON si.[object_id] = so.[object_id] 
+													INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.index_columns sic WITH (READPAST) ON sic.[object_id] = so.[object_id] AND sc.[column_id] = sic.[column_id] AND sic.[index_id] = si.[index_id]
 													LEFT JOIN 
 														(
 														 SELECT [object_id], [column_id]
-														 FROM	sys.stats_columns WITH (READPAST)
+														 FROM	' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.stats_columns WITH (READPAST)
 														 WHERE	[stats_column_id] = 1
 														)ssc ON ssc.[object_id] = so.[object_id] AND sc.[column_id] = ssc.[column_id]
 													WHERE  so.[type] IN (''U'', ''IT'')

@@ -78,9 +78,9 @@ BEGIN TRY
 					[table_name] [sysname]
 				)
 
-		SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+		SET @queryToRun = CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 						SELECT TABLE_SCHEMA, TABLE_NAME 
-						FROM INFORMATION_SCHEMA.TABLES 
+						FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'INFORMATION_SCHEMA.TABLES 
 						WHERE	TABLE_TYPE = ''BASE TABLE'' 
 								AND TABLE_NAME LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + ''' 
 								AND TABLE_SCHEMA LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + ''''
@@ -118,13 +118,13 @@ BEGIN TRY
 						IF (@flgOptions & 1 = 1)
 							begin
 								--list all tables that have foreign key constraints that reffers current table					
-								SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+								SET @queryToRun=CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 												SELECT DISTINCT sch.[name] AS [schema_name], so.[name] AS [table_name], sfk.[name] AS [constraint_name]
-												FROM [sys].[objects] so
-												INNER JOIN [sys].[schemas]		sch  ON sch.[schema_id] = so.[schema_id]
-												INNER JOIN [sys].[foreign_keys]	sfk  ON so.[object_id] = sfk.[parent_object_id]
-												INNER JOIN [sys].[objects]		so2  ON sfk.[referenced_object_id] = so2.[object_id]
-												INNER JOIN [sys].[schemas]		sch2 ON sch2.[schema_id] = so2.[schema_id]
+												FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects] so
+												INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]		sch  ON sch.[schema_id] = so.[schema_id]
+												INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[foreign_keys]	sfk  ON so.[object_id] = sfk.[parent_object_id]
+												INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects]		so2  ON sfk.[referenced_object_id] = so2.[object_id]
+												INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]		sch2 ON sch2.[schema_id] = so2.[schema_id]
 												WHERE	so2.[name]=''' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'sql') + '''
 														AND sch2.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'sql') + '''
 														AND sfk.[is_disabled]=' + CAST(@flgAction AS [varchar]) + '
@@ -139,13 +139,13 @@ BEGIN TRY
 						IF (@flgOptions & 2 = 2)
 							begin
 								--list all tables that current table foreign key constraints reffers 
-								SET @queryToRun=N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+								SET @queryToRun=CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 												SELECT DISTINCT sch2.[name] AS [schema_name], so2.[name] AS [table_name], sfk.[name] AS [constraint_name]
-												FROM [sys].[objects] so
-												INNER JOIN [sys].[schemas]		sch  ON sch.[schema_id] = so.[schema_id]
-												INNER JOIN [sys].[foreign_keys]	sfk ON so.[object_id] = sfk.[referenced_object_id]
-												INNER JOIN [sys].[objects]		so2 ON sfk.[parent_object_id] = so2.[object_id]
-												INNER JOIN [sys].[schemas]		sch2 ON sch.[schema_id] = so2.[schema_id]
+												FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects] so
+												INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]		sch  ON sch.[schema_id] = so.[schema_id]
+												INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[foreign_keys]	sfk ON so.[object_id] = sfk.[referenced_object_id]
+												INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects]		so2 ON sfk.[parent_object_id] = so2.[object_id]
+												INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]		sch2 ON sch.[schema_id] = so2.[schema_id]
 												WHERE	so2.[name]=''' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'sql') + '''
 														AND sch2.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'sql') + '''
 														AND sfk.[is_disabled]=' + CAST(@flgAction AS [varchar])+ '

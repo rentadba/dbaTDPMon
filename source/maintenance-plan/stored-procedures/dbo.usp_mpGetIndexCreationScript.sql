@@ -103,7 +103,7 @@ BEGIN TRY
 
 		--get current index properties
 		SET @queryToRun = N''
-		SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+		SET @queryToRun = @queryToRun + CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 									SELECT  idx.[name]
 										, idx.[type]
 										, idx.[fill_factor]
@@ -113,10 +113,10 @@ BEGIN TRY
 										, idx.[allow_row_locks]
 										, idx.[allow_page_locks]
 										, idx.[ignore_dup_key]
-									FROM [sys].[indexes]			idx
-									INNER JOIN [sys].[objects]		obj ON  idx.[object_id] = obj.[object_id]
-									INNER JOIN [sys].[schemas]		sch ON	sch.[schema_id] = obj.[schema_id]
-									INNER JOIN [sys].[data_spaces]	dSp	ON  idx.[data_space_id] = dSp.[data_space_id]
+									FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[indexes]			idx
+									INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects]		obj ON  idx.[object_id] = obj.[object_id]
+									INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]		sch ON	sch.[schema_id] = obj.[schema_id]
+									INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[data_spaces]	dSp	ON  idx.[data_space_id] = dSp.[data_space_id]
 									WHERE	obj.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
 											AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''' + 
 											CASE	WHEN @indexName IS NOT NULL 
@@ -126,7 +126,7 @@ BEGIN TRY
 											CASE WHEN @flgOptions & 1 <> 1
 												 THEN '	AND NOT EXISTS	(
 																			SELECT 1
-																			FROM [INFORMATION_SCHEMA].[TABLE_CONSTRAINTS]
+																			FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[INFORMATION_SCHEMA].[TABLE_CONSTRAINTS]
 																			WHERE [CONSTRAINT_TYPE]=''PRIMARY KEY''
 																					AND [CONSTRAINT_CATALOG]=''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + '''
 																					AND [TABLE_NAME]=''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
@@ -156,20 +156,20 @@ BEGIN TRY
 		
 		--get current index key columns and include columns and their properties
 		SET @queryToRun = N''
-		SET @queryToRun = @queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; 
+		SET @queryToRun = @queryToRun + CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 								SELECT    
 										  idxCol.[key_ordinal]
 										, idxCol.[index_column_id]
 										, idxCol.[is_included_column]
 										, idxCol.[is_descending_key]
 										, col.[name] AS [column_name]
-								FROM [sys].[indexes] idx
-								INNER JOIN [sys].[index_columns] idxCol ON	idx.[object_id] = idxCol.[object_id]
+								FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[indexes] idx
+								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[index_columns] idxCol ON	idx.[object_id] = idxCol.[object_id]
 																								AND idx.[index_id] = idxCol.[index_id]
-								INNER JOIN [sys].[columns]		 col	ON	idxCol.[object_id] = col.[object_id]
+								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[columns]		 col	ON	idxCol.[object_id] = col.[object_id]
 																								AND idxCol.[column_id] = col.[column_id]
-								INNER JOIN [sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
-								INNER JOIN [sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
+								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects]		 obj	ON  idx.[object_id] = obj.[object_id]
+								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]		 sch	ON	sch.[schema_id] = obj.[schema_id]
 								WHERE	obj.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
 										AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''' + 
 										CASE	WHEN @indexName IS NOT NULL 
@@ -179,7 +179,7 @@ BEGIN TRY
 										CASE WHEN @flgOptions & 1 <> 1
 											 THEN '	AND NOT EXISTS	(
 																		SELECT 1
-																		FROM [INFORMATION_SCHEMA].[TABLE_CONSTRAINTS]
+																		FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[INFORMATION_SCHEMA].[TABLE_CONSTRAINTS]
 																		WHERE [CONSTRAINT_TYPE]=''PRIMARY KEY''
 																				AND [CONSTRAINT_CATALOG]=''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + '''
 																				AND [TABLE_NAME]=''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''

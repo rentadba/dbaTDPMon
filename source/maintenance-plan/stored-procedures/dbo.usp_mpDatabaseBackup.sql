@@ -390,9 +390,9 @@ IF NOT (@serverVersionNum >= 14 AND @hostPlatform='linux' )
 		--create destination path: <@backupLocation>\@sqlServerName\@dbName
 		IF RIGHT(@backupLocation, 1)<>'\' SET @backupLocation = @backupLocation + N'\'
 		IF @agName IS NULL
-			SET @backupLocation = @backupLocation + REPLACE(@sqlServerName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
+			SET @backupLocation = @backupLocation + REPLACE(@sqlServerName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'filename') + '\' ELSE '' END
 		ELSE
-			SET @backupLocation = @backupLocation + REPLACE(@agName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN @dbName + '\' ELSE '' END
+			SET @backupLocation = @backupLocation + REPLACE(@agName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'filename') + '\' ELSE '' END
 		SET @backupLocation = SUBSTRING(@backupLocation, 1, 2) + REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING(@backupLocation, 3, LEN(@backupLocation)), '<', '_'), '>', '_'), ':', '_'), '"', '_')
 
 		SET @backupLocation = [dbo].[ufn_formatPlatformSpecificPath](@sqlServerName, @backupLocation)
@@ -475,7 +475,7 @@ IF @flgOptions & 4 = 4 AND @serverVersionNum >= 9
 
 --check if another backup is needed (full) / partially applicable to AlwaysOn Availability Groups
 SET @optionForceChangeBackupType=0
-IF @flgOptions & 8 = 8 AND 	(@agName IS NULL OR (@agName IS NOT NULL AND @agInstanceRoleDesc = 'PRIMARY'))
+IF @flgOptions & 8 = 8 AND (@agName IS NULL OR (@agName IS NOT NULL AND @agInstanceRoleDesc = 'PRIMARY')) AND @serverVersionNum >= 9
 	begin
 		--check for any full database backup (when differential should be made) or any full/incremental database backup (when transaction log should be made)
 		IF @flgActions & 2 = 2 OR @flgActions & 4 = 4
