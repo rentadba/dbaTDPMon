@@ -146,9 +146,9 @@ BEGIN TRY
 				AND cin.[name] = @sqlServerName
 
 		-----------------------------------------------------------------------------------------------------
-		DELETE shcdd
-		FROM [monitoring].statsDatabaseDetails shcdd
-		INNER JOIN dbo.catalogDatabaseNames cdb ON cdb.[instance_id] = shcdd.[instance_id] AND cdb.[id] = shcdd.[catalog_database_id]
+		DELETE sduh
+		FROM [health-check].statsDatabaseUsageHistory sduh
+		INNER JOIN dbo.catalogDatabaseNames cdb ON cdb.[instance_id] = sduh.[instance_id] AND cdb.[id] = sduh.[catalog_database_id]
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[id] = cdb.[instance_id] AND cin.[project_id] = cdb.[project_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[name] = @sqlServerName
