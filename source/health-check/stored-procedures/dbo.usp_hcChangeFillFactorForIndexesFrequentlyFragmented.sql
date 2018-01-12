@@ -74,25 +74,27 @@ WHERE	[name] = N'Analyze Index Maintenance Operation'
 SET @queryToRun=N'Analyzing event messages for frequently fragmented indexes...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-DECLARE crsFrequentlyFragmentedIndexes CURSOR LOCAL FAST_FORWARD FOR	SELECT    [instance_name], [database_name]
-																				, REPLACE(REPLACE(SUBSTRING([object_name], 1, CHARINDEX('].[', [object_name])), ']', ''), '[', '')						AS [schema_name]
-																				, REPLACE(REPLACE(SUBSTRING([object_name], CHARINDEX('].[', [object_name])+2, LEN([object_name])), ']', ''), '[', '')	AS [table_name]
-																				, REPLACE(REPLACE([index_name], ']', ''), '[', '') AS [index_name]
+DECLARE crsFrequentlyFragmentedIndexes CURSOR LOCAL FAST_FORWARD FOR	SELECT    [instance_name], [database_name], [object_name]
+																				, [index_name]
 																				, CASE WHEN [fill_factor]=0 THEN 100 ELSE [fill_factor] END AS [fill_factor]
 																				, [index_type]
 																		FROM	[dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectCode, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, @analyzeIndexMaintenanceOperation)
-																		ORDER BY [instance_name], [database_name], [schema_name], [table_name], [index_name]
+																		ORDER BY [instance_name], [database_name], [object_name], [index_name]
 OPEN crsFrequentlyFragmentedIndexes
-FETCH NEXT FROM crsFrequentlyFragmentedIndexes INTO @instanceName, @databaseName, @tableSchema, @tableName, @indexName, @fillFactor, @indexType
+FETCH NEXT FROM crsFrequentlyFragmentedIndexes INTO @instanceName, @databaseName, @objectName, @indexName, @fillFactor, @indexType
 WHILE @@FETCH_STATUS=0
 	begin
 		--analyze curent object
-		SET @queryToRun=N'instance=[' + @instanceName + '], database=' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ', table-name=' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'qouted') + '.' + [dbo].[ufn_getObjectQuoteName](@tableName, 'quoted')
+		SET @queryToRun=N'instance=[' + @instanceName + '], database=' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ', table-name=' + @objectName
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
-		SET @queryToRun=N'index-name=' + [dbo].[ufn_getObjectQuoteName](@indexName, 'quoted') + ', type=' + [dbo].[ufn_getObjectQuoteName](@indexType, 'quoted') + ' current fill-factor= ' + CAST(@fillFactor AS [nvarchar])
+		SET @queryToRun=N'index-name=' + @indexName + ', type=' + [dbo].[ufn_getObjectQuoteName](@indexType, 'quoted') + ', current/saved fill-factor=' + CAST(@fillFactor AS [nvarchar])
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
-			
+
+		SET @tableSchema = REPLACE(REPLACE(SUBSTRING(@objectName, 1, CHARINDEX('].[', @objectName)), ']', ''), '[', '')
+		SET @tableName = REPLACE(REPLACE(SUBSTRING(@objectName, CHARINDEX('].[', @objectName)+2, LEN(@objectName)), ']', ''), '[', '')
+		SET @indexName = REPLACE(REPLACE(@indexName, ']', ''), '[', '') 
+		
 		SET @newFillFactor = @fillFactor-@dropFillFactorByPercent
 		IF  @newFillFactor >= @minFillFactorAcceptedLevel
 			begin
@@ -129,10 +131,10 @@ WHILE @@FETCH_STATUS=0
 																@flgAction					= 1,
 																@flgOptions					= DEFAULT,
 																@maxDOP						= DEFAULT,
-																@FillFactor					= @newFillFactor,
+																@fillFactor					= @newFillFactor,
 																@executionLevel				= 0,
 																@affectedDependentObjects	= @affectedDependentObjects OUTPUT,
-																@DebugMode					= @debugMode
+																@debugMode					= @debugMode
 					end
 				ELSE
 					begin
@@ -140,7 +142,6 @@ WHILE @@FETCH_STATUS=0
 						SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@tableName, 'quoted') + ''') IS NOT NULL DBCC DBREINDEX (''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@tableName, 'quoted') + ''', ''' + RTRIM(@indexName) + ''', ' + CAST(@newFillFactor AS [nvarchar]) + N') WITH NO_INFOMSGS'
 						IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-						SET @objectName = [dbo].[ufn_getObjectQuoteName](@tableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@tableName), 'quoted')
 						SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@indexName, 'quoted')
 
 						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @instanceName,
@@ -161,7 +162,7 @@ WHILE @@FETCH_STATUS=0
 				SET @queryToRun=N'fill factor will not be lowered, since it will be under acceptable limit = ' + CAST(@minFillFactorAcceptedLevel AS [nvarchar])
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 			end
-		FETCH NEXT FROM crsFrequentlyFragmentedIndexes INTO @instanceName, @databaseName, @tableSchema, @tableName, @indexName, @fillFactor, @indexType
+		FETCH NEXT FROM crsFrequentlyFragmentedIndexes INTO @instanceName, @databaseName, @objectName, @indexName, @fillFactor, @indexType
 	end
 CLOSE crsFrequentlyFragmentedIndexes
 DEALLOCATE crsFrequentlyFragmentedIndexes

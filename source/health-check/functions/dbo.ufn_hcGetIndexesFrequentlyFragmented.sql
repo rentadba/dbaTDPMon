@@ -37,7 +37,8 @@ AS
 -- Module			 : Database Analysis & Performance Monitoring
 -- ============================================================================
 begin
-	DECLARE	@projectID	[int]
+	DECLARE	@projectID					[int],
+			@maxEventDateUTCToAnalyze	[datetime]
 
 	-----------------------------------------------------------------------------------------------------
 	--get default project code
@@ -50,6 +51,8 @@ begin
 	SELECT    @projectID = [id]
 	FROM [dbo].[catalogProjects]
 	WHERE [code] = @projectCode 
+
+	SET @maxEventDateUTCToAnalyze = DATEADD(hh, -@analyzeOnlyMessagesFromTheLastHours, GETUTCDATE())
 
 	-----------------------------------------------------------------------------------------------------
 	;WITH fillfactorCandidateIndexes AS
@@ -73,6 +76,7 @@ begin
 						)
 						AND [event_type] = 0 --info
 						AND [project_id] = @projectID
+						AND [event_date_utc] >= @maxEventDateUTCToAnalyze
 			)i
 		INNER JOIN
 			(
@@ -91,11 +95,14 @@ begin
 						)
 						AND [event_type] = 4 --action
 						AND [project_id] = @projectID
+						AND [event_date_utc] >= @maxEventDateUTCToAnalyze
 			)a ON	a.[instance_name] = i.[instance_name]
 					AND a.[database_name] = i.[database_name] 
 					AND a.[object_name] = i.[object_name] 
 					AND a.[child_object_name] = i.[child_object_name]
-					AND a.[event_message_id] = i.[event_message_id] + 1
+					AND (  a.[event_message_id] = i.[event_message_id] + 1
+						OR DATEDIFF(ss, i.[event_date_utc], a.[event_date_utc]) BETWEEN 0 AND 60 /* 60 seconds delay between info and action messages */
+						)
 		),
 	fragmentedIndexesInfo AS
 	(
@@ -128,7 +135,6 @@ begin
 															AND A.sequence_id = B.sequence_id - 1
 					WHERE CEILING(DATEDIFF(hh, B.[event_date_utc], A.[event_date_utc]) / 24.) <= @minimumIndexMaintenanceFrequencyDays
 						AND A.[sequence_id] = 1
-						AND DATEDIFF(hh, A.[event_date_utc], GETUTCDATE()) <= @analyzeOnlyMessagesFromTheLastHours
 				)X
 			CROSS APPLY [info_xml].nodes ('//index-fragmentation/detail') I(info)
 			CROSS APPLY [action_xml].nodes ('//action/detail') A(act)

@@ -606,3 +606,9 @@
 /* 22.12.2017 */
 	- fix issue when a job failed and it was reported as "in progress" instead of "failed" (parallel maintenance-plan)
 	- full testing cycle on SQL Server 2000 up to SQL Server 2017
+
+/*----------------------------------------------------------------------*/
+/* January 2018 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 12.12.2017 */
+	- fix dbo.ufn_hcGetIndexesFrequentlyFragmented function when using parallel index maintenance
