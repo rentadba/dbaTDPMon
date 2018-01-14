@@ -610,5 +610,8 @@
 /*----------------------------------------------------------------------*/
 /* January 2018 new features & fixes
 /*----------------------------------------------------------------------*/
-/* 12.12.2017 */
+/* 12.01.2018 */
 	- fix dbo.ufn_hcGetIndexesFrequentlyFragmented function when using parallel index maintenance
+
+/* 14.01.2018 */
+	- add utility for update support from version 2017.6 to 2017.12
