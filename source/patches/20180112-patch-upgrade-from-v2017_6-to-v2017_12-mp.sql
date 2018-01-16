@@ -1,16 +1,17 @@
 SET NOCOUNT ON
-RAISERROR('*-----------------------------------------------------------------------------*', 10, 1) WITH NOWAIT
-RAISERROR('* dbaTDPMon (Troubleshoot Database Performance / Monitoring)                  *', 10, 1) WITH NOWAIT
-RAISERROR('* https://github.com/rentadba/dbaTDPMon, under GNU (GPLv3) licence model      *', 10, 1) WITH NOWAIT
-RAISERROR('*-----------------------------------------------------------------------------*', 10, 1) WITH NOWAIT
-RAISERROR('* Patch script: from version 2017.6 to 2017.12 (2017.12.22)					 *', 10, 1) WITH NOWAIT
-RAISERROR('*-----------------------------------------------------------------------------*', 10, 1) WITH NOWAIT
-
+/*
+*-----------------------------------------------------------------------------*
+* dbaTDPMon (Troubleshoot Database Performance / Monitoring)                  *
+* https://github.com/rentadba/dbaTDPMon, under GNU (GPLv3) licence model      *
+*-----------------------------------------------------------------------------*
+* Patch script: from version 2017.6 to 2017.12 (2017.12.22)					  *
+*-----------------------------------------------------------------------------*
+*/
 
 /*---------------------------------------------------------------------------------------------------------------------*/
 /* patch module: maintenance-plan																					   */
 /*---------------------------------------------------------------------------------------------------------------------*/
-RAISERROR('Patching module: MAINTENANCE-PLAN', 10, 1) WITH NOWAIT
+RAISERROR('* Patch: 20180112-patch-upgrade-from-v2017_6-to-v2017_12-mp.sql', 10, 1) WITH NOWAIT
 
 IF EXISTS(SELECT * FROM INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE WHERE [CONSTRAINT_NAME] = 'FK_internalScheduler_MaintenancePlan_internalTasks')
 	ALTER TABLE [maintenance-plan].[internalScheduler] DROP CONSTRAINT [FK_internalScheduler_MaintenancePlan_internalTasks]
@@ -152,6 +153,3 @@ ELSE
 					[id]
 				)
 GO	
-
-RAISERROR('* Done *', 10, 1) WITH NOWAIT
-GO

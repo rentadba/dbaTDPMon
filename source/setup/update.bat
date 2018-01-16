@@ -77,6 +77,8 @@ goto help
      
 :common
 
+sqlcmd.exe -S%server% %autentif% -i "detect-version.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
 
 echo *-----------------------------------------------------------------------------*
 echo Running table's patching scripts...
@@ -445,7 +447,13 @@ if "%module%"=="all" goto done
 goto done
 
 :done
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2017.17.22' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err  
+
 echo *-----------------------------------------------------------------------------*
+sqlcmd.exe -S%server% %autentif% -i "detect-version.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 echo The update was successful.
 goto end
 
