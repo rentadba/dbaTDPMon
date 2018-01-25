@@ -615,3 +615,6 @@
 
 /* 14.01.2018 */
 	- add utility for update support from version 2017.6 to 2017.12
+
+/* 25.01.2018 */
+	- update support enhancement: auto detection for installed modules at run-time

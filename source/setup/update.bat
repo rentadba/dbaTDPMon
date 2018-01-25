@@ -1,4 +1,5 @@
 @echo off
+@echo off
 cls
 
 echo *-----------------------------------------------------------------------------*
@@ -13,28 +14,16 @@ if "%1" == "/?" goto help
 
 if  !%1==! goto help
 if  !%2==! goto help
-if  !%3==! goto help
 
 set server=%1
 set dbname=%2
-set module=%3
-set project=%4
-set data_files_path=%5
-set log_files_path=%6
-set userid=%7
-set password=%8
+set userid=%3
+set password=%4
 
-set module=%module:"=%
-
-if !%4==! set project="DEFAULT"
-if !%5==! set data_files_path=""
-if !%6==! set log_files_path=""
-if !%7==! goto trusted_connection
-
+if !%3==! goto trusted_connection
 set autentif=-U%userid% -P%password%
 
 goto start
-
 
 :trusted_connection
 set autentif=-E
@@ -44,6 +33,9 @@ echo Checking connection...
 sqlcmd.exe -S%server% %autentif% -d master -Q "" -b -m-1
 if errorlevel 1 goto connect
 
+set data_files_path=""
+set log_files_path=""
+
 sqlcmd.exe -S%server% %autentif% -i "install-get-instance-info.sql" -d master -v dbName=%dbname% -o install-get-instance-info.out -b -r 1
 if errorlevel 1 (
 	type install-get-instance-info.out
@@ -51,8 +43,8 @@ if errorlevel 1 (
 	goto install_err
 	)
 
-FOR /F "tokens=1,2 delims==" %%A IN ('FINDSTR /R "dataFilePath" install-get-instance-info.out') DO (SET data_files_path=%%B)
-FOR /F "tokens=1,2 delims==" %%A IN ('FINDSTR /R "logFilePath" install-get-instance-info.out') DO (SET log_files_path=%%B)
+FOR /F "tokens=1,2 delims==" %%A IN ('FINDSTR /R "dataFilePath" install-get-instance-info.out') DO (SET product_version=%%B)
+FOR /F "tokens=1,2 delims==" %%A IN ('FINDSTR /R "logFilePath" install-get-instance-info.out') DO (SET product_version=%%B)
 FOR /F "tokens=1,2 delims==" %%A IN ('FINDSTR /R "productVersion" install-get-instance-info.out') DO (SET product_version=%%B)
 FOR /F "tokens=1,2 delims==" %%A IN ('FINDSTR /R "engineVersion" install-get-instance-info.out') DO (SET engine_version=%%B)
 del /F /Q install-get-instance-info.out
@@ -61,47 +53,21 @@ echo Detected SQL Server version %product_version%
 
 set run2kmode=false
 if "%engine_version%"=="8" (
-	set run2kmode=true
-	if not "%module%" == "maintenance-plan" (
-		echo Update mode is not supported for SQL Server 2000. Run Install mode.
-		goto help
-		)
+	echo Update mode is not supported for SQL Server 2000. Run Install mode.
+	goto help
 	)
-
-if "%module%"=="all" goto common
-if "%module%"=="health-check" goto common
-if "%module%"=="maintenance-plan" goto common
-if "%module%"=="monitoring" goto common
-goto help
-
-     
+    
 :common
 
 sqlcmd.exe -S%server% %autentif% -i "detect-version.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 echo *-----------------------------------------------------------------------------*
-echo Running table's patching scripts...
+echo Common: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
 
-if "%module%"=="all" sqlcmd.exe -S%server% %autentif% -i "..\patches\20180112-patch-upgrade-from-v2017_6-to-v2017_12-common.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20180112-patch-upgrade-from-v2017_6-to-v2017_12-common.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
-
-if "%module%"=="all" sqlcmd.exe -S%server% %autentif% -i "..\patches\20180112-patch-upgrade-from-v2017_6-to-v2017_12-mp.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-if "%module%"=="health-check" sqlcmd.exe -S%server% %autentif% -i "..\patches\20180112-patch-upgrade-from-v2017_6-to-v2017_12-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-if "%module%"=="maintenance-plan" sqlcmd.exe -S%server% %autentif% -i "..\patches\20180112-patch-upgrade-from-v2017_6-to-v2017_12-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-if "%module%"=="maintenance-plan" sqlcmd.exe -S%server% %autentif% -i "..\patches\20180112-patch-upgrade-from-v2017_6-to-v2017_12-mp.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-if "%module%"=="monitoring" sqlcmd.exe -S%server% %autentif% -i "..\patches\20180112-patch-upgrade-from-v2017_6-to-v2017_12-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
 
 
 echo *-----------------------------------------------------------------------------*
@@ -230,16 +196,22 @@ if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_purgeHistoryData.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
-
 	
-if "%module%"=="all" goto mp
-if "%module%"=="health-check" goto hc
-if "%module%"=="maintenance-plan" goto mp
-if "%module%"=="monitoring" goto mon
-goto help
-
-
 :mp
+sqlcmd.exe -S%server% %autentif% -Q "set nocount on; select ltrim(rtrim(name)) from sys.schemas where name='maintenance-plan'" -d %dbname% -o check-schema.out -b -r 1
+
+SET schema_installed=0
+FOR /F "tokens=1 delims==" %%A IN ('FINDSTR /R "maintenance-plan" check-schema.out') DO (SET schema_installed=1)
+del check-schema.out
+if "%schema_installed%" == "0" goto hc
+
+echo *-----------------------------------------------------------------------------*
+echo Maintenance Plan: Running table's patching scripts...
+echo *-----------------------------------------------------------------------------*
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20180112-patch-upgrade-from-v2017_6-to-v2017_12-mp.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+
 echo *-----------------------------------------------------------------------------*
 echo Maintenance Plan: Creating Views ...
 echo *-----------------------------------------------------------------------------*
@@ -324,11 +296,18 @@ if errorlevel 1 goto install_err
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpJobQueueCreate.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-
-if "%module%"=="all" goto hc
-goto done
-
 :hc
+SET schema_installed=0
+sqlcmd.exe -S%server% %autentif% -Q "set nocount on; select name from sys.schemas where name='health-check'" -d %dbname% -o check-schema.out -b -r 1
+FOR /F "tokens=1 delims==" %%A IN ('FINDSTR /R "health-check" check-schema.out') DO (SET schema_installed=1)
+del check-schema.out
+if "%schema_installed%" == "0" goto mon
+
+echo *-----------------------------------------------------------------------------*
+echo Health Check: Running table's patching scripts...
+echo *-----------------------------------------------------------------------------*
+echo No patches available.
+
 echo *-----------------------------------------------------------------------------*
 echo Health Check: Creating Views ...
 echo *-----------------------------------------------------------------------------*
@@ -410,11 +389,18 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcJobQueueCreate.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%module%"=="all" goto mon
-goto done
-
-
 :mon
+SET schema_installed=0
+sqlcmd.exe -S%server% %autentif% -Q "set nocount on; select name from sys.schemas where name='monitoring'" -d %dbname% -o check-schema.out -b -r 1
+FOR /F "tokens=1 delims==" %%A IN ('FINDSTR /R "monitoring" check-schema.out') DO (SET schema_installed=1)
+del check-schema.out
+if "%schema_installed%" == "0" goto done
+
+echo *-----------------------------------------------------------------------------*
+echo Monitoring: Running table's patching scripts...
+echo *-----------------------------------------------------------------------------*
+echo No patches available.
+
 echo *-----------------------------------------------------------------------------*
 echo Monitoring: Creating Views ...
 echo *-----------------------------------------------------------------------------*
@@ -443,9 +429,6 @@ sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\dbo.usp_mon
 if errorlevel 1 goto install_err
 
 
-if "%module%"=="all" goto done
-goto done
-
 :done
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2017.12.22' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err  
@@ -471,18 +454,16 @@ goto end
 
 :help
 echo USAGE : SQL Server Authentication
-echo update.bat "server_name" "db_name" "module" "project_code" "data_files_path" "log_files_path" "login_id" "login_password"
+echo update.bat "server_name" "db_name" "module" "login_id" "login_password"
 echo .
 echo USAGE : Windows Authentication
-echo update.bat "server_name" "db_name" "module" "project_code" "data_files_path" "log_files_path"
-echo .
-echo "module: {all | health-check | maintenance-plan | monitoring}"
+echo update.bat "server_name" "db_name" "module" 
 echo .
 echo Example Call : SQL Server Authentication
-echo update.bat . "dbaTDPMon" "all" "TEST" "D:\SQLData\Data\" "D:\SQLData\Log\" "testuser" "testpassword"
+echo update.bat . "dbaTDPMon" "testuser" "testpassword"
 echo .
 echo Example Call : Windows Authentication
-echo update.bat "LAB-SERVER" "dbaTDPMon" "all" "LAB"
+echo update.bat "LAB-SERVER" "dbaTDPMon"
 
 echo *-----------------------------------------------------------------------------*
 :end
