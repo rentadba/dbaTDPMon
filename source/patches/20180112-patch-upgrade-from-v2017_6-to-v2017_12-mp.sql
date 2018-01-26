@@ -98,7 +98,7 @@ GO
 
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[maintenance-plan].[objectSkipList]') AND type in (N'U'))
 	begin 
-		RAISERROR('Create table: [maintenance-plan].[objectSkipList]', 10, 1) WITH NOWAIT
+		RAISERROR('	Create table: [maintenance-plan].[objectSkipList]', 10, 1) WITH NOWAIT
 
 		CREATE TABLE [maintenance-plan].[objectSkipList] 
 		(

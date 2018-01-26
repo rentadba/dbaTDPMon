@@ -66,6 +66,19 @@ echo *--------------------------------------------------------------------------
 echo Common: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
 
+
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20170324-patch-upgrade-from-v2016_11-to-v2017_4-common.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20170428-patch-upgrade-from-v2017_4-to-v2017_5-common.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20170509-patch-upgrade-from-v2017_4-to-v2017_5-common.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20170516-patch-upgrade-from-v2017_4-to-v2017_6-common.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20180112-patch-upgrade-from-v2017_6-to-v2017_12-common.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -208,6 +221,13 @@ if "%schema_installed%" == "0" goto hc
 echo *-----------------------------------------------------------------------------*
 echo Maintenance Plan: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
+
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20170324-patch-upgrade-from-v2016_11-to-v2017_4-mp.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20170520-patch-upgrade-from-v2017_4-to-v2017_6-mp.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20180112-patch-upgrade-from-v2017_6-to-v2017_12-mp.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -306,7 +326,13 @@ if "%schema_installed%" == "0" goto mon
 echo *-----------------------------------------------------------------------------*
 echo Health Check: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
-echo No patches available.
+
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20170324-patch-upgrade-from-v2016_11-to-v2017_4-hc.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20170526-patch-upgrade-from-v2017_4-to-v2017_6-hc.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 
 echo *-----------------------------------------------------------------------------*
 echo Health Check: Creating Views ...
