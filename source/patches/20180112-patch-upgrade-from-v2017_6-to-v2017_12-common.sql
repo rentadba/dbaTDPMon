@@ -21,3 +21,14 @@ GO
 IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE [TABLE_SCHEMA]='dbo' AND [TABLE_NAME]='catalogMachineNames' AND [COLUMN_NAME]='host_platform')
 	ALTER TABLE [dbo].[catalogMachineNames] ADD [host_platform]	[sysname] NULL
 GO
+
+IF EXISTS (SELECT *
+             FROM sysobjects
+            WHERE id = object_id(N'[dbo].[sp_SQLSMTPMail]')
+              AND OBJECTPROPERTY(id, N'IsProcedure') = 1)
+	begin
+		RAISERROR('	Drop procedure: [dbo].[sp_SQLSMTPMail]', 10, 1) WITH NOWAIT
+ 
+		DROP PROCEDURE [dbo].[sp_SQLSMTPMail]
+	end
+GO
