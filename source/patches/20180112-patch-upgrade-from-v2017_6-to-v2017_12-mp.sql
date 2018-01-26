@@ -139,7 +139,8 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[maintenance-plan
 		CREATE INDEX [IX_MaintenancePlan_objectSkipList_TaskID] ON [maintenance-plan].[objectSkipList]
 				([task_id], [project_id])
 			INCLUDE
-				([schema_name], [object_name]);
+				([schema_name], [object_name])
+			ON [FG_Statistics_Index]
 	end
 ELSE
 	IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE WHERE [CONSTRAINT_NAME] = 'FK_MaintenancePlan_objectSkipList_MaintenancePlan_internalTasks')
@@ -153,3 +154,15 @@ ELSE
 					[id]
 				)
 GO	
+
+IF EXISTS (SELECT * FROM sys.indexes WHERE [name] = 'IX_MaintenancePlan_objectSkipList_TaskID' AND [object_id] = OBJECT_ID('[maintenance-plan].[objectSkipList]') AND [data_space_id] = 1)
+	begin
+		DROP INDEX [IX_MaintenancePlan_objectSkipList_TaskID] ON [maintenance-plan].[objectSkipList];
+
+		CREATE INDEX [IX_MaintenancePlan_objectSkipList_TaskID] ON [maintenance-plan].[objectSkipList]
+				([task_id], [project_id])
+			INCLUDE
+				([schema_name], [object_name])
+			ON [FG_Statistics_Index];
+	end
+GO
