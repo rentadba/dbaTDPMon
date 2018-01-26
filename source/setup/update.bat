@@ -33,8 +33,8 @@ echo Checking connection...
 sqlcmd.exe -S%server% %autentif% -d master -Q "" -b -m-1
 if errorlevel 1 goto connect
 
-set data_files_path=""
-set log_files_path=""
+set data_files_path="/"
+set log_files_path="/"
 
 sqlcmd.exe -S%server% %autentif% -i "install-get-instance-info.sql" -d master -v dbName=%dbname% -o install-get-instance-info.out -b -r 1
 if errorlevel 1 (
