@@ -69,6 +69,9 @@ echo *--------------------------------------------------------------------------
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20160825-patch-upgrade-from-v2016_6-to-v2016_9-common.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20161119-patch-upgrade-from-v2016_11-to-v2017_4-common.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20170324-patch-upgrade-from-v2016_11-to-v2017_4-common.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
