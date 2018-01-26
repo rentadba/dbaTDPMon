@@ -66,6 +66,8 @@ echo *--------------------------------------------------------------------------
 echo Common: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
 
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20160825-patch-upgrade-from-v2016_6-to-v2016_9-common.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20170324-patch-upgrade-from-v2016_11-to-v2017_4-common.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
@@ -221,6 +223,9 @@ if "%schema_installed%" == "0" goto hc
 echo *-----------------------------------------------------------------------------*
 echo Maintenance Plan: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
+
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20161025-patch-upgrade-from-v2016_9-to-v2016_11-mp.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20170324-patch-upgrade-from-v2016_11-to-v2017_4-mp.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
@@ -425,7 +430,9 @@ if "%schema_installed%" == "0" goto done
 echo *-----------------------------------------------------------------------------*
 echo Monitoring: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
-echo No patches available.
+
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20160624-patch-upgrade-from-v2015_12-to-v2016_6-mon.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
 
 echo *-----------------------------------------------------------------------------*
 echo Monitoring: Creating Views ...
