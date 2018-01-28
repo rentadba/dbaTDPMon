@@ -3845,21 +3845,24 @@ BEGIN TRY
 													, @debugMode	 = 0
 
 	/* save report using bcp */	
-	SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [html_content] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[report].[htmlContent] WHERE [id]=' + CAST(@reportID AS [varchar]) + '" queryout ' + @reportFilePath + ' -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'''
-	EXEC (@queryToRun)
-	
-	/* disable xp_cmdshell configuration option */
-	EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @@SERVERNAME
-													, @flgAction	 = 0			-- 1=enable | 0=disable
-													, @optionXPValue = @optionXPValue OUTPUT
-													, @debugMode	 = 0
+	IF @optionXPValue = 1
+		begin
+			SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [html_content] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[report].[htmlContent] WHERE [id]=' + CAST(@reportID AS [varchar]) + '" queryout ' + @reportFilePath + ' -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'''
+			EXEC (@queryToRun)
 
-	IF @@ERROR=0
-		UPDATE [report].[htmlContent]
-			SET   [html_content] = NULL
-				, [file_name]	 = @HTMLReportFileName
-		WHERE [id] = @reportID
-		
+			/* disable xp_cmdshell configuration option */
+			EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @@SERVERNAME
+															, @flgAction	 = 0			-- 1=enable | 0=disable
+															, @optionXPValue = @optionXPValue OUTPUT
+															, @debugMode	 = 0
+
+			IF @@ERROR=0
+				UPDATE [report].[htmlContent]
+					SET   [html_content] = NULL
+						, [file_name]	 = @HTMLReportFileName
+				WHERE [id] = @reportID
+		end
+				
 	-----------------------------------------------------------------------------------------------------
 	--
 	-----------------------------------------------------------------------------------------------------
