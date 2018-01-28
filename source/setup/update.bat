@@ -54,7 +54,7 @@ echo Detected SQL Server version %product_version%
 set run2kmode=false
 if "%engine_version%"=="8" (
 	echo Update mode is not supported for SQL Server 2000. Run Install mode.
-	goto help
+	goto end
 	)
     
 :common
