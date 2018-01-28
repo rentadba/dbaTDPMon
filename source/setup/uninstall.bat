@@ -1,5 +1,12 @@
 @echo off
+set local
 cls
+
+echo *-----------------------------------------------------------------------------*
+echo * dbaTDPMon (Troubleshoot Database Performance / Monitoring)                  *
+echo * http://dbatdpmon.codeplex.com, under GNU (GPLv3) licence model              *
+echo *-----------------------------------------------------------------------------*
+
 if "%1" =="-help" goto help
  
 if "%1" == "help" goto help
@@ -24,9 +31,34 @@ set autentif=-E
 
 :start
 echo Checking connection...
-sqlcmd.exe -S%server% %autentif% -d master -Q "" -b -m-1
+sqlcmd.exe -S%server% %autentif% -d %dbname% -Q "" -b -m-1
 if errorlevel 1 goto connect
-echo Ok
+
+set data_files_path="/"
+set log_files_path="/"
+
+sqlcmd.exe -S%server% %autentif% -i "install-get-instance-info.sql" -d master -v dbName=%dbname% -o install-get-instance-info.out -b -r 1
+if errorlevel 1 (
+	type install-get-instance-info.out
+	del /F /Q install-get-instance-info.out
+	goto install_err
+	)
+
+FOR /F "tokens=1,2 delims==" %%A IN ('FINDSTR /R "dataFilePath" install-get-instance-info.out') DO (SET product_version=%%B)
+FOR /F "tokens=1,2 delims==" %%A IN ('FINDSTR /R "logFilePath" install-get-instance-info.out') DO (SET product_version=%%B)
+FOR /F "tokens=1,2 delims==" %%A IN ('FINDSTR /R "productVersion" install-get-instance-info.out') DO (SET product_version=%%B)
+FOR /F "tokens=1,2 delims==" %%A IN ('FINDSTR /R "engineVersion" install-get-instance-info.out') DO (SET engine_version=%%B)
+del /F /Q install-get-instance-info.out
+
+echo Detected SQL Server version %product_version%
+
+sqlcmd.exe -S%server% %autentif% -i "detect-version.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+:prompt
+set doUninstall = "N"
+set /P doUninstall=Continue with uninstall of dbaTDPMon (Y/[N])? 
+if /I "%doUninstall%" neq "Y" goto end
 
 
 echo *-----------------------------------------------------------------------------*
@@ -47,7 +79,7 @@ goto end
 
 
 :connect
-echo Can not connect 
+echo Could not connect to the specified SQL Server instance.
 goto end
 
 :install_err
@@ -55,10 +87,6 @@ echo One of the scripts had errors or does not exists in current path %cd%..\db.
 goto end
 
 :help
-echo *-----------------------------------------------------------------------------*
-echo * dbaTDPMon (Troubleshoot Database Performance / Monitoring)                  *
-echo * http://dbatdpmon.codeplex.com, under GNU (GPLv3) licence model              *
-echo *-----------------------------------------------------------------------------*
 echo USAGE : SQL Server Authentication
 echo uninstall.bat "server_name" "db_name" "login_id" "login_password"
 echo .
@@ -73,3 +101,4 @@ echo uninstall.bat "LAB-SERVER" "dbaTDPMon"
 
 echo *-----------------------------------------------------------------------------*
 :end
+endlocal
