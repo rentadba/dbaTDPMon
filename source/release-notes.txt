@@ -623,5 +623,7 @@
 	- add support for updating from version 15.12, 16.6, 16.9, 16.11 and 17.4 to 17.12
 
 /* 28.01.2018 */
-	- add user confirmation when performing uninstall
+	- uninstall utility: add user confirmation
 	- health-check: fix possible bcp out issue when xp_cmdshell is not enabled
+	- monitoring: fix possible multiple reporting for the same uncommitted transaction
+	- monitoring: add long session request monitoring alert (long running SQL statements) (requested by Razvan Puscasu)

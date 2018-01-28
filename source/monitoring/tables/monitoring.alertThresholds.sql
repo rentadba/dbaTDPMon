@@ -47,5 +47,6 @@ INSERT	INTO [monitoring].[alertThresholds] ([category], [alert_name], [operator]
 		SELECT 'performance', 'Running Transaction Elapsed Time (sec)', '>', 1800, 3600 UNION ALL
 		SELECT 'performance', 'Uncommitted Transaction Elapsed Time (sec)', '>', 900, 1800 UNION ALL
 		SELECT 'performance', 'Blocking Transaction Elapsed Time (sec)', '>', 600, 900 UNION ALL
+		SELECT 'performance', 'Active Request/Session Elapsed Time (sec)', '>', 600, 900 UNION ALL
 		SELECT 'performance', 'tempdb: space used by a single session', '>', 8192, 16384
 GO

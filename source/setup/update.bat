@@ -437,6 +437,10 @@ echo *--------------------------------------------------------------------------
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20160624-patch-upgrade-from-v2015_12-to-v2016_6-mon.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20180128-patch-upgrade-from-v2017_12-to-v2018_1-mon.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+
 echo *-----------------------------------------------------------------------------*
 echo Monitoring: Creating Views ...
 echo *-----------------------------------------------------------------------------*
