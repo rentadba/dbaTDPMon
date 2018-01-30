@@ -17,3 +17,8 @@ IF NOT EXISTS(SELECT * FROM [monitoring].[alertThresholds] WHERE [category]='per
 	INSERT	INTO [monitoring].[alertThresholds] ([category], [alert_name], [operator], [warning_limit], [critical_limit])
 			SELECT 'performance', 'Active Request/Session Elapsed Time (sec)', '>', 600, 900
 GO
+
+IF NOT EXISTS(SELECT * FROM [monitoring].[alertSkipRules] WHERE [category]='performance' AND [alert_name] = 'Active Request/Session Elapsed Time (sec)')
+	INSERT	INTO [monitoring].[alertSkipRules] ([category], [alert_name], [skip_value], [skip_value2], [active])
+			SELECT 'performance', 'Active Request/Session Elapsed Time (sec)', 'InstanceName', NULL, 0 
+GO
