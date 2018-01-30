@@ -288,6 +288,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																			AND sts.[transaction_elapsed_time_sec] >= @alertThresholdWarningRunningTransactions 
 																			AND sts.[transaction_elapsed_time_sec] < @alertThresholdCriticalRunningTransactions 
 																			AND sts.[request_completed] = 0 /* running transaction */
+																			AND asr.[id] IS NULL
 												
 																	UNION ALL
 
@@ -361,6 +362,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																			AND cin.[instance_name] LIKE @sqlServerNameFilter
 																			AND sts.[transaction_elapsed_time_sec] >= @alertThresholdCriticalRunningTransactions
 																			AND sts.[request_completed] = 0 /* running transaction */
+																			AND asr.[id] IS NULL
 												
 																	UNION ALL
 												
@@ -435,6 +437,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																			AND sts.[transaction_elapsed_time_sec] >= @alertThresholdWarningUncommitted 
 																			AND sts.[transaction_elapsed_time_sec] < @alertThresholdCriticalUncommitted 
 																			AND sts.[request_completed] = 1 /* uncommitted transaction / request has completed */
+																			AND asr.[id] IS NULL
 												
 																	UNION ALL
 
@@ -508,6 +511,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																			AND cin.[instance_name] LIKE @sqlServerNameFilter
 																			AND sts.[transaction_elapsed_time_sec] >= @alertThresholdCriticalUncommitted
 																			AND sts.[request_completed] = 1 /* uncommitted transaction / request has completed */
+																			AND asr.[id] IS NULL
 
 																	UNION ALL
 
@@ -582,6 +586,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																			AND sts.[wait_duration_sec] >= @alertThresholdWarningBlocking
 																			AND sts.[wait_duration_sec] < @alertThresholdCriticalBlocking
 																			AND sts.[is_session_blocked] = 1
+																			AND asr.[id] IS NULL
 												
 																	UNION ALL
 
@@ -655,6 +660,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																			AND cin.[instance_name] LIKE @sqlServerNameFilter
 																			AND sts.[wait_duration_sec] >= @alertThresholdCriticalBlocking
 																			AND sts.[is_session_blocked] = 1
+																			AND asr.[id] IS NULL
 
 																	UNION ALL
 
@@ -728,6 +734,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																			AND cin.[instance_name] LIKE @sqlServerNameFilter
 																			AND sts.[tempdb_space_used_mb] >= @alertThresholdWarningTempdb
 																			AND sts.[tempdb_space_used_mb] < @alertThresholdCriticalTempdb
+																			AND asr.[id] IS NULL
 												
 																	UNION ALL
 
@@ -800,6 +807,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																			AND cin.[project_id] = @projectID
 																			AND cin.[instance_name] LIKE @sqlServerNameFilter
 																			AND sts.[tempdb_space_used_mb] >= @alertThresholdCriticalTempdb
+																			AND asr.[id] IS NULL
 
 																	UNION ALL
 												
@@ -876,6 +884,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																			AND sts.[last_request_elapsed_time_sec] < @alertThresholdCriticalActiveRequest 
 																			AND sts.[request_completed] = 0
 																			AND sts.[is_session_blocked] = 0
+																			AND asr.[id] IS NULL
 												
 																	UNION ALL
 
@@ -951,6 +960,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																			AND sts.[last_request_elapsed_time_sec] >= @alertThresholdCriticalActiveRequest
 																			AND sts.[request_completed] = 0
 																			AND sts.[is_session_blocked] = 0
+																			AND asr.[id] IS NULL
 																	ORDER BY [instance_name], [object_name]
 OPEN crsTransactionStatusAlarms
 FETCH NEXT FROM crsTransactionStatusAlarms INTO @instanceName, @databaseName, @childObjectName, @severity, @eventName, @eventMessage
