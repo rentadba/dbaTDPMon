@@ -781,11 +781,11 @@ BEGIN TRY
 			</TR>
 			</TABLE>
 		</TD>
-		<TD WIDTH="410px"ALIGN=RIGHT VALIGN="TOP">
-			<TABLE CELLSPACING=0 CELLPADDING="3px" border=0 WIDTH="410px"> 
+		<TD WIDTH="430px"ALIGN=RIGHT VALIGN="TOP">
+			<TABLE CELLSPACING=0 CELLPADDING="3px" border=0 WIDTH="430px"> 
 				<TR VALIGN=TOP>
 					<TD WIDTH="170px" ALIGN=CENTER>' + [dbo].[ufn_reportHTMLGetImage]('Logo') + N'</TD>	
-					<TD WIDTH="240px" ALIGN=CENTER><P class="title2-style" ALIGN=CENTER>dbaTDPMon<br>Daily Health Check Report</P></TD>
+					<TD WIDTH="260px" ALIGN=CENTER><P class="title2-style" ALIGN=CENTER>dbaTDPMon<br>Daily Health Check Report</P></TD>
 				</TR>
 				<TR VALIGN=TOP>
 					<TD  COLSPAN="2" ALIGN=RIGHT><P class="disclaimer"><BR><A TARGET="_blank" HREF="https://github.com/rentadba/dbaTDPMon">https://github.com/rentadba/dbaTDPMon</A>, under GNU (GPLv3) licence model
