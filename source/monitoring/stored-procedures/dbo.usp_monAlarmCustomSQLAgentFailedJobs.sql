@@ -94,7 +94,8 @@ INSERT	INTO [dbo].[jobExecutionQueue](	[instance_id], [project_id], [module], [d
 				, N'EXEC dbo.usp_monGetSQLAgentFailedJobs @projectCode = ''' + @projectCode + N''', @sqlServerNameFilter = ''' + cin.[name] + N''''
 		FROM	[dbo].[catalogInstanceNames] cin
 		WHERE	cin.[active] = 1
-						AND cin.[project_id] = @projectID
+				AND cin.[project_id] = @projectID
+				AND cin.[name] LIKE @sqlServerNameFilter
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 SET @strMessage='Running internal jobs..'
