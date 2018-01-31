@@ -627,3 +627,6 @@
 	- health-check: fix possible bcp out issue when xp_cmdshell is not enabled
 	- monitoring: fix possible multiple reporting for the same uncommitted transaction
 	- monitoring: add long session request monitoring alert (long running SQL statements) (requested by Razvan Puscasu)
+
+/* 31.01.2018 */
+	- monitoring: sql_handle can be used to filter out unwanted alerts ([monitoring].[alertSkipRules])

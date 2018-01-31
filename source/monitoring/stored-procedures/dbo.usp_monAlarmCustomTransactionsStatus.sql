@@ -281,7 +281,11 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																													AND asr.[alert_name] IN ('Running Transaction Elapsed Time (sec)')
 																													AND asr.[active] = 1
-																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])
+																													AND (   asr.[skip_value2] IS NULL 
+																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])
+																														)
+
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
 																			AND cin.[instance_name] LIKE @sqlServerNameFilter
@@ -356,7 +360,10 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																													AND asr.[alert_name] IN ('Running Transaction Elapsed Time (sec)')
 																													AND asr.[active] = 1
-																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])
+																													AND (   asr.[skip_value2] IS NULL 
+																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])
+																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
 																			AND cin.[instance_name] LIKE @sqlServerNameFilter
@@ -430,7 +437,10 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																													AND asr.[alert_name] IN ('Uncommitted Transaction Elapsed Time (sec)')
 																													AND asr.[active] = 1
-																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])
+																													AND (   asr.[skip_value2] IS NULL 
+																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])
+																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
 																			AND cin.[instance_name] LIKE @sqlServerNameFilter
@@ -505,7 +515,10 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																													AND asr.[alert_name] IN ('Uncommitted Transaction Elapsed Time (sec)')
 																													AND asr.[active] = 1
-																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])
+																													AND (   asr.[skip_value2] IS NULL 
+																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])
+																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
 																			AND cin.[instance_name] LIKE @sqlServerNameFilter
@@ -579,7 +592,10 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																													AND asr.[alert_name] IN ('Blocking Transaction Elapsed Time (sec)')
 																													AND asr.[active] = 1
-																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])
+																													AND (   asr.[skip_value2] IS NULL 
+																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])
+																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
 																			AND cin.[instance_name] LIKE @sqlServerNameFilter
@@ -654,7 +670,10 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																													AND asr.[alert_name] IN ('Blocking Transaction Elapsed Time (sec)')
 																													AND asr.[active] = 1
-																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])
+																													AND (   asr.[skip_value2] IS NULL 
+																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])
+																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
 																			AND cin.[instance_name] LIKE @sqlServerNameFilter
@@ -728,7 +747,10 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																													AND asr.[alert_name] IN ('tempdb: space used by a single session')
 																													AND asr.[active] = 1
-																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])
+																													AND (   asr.[skip_value2] IS NULL 
+																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])
+																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
 																			AND cin.[instance_name] LIKE @sqlServerNameFilter
@@ -802,7 +824,10 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																													AND asr.[alert_name] IN ('tempdb: space used by a single session')
 																													AND asr.[active] = 1
-																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])																					
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])
+																													AND (   asr.[skip_value2] IS NULL 
+																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])
+																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
 																			AND cin.[instance_name] LIKE @sqlServerNameFilter
@@ -873,9 +898,9 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																													AND asr.[alert_name] IN ('Active Request/Session Elapsed Time (sec)')
 																													AND asr.[active] = 1
-																													AND (   asr.[skip_value] = cin.[machine_name] 
-																														 OR asr.[skip_value] = cin.[instance_name]
-																														 OR (asr.[skip_value] = cin.[instance_name] AND asr.[skip_value2] = sh.[sql_handle])
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])
+																													AND (   asr.[skip_value2] IS NULL 
+																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])
 																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
@@ -950,9 +975,9 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																	LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'performance'
 																													AND asr.[alert_name] IN ('Active Request/Session Elapsed Time (sec)')
 																													AND asr.[active] = 1
-																													AND (   asr.[skip_value] = cin.[machine_name] 
-																														 OR asr.[skip_value] = cin.[instance_name]
-																														 OR (asr.[skip_value] = cin.[instance_name] AND asr.[skip_value2] = sh.[sql_handle])
+																													AND (asr.[skip_value] = cin.[machine_name] OR asr.[skip_value]=cin.[instance_name])
+																													AND (   asr.[skip_value2] IS NULL 
+																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])
 																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
