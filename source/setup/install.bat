@@ -4,7 +4,7 @@ cls
 
 echo *-----------------------------------------------------------------------------*
 echo * dbaTDPMon (Troubleshoot Database Performance / Monitoring)                  *
-echo * http://dbatdpmon.codeplex.com, under GNU (GPLv3) licence model              *
+echo * https://github.com/rentadba/dbaTDPMon, under GNU (GPLv3) licence model      *
 echo *-----------------------------------------------------------------------------*
 
 if "%1" =="-help" goto help
