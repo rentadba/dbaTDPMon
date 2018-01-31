@@ -512,7 +512,7 @@ BEGIN TRY
 		}
 	p.disclaimer
 		{
-		font-size:9px; 
+		font-size:11px; 
 		}
 	a.category-style
 		{
@@ -738,6 +738,8 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	--report header
 	-----------------------------------------------------------------------------------------------------
+	SELECT @HTMLReportArea = [value] FROM [dbo].[appConfigurations] WHERE [name]='Application Version' AND [module] = 'common'
+
 	SET @ErrMessage ='Build Report: Header'
 	EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
@@ -752,79 +754,49 @@ BEGIN TRY
 	<HR WIDTH="1130px" ALIGN=LEFT><br>
 	<TABLE BORDER=0 CELLSPACING=0 CELLPADDING="3px" WIDTH="1130px">
 	<TR VALIGN=TOP>
-		<TD WIDTH="410px" ALIGN=LEFT>
-			<TABLE CELLSPACING=0 CELLPADDING="3px" border=0> 
-				<TR VALIGN=TOP>
-					<TD WIDTH="200px">' + [dbo].[ufn_reportHTMLGetImage]('Logo') + N'</TD>	
-					<TD WIDTH="210px" ALIGN=CENTER><P class="title2-style" ALIGN=CENTER>dbaTDPMon<br>Health Check Report</P></TD>
-				</TR>
-			</TABLE>
-			<HR WIDTH="400px" ALIGN=LEFT>
-			<TABLE CELLSPACING=0 CELLPADDING="3px" border=0> 
-				<TR>
-					<TD ALIGN=RIGHT WIDTH="60px"><P class="title3-style">Project:</P></TD>
-					<TD ALIGN=LEFT  WIDTH="340px"><P class="title-style">' +  @projectName + N'</P></TD>
-				</TR>
-				<TR>
-					<TD ALIGN=RIGHT WIDTH="60px"><P class="title3-style">@</P></TD>
-					<TD ALIGN=LEFT  WIDTH="340px"><P class="title2-style">' + CONVERT([varchar](20), ISNULL(@reportBuildStartTime, CONVERT([datetime], N'1900-01-01', 120)), 120) + N' (UTC)</P></TD>							
-				</TR>
-			</TABLE>' + 
-			CASE WHEN @reportDescription IS NOT NULL
-				 THEN N'
-						<HR WIDTH="400px" ALIGN=LEFT>
-						<DIV ALIGN=CENTER>
-						<TABLE CELLSPACING=0 CELLPADDING="3px" border=0> 
-							<TR>
-								<TD ALIGN=CENTER><P class="title4-style">' + @reportDescription + N'</P></TD>							
-							</TR>
-						</TABLE>
-						</DIV>'
-				 ELSE N''
-			END + 
-			N'
-		</TD>
-		<TD ALIGN=RIGHT>'
-
-
-	SET @HTMLReport = @HTMLReport + N'				
-			<TABLE CELLSPACING=0 CELLPADDING="3px" border=0 width="360px">
+		<TD WIDTH="400px" ALIGN=LEFT VALIGN="TOP">
+			<TABLE CELLSPACING=0 CELLPADDING="3px" border=0 width="400px">
 			<TR VALIGN="TOP">
-				<TD WIDTH="360px">
-					<TABLE CELLSPACING=0 CELLPADDING="1px" border=0 width="360px" class="with-border">
-						<TR VALIGN="TOP" class="color-1">
-							<TD WIDTH="180px" class="details-very-small" ALIGN="LEFT">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + CASE WHEN @flgActions &   1 =   1 THEN [dbo].[ufn_reportHTMLGetImage]('check-checked') ELSE [dbo].[ufn_reportHTMLGetImage]('check-unchecked') END + N'&nbsp;&nbsp;Instance Availability</TD>
+				<TD WIDTH="400px" VALIGN="TOP">
+					<TABLE CELLSPACING=0 CELLPADDING="3px" border=0> 
+						<TR>
+							<TD ALIGN=RIGHT WIDTH="60px"><P class="title3-style">Project:</P></TD>
+							<TD ALIGN=LEFT  WIDTH="340px"><P class="title-style">' +  @projectName + N'</P></TD>
 						</TR>
-						<TR VALIGN="TOP" class="color-2">
-							<TD WIDTH="180px" class="details-very-small" ALIGN="LEFT">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + CASE WHEN @flgActions &   2 =   2 THEN [dbo].[ufn_reportHTMLGetImage]('check-checked') ELSE [dbo].[ufn_reportHTMLGetImage]('check-unchecked') END + N'&nbsp;&nbsp;Databases status</TD>
-						</TR>
-						<TR VALIGN="TOP" class="color-1">
-							<TD WIDTH="180px" class="details-very-small" ALIGN="LEFT">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + CASE WHEN @flgActions &   4 =   4  THEN [dbo].[ufn_reportHTMLGetImage]('check-checked') ELSE [dbo].[ufn_reportHTMLGetImage]('check-unchecked') END  + N'&nbsp;&nbsp;SQL Server Agent Jobs status</TD>
-						</TR>
-						<TR VALIGN="TOP" class="color-2">
-							<TD WIDTH="180px" class="details-very-small" ALIGN="LEFT">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + CASE WHEN @flgActions &   8 =   8 THEN [dbo].[ufn_reportHTMLGetImage]('check-checked') ELSE [dbo].[ufn_reportHTMLGetImage]('check-unchecked') END + N'&nbsp;&nbsp;Disk Space information</TD>
-						</TR>
-						<TR VALIGN="TOP" class="color-1">
-							<TD WIDTH="180px" class="details-very-small" ALIGN="LEFT">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + CASE WHEN @flgActions &  16 =  16  THEN [dbo].[ufn_reportHTMLGetImage]('check-checked') ELSE [dbo].[ufn_reportHTMLGetImage]('check-unchecked') END  + N'&nbsp;&nbsp;Errorlog messages</TD>
-						</TR>
-						<TR VALIGN="TOP" class="color-2">
-							<TD WIDTH="180px" class="details-very-small" ALIGN="LEFT">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + CASE WHEN @flgActions &  32 =  32  THEN [dbo].[ufn_reportHTMLGetImage]('check-checked') ELSE [dbo].[ufn_reportHTMLGetImage]('check-unchecked') END  + N'&nbsp;&nbsp;OS Event messages</TD>
-						</TR>
+						<TR>
+							<TD ALIGN=RIGHT WIDTH="60px"><P class="title3-style">@</P></TD>
+							<TD ALIGN=LEFT  WIDTH="340px"><P class="title2-style">' + CONVERT([varchar](20), ISNULL(@reportBuildStartTime, CONVERT([datetime], N'1900-01-01', 120)), 120) + N' (UTC)</P></TD>							
+						</TR>' + 
+						CASE WHEN @reportDescription IS NOT NULL
+							 THEN N'
+									<TR>
+										<TD ALIGN=RIGHT WIDTH="60px"><P class="title3-style">&nbsp;</P></TD>	
+										<TD ALIGN=LEFT  WIDTH="340px"><P class="title4-style">' + @reportDescription + N'</P></TD>
+									</TR>'
+							 ELSE N''
+						END + 
+						N'
 					</TABLE>
 				</TD>
 			</TR>
 			</TABLE>
-			'
-
-	SET @HTMLReportArea=N''
-	SET @HTMLReportArea = @HTMLReportArea + N'				
-			<P class="disclaimer">Browser support: IE 8, Firefox 3.5 and Google Chrome 7 (on lower versions, some features may be missing).</P>
+		</TD>
+		<TD WIDTH="410px"ALIGN=RIGHT VALIGN="TOP">
+			<TABLE CELLSPACING=0 CELLPADDING="3px" border=0 WIDTH="410px"> 
+				<TR VALIGN=TOP>
+					<TD WIDTH="170px" ALIGN=CENTER>' + [dbo].[ufn_reportHTMLGetImage]('Logo') + N'</TD>	
+					<TD WIDTH="240px" ALIGN=CENTER><P class="title2-style" ALIGN=CENTER>dbaTDPMon<br>Daily Health Check Report</P></TD>
+				</TR>
+				<TR VALIGN=TOP>
+					<TD  COLSPAN="2" ALIGN=RIGHT><P class="disclaimer"><BR><A TARGET="_blank" HREF="https://github.com/rentadba/dbaTDPMon">https://github.com/rentadba/dbaTDPMon</A>, under GNU (GPLv3) licence model
+																		<BR>version ' + @HTMLReportArea + N'
+																	</P></TD>
+				</TR>
+			</TABLE>
 		</TD>
 	</TR>
 	</TABLE>
 	<HR WIDTH="1130px" ALIGN=LEFT><br>'
-	
-	SET @HTMLReport = @HTMLReport + @HTMLReportArea
 
 	SET @HTMLReport = @HTMLReport + N'
 	<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px">

@@ -631,3 +631,4 @@
 /* 31.01.2018 */
 	- monitoring: sql_handle can be used to filter out unwanted alerts ([monitoring].[alertSkipRules])
 	- maintenance-plan: fix small bug when detecting existence of a full database backup
+	- health-check: refactoring of daily report header

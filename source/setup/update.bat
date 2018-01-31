@@ -87,6 +87,9 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20180112-patch-upgrade-from-v2017_6-to-v2017_12-common.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20180131-patch-upgrade-from-v2017_12-to-v2018_1-common.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 
 echo *-----------------------------------------------------------------------------*
 echo Common: Creating Views ...
