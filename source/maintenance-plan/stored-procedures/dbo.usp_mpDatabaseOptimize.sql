@@ -20,7 +20,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseOptimize]
 		@rebuildIndexThreshold		[smallint]	=    30,
 		@pageThreshold				[int]		=  1000,
 		@rebuildIndexPageCountLimit	[int]		= 2147483647,	--16TB/no limit
-		@statsSamplePercent			[smallint]	=   100,
+		@statsSamplePercent			[smallint]	=     0,
 		@statsAgeDays				[smallint]	=   365,
 		@statsChangePercent			[smallint]	=     1,
 		@maxDOP						[smallint]	=	  1,
@@ -260,9 +260,9 @@ IF ISNULL(@rebuildIndexThreshold, 0)=0
 		RETURN 1
 	end
 
-IF ISNULL(@statsSamplePercent, 0)=0 
+IF ISNULL(@statsSamplePercent, 0) < 0
 	begin
-		SET @queryToRun=N'ERROR: Sample percent value for update statistics sample should be greater than 0.'
+		SET @queryToRun=N'ERROR: Sample percent value for update statistics sample should be greater or equal to 0.'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=1
 		RETURN 1
 	end
@@ -1554,9 +1554,9 @@ IF (@serverVersionNum >= 9.04035 AND @flgOptions & 65536 = 65536) AND (GETDATE()
 IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 	begin
 		SET @queryToRun=N'Update statistics for all tables (' + 
-					CASE WHEN @statsSamplePercent<100 
-							THEN 'sample ' + CAST(@statsSamplePercent AS [nvarchar]) + ' percent'
-							ELSE 'fullscan'
+					CASE WHEN @statsSamplePercent =   0 THEN 'default sample'
+						 WHEN @statsSamplePercent < 100 THEN 'sample ' + CAST(@statsSamplePercent AS [nvarchar]) + ' percent'
+						 ELSE 'fullscan'
 					END + ')...'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -1646,12 +1646,13 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 
 						--------------------------------------------------------------------------------------------------
 						SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-						SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''') IS NOT NULL UPDATE STATISTICS ' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + '(' + dbo.ufn_getObjectQuoteName(@IndexName, 'quoted') + ') WITH '
+						SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''') IS NOT NULL UPDATE STATISTICS ' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + '(' + dbo.ufn_getObjectQuoteName(@IndexName, 'quoted') + ')'
 								
-						IF @statsSamplePercent<100
-							SET @queryToRun=@queryToRun + N'SAMPLE ' + CAST(@statsSamplePercent AS [nvarchar]) + ' PERCENT'
+						IF @statsSamplePercent > 0 AND @statsSamplePercent < 100
+							SET @queryToRun=@queryToRun + N' WITH SAMPLE ' + CAST(@statsSamplePercent AS [nvarchar]) + ' PERCENT'
 						ELSE
-							SET @queryToRun=@queryToRun + N'FULLSCAN'
+							IF @statsSamplePercent = 100
+								SET @queryToRun=@queryToRun + N' WITH FULLSCAN'
 
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 						
