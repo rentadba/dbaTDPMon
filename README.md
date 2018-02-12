@@ -46,3 +46,4 @@ Maintenance-plan, health-check and monitoring modules can be used as “agentles
 * and many more...
 
 Author webpage: [http://www.rentadba.eu](http://www.rentadba.eu)
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.me/rentadba)
