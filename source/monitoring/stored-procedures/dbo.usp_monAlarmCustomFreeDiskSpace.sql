@@ -131,7 +131,10 @@ DECLARE crsDiskSpaceAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINCT
 																				AND dsi.[percent_available] > @criticalFreeDiskMinSpaceMB
 																			)
 																		)
-																	AND (dsi.[logical_drive] IN ('C') OR CHARINDEX(dsi.[logical_drive], cdd.[physical_drives])>0)
+																	AND (   dsi.[logical_drive] IN ('C') 
+																		 OR cdd.[physical_drives] IS NULL
+																		 OR (cdd.[physical_drives] IS NOT NULL AND CHARINDEX(dsi.[logical_drive], cdd.[physical_drives])>0)
+																		)
 																	AND asr.[id] IS NULL
 																	AND (@warningFreeDiskMinSpaceMB IS NOT NULL AND @warningFreeDiskMinPercent IS NOT NULL)
 
@@ -180,7 +183,10 @@ DECLARE crsDiskSpaceAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINCT
 																				AND dsi.[available_space_mb] < @criticalFreeDiskMinSpaceMB
 																			)
 																		)
-																	AND (dsi.[logical_drive] IN ('C') OR CHARINDEX(dsi.[logical_drive], cdd.[physical_drives])>0)
+																	AND (   dsi.[logical_drive] IN ('C') 
+																		 OR cdd.[physical_drives] IS NULL
+																		 OR (cdd.[physical_drives] IS NOT NULL AND CHARINDEX(dsi.[logical_drive], cdd.[physical_drives])>0)
+																		)
 																	AND asr.[id] IS NULL
 																	AND (@criticalFreeDiskMinSpaceMB IS NOT NULL AND @criticalFreeDiskMinPercent IS NOT NULL)										
 															ORDER BY [instance_name], [object_name]

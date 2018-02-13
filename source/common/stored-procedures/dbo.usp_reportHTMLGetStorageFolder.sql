@@ -70,7 +70,13 @@ BEGIN TRY
 	FROM	[dbo].[appConfigurations] 
 	WHERE	[name] = 'Local storage path for HTML reports'
 			AND [module] = 'common'
-	
+
+	IF @localStoragePath IS NULL
+		begin
+			SET @ErrMessage=N'"Local storage path for HTML reports" configuration is not defined in dbo.appConfigurations table.'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+		end
+
 	SET @relativeStoragePath = N''
 	
 	-----------------------------------------------------------------------------------------------------

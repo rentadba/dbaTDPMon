@@ -329,7 +329,7 @@ if errorlevel 1 goto install_err
 
 :hc
 SET schema_installed=0
-sqlcmd.exe -S%server% %autentif% -Q "set nocount on; select name from sys.schemas where name='health-check'" -d %dbname% -o check-schema.out -b -r 1
+sqlcmd.exe -S%server% %autentif% -Q "set nocount on; select name from sys.schemas where name='health-check' and exists(select * from sys.objects where name='usp_hcCollectDatabaseDetails')" -d %dbname% -o check-schema.out -b -r 1
 FOR /F "tokens=1 delims==" %%A IN ('FINDSTR /R "health-check" check-schema.out') DO (SET schema_installed=1)
 del check-schema.out
 if "%schema_installed%" == "0" goto mon
@@ -473,7 +473,7 @@ if errorlevel 1 goto install_err
 
 
 :done
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2018.02.01' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2018.02.13' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err  
 
 echo *-----------------------------------------------------------------------------*

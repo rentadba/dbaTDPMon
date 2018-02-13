@@ -111,7 +111,7 @@ WHERE sj.[name] LIKE ''%Discovery & Health Check%''
 	AND sjs.[database_name] = DB_NAME()
 
 SET @lastExecutionStatus = 4
-WHILE @lastExecutionStatus = 4
+WHILE @lastExecutionStatus = 4 AND @jobName IS NOT NULL
 	begin
 		EXEC dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @@SERVERNAME,
 											@jobName				= @jobName,

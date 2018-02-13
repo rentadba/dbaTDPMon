@@ -482,6 +482,7 @@ sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_stats
 if errorlevel 1 goto install_err
 
 
+
 echo *-----------------------------------------------------------------------------*
 echo Health Check: Creating Functions / Stored Procedures
 echo *-----------------------------------------------------------------------------*
@@ -587,6 +588,32 @@ sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\dbo.usp_mon
 if errorlevel 1 goto install_err
 
 
+set healthCheckInstalled=true
+if "%module%"=="monitoring" set healthCheckInstalled=false
+
+if "%healthCheckInstalled%" == "false" sqlcmd.exe -S%server% %autentif% -i "..\health-check\schema\create-schema-health-check.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%healthCheckInstalled%" == "false" sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsDatabaseDetails.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%healthCheckInstalled%" == "false" sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsDatabaseDetails.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%healthCheckInstalled%" == "false" sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsDiskSpaceInfo.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%healthCheckInstalled%" == "false" sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsDiskSpaceInfo.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%healthCheckInstalled%" == "false" sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcJobQueueCreate.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%healthCheckInstalled%" == "false" sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectDiskSpaceUsage.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+
+
 echo *-----------------------------------------------------------------------------*
 echo Monitoring: Creating SQL Server Agent Jobs
 echo *-----------------------------------------------------------------------------*
@@ -611,6 +638,9 @@ goto done
 
 :done
 echo *-----------------------------------------------------------------------------*
+sqlcmd.exe -S%server% %autentif% -i "detect-version.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 echo The installation was successful.
 goto end
 

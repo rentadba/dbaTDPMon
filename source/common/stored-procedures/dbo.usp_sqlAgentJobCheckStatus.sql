@@ -57,6 +57,15 @@ SET NOCOUNT ON
 IF OBJECT_ID('tempdb..#tmpCheck') IS NOT NULL DROP TABLE #tmpCheck
 CREATE TABLE #tmpCheck (Result varchar(1024))
 
+---------------------------------------------------------------------------------------------
+SET	@strMessage			= NULL
+SET	@currentRunning		= NULL
+SET	@lastExecutionStatus= NULL
+SET	@lastExecutionDate	= NULL
+SET	@lastExecutionTime 	= NULL
+SET	@runningTimeSec		= NULL
+
+---------------------------------------------------------------------------------------------
 IF ISNULL(@sqlServerName, '')=''
 	begin
 		SET @queryToRun=N'ERROR: The specified value for SOURCE server is not valid.'
@@ -80,14 +89,6 @@ IF (SELECT count(*) FROM #tmpCheck)=0
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		RETURN 1
 	end
-
----------------------------------------------------------------------------------------------
-SET	@strMessage			= NULL
-SET	@currentRunning		= NULL
-SET	@lastExecutionStatus= NULL
-SET	@lastExecutionDate	= NULL
-SET	@lastExecutionTime 	= NULL
-SET	@runningTimeSec		= NULL
 
 
 ---------------------------------------------------------------------------------------------

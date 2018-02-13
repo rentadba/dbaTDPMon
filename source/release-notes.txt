@@ -638,3 +638,6 @@
 /*----------------------------------------------------------------------*/
 /* 01.02.2018 */
 	- maintenance-plan: allow updating statistics with default sample 
+
+/* 13.02.2018 */
+	- monitoring: fix long waits for monitoring disk space job when only monitoring module was installed (reported by George Talaba)
