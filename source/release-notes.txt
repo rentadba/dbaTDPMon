@@ -641,3 +641,6 @@
 
 /* 13.02.2018 */
 	- monitoring: fix long waits for monitoring disk space job when only monitoring module was installed (reported by George Talaba)
+
+/* 15.02.2018 */
+	- modify active start date for all jobs to be utility installation day (reported by George Talaba)

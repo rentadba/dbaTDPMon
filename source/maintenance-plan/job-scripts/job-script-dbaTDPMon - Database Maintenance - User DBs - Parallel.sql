@@ -187,8 +187,11 @@ EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
+	DECLARE @startDate [int]
+	SET @startDate = CAST(CONVERT([varchar](8), GETDATE(), 112) AS [int])
+
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobschedule	@job_id=@jobId, 
-													@name=N'Daily', 
+													@name=N'Daily at 2 am', 
 													@enabled=1, 
 													@freq_type=4, 
 													@freq_interval=1, 
@@ -196,7 +199,7 @@ EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
 													@freq_subday_interval=0, 
 													@freq_relative_interval=0, 
 													@freq_recurrence_factor=0, 
-													@active_start_date=20141215, 
+													@active_start_date=@startDate, 
 													@active_end_date=99991231, 
 													@active_start_time=020000, 
 													@active_end_time=235959

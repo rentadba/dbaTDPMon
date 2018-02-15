@@ -276,6 +276,9 @@ EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
+	DECLARE @startDate [int]
+	SET @startDate = CAST(CONVERT([varchar](8), GETDATE(), 112) AS [int])
+
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobschedule	@job_id=@jobId, 
 													@name=N'Business Time - Every 15 minutes', 
 													@enabled=1, 
@@ -285,7 +288,7 @@ EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
 													@freq_subday_interval=15, 
 													@freq_relative_interval=0, 
 													@freq_recurrence_factor=0, 
-													@active_start_date=20151012, 
+													@active_start_date=@startDate, 
 													@active_end_date=99991231, 
 													@active_start_time=63000, 
 													@active_end_time=223000
@@ -302,7 +305,7 @@ EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
 													@freq_subday_interval=30, 
 													@freq_relative_interval=0, 
 													@freq_recurrence_factor=0, 
-													@active_start_date=20151012, 
+													@active_start_date=@startDate, 
 													@active_end_date=99991231, 
 													@active_start_time=0, 
 													@active_end_time=53000
@@ -319,7 +322,7 @@ EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
 													@freq_subday_interval=30, 
 													@freq_relative_interval=0, 
 													@freq_recurrence_factor=0, 
-													@active_start_date=20151012, 
+													@active_start_date=@startDate, 
 													@active_end_date=99991231, 
 													@active_start_time=223000, 
 													@active_end_time=235959
