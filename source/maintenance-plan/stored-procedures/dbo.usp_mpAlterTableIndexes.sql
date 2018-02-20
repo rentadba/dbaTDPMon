@@ -562,14 +562,15 @@ BEGIN TRY
 									SET @queryToRun = @queryToRun + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
 									SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, 'quoted') + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ' REORGANIZE'
 				
+									IF @partitionNumber <> 0
+										SET @queryToRun = @queryToRun + N' PARTITION = ' + CAST(@partitionNumber AS [nvarchar])
+
 									--  1  - Compact large objects (LOB) (default)
 									IF @flgOptions & 1 = 1
 										SET @queryToRun = @queryToRun + N' WITH (LOB_COMPACTION = ON) '
 									ELSE
 										SET @queryToRun = @queryToRun + N' WITH (LOB_COMPACTION = OFF) '
 				
-									IF @partitionNumber>1
-										SET @queryToRun = @queryToRun + N' PARTITION ' + CAST(@partitionNumber AS [nvarchar])
 									IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 
