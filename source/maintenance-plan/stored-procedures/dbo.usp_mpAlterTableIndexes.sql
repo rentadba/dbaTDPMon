@@ -16,7 +16,7 @@ CREATE PROCEDURE [dbo].[usp_mpAlterTableIndexes]
 		@tableName					[sysname] = '%',
 		@indexName					[sysname] = '%',
 		@indexID					[int],
-		@partitionNumber			[int] = 1,
+		@partitionNumber			[int] = 0,
 		@flgAction					[tinyint] = 1,
 		@flgOptions					[int] = 6145, --4096 + 2048 + 1	/* 6177 for space optimized index rebuild */
 		@maxDOP						[smallint] = 1,
@@ -45,7 +45,7 @@ AS
 --		@indexName		- name of the index to be analyzed
 --		@indexID		- id of the index to be analyzed. to may specify either index name or id. 
 --						  if you specify both, index name will be taken into consideration
---		@partitionNumber- index partition number. default value = 1 (index with no partitions)
+--		@partitionNumber- index partition number. default value = 0 (index with no partitions)
 --		@flgAction:		 1	- Rebuild index (default)
 --						 2  - Reorganize indexes
 --						 4	- Disable index
@@ -428,14 +428,14 @@ BEGIN TRY
 								SET @queryToRun = @queryToRun + N'SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
 								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, 'quoted') + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ' REBUILD'
 					
+								IF @partitionNumber <> 0
+									SET @queryToRun = @queryToRun + N' PARTITION = ' + CAST(@partitionNumber AS [nvarchar])
+
 								--rebuild options
 								SET @queryToRun = @queryToRun + N' WITH (SORT_IN_TEMPDB = ON' + CASE WHEN ISNULL(@maxDOP, 0) <> 0 THEN N', MAXDOP = ' + CAST(@maxDOP AS [nvarchar]) ELSE N'' END + 
 																						CASE WHEN ISNULL(@sqlScriptOnline, N'')<>N'' THEN N', ' + @sqlScriptOnline ELSE N'' END + 
 																						CASE WHEN ISNULL(@fillFactor, 0) <> 0 THEN N', FILLFACTOR = ' + CAST(@fillFactor AS [nvarchar]) ELSE N'' END +
 																N')'
-
-								IF @partitionNumber>1
-									SET @queryToRun = @queryToRun + N' PARTITION ' + CAST(@partitionNumber AS [nvarchar])
 
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 

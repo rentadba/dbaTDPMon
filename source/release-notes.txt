@@ -644,3 +644,6 @@
 
 /* 15.02.2018 */
 	- modify active start date for all jobs to be utility installation day (reported by George Talaba)
+
+/* 20.02.2018 */
+	- maintenance plan: fix small bug when building SQL statement for rebuilding index partition
