@@ -647,3 +647,7 @@
 
 /* 20.02.2018 */
 	- maintenance plan: fix small bug when building SQL statement for rebuilding index partition
+	- maintenance plan: add option to rebuild only a heap table partition
+
+/* 21.02.2018 */
+	- maintenance plan: extend support for heap/index partition maintenance (rebuild/reorganize)
