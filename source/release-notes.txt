@@ -651,3 +651,6 @@
 
 /* 21.02.2018 */
 	- maintenance plan: extend support for heap/index partition maintenance (rebuild/reorganize)
+
+/* 22.02.2018 */
+	- maintenance plan: add support for incremental statistics (SQL Server 2014+)

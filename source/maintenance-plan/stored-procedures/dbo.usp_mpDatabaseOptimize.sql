@@ -113,7 +113,7 @@ DECLARE		@queryToRun    					[nvarchar](4000),
 			@indexIsRebuilt					[bit],
 			@stopTimeLimit					[datetime],
 			@partitionNumber				[int],
-			@isPartitioned					[bit]			
+			@isPartitioned					[bit]
 
 SET NOCOUNT ON
 
@@ -350,9 +350,19 @@ CREATE TABLE #databaseObjectsWithStatisticsList(
 												[rows]					[bigint]		NULL,
 												[modification_counter]	[bigint]		NULL,
 												[last_updated]			[datetime]		NULL,
-												[percent_changes]		[decimal](38,2)	NULL
+												[percent_changes]		[decimal](38,2)	NULL,
+												[is_incremental]		[bit]			NULL DEFAULT (0),
+												[partition_number]		[int]			NULL
 												)
 
+---------------------------------------------------------------------------------------------
+IF object_id('tempdb..#incrementalStatisticsList') IS NOT NULL 
+	DROP TABLE #incrementalStatisticsList
+
+CREATE TABLE #incrementalStatisticsList (
+										 [object_id]	[int],
+										 [stats_id]		[int]
+										)
 
 ---------------------------------------------------------------------------------------------
 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
@@ -848,11 +858,95 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 		IF @sqlServerName<>@@SERVERNAME
 			SET @queryToRun = N'SELECT x.* FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sp_executesql N''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''''')x'
 
-
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		INSERT	INTO #databaseObjectsWithStatisticsList([database_id], [object_id], [table_schema], [table_name], [stats_id], [stats_name], [auto_created], [last_updated], [rows], [modification_counter], [percent_changes])
 				EXEC (@queryToRun)
+
+
+		/* starting with SQL Server 2014, incremental statistics are available */
+		IF @serverVersionNum >= 12
+			begin
+				SET @queryToRun=N'Create list of incremental statistics to be analyzed...' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+				SET @queryToRun = N''
+				SET @queryToRun = @queryToRun + 
+									CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
+									SELECT ss.[object_id], ss.[stats_id] 
+									FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.stats ss
+									INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.objects ob	ON ob.[object_id] = ss.[object_id]
+									INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]
+									WHERE	ob.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+											AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
+											AND ob.[type] <> ''S''
+											AND ss.[is_incremental] = 1';
+
+				IF @sqlServerName<>@@SERVERNAME
+					SET @queryToRun = N'SELECT x.* FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sp_executesql N''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''''')x'
+
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+				INSERT	INTO #incrementalStatisticsList([object_id], [stats_id])
+						EXEC (@queryToRun)
+
+				DECLARE crsIncrementalStatisticsList CURSOR LOCAL FAST_FORWARD FOR	SELECT [object_id], [stats_id]
+																					FROM #incrementalStatisticsList																	
+				OPEN crsIncrementalStatisticsList
+				FETCH NEXT FROM crsIncrementalStatisticsList INTO @ObjectID, @IndexID
+				WHILE @@FETCH_STATUS = 0
+					begin
+						SET @queryToRun = N''
+						SET @queryToRun = @queryToRun + 
+											CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
+											SELECT DB_ID() AS [database_id]
+													, sp.[object_id]
+													, sc.[name] AS [table_schema]
+													, ob.[name] AS [table_name]
+													, sp.[stats_id]
+													, ss.[name] AS [stats_name]
+													, ss.[auto_created]
+													, sp.[last_updated]
+													, sp.[rows]
+													, ABS(sp.[modification_counter]) AS [modification_counter]
+													, (ABS(sp.[modification_counter]) * 100. / CAST(sp.[rows] AS [float])) AS [percent_changes]
+													, ss.[is_incremental]
+													, sp.[partition_number]
+											FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.stats ss
+											INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.objects ob	ON ob.[object_id] = ss.[object_id]
+											INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.schemas sc	ON sc.[schema_id] = ob.[schema_id]
+											INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.dm_db_incremental_stats_properties(' + CAST(@ObjectID AS [varchar](32)) + N', ' + CAST(@IndexID AS [varchar](32)) + N') AS sp ON sp.[object_id] = ss.[object_id] AND sp.[stats_id] = ss.[stats_id]
+											WHERE	sp.[rows] > 0
+												AND (    (    DATEDIFF(dd, sp.[last_updated], GETDATE()) >= ' + CAST(@statsAgeDays AS [nvarchar](32)) + N' 
+														  AND sp.[modification_counter] <> 0
+														 )
+													 OR  
+														 ( 
+															  DATEDIFF(dd, sp.[last_updated], GETDATE()) < ' + CAST(@statsAgeDays AS [nvarchar](32)) + N' 
+														  AND sp.[modification_counter] <> 0 
+														  AND (ABS(sp.[modification_counter]) * 100. / CAST(sp.[rows] AS [float])) >= ' + CAST(@statsChangePercent AS [nvarchar](32)) + N'
+														 )
+													)'+
+												CASE WHEN @skipObjectsList IS NOT NULL AND @serverVersionNum >= 9
+													 THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
+																AND ss.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))' 
+												ELSE N'' END
+
+
+						IF @sqlServerName<>@@SERVERNAME
+							SET @queryToRun = N'SELECT x.* FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sp_executesql N''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''''')x'
+
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+						INSERT	INTO #databaseObjectsWithStatisticsList([database_id], [object_id], [table_schema], [table_name], [stats_id], [stats_name], [auto_created], [last_updated], [rows], [modification_counter], [percent_changes], [is_incremental], [partition_number])
+								EXEC (@queryToRun)
+
+						FETCH NEXT FROM crsIncrementalStatisticsList INTO @ObjectID, @IndexID
+					end
+				CLOSE crsIncrementalStatisticsList
+				DEALLOCATE crsIncrementalStatisticsList
+			end
+
 
 		--delete entries which should be excluded from current maintenance actions, as they are part of [maintenance-plan].[vw_objectSkipList]
 		IF (@serverVersionNum >= 9)
@@ -1643,6 +1737,25 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				WHERE [auto_created]=1
 			end
 
+		/* for incremental statistics, keep only partition related changes */
+		IF @serverVersionNum >= 12
+			begin
+				SET @queryToRun=N'optimizing list (3)'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+				DELETE dowsl
+				FROM #databaseObjectsWithStatisticsList	dowsl
+				WHERE [is_incremental] = 0
+						AND EXISTS(
+									SELECT 1
+									FROM #databaseObjectsWithStatisticsList X
+									WHERE	x.[database_id] = dowsl.[database_id]
+											AND x.[object_id] = dowsl.[object_id]
+											AND x.[stats_id] = dowsl.[stats_id]
+											AND x.[is_incremental] = 1
+								  )
+			end
+
 		DECLARE   @statsAutoCreated			[bit]
 				, @tableRows				[bigint]
 				, @statsModificationCounter	[bigint]
@@ -1664,15 +1777,16 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				SET @IndexID=1
 				DECLARE crsTableStatsList CURSOR LOCAL FAST_FORWARD FOR	SELECT	  [stats_name], [auto_created], [rows], [modification_counter], [last_updated], [percent_changes]
 																				, DATEDIFF(dd, [last_updated], GETDATE()) AS [stats_age]
+																				, [is_incremental], [partition_number]
 																		FROM	#databaseObjectsWithStatisticsList	
 																		WHERE	[table_schema] = @CurrentTableSchema
 																				AND [table_name] = @CurrentTableName
 																		ORDER BY [stats_name]
 				OPEN crsTableStatsList
-				FETCH NEXT FROM crsTableStatsList INTO @IndexName, @statsAutoCreated, @tableRows, @statsModificationCounter, @lastUpdated, @percentChanges, @statsAge
+				FETCH NEXT FROM crsTableStatsList INTO @IndexName, @statsAutoCreated, @tableRows, @statsModificationCounter, @lastUpdated, @percentChanges, @statsAge, @isPartitioned, @partitionNumber
 				WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 					begin
-						SET @queryToRun=CAST(@IndexID AS [nvarchar](64)) + '/' + CAST(@statsCount AS [nvarchar](64)) + ' - ' + [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') + ' / age = ' + CAST(@statsAge AS [varchar](32)) + ' days / rows = ' + CAST(@tableRows AS [varchar](32)) + ' / changes = ' + CAST(@statsModificationCounter AS [varchar](32))
+						SET @queryToRun=CAST(@IndexID AS [nvarchar](64)) + '/' + CAST(@statsCount AS [nvarchar](64)) + ' - ' + [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') + ' : ' + CASE WHEN @isPartitioned = 1 THEN ' partition ' + CAST(@partitionNumber AS [varchar](32)) + N' / ' ELSE N'' END + 'age = ' + CAST(@statsAge AS [varchar](32)) + ' days / rows = ' + CAST(@tableRows AS [varchar](32)) + ' / changes = ' + CAST(@statsModificationCounter AS [varchar](32))
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 
 						--------------------------------------------------------------------------------------------------
@@ -1685,6 +1799,8 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 											'<object_name>' + [dbo].[ufn_getObjectQuoteName](@objectName, 'xml') + '</object_name>'+ 
 											'<stats_name>' + [dbo].[ufn_getObjectQuoteName](@childObjectName, 'xml') + '</stats_name>' + 
 											'<auto_created>' + CAST(@statsAutoCreated AS [varchar](32)) + '</auto_created>' + 
+											'<is_incremental>' + CASE WHEN @isPartitioned = 1 THEN 'Yes' ELSE 'No' END + '</is_incremental>' + 
+											'<partition_number>' +  CASE WHEN @partitionNumber IS NOT NULL THEN CAST(@partitionNumber AS [varchar](32)) ELSE '' END + '</partition_number>' + 
 											'<rows>' + CAST(@tableRows AS [varchar](32)) + '</rows>' + 
 											'<modification_counter>' + CAST(@statsModificationCounter AS [varchar](32)) + '</modification_counter>' + 
 											'<percent_changes>' + CAST(@percentChanges AS [varchar](32)) + '</percent_changes>' + 
@@ -1704,12 +1820,15 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 						--------------------------------------------------------------------------------------------------
 						SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
 						SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + ''') IS NOT NULL UPDATE STATISTICS ' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + '(' + dbo.ufn_getObjectQuoteName(@IndexName, 'quoted') + ')'
-								
-						IF @statsSamplePercent > 0 AND @statsSamplePercent < 100
-							SET @queryToRun=@queryToRun + N' WITH SAMPLE ' + CAST(@statsSamplePercent AS [nvarchar]) + ' PERCENT'
+						
+						IF @isPartitioned = 1  
+							SET @queryToRun=@queryToRun + N' WITH RESAMPLE ON PARTITIONS (' + CAST(@partitionNumber AS [varchar](32)) + N')'
 						ELSE
-							IF @statsSamplePercent = 100
-								SET @queryToRun=@queryToRun + N' WITH FULLSCAN'
+							IF @statsSamplePercent > 0 AND @statsSamplePercent < 100
+								SET @queryToRun=@queryToRun + N' WITH SAMPLE ' + CAST(@statsSamplePercent AS [nvarchar]) + N' PERCENT'
+							ELSE
+								IF @statsSamplePercent = 100
+									SET @queryToRun=@queryToRun + N' WITH FULLSCAN'
 
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 						
@@ -1727,7 +1846,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 																		@debugMode		= @debugMode
 
 						SET @IndexID = @IndexID + 1
-						FETCH NEXT FROM crsTableStatsList INTO @IndexName, @statsAutoCreated, @tableRows, @statsModificationCounter, @lastUpdated, @percentChanges, @statsAge
+						FETCH NEXT FROM crsTableStatsList INTO @IndexName, @statsAutoCreated, @tableRows, @statsModificationCounter, @lastUpdated, @percentChanges, @statsAge, @isPartitioned, @partitionNumber
 					end
 				CLOSE crsTableStatsList
 				DEALLOCATE crsTableStatsList
