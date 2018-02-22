@@ -31,6 +31,7 @@ Maintenance-plan, health-check and monitoring modules can be used as “agentles
 	* rebuild decision based on extent fragmentation, page density and forwarded records
 * **_Statistics Maintenance_**
 	* use "drive table" to limit the number of analyzed statistics
+	* support for incremental statistics (+2014)
 	* update decision is made based on statistics age and changes made
 * **_System Maintenance_**
 	* scheduled errorlog cycle
