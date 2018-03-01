@@ -59,6 +59,7 @@ DECLARE @projectID					[smallint],
 		@eventData					[varchar](8000),
 		@ignoreAlertsForError1222	[bit],
 		@ignoreAlertsForError15281	[bit],
+		@ignoreAlertsForError1927	[bit],
 		@errorCode					[int],
 		@eventMessageXML			[xml]
 		
@@ -148,6 +149,14 @@ WHERE	[name]='Ignore alerts for: Error 15281 - SQL Server blocked access to proc
 		AND [module] = 'maintenance-plan'
 
 SET @ignoreAlertsForError15281 = ISNULL(@ignoreAlertsForError15281, 0)
+
+-----------------------------------------------------------------------------------------------------
+SELECT	@ignoreAlertsForError1927 = CASE WHEN LOWER([value])='true' THEN 1 ELSE 0 END
+FROM	[dbo].[appConfigurations]
+WHERE	[name]='Ignore alerts for: Error 1927 - There are already statistics on table'
+		AND [module] = 'maintenance-plan'
+
+SET @ignoreAlertsForError1927 = ISNULL(@ignoreAlertsForError1927, 0)
 
 
 -----------------------------------------------------------------------------------------------------
@@ -552,7 +561,7 @@ IF @eventType IN (2, 5)
 	
 IF @eventType IN (1)
 	begin
-		IF (@ignoreAlertsForError1222=1 AND @errorCode=1222) or (@ignoreAlertsForError15281=1 and @errorCode=15281)
+		IF (@ignoreAlertsForError1222=1 AND @errorCode=1222) or (@ignoreAlertsForError15281=1 and @errorCode=15281) or (@ignoreAlertsForError1927=1 and @errorCode=1927)
 			begin
 				SET @alertSent=1
 				SET @isFloodControl=1

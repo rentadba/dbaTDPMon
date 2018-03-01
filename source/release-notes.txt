@@ -654,3 +654,9 @@
 
 /* 22.02.2018 */
 	- maintenance plan: add support for incremental statistics (SQL Server 2014+)
+
+/*----------------------------------------------------------------------*/
+/* March 2018 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 01.03.2018 */
+		- add support for ignoring error code 1927: There are already statistics on table [...]
