@@ -659,5 +659,5 @@
 /* March 2018 new features & fixes
 /*----------------------------------------------------------------------*/
 /* 01.03.2018 */
-		- add support for ignoring error code 1927: There are already statistics on table [...]
-		- disable shrink internal jobs in parallel maintenance plan
+		- add support for ignoring error code 1927: There are already statistics on table [...] (reported by Stefan Iancu)
+		- disable shrink internal jobs in parallel maintenance plan (reported by Stefan Iancu)
