@@ -544,7 +544,7 @@ IF DATENAME(weekday, GETDATE()) = ''Monday''
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases
-									WHERE [name] IN (''master'', ''model'', ''msdb'', ''distribution'')
+									WHERE [name] IN (''master'', ''msdb'', ''distribution'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
 													 WHEN [status] & 64 = 64 THEN ''PRE RECOVERY''
@@ -601,7 +601,7 @@ IF DATENAME(weekday, GETDATE()) = ''Saturday'' AND DATEPART(dd, GETDATE())<=7
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases
-									WHERE [name] IN (''master'', ''model'', ''msdb'', ''tempdb'', ''distribution'')
+									WHERE [name] IN (''master'', ''msdb'', ''tempdb'', ''distribution'')
 											AND [status] <> 0
 											AND CASE WHEN [status] & 32 = 32 THEN ''LOADING''
 													 WHEN [status] & 64 = 64 THEN ''PRE RECOVERY''
