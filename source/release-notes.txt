@@ -660,3 +660,4 @@
 /*----------------------------------------------------------------------*/
 /* 01.03.2018 */
 		- add support for ignoring error code 1927: There are already statistics on table [...]
+		- disable shrink internal jobs in parallel maintenance plan
