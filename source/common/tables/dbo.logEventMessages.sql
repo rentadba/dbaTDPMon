@@ -74,7 +74,7 @@ EXEC (@queryToRun)
 SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_ObjectName] ON [dbo].[logEventMessages]([object_name], [database_name]) ON [FG_Statistics_Index]'
 EXEC (@queryToRun)
 
-SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_EventType] ON [dbo].[logEventMessages]([event_type]) ON [FG_Statistics_Index]'
+SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_EventType_EventDateUTC_Instance_ID] ON [dbo].[logEventMessages] ([event_type], [event_date_utc], [instance_id]) ON [FG_Statistics_Index]'
 EXEC (@queryToRun)
 
 SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_Module_EventName] ON [dbo].[logEventMessages] ([project_id], [instance_id], [module], [event_name])' + CASE WHEN @SQLMajorVersion>8 THEN ' INCLUDE ([parameters], [database_name], [object_name], [child_object_name], [event_date_utc])' ELSE '' END + ' ON [FG_Statistics_Index]'
