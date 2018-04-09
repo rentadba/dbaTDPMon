@@ -228,16 +228,16 @@ GO
 IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='catalogProjects' AND COLUMN_NAME='solution_id')
 	ALTER TABLE [dbo].[catalogProjects] ADD [solution_id] [smallint] NULL
 GO
-IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='catalogProjects' AND COLUMN_NAME='dbFilter')
-	ALTER TABLE [dbo].[catalogProjects] ADD [dbFilter] [sysname] NULL
+IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='catalogProjects' AND COLUMN_NAME='db_filter')
+	ALTER TABLE [dbo].[catalogProjects] ADD [db_filter] [sysname] NULL
 GO
 
-IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='catalogProjects' AND COLUMN_NAME='isProduction')
+IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='catalogProjects' AND COLUMN_NAME='is_production')
 begin
-	EXEC ('ALTER TABLE [dbo].[catalogProjects] ADD [isProduction] [bit] NULL');
-	EXEC ('ALTER TABLE [dbo].[catalogProjects] ADD CONSTRAINT [DF_catalogProjects_isProduction] DEFAULT (0) FOR [isProduction]');
-	EXEC ('UPDATE [dbo].[catalogProjects] SET [isProduction] = 0 WHERE [isProduction] IS NULL');
-	EXEC ('ALTER TABLE [dbo].[catalogProjects] ALTER COLUMN [isProduction] [bit] NOT NULL');
+	EXEC ('ALTER TABLE [dbo].[catalogProjects] ADD [is_production] [bit] NULL');
+	EXEC ('ALTER TABLE [dbo].[catalogProjects] ADD CONSTRAINT [DF_catalogProjects_isProduction] DEFAULT (0) FOR [is_production]');
+	EXEC ('UPDATE [dbo].[catalogProjects] SET [is_production] = 0 WHERE [is_production] IS NULL');
+	EXEC ('ALTER TABLE [dbo].[catalogProjects] ALTER COLUMN [is_production] [bit] NOT NULL');
 end
 GO
 
@@ -276,8 +276,8 @@ begin
 			, cp.[code]				AS [project_code]
 			, cp.[name]				AS [project_name]
 			, cp.[description]		AS [project_description]
-			, cp.[isProduction]		AS [is_production]
-			, cp.[dbFilter]			AS [db_filter]
+			, cp.[is_production]
+			, cp.[db_filter]
 			, cs.[name]				AS [solution_name]
 			, cs.[contact]
 			, cs.[details]

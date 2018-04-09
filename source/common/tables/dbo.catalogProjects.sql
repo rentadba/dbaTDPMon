@@ -21,8 +21,8 @@ CREATE TABLE [dbo].[catalogProjects]
 	[name]			[nvarchar](128)			NOT NULL,
 	[description]	[nvarchar](256)			NOT NULL,
 	[solution_id]	[smallint]				NULL,
-	[dbFilter]		[sysname]				NULL,
-	[isProduction]	[bit]					NOT NULL CONSTRAINT [DF_catalogProjects_isProduction] DEFAULT (0),
+	[db_filter]		[sysname]				NULL,
+	[is_production]	[bit]					NOT NULL CONSTRAINT [DF_catalogProjects_isProduction] DEFAULT (0),
 	[active]		[bit]					NOT NULL CONSTRAINT [DF_catalogProjects_Active] DEFAULT (1),
 	CONSTRAINT [PK_catalogProjects] PRIMARY KEY  CLUSTERED 
 	(
@@ -55,8 +55,8 @@ RAISERROR('		...insert default data', 10, 1) WITH NOWAIT
 GO
 SET NOCOUNT ON
 GO
-INSERT	INTO [dbo].[catalogProjects]([id], [code], [name], [description], [active], [solution_id], [isProduction])
-		SELECT 0, '$(projectCode)', 'Default', '', 1, cs.[id], 1
+INSERT	INTO [dbo].[catalogProjects]([id], [code], [name], [description], [active], [solution_id], [is_production], [db_filter])
+		SELECT 0, '$(projectCode)', 'Default', '', 1, cs.[id], 1, '*'
 		FROM [dbo].[catalogSolutions] cs
 		WHERE cs.[name]='Default'
 GO
