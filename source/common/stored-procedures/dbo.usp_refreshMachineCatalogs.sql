@@ -42,6 +42,7 @@ DECLARE   @queryToRun			[nvarchar](max)	-- used for dynamic statements
 		, @domainName			[sysname]
 		, @optionXPValue		[int]
 		, @hostPlatform			[sysname]
+		, @dbFilter				[sysname]
 
 -- { sql_statement | statement_block }
 BEGIN TRY
@@ -126,7 +127,8 @@ BEGIN TRY
 	IF @projectCode IS NULL
 		SET @projectCode = [dbo].[ufn_getProjectCode](@sqlServerName, NULL)
 
-	SELECT @projectID = [id]
+	SELECT    @projectID = [id]
+			, @dbFilter = [db_filter]
 	FROM [dbo].[catalogProjects]
 	WHERE [code] = @projectCode 
 
@@ -136,6 +138,8 @@ BEGIN TRY
 			EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		end
 
+	IF ISNULL(@dbFilter, '')='' SET @dbFilter = '%'
+		
 	-----------------------------------------------------------------------------------------------------
 	--check if the connection to machine can be made & discover instance name
 	-----------------------------------------------------------------------------------------------------
@@ -270,19 +274,25 @@ BEGIN TRY
 													WHEN sdb.[status] = 0 THEN ''UNKNOWN''
 													ELSE ''ONLINE''
 												END AS [state_desc]
-									FROM master.dbo.sysdatabases sdb'
+									FROM master.dbo.sysdatabases sdb
+									WHERE sdb.[name] LIKE ''' + @dbFilter + ''''
 			ELSE
 				SET @queryToRun = N'SELECT sdb.[database_id], sdb.[name], sdb.[state], sdb.[state_desc]
 									FROM sys.databases sdb
-									WHERE [is_read_only] = 0 AND [is_in_standby] = 0
+									WHERE	[is_read_only] = 0 
+											AND [is_in_standby] = 0
+											AND sdb.[name] LIKE ''' + @dbFilter + '''
 									UNION ALL
 									SELECT sdb.[database_id], sdb.[name], sdb.[state], ''READ ONLY''
 									FROM sys.databases sdb
-									WHERE [is_read_only] = 1 AND [is_in_standby] = 0
+									WHERE	[is_read_only] = 1
+											AND [is_in_standby] = 0
+											AND sdb.[name] LIKE ''' + @dbFilter + '''
 									UNION ALL
 									SELECT sdb.[database_id], sdb.[name], sdb.[state], ''STANDBY''
 									FROM sys.databases sdb
-									WHERE [is_in_standby] = 1'
+									WHERE	[is_in_standby] = 1
+											AND sdb.[name] LIKE ''' + @dbFilter + ''''
 			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 			IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
