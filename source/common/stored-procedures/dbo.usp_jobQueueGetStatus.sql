@@ -231,6 +231,15 @@ IF @minJobToRunBeforeExit=0
 
 				IF @currentRunning = 0
 					begin
+						IF @lastExecutionStatus <> 5
+							begin
+								UPDATE [dbo].[jobExecutionQueue]
+										SET [status] = @lastExecutionStatus,
+											[running_time_sec] = @runningTimeSec,
+											[log_message] = @strMessage
+									WHERE [id] = @jobQueueID
+							end
+
 						/* removing job */
 						IF @debugMode=1 
 							begin
