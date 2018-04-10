@@ -47,12 +47,9 @@ DECLARE @projectID					[smallint],
 		@instanceID					[smallint]
 
 -----------------------------------------------------------------------------------------------------
---get default project code
+-- try to get project code by database name / or get the default project value
 IF @projectCode IS NULL
-	SELECT	@projectCode = [value]
-	FROM	[dbo].[appConfigurations]
-	WHERE	[name] = 'Default project code'
-			AND [module] = 'common'
+	SET @projectCode = [dbo].[ufn_getProjectCode](@sqlServerName, @dbName)
 
 SELECT @projectID = [id]
 FROM [dbo].[catalogProjects]

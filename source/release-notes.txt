@@ -667,3 +667,7 @@
 /*----------------------------------------------------------------------*/
 /* 05.04.2018 */
 	- merging code with a 3rd party client: dbo.catalogSolutions, dbo.catalogProjects, dbo.jobExecutionQueue, dbo.jobExecutionHistory
+
+/* 10.04.2018 */
+	- add function [dbo].[ufn_getProjectCode](@sqlServerName, @dbName) (merging code with a 3rd party client)
+
