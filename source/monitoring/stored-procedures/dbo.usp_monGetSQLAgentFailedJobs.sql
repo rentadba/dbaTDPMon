@@ -58,12 +58,9 @@ CREATE TABLE #statsSQLAgentJobs
 SET @executionLevel = 0
 
 ------------------------------------------------------------------------------------------------------------------------------------------
---get default project code
+--get default projectCode
 IF @projectCode IS NULL
-	SELECT	@projectCode = [value]
-	FROM	[dbo].[appConfigurations]
-	WHERE	[name] = 'Default project code'
-			AND [module] = 'common'
+	SET @projectCode = [dbo].[ufn_getProjectCode](NULL, NULL)
 
 SELECT @projectID = [id]
 FROM [dbo].[catalogProjects]

@@ -24,7 +24,7 @@ begin
 				AND cdn.[name] = @dbName 
 				AND cdn.[active] = 1 
 
-	/* if not possible, get the default Project Code, as configured */
+	/* if not possible, get the default ProjectCode, as configured */
 	IF @projectCode IS NULL
 		begin
 			SELECT	@projectCode = [value]

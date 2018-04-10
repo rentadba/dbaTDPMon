@@ -42,22 +42,22 @@ DECLARE		@projectID						[smallint],
 			@instanceID						[smallint],
 			@errorCode						[int],
 			@durationSeconds				[bigint],
-			@eventData						[varchar](8000)
+			@eventData						[varchar](8000),
+			@projectCode					[varchar](32)
 			
 SET NOCOUNT ON
 
 
 ---------------------------------------------------------------------------------------------
---get default project id / instance id
+-- try to get project code by database name / or get the default project value
+IF @projectCode IS NULL
+	SET @projectCode = [dbo].[ufn_getProjectCode](@sqlServerName, @dbName)
+
 SELECT	@projectID = [id]
 FROM	[dbo].[catalogProjects]
-WHERE	[code] IN ( 
-					SELECT	[value]
-					FROM	[dbo].[appConfigurations]
-					WHERE	[name] = 'Default project code'
-							AND [module] = 'common'
-				  )
+WHERE	[code] = @projectCode
 
+---------------------------------------------------------------------------------------------
 SELECT  @instanceID = [id] 
 FROM	[dbo].[catalogInstanceNames]  
 WHERE	[name] = @sqlServerName
