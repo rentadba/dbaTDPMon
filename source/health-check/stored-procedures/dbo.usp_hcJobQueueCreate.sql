@@ -88,6 +88,11 @@ WHILE @@FETCH_STATUS=0
 		SET @strMessage='Generating queue for : ' + @codeDescriptor
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
 
+		/* save the previous executions statistics */
+		EXEC [dbo].[usp_jobExecutionSaveStatistics]	@projectCode		= @projectCode,
+													@moduleFilter		= @module,
+													@descriptorFilter	= @codeDescriptor
+
 		/* save the execution history */
 		INSERT	INTO [dbo].[jobExecutionHistory]([instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id], 
 												 [job_name], [job_step_name], [job_database_name], [job_command], [execution_date], 
