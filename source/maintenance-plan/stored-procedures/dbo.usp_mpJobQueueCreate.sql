@@ -34,7 +34,7 @@ CREATE PROCEDURE [dbo].[usp_mpJobQueueCreate]
 															8192	Hourly: Backup User Databases Transaction Log 
 														*/
 		@skipDatabasesList		[nvarchar](1024) = NULL,/* databases list, comma separated, to be excluded from maintenance */
-	    @recreateMode			[bit] = 0,				/*  1 - existings jobs will be dropped an created based on this stored procedure logic
+	    @recreateMode			[bit] = 0,				/*  1 - existings jobs will be dropped and created based on this stored procedure logic
 															0 - jobs definition will be preserved; only status columns will be updated; new jobs are created, for newly discovered databases
 														*/
 		@debugMode				[bit] = 0

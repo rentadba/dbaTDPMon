@@ -158,6 +158,7 @@ WHILE @lastExecutionStatus = 4 AND @jobName IS NOT NULL
 															@sqlServerNameFilter	= ''%'',
 															@collectorDescriptor	= ''dbo.usp_hcCollectDiskSpaceUsage'',
 															@enableXPCMDSHELL		= 1,
+															@recreateMode			= 0,
 															@debugMode				= 0'
 	
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 

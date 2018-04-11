@@ -131,7 +131,7 @@ if errorlevel 1 goto install_err
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.jobExecutionHistory.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.jobExecutionStatistics.sql" -d %dbname%  -b -r 1
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.jobExecutionStatisticsHistory.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.logAnalysisMessages.sql" -d %dbname%  -b -r 1
@@ -151,6 +151,13 @@ if errorlevel 1 goto install_err
 
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\report.htmlContent.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
+
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\schema\create-schema-maintenance-plan.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.internalTasks.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 
 
 sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_getObjectQuoteName.sql" -d %dbname%  -b -r 1
@@ -180,7 +187,10 @@ if errorlevel 1 goto install_err
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionHistory.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionLiveStatistics.sql" -d %dbname%  -b -r 1
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionStatistics.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionStatisticsHistory.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 
@@ -313,13 +323,7 @@ echo *--------------------------------------------------------------------------
 echo Maintenance Plan: Creating Table / Views and Indexes...
 echo *-----------------------------------------------------------------------------*
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\schema\create-schema-maintenance-plan.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.logInternalAction.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.internalTasks.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.internalScheduler.sql" -d %dbname%  -b -r 1

@@ -56,7 +56,7 @@ INNER JOIN [dbo].[catalogProjects]		 cp		ON cp.[id] = jeq.[project_id]
 
 UNION ALL
 
-/* currernt / last executions */
+/* current / last executions */
 SELECT    jeq.[id]
 		, jeq.[project_id]
 		, cp.[code]		AS [project_code]

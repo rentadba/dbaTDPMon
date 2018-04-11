@@ -131,7 +131,10 @@ if errorlevel 1 goto install_err
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionHistory.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionLiveStatistics.sql" -d %dbname%  -b -r 1
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionStatistics.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionStatisticsHistory.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 

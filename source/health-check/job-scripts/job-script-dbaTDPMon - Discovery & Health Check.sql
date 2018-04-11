@@ -115,9 +115,11 @@ http://dbaTDPMon.codeplex.com',
 
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'EXEC [dbo].[usp_hcJobQueueCreate]	@projectCode			= ''' + @projectCode + N''',
+															@module					= ''health-check'',
 															@sqlServerNameFilter	= ''%'',
 															@collectorDescriptor	= ''%'',
 															@enableXPCMDSHELL		= 1,
+															@recreateMode			= 0,
 															@debugMode				= 0'
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
