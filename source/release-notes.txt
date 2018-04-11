@@ -671,3 +671,6 @@
 /* 10.04.2018 */
 	- add function [dbo].[ufn_getProjectCode](@sqlServerName, @dbName) (merging code with a 3rd party client)
 	- dbo.usp_refreshMachineCatalogs will make use of db_filter property from dbo.catalogProjects table
+
+/* 11.04.2018 */
+	- add dbo.vw_jobExecutionLiveStatistics, view and mechanism for internal parallelism and jobs execution stats (developed by Razvan Puscasu)
