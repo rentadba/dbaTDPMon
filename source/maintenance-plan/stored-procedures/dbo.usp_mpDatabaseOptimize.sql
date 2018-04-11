@@ -1748,7 +1748,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				WHERE [is_incremental] = 0
 						AND EXISTS(
 									SELECT 1
-									FROM #databaseObjectsWithStatisticsList X
+									FROM #databaseObjectsWithStatisticsList x
 									WHERE	x.[database_id] = dowsl.[database_id]
 											AND x.[object_id] = dowsl.[object_id]
 											AND x.[stats_id] = dowsl.[stats_id]
