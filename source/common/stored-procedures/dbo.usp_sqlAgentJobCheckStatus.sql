@@ -80,21 +80,23 @@ IF LEN(@jobName)=0 OR ISNULL(@jobName, '')=''
 		RETURN 1
 	end
 
-SET @queryToRun=N'SELECT [srvid] FROM master.dbo.sysservers WHERE [srvname]=''' + @sqlServerName + ''''
-TRUNCATE TABLE #tmpCheck
-INSERT INTO #tmpCheck EXEC (@queryToRun)
-IF (SELECT count(*) FROM #tmpCheck)=0
+IF @sqlServerName != @@SERVERNAME
 	begin
-		SET @queryToRun=N'ERROR: SOURCE server [' + @sqlServerName + '] is not defined as linked server on THIS server [' + @sqlServerName + '].'
-		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
-		RETURN 1
+		SET @queryToRun=N'SELECT [srvid] FROM master.dbo.sysservers WHERE [srvname]=''' + @sqlServerName + ''''
+		TRUNCATE TABLE #tmpCheck
+		INSERT INTO #tmpCheck EXEC (@queryToRun)
+		IF (SELECT count(*) FROM #tmpCheck)=0
+			begin
+				SET @queryToRun=N'ERROR: SOURCE server [' + @sqlServerName + '] is not defined as linked server on THIS server [' + @sqlServerName + '].'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+				RETURN 1
+			end
 	end
-
 
 ---------------------------------------------------------------------------------------------
 SET @ReturnValue	= 5 --Unknown
 
-SET @queryToRun=N'SELECT  CAST([job_id] AS [varchar](255)) AS [job_id] FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + [dbo].[ufn_getObjectQuoteName](@jobName, 'sql') + ''''
+SET @queryToRun=N'SELECT  CAST([job_id] AS [varchar](255)) AS [job_id] FROM [msdb].[dbo].[sysjobs] WITH (NOLOCK) WHERE [name]=''' + [dbo].[ufn_getObjectQuoteName](@jobName, 'sql') + ''''
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
@@ -132,18 +134,18 @@ ELSE
 									SELECT SUBSTRING([program_name], CHARINDEX('': Step'', [program_name]) + 7, LEN([program_name]) - CHARINDEX('': Step'', [program_name]) - 7) [step_id]
 										 , SUBSTRING([program_name], CHARINDEX(''(Job 0x'', [program_name]) + 7, CHARINDEX('' : Step '', [program_name]) - CHARINDEX(''(Job 0x'', [program_name]) - 7) [job_id]
 										 , [spid]
-			 						FROM [master].[dbo].[sysprocesses] 
+			 						FROM [master].[dbo].[sysprocesses] WITH (NOLOCK) 
 									WHERE [program_name] LIKE ''SQLAgent - %JobStep%''
 								   ) sp
 							) sp
-						INNER JOIN [msdb].[dbo].[sysjobs] sj ON sj.[job_id] = sp.[job_id]
+						INNER JOIN [msdb].[dbo].[sysjobs] sj WITH (NOLOCK) ON sj.[job_id] = sp.[job_id]
 						WHERE CHARINDEX(sj.[name], ''' + @jobName + N''') <> 0
 						UNION
 						SELECT DISTINCT sjs.[step_id], sj.[job_id], sp.[spid]
-						FROM [master].[dbo].[sysprocesses] sp
-						INNER JOIN [msdb].[dbo].[sysjobs]		sj  ON sj.[name] = sp.[program_name]
-						INNER JOIN [msdb].[dbo].[sysjobsteps]	sjs ON sjs.[job_id] = sj.[job_id]
-						INNER JOIN [msdb].[dbo].[sysjobhistory] sjh ON sjh.[job_id] = sj.[job_id] AND sjh.[step_id] = sjs.[step_id] AND sjh.[run_status] = 4
+						FROM [master].[dbo].[sysprocesses] sp WITH (NOLOCK) 
+						INNER JOIN [msdb].[dbo].[sysjobs]		sj WITH (NOLOCK) ON sj.[name] = sp.[program_name]
+						INNER JOIN [msdb].[dbo].[sysjobsteps]	sjs WITH (NOLOCK) ON sjs.[job_id] = sj.[job_id]
+						INNER JOIN [msdb].[dbo].[sysjobhistory] sjh WITH (NOLOCK) ON sjh.[job_id] = sj.[job_id] AND sjh.[step_id] = sjs.[step_id] AND sjh.[run_status] = 4
 						WHERE CHARINDEX(sj.[name], ''' + @jobName + N''') <> 0'
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
@@ -163,7 +165,7 @@ ELSE
 	
 		IF @currentRunning > 0 
 			begin
-				SET @queryToRun=N'SELECT [step_name] FROM [msdb].[dbo].[sysjobsteps] WHERE [step_id]=' + CAST(@StepID AS [nvarchar]) + ' AND [job_id]=''' + @JobID + ''''
+				SET @queryToRun=N'SELECT [step_name] FROM [msdb].[dbo].[sysjobsteps] WITH (NOLOCK) WHERE [step_id]=' + CAST(@StepID AS [nvarchar]) + ' AND [job_id]=''' + @JobID + ''''
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
@@ -190,12 +192,12 @@ ELSE
 											, CAST(h.[run_time] AS varchar) AS [start_time]
 											, NULL AS [run_status]
 											, GETDATE() AS [event_time]
-								FROM [msdb].[dbo].[sysjobhistory] h
+								FROM [msdb].[dbo].[sysjobhistory] h WITH (NOLOCK) 
 								WHERE h.[job_id]=''' + @JobID + N''' 
 										AND h.[instance_id] > (
 																/* last job completion id */
 																SELECT TOP 1 h1.[instance_id]
-																FROM [msdb].[dbo].[sysjobhistory] h1
+																FROM [msdb].[dbo].[sysjobhistory] h1 WITH (NOLOCK) 
 																WHERE h1.[job_id]=''' + @JobID + N''' 
 																		AND [step_name] =''(Job outcome)''
 																ORDER BY h1.[instance_id] DESC
@@ -217,12 +219,12 @@ ELSE
 															, CAST(h.[run_time] AS varchar) AS [start_time]
 															, h.[run_status]
 															, GETDATE() AS [event_time]
-												FROM [msdb].[dbo].[sysjobhistory] h
+												FROM [msdb].[dbo].[sysjobhistory] h WITH (NOLOCK) 
 												WHERE h.[job_id]=''' + @JobID + N''' 
 														AND h.[instance_id] = (
 																				/* last job completion id */
 																				SELECT TOP 1 h1.[instance_id]
-																				FROM [msdb].[dbo].[sysjobhistory] h1
+																				FROM [msdb].[dbo].[sysjobhistory] h1 WITH (NOLOCK) 
 																				WHERE h1.[job_id]=''' + @JobID + N''' 
 																						AND [step_name] =''(Job outcome)''
 																				ORDER BY h1.[instance_id] DESC
@@ -235,7 +237,7 @@ ELSE
 														, REPLACE(SUBSTRING(CONVERT([varchar](19), [login_time], 120), 12, 19), '':'', '''') AS [start_time]
 														, 4 AS [run_status]
 														, GETDATE() AS [event_time]
-												FROM [master].[dbo].[sysprocesses]
+												FROM [master].[dbo].[sysprocesses] WITH (NOLOCK) 
 												WHERE [spid] = ' + CAST(@JobSessionID AS [nvarchar])
 							end
 						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
@@ -291,7 +293,7 @@ ELSE
 				SET @queryToRun=N'SELECT TOP 1 h.[message], h.[step_id], h.[step_name], h.[run_status]
 											, CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
 											, GETDATE() AS [event_time]
-								FROM [msdb].[dbo].[sysjobhistory] h
+								FROM [msdb].[dbo].[sysjobhistory] h WITH (NOLOCK) 
 								WHERE	h.[job_id]=''' + @JobID + N''' 
 										AND h.[step_name] <> ''(Job outcome)''
 								ORDER BY h.[instance_id] DESC'
@@ -321,7 +323,7 @@ ELSE
 				FROM #jobLastRunDetails
 				
 				SET @queryToRun=N'SELECT TOP 1 NULL AS [message], NULL AS [step_id], NULL AS [step_name], [run_status], NULL AS [run_date], NULL AS [run_time], CAST([run_duration] AS varchar) AS [RunDuration], NULL AS [event_time]
-								FROM [msdb].[dbo].[sysjobhistory]
+								FROM [msdb].[dbo].[sysjobhistory] WITH (NOLOCK) 
 								WHERE	[job_id] = ''' + @JobID + N'''
 										AND [step_name] =''(Job outcome)''
 								ORDER BY [instance_id] DESC'
@@ -346,7 +348,7 @@ ELSE
 				IF @RunStatus=0
 					begin
 						SET @queryToRun='SELECT TOP 1 h.[message], NULL AS [step_id], NULL AS [step_name], NULL AS [run_status], NULL AS [run_date], NULL AS [run_time], NULL AS [run_duration], NULL AS [event_time]
-									FROM [msdb].[dbo].[sysjobhistory] h
+									FROM [msdb].[dbo].[sysjobhistory] h WITH (NOLOCK) 
 									WHERE h.[job_id]=''' + @JobID + ''' 
 											AND h.[step_name] <> ''(Job outcome)'' 
 											AND h.[run_status]=0
@@ -423,12 +425,12 @@ ELSE
 						SET @queryToRun=N'SELECT   h.[message], h.[step_id], h.[step_name], h.[run_status]
 												, CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
 												, GETDATE() AS [event_time]
-										FROM [msdb].[dbo].[sysjobhistory] h
+										FROM [msdb].[dbo].[sysjobhistory] h WITH (NOLOCK) 
 										WHERE	 h.[instance_id] < (
 																	SELECT TOP 1 [instance_id] 
 																	FROM (	
 																			SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-																			FROM [msdb].[dbo].[sysjobhistory] h
+																			FROM [msdb].[dbo].[sysjobhistory] h WITH (NOLOCK) 
 																			WHERE	h.[job_id]=''' + @JobID + N''' 
 																					AND h.[step_name] =''(Job outcome)''
 																			ORDER BY h.[instance_id] DESC
@@ -438,7 +440,7 @@ ELSE
 																	( SELECT [instance_id] 
 																	FROM (	
 																			SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-																			FROM [msdb].[dbo].[sysjobhistory] h
+																			FROM [msdb].[dbo].[sysjobhistory] h WITH (NOLOCK) 
 																			WHERE	h.[job_id]=''' + @JobID + N''' 
 																					AND h.[step_name] =''(Job outcome)''
 																			ORDER BY h.[instance_id] DESC
@@ -447,7 +449,7 @@ ELSE
 																		(
 																		SELECT TOP 1 [instance_id] 
 																		FROM (	SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-																				FROM [msdb].[dbo].[sysjobhistory] h
+																				FROM [msdb].[dbo].[sysjobhistory] h WITH (NOLOCK) 
 																				WHERE	h.[job_id]=''' + @JobID + N''' 
 																						AND h.[step_name] =''(Job outcome)''
 																				ORDER BY h.[instance_id] DESC
@@ -459,12 +461,12 @@ ELSE
 						SET @queryToRun=N'SELECT   h.[message], h.[step_id], h.[step_name], h.[run_status]
 												, CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
 												, GETDATE() AS [event_time]
-										FROM [msdb].[dbo].[sysjobhistory] h
+										FROM [msdb].[dbo].[sysjobhistory] h WITH (NOLOCK) 
 										WHERE	 h.[instance_id] > (
 																	SELECT TOP 1 [instance_id] 
 																	FROM (	
 																			SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-																			FROM [msdb].[dbo].[sysjobhistory] h
+																			FROM [msdb].[dbo].[sysjobhistory] h WITH (NOLOCK) 
 																			WHERE	h.[job_id]=''' + @JobID + N''' 
 																					AND h.[step_name] =''(Job outcome)''
 																			ORDER BY h.[instance_id] DESC
