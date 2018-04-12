@@ -73,7 +73,9 @@ DECLARE @jobExecutionQueue TABLE
 			[job_name]				[sysname]		NOT NULL,
 			[job_step_name]			[sysname]		NOT NULL,
 			[job_database_name]		[sysname]		NOT NULL,
-			[job_command]			[nvarchar](max) NOT NULL
+			[job_command]			[nvarchar](max) NOT NULL,
+			[task_id]				[bigint]		NULL,
+			[database_name]			[sysname]		NULL
 		)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
@@ -122,7 +124,7 @@ WHILE @@FETCH_STATUS=0
 		WHERE	[project_id] = @projectID
 				AND [id] = @instanceID				
 
-		DECLARE crsCollectorDescriptor CURSOR LOCAL FAST_FORWARD FOR	SELECT x.[descriptor]
+		DECLARE crsCollectorDescriptor CURSOR LOCAL FAST_FORWARD FOR	SELECT [descriptor]
 																		FROM
 																			(
 																				SELECT 'dbo.usp_mpDatabaseConsistencyCheck' AS [descriptor] UNION ALL
@@ -131,8 +133,8 @@ WHILE @@FETCH_STATUS=0
 																				SELECT 'dbo.usp_mpDatabaseBackup(Data)' AS [descriptor] UNION ALL
 																				SELECT 'dbo.usp_mpDatabaseBackup(Log)' AS [descriptor]
 																			)x
-																		WHERE (    x.[descriptor] LIKE @jobDescriptor
-																				OR ISNULL(CHARINDEX(x.[descriptor], @jobDescriptor), 0) <> 0
+																		WHERE (   [descriptor] LIKE @jobDescriptor
+																				OR ISNULL(CHARINDEX([descriptor], @jobDescriptor), 0) <> 0
 																				)			
 
 		OPEN crsCollectorDescriptor
@@ -198,18 +200,24 @@ WHILE @@FETCH_STATUS=0
 						/*-------------------------------------------------------------------*/
 						/* Weekly: Database Consistency Check - only once a week on Saturday */
 						IF @flgActions & 1 = 1 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Database Consistency Check', GETDATE()) = 1
+							begin
+								SET @taskID = NULL
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseConsistencyCheck' AND [task_name] = 'Database Consistency Check'
+
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-																, [job_command])
+																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Database Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName	= ''' + @forSQLServerName + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 1, @flgOptions = 3, @maxDOP	= DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName	= ''' + @forSQLServerName + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 1, @flgOptions = 3, @maxDOP	= DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
+										@taskID, [database_name]
 								FROM
 									(
-										SELECT [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+												, [database_id]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -217,6 +225,7 @@ WHILE @@FETCH_STATUS=0
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE', 'READ ONLY')
 									)X
+								end
 
 						/*-------------------------------------------------------------------*/
 						/* Daily: Allocation Consistency Check */
@@ -227,18 +236,24 @@ WHILE @@FETCH_STATUS=0
 							SET @featureflgActions = 12
 
 						IF @flgActions & 2 = 2 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Allocation Consistency Check', GETDATE()) = 1
+							begin
+								SET @taskID = NULL
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseConsistencyCheck' AND [task_name] = 'Allocation Consistency Check'
+
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-																, [job_command])
+																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Allocation Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = ' + CAST(@featureflgActions AS [nvarchar]) + N', @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = ' + CAST(@featureflgActions AS [nvarchar]) + N', @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
+										@taskID, [database_name]
 								FROM
 									(
-										SELECT [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+												, [database_id]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -246,22 +261,29 @@ WHILE @@FETCH_STATUS=0
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE', 'READ ONLY')
 									)X
+							end
 
 						/*-------------------------------------------------------------------*/
 						/* Weekly: Tables Consistency Check - only once a week on Sunday*/
 						IF @flgActions & 4 = 4 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Tables Consistency Check', GETDATE()) = 1
+							begin
+								SET @taskID = NULL
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseConsistencyCheck' AND [task_name] = 'Tables Consistency Check'
+
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-																, [job_command])
+																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Tables Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 2, @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 2, @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
+										@taskID, [database_name]
 								FROM
 									(
-										SELECT [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+												, [database_id]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -269,22 +291,29 @@ WHILE @@FETCH_STATUS=0
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE', 'READ ONLY')
 									)X
+							end
 
 						/*-------------------------------------------------------------------*/
 						/* Weekly: Reference Consistency Check - only once a week on Sunday*/
 						IF @flgActions & 8 = 8 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Reference Consistency Check', GETDATE()) = 1
+							begin
+								SET @taskID = NULL
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseConsistencyCheck' AND [task_name] = 'Reference Consistency Check'
+
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-																, [job_command])
+																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Reference Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 16, @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 16, @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
+										@taskID, [database_name]
 								FROM
 									(
-										SELECT [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+												, [database_id]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -292,22 +321,29 @@ WHILE @@FETCH_STATUS=0
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE', 'READ ONLY')
 									)X
+							end
 
 						/*-------------------------------------------------------------------*/
 						/* Monthly: Perform Correction to Space Usage - on the first Saturday of the month */
 						IF @flgActions & 16 = 16 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Perform Correction to Space Usage', GETDATE()) = 1
+							begin
+								SET @taskID = NULL
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseConsistencyCheck' AND [task_name] = 'Perform Correction to Space Usage'
+
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-																, [job_command])
+																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Perform Correction to Space Usage' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 64, @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 64, @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
+										@taskID, [database_name]
 								FROM
 									(
-										SELECT [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+												, [database_id]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -315,6 +351,7 @@ WHILE @@FETCH_STATUS=0
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE')
 									)X
+							end
 					end
 
 
@@ -324,18 +361,24 @@ WHILE @@FETCH_STATUS=0
 						/*-------------------------------------------------------------------*/
 						/* Daily: Rebuild Heap Tables - only for SQL versions +2K5*/
 						IF @flgActions & 32 = 32 AND @serverVersionNum > 9 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseOptimize', 'Rebuild Heap Tables', GETDATE()) = 1
+							begin
+								SET @taskID = NULL
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseOptimize' AND [task_name] = 'Rebuild Heap Tables'
+
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-																, [job_command])
+																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Rebuild Heap Tables' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseOptimize] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 16, @flgOptions = DEFAULT, @defragIndexThreshold = DEFAULT, @rebuildIndexThreshold = DEFAULT, @pageThreshold = DEFAULT, @rebuildIndexPageCountLimit = DEFAULT, @maxDOP = DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseOptimize] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 16, @flgOptions = DEFAULT, @defragIndexThreshold = DEFAULT, @rebuildIndexThreshold = DEFAULT, @pageThreshold = DEFAULT, @rebuildIndexPageCountLimit = DEFAULT, @maxDOP = DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
+										@taskID, [database_name]
 								FROM
 									(
-										SELECT [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+												, [database_id]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -343,11 +386,15 @@ WHILE @@FETCH_STATUS=0
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE')
 									)X
+							end
 
 						/*-------------------------------------------------------------------*/
 						/* Daily: Rebuild or Reorganize Indexes*/			
 						IF @flgActions & 64 = 64 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseOptimize', 'Rebuild or Reorganize Indexes', GETDATE()) = 1
 							begin
+								SET @taskID = NULL
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseOptimize' AND [task_name] = 'Rebuild or Reorganize Indexes'
+
 								SET @featureflgActions = 3
 								
 								IF @flgActions & 128 = 128 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseOptimize', 'Update Statistics', GETDATE()) = 1 /* Daily: Update Statistics */
@@ -355,16 +402,18 @@ WHILE @@FETCH_STATUS=0
 
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-																, [job_command])
+																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Rebuild or Reorganize Indexes' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseOptimize] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = ' + CAST(@featureflgActions AS [varchar]) + ', @flgOptions = DEFAULT, @defragIndexThreshold = DEFAULT, @rebuildIndexThreshold = DEFAULT, @pageThreshold = DEFAULT, @rebuildIndexPageCountLimit = DEFAULT, @statsSamplePercent = DEFAULT, @statsAgeDays = DEFAULT, @statsChangePercent = DEFAULT, @maxDOP = DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseOptimize] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = ' + CAST(@featureflgActions AS [varchar]) + ', @flgOptions = DEFAULT, @defragIndexThreshold = DEFAULT, @rebuildIndexThreshold = DEFAULT, @pageThreshold = DEFAULT, @rebuildIndexPageCountLimit = DEFAULT, @statsSamplePercent = DEFAULT, @statsAgeDays = DEFAULT, @statsChangePercent = DEFAULT, @maxDOP = DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
+										@taskID, [database_name]
 								FROM
 									(
-										SELECT [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+												, [database_id]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -377,18 +426,24 @@ WHILE @@FETCH_STATUS=0
 						/*-------------------------------------------------------------------*/
 						/* Daily: Update Statistics */
 						IF @flgActions & 128 = 128 AND NOT (@flgActions & 64 = 64) AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseOptimize', 'Update Statistics', GETDATE()) = 1
+							begin
+								SET @taskID = NULL
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseOptimize' AND [task_name] = 'Update Statistics'
+
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-																, [job_command])
+																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Update Statistics' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseOptimize] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 8, @flgOptions = DEFAULT, @statsSamplePercent = DEFAULT, @statsAgeDays = DEFAULT, @statsChangePercent = DEFAULT, @maxDOP = DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseOptimize] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 8, @flgOptions = DEFAULT, @statsSamplePercent = DEFAULT, @statsAgeDays = DEFAULT, @statsChangePercent = DEFAULT, @maxDOP = DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
+										@taskID, [database_name]
 								FROM
 									(
-										SELECT [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+												, [database_id]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -396,6 +451,7 @@ WHILE @@FETCH_STATUS=0
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE')
 									)X
+							end
 					end
 
 				------------------------------------------------------------------------------------------------------------------------------------------
@@ -404,18 +460,24 @@ WHILE @@FETCH_STATUS=0
 						/*-------------------------------------------------------------------*/
 						/* Weekly: Shrink Database (TRUNCATEONLY) - only once a week on Sunday*/
 						IF @flgActions & 256 = 256 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseShrink', 'Shrink Database (TRUNCATEONLY)', GETDATE()) = 1
+							begin
+								SET @taskID = NULL
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseShrink' AND [task_name] = 'Shrink Database (TRUNCATEONLY)'
+
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-																, [job_command])
+																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Shrink Database (TRUNCATEONLY)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseShrink] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @flgActions = 2, @flgOptions = 1, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseShrink] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @flgActions = 2, @flgOptions = 1, @debugMode = ' + CAST(@debugMode AS [varchar]),
+										@taskID, [database_name]
 								FROM
 									(
-										SELECT [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+												, [database_id]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -423,22 +485,29 @@ WHILE @@FETCH_STATUS=0
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE')
 									)X
+							end
 
 						/*-------------------------------------------------------------------*/
 						/* Monthly: Shrink Log File - on the first Saturday of the month */
 						IF @flgActions & 512 = 512 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseShrink', 'Shrink Log File', GETDATE()) = 1
+							begin
+								SET @taskID = NULL
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseShrink' AND [task_name] = 'Shrink Log File'
+
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-																, [job_command])
+																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Shrink Log File' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseShrink] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @flgActions = 1, @flgOptions = 0, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseShrink] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @flgActions = 1, @flgOptions = 0, @debugMode = ' + CAST(@debugMode AS [varchar]),
+										@taskID, [database_name]
 								FROM
 									(
-										SELECT [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+												, [database_id]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
@@ -446,6 +515,7 @@ WHILE @@FETCH_STATUS=0
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE')
 									)X
+							end
 
 					end
 
@@ -456,68 +526,89 @@ WHILE @@FETCH_STATUS=0
 						/* Daily: Backup User Databases (diff) */
 						IF @flgActions & 1024 = 1024 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseBackup', 'User Databases (diff)', GETDATE()) = 1
 							AND NOT (@flgActions & 2048 = 2048 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseBackup', 'User Databases (full)', GETDATE()) = 1)
+							begin
+								SET @taskID = NULL
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseBackup' AND [task_name] = 'User Databases (diff)'
+
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-																, [job_command])
+																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Backup User Databases (diff)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 2, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 2, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
+										@taskID, [database_name]
 								FROM
 									(
-										SELECT [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+												, [database_id]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 									)X
+							end
 
 						/*-------------------------------------------------------------------*/
 						/* Weekly: User Databases (full) - only once a week on Saturday */
 						IF @flgActions & 2048 = 2048 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseBackup', 'User Databases (full)', GETDATE()) = 1
+							begin
+								SET @taskID = NULL
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseBackup' AND [task_name] = 'User Databases (full)'
+
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-																, [job_command])
+																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Backup User Databases (full)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 1, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 1, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
+										@taskID, [database_name]
 								FROM
 									(
-										SELECT [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+												, [database_id]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 									)X
+							end
 
 						/*-------------------------------------------------------------------*/
 						/* Weekly: System Databases (full) - only once a week on Saturday */
 						IF @flgActions & 4096 = 4096 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseBackup', 'System Databases (full)', GETDATE()) = 1
+							begin
+								SET @taskID = NULL
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseBackup' AND [task_name] = 'System Databases (full)'
+
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-																, [job_command])
+																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Backup System Databases (full)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 1, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 1, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
+										@taskID, [database_name]
 								FROM
 									(
-										SELECT [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+												, [database_id]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] IN ('master', 'model', 'msdb', 'distribution')														
 									)X
+							end
 					end
 
 				------------------------------------------------------------------------------------------------------------------------------------------
@@ -526,24 +617,31 @@ WHILE @@FETCH_STATUS=0
 						/*-------------------------------------------------------------------*/
 						/* Hourly: Backup User Databases Transaction Log */
 						IF @flgActions & 8192 = 8192 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseBackup', 'User Databases Transaction Log', GETDATE()) = 1
+							begin
+								SET @taskID = NULL
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseBackup' AND [task_name] = 'User Databases Transaction Log'
+
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-																, [job_command])
+																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
 										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Backup User Databases (log)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
-										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 4, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar])
+										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 4, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
+										@taskID, [database_name]
 								FROM
 									(
-										SELECT [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
+												, [database_id]
 										FROM [dbo].[catalogDatabaseNames]
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')	
 									)X
+							end
 						end
 				------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -555,6 +653,8 @@ WHILE @@FETCH_STATUS=0
 								, jeq.[status] = -1
 								, jeq.[event_date_utc] = GETUTCDATE()
 								, jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_')	/* manage special characters in job names */
+								, jeq.[task_id] = S.[task_id]
+								, jeq.[database_name] = S.[database_name]
 						FROM [dbo].[jobExecutionQueue] jeq
 						INNER JOIN @jobExecutionQueue S ON		jeq.[instance_id] = S.[instance_id]
 															AND jeq.[project_id] = S.[project_id]
@@ -576,12 +676,13 @@ WHILE @@FETCH_STATUS=0
 
 				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 														, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-														, [job_command])
+														, [job_command], [task_id], [database_name])
 						SELECT	  S.[instance_id], S.[project_id], S.[module], S.[descriptor]
 								, S.[for_instance_id]
 								, REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_')	/* manage special characters in job names */
 								, S.[job_step_name], S.[job_database_name]
 								, S.[job_command]
+								, S.[task_id], S.[database_name]
 						FROM @jobExecutionQueue S
 						LEFT JOIN [dbo].[jobExecutionQueue] jeq ON		jeq.[instance_id] = S.[instance_id]
 																	AND jeq.[project_id] = S.[project_id]
