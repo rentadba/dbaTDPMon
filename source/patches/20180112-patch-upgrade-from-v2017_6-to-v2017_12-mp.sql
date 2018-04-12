@@ -47,7 +47,7 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[maintenance-plan
 		(
 			[id]					[int]			IDENTITY (1, 1)	NOT NULL,
 			[project_id]			[smallint]		NULL,
-			[task_id]				[int]			NOT NULL,
+			[task_id]				[bigint]		NOT NULL,
 			[schema_name]			[sysname]		NOT NULL,
 			[object_name]			[sysname]		NOT NULL,
 			CONSTRAINT [PK_objectSkipList] PRIMARY KEY  CLUSTERED 
