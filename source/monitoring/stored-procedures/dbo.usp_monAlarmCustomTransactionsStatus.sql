@@ -161,30 +161,38 @@ WHERE	cin.[active] = 1
 		AND cin.[project_id] = @projectID
 		AND cin.[name] = @@SERVERNAME
 
+/* save the previous executions statistics */
+EXEC [dbo].[usp_jobExecutionSaveStatistics]	@projectCode		= @projectCode,
+											@moduleFilter		= 'monitoring',
+											@descriptorFilter	= 'dbo.usp_monAlarmCustomTransactionsStatus'
+
 /* save the execution history */
 INSERT	INTO [dbo].[jobExecutionHistory]([instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id], 
 										 [job_name], [job_step_name], [job_database_name], [job_command], [execution_date], 
-										 [running_time_sec], [log_message], [status], [event_date_utc])
+										 [running_time_sec], [log_message], [status], [event_date_utc], [task_id])
 		SELECT	[instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id], 
 				[job_name], [job_step_name], [job_database_name], [job_command], [execution_date], 
-				[running_time_sec], [log_message], [status], [event_date_utc]
+				[running_time_sec], [log_message], [status], [event_date_utc], [task_id]
 		FROM [dbo].[jobExecutionQueue]
 		WHERE [project_id] = @projectID
 				AND [instance_id] = @currentInstanceID
 				AND [module] = 'monitoring'
-				AND [descriptor] = 'usp_monAlarmCustomTransactionsStatus'
+				AND [descriptor] = 'dbo.usp_monAlarmCustomTransactionsStatus'
 				AND [status] <> -1
 				
 DELETE FROM [dbo].[jobExecutionQueue]
 WHERE [project_id] = @projectID
 		AND [instance_id] = @currentInstanceID
 		AND [module] = 'monitoring'
-		AND [descriptor] = 'usp_monAlarmCustomTransactionsStatus'
+		AND [descriptor] = 'dbo.usp_monAlarmCustomTransactionsStatus'
 
 
-INSERT	INTO [dbo].[jobExecutionQueue](	[instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id],
+INSERT	INTO [dbo].[jobExecutionQueue](	[instance_id], [project_id], [module], [descriptor], [task_id],
+										[filter], [for_instance_id],
 										[job_name], [job_step_name], [job_database_name], [job_command])
-		SELECT	@currentInstanceID, @projectID, 'monitoring', 'usp_monAlarmCustomTransactionsStatus', NULL, cin.[id],
+		SELECT	@currentInstanceID, @projectID, 'monitoring', 'dbo.usp_monAlarmCustomTransactionsStatus', 
+				(SELECT it.[id] FROM [dbo].[appInternalTasks] it WHERE it.[descriptor] = 'dbo.usp_monAlarmCustomTransactionsStatus'),
+				NULL, cin.[id],
 				'dbaTDPMon - usp_monAlarmCustomTransactionsStatus - ' + REPLACE(cin.[name], '\', '$'), 'Run Analysis', DB_NAME()
 				, N'EXEC dbo.usp_monGetTransactionsStatus @projectCode = ''' + @projectCode + N''', @sqlServerNameFilter = ''' + cin.[name] + N''''
 		FROM	[dbo].[catalogInstanceNames] cin
@@ -198,7 +206,7 @@ EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrin
 ------------------------------------------------------------------------------------------------------------------------------------------
 EXEC dbo.usp_jobQueueExecute	@projectCode		= @projectCode,
 								@moduleFilter		= 'monitoring',
-								@descriptorFilter	= 'usp_monAlarmCustomTransactionsStatus',
+								@descriptorFilter	= 'dbo.usp_monAlarmCustomTransactionsStatus',
 								@waitForDelay		= DEFAULT,
 								@debugMode			= @debugMode
 

@@ -13,34 +13,6 @@ SET NOCOUNT ON
 /*---------------------------------------------------------------------------------------------------------------------*/
 RAISERROR('* Patch: 20170324-patch-upgrade-from-v2016_11-to-v2017_4-hc.sql', 10, 1) WITH NOWAIT
 
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[health-check].[statsSQLServerErrorlogDetails]') AND type in (N'U'))
-	begin
-		RAISERROR('	Drop table: [health-check].[statsSQLServerErrorlogDetails]', 10, 1) WITH NOWAIT
-		DROP TABLE [health-check].[statsSQLServerErrorlogDetails]
-	end
-GO
-
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[health-check].[statsSQLServerAgentJobsHistory]') AND type in (N'U'))
-	begin
-		RAISERROR('	Drop table: [health-check].[statsSQLServerAgentJobsHistory]', 10, 1) WITH NOWAIT
-		DROP TABLE [health-check].[statsSQLServerAgentJobsHistory]
-	end
-GO
-
-IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[health-check].[vw_statsSQLServerAgentJobsHistory]'))
-	begin
-		RAISERROR('	Drop view : [health-check].[vw_statsSQLServerAgentJobsHistory]', 10, 1) WITH NOWAIT
-		DROP VIEW [health-check].[vw_statsSQLServerAgentJobsHistory]
-	end
-GO
-
-IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[health-check].[vw_statsSQLServerErrorlogDetails]'))
-	begin
-		RAISERROR('	Drop view : [health-check].[vw_statsSQLServerErrorlogDetails]', 10, 1) WITH NOWAIT
-		DROP VIEW [health-check].[vw_statsSQLServerErrorlogDetails]
-	end
-GO
-
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[health-check].[statsDatabaseUsageHistory]') AND type in (N'U'))
 	begin
 		RAISERROR('	Create table: [health-check].[statsDatabaseUsageHistory]', 10, 1) WITH NOWAIT
@@ -168,3 +140,46 @@ IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[health-c
 	end
 GO
 
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[health-check].[statsSQLServerErrorlogDetails]') AND type in (N'U'))
+	begin
+		RAISERROR('	Save records: [health-check].[statsSQLServerErrorlogDetails]', 10, 1) WITH NOWAIT
+
+		SET IDENTITY_INSERT [health-check].[statsErrorlogDetails] ON;
+		INSERT	INTO [health-check].[statsErrorlogDetails]([id], [instance_id], [project_id], [event_date_utc], [log_date], [process_info], [text])
+				SELECT [id], [instance_id], [project_id], [event_date_utc], [log_date], [process_info], [text]
+				FROM [health-check].[statsSQLServerErrorlogDetails];
+		SET IDENTITY_INSERT [health-check].[statsErrorlogDetails] OFF;
+
+		RAISERROR('	Drop table: [health-check].[statsSQLServerErrorlogDetails]', 10, 1) WITH NOWAIT
+		DROP TABLE [health-check].[statsSQLServerErrorlogDetails]
+	end
+GO
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[health-check].[statsSQLServerAgentJobsHistory]') AND type in (N'U'))
+	begin
+		RAISERROR('	Save records: [health-check].[statsSQLServerAgentJobsHistory]', 10, 1) WITH NOWAIT
+
+		SET IDENTITY_INSERT [health-check].[statsSQLAgentJobsHistory] ON;
+		INSERT	INTO [health-check].[statsSQLAgentJobsHistory]([id], [instance_id], [project_id], [event_date_utc], [job_name], [last_execution_status], [last_execution_date], [last_execution_time], [running_time_sec], [message])
+				SELECT [id], [instance_id], [project_id], [event_date_utc], [job_name], [last_execution_status], [last_execution_date], [last_execution_time], [running_time_sec], [message]
+				FROM [health-check].[statsSQLServerAgentJobsHistory];
+		SET IDENTITY_INSERT [health-check].[statsSQLAgentJobsHistory] OFF;
+
+		RAISERROR('	Drop table: [health-check].[statsSQLServerAgentJobsHistory]', 10, 1) WITH NOWAIT
+		DROP TABLE [health-check].[statsSQLServerAgentJobsHistory]
+	end
+GO
+
+IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[health-check].[vw_statsSQLServerAgentJobsHistory]'))
+	begin
+		RAISERROR('	Drop view : [health-check].[vw_statsSQLServerAgentJobsHistory]', 10, 1) WITH NOWAIT
+		DROP VIEW [health-check].[vw_statsSQLServerAgentJobsHistory]
+	end
+GO
+
+IF  EXISTS (SELECT * FROM sys.views WHERE object_id = OBJECT_ID(N'[health-check].[vw_statsSQLServerErrorlogDetails]'))
+	begin
+		RAISERROR('	Drop view : [health-check].[vw_statsSQLServerErrorlogDetails]', 10, 1) WITH NOWAIT
+		DROP VIEW [health-check].[vw_statsSQLServerErrorlogDetails]
+	end
+GO

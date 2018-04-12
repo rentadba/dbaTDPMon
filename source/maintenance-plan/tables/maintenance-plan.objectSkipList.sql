@@ -19,7 +19,7 @@ CREATE TABLE [maintenance-plan].[objectSkipList]
 (
 	[id]					[int]			IDENTITY (1, 1)	NOT NULL,
 	[project_id]			[smallint]		NULL,
-	[task_id]				[smallint]		NOT NULL,
+	[task_id]				[bigint]		NOT NULL,
 	[schema_name]			[sysname]		NOT NULL,
 	[object_name]			[sysname]		NOT NULL,
 	CONSTRAINT [PK_objectSkipList] PRIMARY KEY  CLUSTERED 
@@ -41,11 +41,11 @@ CREATE TABLE [maintenance-plan].[objectSkipList]
 	(
 		[id]
 	),
-	CONSTRAINT [FK_MaintenancePlan_objectSkipList_MaintenancePlan_internalTasks] FOREIGN KEY 
+	CONSTRAINT [FK_MaintenancePlan_objectSkipList_appInternalTasks] FOREIGN KEY 
 	(
 		[task_id]
 	) 
-	REFERENCES [maintenance-plan].[internalTasks]
+	REFERENCES [dbo].[appInternalTasks]
 	(
 		[id]
 	)

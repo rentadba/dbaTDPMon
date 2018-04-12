@@ -20,14 +20,14 @@ SELECT 	  cp.[id]				AS [project_id]
 		, cp.[code]				AS [project_code]
 		, cp.[name]				AS [project_name]
 		, osl.[id]
-		, it.[job_descriptor]
+		, it.[descriptor]		AS [job_descriptor]
 		, osl.[task_id]
 		, it.[task_name]
 		, osl.[schema_name]
 		, osl.[object_name]
 		, it.[flg_actions]
 FROM [maintenance-plan].[objectSkipList] osl
-INNER JOIN [maintenance-plan].[internalTasks] it ON it.[id] = osl.[task_id]
+INNER JOIN [dbo].[appInternalTasks] it ON it.[id] = osl.[task_id]
 LEFT  JOIN [dbo].[catalogProjects] cp ON cp.[id] = osl.[project_id]
 GO
 

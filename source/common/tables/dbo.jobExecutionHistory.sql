@@ -22,7 +22,7 @@ CREATE TABLE [dbo].[jobExecutionHistory]
 	[module]				[varchar](32)	NOT NULL,
 	[descriptor]			[varchar](256)	NOT NULL,
 	[filter]				[sysname]		NULL,
-	[task_id]				[smallint]		NULL,
+	[task_id]				[bigint]		NULL,
 	[database_name]			[sysname]		NULL,
 	[for_instance_id]		[smallint]		NOT NULL,
 	[job_name]				[sysname]		NOT NULL,

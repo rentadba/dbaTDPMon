@@ -21,11 +21,11 @@ SELECT 	  cp.[id]				AS [project_id]
 		, cp.[name]				AS [project_name]
 		, isch.[id]
 		, isch.[task_id]
-		, it.[job_descriptor]
+		, it.[descriptor]		AS [job_descriptor]
 		, it.[task_name]
 		, isch.[scheduled_weekday]
 		, isch.[active]
 FROM [maintenance-plan].[internalScheduler] isch
-INNER JOIN [maintenance-plan].[internalTasks] it ON it.[id] = isch.[task_id]
+INNER JOIN [dbo].[appInternalTasks] it ON it.[id] = isch.[task_id]
 LEFT  JOIN [dbo].[catalogProjects] cp ON cp.[id] = isch.[project_id]
 GO

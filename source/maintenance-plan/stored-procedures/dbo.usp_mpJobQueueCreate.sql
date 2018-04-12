@@ -51,6 +51,7 @@ AS
 SET NOCOUNT ON
 
 DECLARE   @codeDescriptor		[varchar](260)
+		, @taskID				[bigint]
 		, @strMessage			[varchar](1024)
 		, @projectID			[smallint]
 		, @instanceID			[smallint]
@@ -121,7 +122,7 @@ WHILE @@FETCH_STATUS=0
 		WHERE	[project_id] = @projectID
 				AND [id] = @instanceID				
 
-		DECLARE crsCollectorDescriptor CURSOR LOCAL FAST_FORWARD FOR	SELECT [descriptor]
+		DECLARE crsCollectorDescriptor CURSOR LOCAL FAST_FORWARD FOR	SELECT x.[descriptor]
 																		FROM
 																			(
 																				SELECT 'dbo.usp_mpDatabaseConsistencyCheck' AS [descriptor] UNION ALL
@@ -129,9 +130,9 @@ WHILE @@FETCH_STATUS=0
 																				SELECT 'dbo.usp_mpDatabaseShrink' AS [descriptor] UNION ALL
 																				SELECT 'dbo.usp_mpDatabaseBackup(Data)' AS [descriptor] UNION ALL
 																				SELECT 'dbo.usp_mpDatabaseBackup(Log)' AS [descriptor]
-																			)X
-																		WHERE (    [descriptor] LIKE @jobDescriptor
-																				OR ISNULL(CHARINDEX([descriptor], @jobDescriptor), 0) <> 0
+																			)x
+																		WHERE (    x.[descriptor] LIKE @jobDescriptor
+																				OR ISNULL(CHARINDEX(x.[descriptor], @jobDescriptor), 0) <> 0
 																				)			
 
 		OPEN crsCollectorDescriptor
@@ -140,6 +141,11 @@ WHILE @@FETCH_STATUS=0
 			begin
 				SET @strMessage='Generating queue for : ' + @codeDescriptor
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
+
+				/* save the previous executions statistics */
+				EXEC [dbo].[usp_jobExecutionSaveStatistics]	@projectCode		= @projectCode,
+															@moduleFilter		= @module,
+															@descriptorFilter	= @codeDescriptor
 
 				/* save the execution history */
 				INSERT	INTO [dbo].[jobExecutionHistory]([instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id], 

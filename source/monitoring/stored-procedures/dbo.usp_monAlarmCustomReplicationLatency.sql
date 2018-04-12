@@ -476,25 +476,30 @@ WHERE	cin.[active] = 1
 		AND cin.[project_id] = @projectID
 		AND cin.[name] = @@SERVERNAME
 
+/* save the previous executions statistics */
+EXEC [dbo].[usp_jobExecutionSaveStatistics]	@projectCode		= @projectCode,
+											@moduleFilter		= 'monitoring',
+											@descriptorFilter	= 'dbo.usp_monAlarmCustomReplicationLatency'
+
 /* save the execution history */
 INSERT	INTO [dbo].[jobExecutionHistory]([instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id], 
 										 [job_name], [job_step_name], [job_database_name], [job_command], [execution_date], 
-										 [running_time_sec], [log_message], [status], [event_date_utc])
+										 [running_time_sec], [log_message], [status], [event_date_utc], [task_id])
 		SELECT	[instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id], 
 				[job_name], [job_step_name], [job_database_name], [job_command], [execution_date], 
-				[running_time_sec], [log_message], [status], [event_date_utc]
+				[running_time_sec], [log_message], [status], [event_date_utc], [task_id]
 		FROM [dbo].[jobExecutionQueue]
 		WHERE [project_id] = @projectID
 				AND [instance_id] = @currentInstanceID
 				AND [module] = 'monitoring'
-				AND [descriptor] = 'usp_monAlarmCustomReplicationLatency'
+				AND [descriptor] = 'dbo.usp_monAlarmCustomReplicationLatency'
 				AND [status] <> -1
 
 DELETE FROM [dbo].[jobExecutionQueue]
 WHERE [project_id] = @projectID
 		AND [instance_id] = @currentInstanceID
 		AND [module] = 'monitoring'
-		AND [descriptor] = 'usp_monAlarmCustomReplicationLatency'
+		AND [descriptor] = 'dbo.usp_monAlarmCustomReplicationLatency'
 
 DECLARE crsActivePublishers	CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT cin.[id], [publisher_server]
 															FROM	[monitoring].[statsReplicationLatency] srl
@@ -526,9 +531,12 @@ WHILE @@FETCH_STATUS=0
 				SET @queryToRun = N''
 				SET @queryToRun = @queryToRun + N'EXEC [' + @publicationServer + '].tempdb.dbo.usp_monGetReplicationLatency @publisherDB = ''' + [dbo].[ufn_getObjectQuoteName](@publisherDB, 'sql') + N''', @publicationName = ''' + [dbo].[ufn_getObjectQuoteName](@publicationName, 'sql') + N''', @replicationDelay = ' + CAST(@alertThresholdCriticalReplicationLatencySec AS [nvarchar]) + N', @operationDelay = ''' + @operationDelay + N''';'
 
-				INSERT	INTO [dbo].[jobExecutionQueue](	[instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id],
+				INSERT	INTO [dbo].[jobExecutionQueue](	[instance_id], [project_id], [module], [descriptor], [task_id],
+														[filter], [for_instance_id],
 														[job_name], [job_step_name], [job_database_name], [job_command])
-						SELECT	@currentInstanceID, @projectID, 'monitoring', 'usp_monAlarmCustomReplicationLatency', @publicationName + ' - ' + @publisherDB, @publisherInstanceID,
+						SELECT	@currentInstanceID, @projectID, 'monitoring', 'dbo.usp_monAlarmCustomReplicationLatency', 
+								(SELECT it.[id] FROM [dbo].[appInternalTasks] it WHERE it.[descriptor] = 'dbo.usp_monAlarmCustomReplicationLatency'),
+								@publicationName + ' - ' + @publisherDB, @publisherInstanceID,
 								'dbaTDPMon - usp_monAlarmCustomReplicationLatency(1) - ' + REPLACE(@publicationServer, '\', '$') + ' - ' + @publicationName + ' - ' + @publisherDB, 'Run Analysis', 'tempdb', @queryToRun
 				
 				FETCH NEXT FROM crsActivePublications INTO @publicationName, @publisherDB
@@ -549,7 +557,7 @@ EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrin
 ------------------------------------------------------------------------------------------------------------------------------------------
 EXEC dbo.usp_jobQueueExecute	@projectCode		= @projectCode,
 								@moduleFilter		= 'monitoring',
-								@descriptorFilter	= 'usp_monAlarmCustomReplicationLatency',
+								@descriptorFilter	= 'dbo.usp_monAlarmCustomReplicationLatency',
 								@waitForDelay		= DEFAULT,
 								@debugMode			= @debugMode
 
@@ -560,7 +568,7 @@ INNER JOIN [dbo].[jobExecutionQueue] jeq ON jeq.[filter] = srl.[publication_name
 											AND jeq.[job_name] = 'dbaTDPMon - usp_monAlarmCustomReplicationLatency(1) - ' + REPLACE(srl.[publisher_server], '\', '$') + ' - ' + srl.[publication_name] + ' - ' + srl.[publisher_db]
 											AND jeq.[job_step_name] = 'Run Analysis'
 WHERE	jeq.[module] = 'monitoring'
-		AND jeq.[descriptor] = 'usp_monAlarmCustomReplicationLatency'
+		AND jeq.[descriptor] = 'dbo.usp_monAlarmCustomReplicationLatency'
 		AND jeq.[status] = 1 /* succedded */
 
 ------------------------------------------------------------------------------------------------------------------------------------------
@@ -622,9 +630,12 @@ WHILE @@FETCH_STATUS=0
 
 				SET @queryToRun = N'SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; ' + @queryToRun
 		
-				INSERT	INTO [dbo].[jobExecutionQueue](	[instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id],
+				INSERT	INTO [dbo].[jobExecutionQueue](	[instance_id], [project_id], [module], [descriptor], [task_id],
+														[filter], [for_instance_id],
 														[job_name], [job_step_name], [job_database_name], [job_command])
-						SELECT	@currentInstanceID, @projectID, 'monitoring', 'usp_monAlarmCustomReplicationLatency', @publicationName + ' - ' + @publisherDB , @publisherInstanceID,
+						SELECT	@currentInstanceID, @projectID, 'monitoring', 'dbo.usp_monAlarmCustomReplicationLatency', 
+								(SELECT it.[id] FROM [dbo].[appInternalTasks] it WHERE it.[descriptor] = 'dbo.usp_monAlarmCustomReplicationLatency'),
+								@publicationName + ' - ' + @publisherDB , @publisherInstanceID,
 								'dbaTDPMon - usp_monAlarmCustomReplicationLatency(2) - ' + REPLACE(@publicationServer, '\', '$') + ' - ' + @publicationName + ' - ' + @publisherDB, 'Get Latency', DB_NAME(), @queryToRun
 
 				FETCH NEXT FROM crsActivePublications INTO @publicationName, @publisherDB
@@ -644,7 +655,7 @@ EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrin
 ------------------------------------------------------------------------------------------------------------------------------------------
 EXEC dbo.usp_jobQueueExecute	@projectCode		= @projectCode,
 								@moduleFilter		= 'monitoring',
-								@descriptorFilter	= 'usp_monAlarmCustomReplicationLatency',
+								@descriptorFilter	= 'dbo.usp_monAlarmCustomReplicationLatency',
 								@waitForDelay		= DEFAULT,
 								@debugMode			= @debugMode
 
@@ -659,7 +670,7 @@ INNER JOIN [dbo].[jobExecutionQueue] jeq ON jeq.[filter] = srl.[publication_name
 											AND jeq.[job_name] = 'dbaTDPMon - usp_monAlarmCustomReplicationLatency(2) - ' + REPLACE(srl.[publisher_server], '\', '$') + ' - ' + srl.[publication_name] + ' - ' + srl.[publisher_db]
 											AND jeq.[job_step_name] = 'Get Latency'
 WHERE	jeq.[module] = 'monitoring'
-		AND jeq.[descriptor] = 'usp_monAlarmCustomReplicationLatency'
+		AND jeq.[descriptor] = 'dbo.usp_monAlarmCustomReplicationLatency'
 		AND jeq.[status] = 1 /* succedded */
 
 

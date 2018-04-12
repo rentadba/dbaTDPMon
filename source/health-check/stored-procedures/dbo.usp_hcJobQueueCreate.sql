@@ -32,6 +32,7 @@ AS
 SET NOCOUNT ON
 
 DECLARE   @codeDescriptor		[varchar](260)
+		, @taskID				[bigint]
 		, @strMessage			[varchar](1024)
 		, @projectID			[smallint]
 		, @instanceID			[smallint]
@@ -49,7 +50,8 @@ DECLARE @jobExecutionQueue TABLE
 			[job_name]				[sysname]		NOT NULL,
 			[job_step_name]			[sysname]		NOT NULL,
 			[job_database_name]		[sysname]		NOT NULL,
-			[job_command]			[nvarchar](max) NOT NULL
+			[job_command]			[nvarchar](max) NOT NULL,
+			[task_id]				[bigint]		NOT NULL
 		)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
@@ -88,7 +90,7 @@ WHERE [project_id] = @projectID
 		AND [name] = @@SERVERNAME
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-DECLARE crsCollectorDescriptor CURSOR LOCAL FAST_FORWARD FOR	SELECT [descriptor]
+DECLARE crsCollectorDescriptor CURSOR LOCAL FAST_FORWARD FOR	SELECT x.[descriptor], it.[id] AS [task_id]
 																FROM
 																	(
 																		SELECT 'dbo.usp_hcCollectDatabaseDetails' AS [descriptor] UNION ALL
@@ -97,10 +99,11 @@ DECLARE crsCollectorDescriptor CURSOR LOCAL FAST_FORWARD FOR	SELECT [descriptor]
 																		SELECT 'dbo.usp_hcCollectErrorlogMessages' AS [descriptor] UNION ALL
 																		SELECT 'dbo.usp_hcCollectOSEventLogs' AS [descriptor] UNION ALL
 																		SELECT 'dbo.usp_hcCollectEventMessages' AS [descriptor]
-																	)X
-																WHERE [descriptor] LIKE @collectorDescriptor
+																	)x
+																INNER JOIN [dbo].[appInternalTasks] it ON it.[descriptor] = x.[descriptor]
+																WHERE x.[descriptor] LIKE @collectorDescriptor
 OPEN crsCollectorDescriptor
-FETCH NEXT FROM crsCollectorDescriptor INTO @codeDescriptor
+FETCH NEXT FROM crsCollectorDescriptor INTO @codeDescriptor, @taskID
 WHILE @@FETCH_STATUS=0
 	begin
 		SET @strMessage='Generating queue for : ' + @codeDescriptor
@@ -114,10 +117,10 @@ WHILE @@FETCH_STATUS=0
 		/* save the execution history */
 		INSERT	INTO [dbo].[jobExecutionHistory]([instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id], 
 												 [job_name], [job_step_name], [job_database_name], [job_command], [execution_date], 
-												 [running_time_sec], [log_message], [status], [event_date_utc])
+												 [running_time_sec], [log_message], [status], [event_date_utc], [task_id])
 				SELECT	[instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id], 
 						[job_name], [job_step_name], [job_database_name], [job_command], [execution_date], 
-						[running_time_sec], [log_message], [status], [event_date_utc]
+						[running_time_sec], [log_message], [status], [event_date_utc], [task_id]
 				FROM [dbo].[jobExecutionQueue]
 				WHERE [project_id] = @projectID
 						AND [instance_id] = @instanceID
@@ -137,10 +140,10 @@ WHILE @@FETCH_STATUS=0
 		------------------------------------------------------------------------------------------------------------------------------------------
 		IF @codeDescriptor = 'dbo.usp_hcCollectDatabaseDetails'
 			begin
-				INSERT	INTO @jobExecutionQueue(  [instance_id], [project_id], [module], [descriptor]
+				INSERT	INTO @jobExecutionQueue(  [instance_id], [project_id], [module], [descriptor], [task_id]
 												, [for_instance_id], [job_name], [job_step_name], [job_database_name]
 												, [job_command])
-						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
+						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, 
 								X.[instance_id] AS [for_instance_id], 
 								DB_NAME() + ' - ' + 'usp_hcCollectDatabaseDetails' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END + ' - ' + @projectCode AS [job_name],
 								'Run Collect'	AS [job_step_name],
@@ -165,10 +168,10 @@ WHILE @@FETCH_STATUS=0
 		------------------------------------------------------------------------------------------------------------------------------------------
 		IF @codeDescriptor = 'dbo.usp_hcCollectSQLServerAgentJobsStatus'
 			begin
-				INSERT	INTO @jobExecutionQueue(  [instance_id], [project_id], [module], [descriptor]
+				INSERT	INTO @jobExecutionQueue(  [instance_id], [project_id], [module], [descriptor], [task_id]
 												, [for_instance_id], [job_name], [job_step_name], [job_database_name]
 												, [job_command])
-						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
+						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, 
 								X.[instance_id] AS [for_instance_id], 
 								DB_NAME() + ' - ' + 'usp_hcCollectSQLServerAgentJobsStatus' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END + ' - ' + @projectCode AS [job_name],
 								'Run Collect'	AS [job_step_name],
@@ -193,10 +196,10 @@ WHILE @@FETCH_STATUS=0
 		------------------------------------------------------------------------------------------------------------------------------------------
 		IF @codeDescriptor = 'dbo.usp_hcCollectDiskSpaceUsage'
 			begin
-				INSERT	INTO @jobExecutionQueue(  [instance_id], [project_id], [module], [descriptor]
+				INSERT	INTO @jobExecutionQueue(  [instance_id], [project_id], [module], [descriptor], [task_id]
 												, [for_instance_id], [job_name], [job_step_name], [job_database_name]
 												, [job_command])
-						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
+						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, 
 								X.[instance_id] AS [for_instance_id], 
 								DB_NAME() + ' - ' + 'usp_hcCollectDiskSpaceUsage' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END + ' - ' + @projectCode AS [job_name],
 								'Run Collect'	AS [job_step_name],
@@ -223,10 +226,10 @@ WHILE @@FETCH_STATUS=0
 		------------------------------------------------------------------------------------------------------------------------------------------
 		IF @codeDescriptor = 'dbo.usp_hcCollectErrorlogMessages'
 			begin
-				INSERT	INTO @jobExecutionQueue(  [instance_id], [project_id], [module], [descriptor]
+				INSERT	INTO @jobExecutionQueue(  [instance_id], [project_id], [module], [descriptor], [task_id]
 												, [for_instance_id], [job_name], [job_step_name], [job_database_name]
 												, [job_command])
-						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
+						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, 
 								X.[instance_id] AS [for_instance_id], 
 								DB_NAME() + ' - ' + 'usp_hcCollectErrorlogMessages' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END + ' - ' + @projectCode AS [job_name],
 								'Run Collect'	AS [job_step_name],
@@ -251,10 +254,10 @@ WHILE @@FETCH_STATUS=0
 		------------------------------------------------------------------------------------------------------------------------------------------
 		IF @codeDescriptor = 'dbo.usp_hcCollectEventMessages'
 			begin
-				INSERT	INTO @jobExecutionQueue(  [instance_id], [project_id], [module], [descriptor]
+				INSERT	INTO @jobExecutionQueue(  [instance_id], [project_id], [module], [descriptor], [task_id]
 												, [for_instance_id], [job_name], [job_step_name], [job_database_name]
 												, [job_command])
-						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
+						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, 
 								X.[instance_id] AS [for_instance_id], 
 								DB_NAME() + ' - ' + 'usp_hcCollectEventMessages' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END + ' - ' + @projectCode AS [job_name],
 								'Run Collect'	AS [job_step_name],
@@ -280,10 +283,10 @@ WHILE @@FETCH_STATUS=0
 		------------------------------------------------------------------------------------------------------------------------------------------
 		IF @codeDescriptor = 'dbo.usp_hcCollectOSEventLogs'
 			begin
-				INSERT	INTO @jobExecutionQueue(  [instance_id], [project_id], [module], [descriptor], [filter]
+				INSERT	INTO @jobExecutionQueue(  [instance_id], [project_id], [module], [descriptor], [task_id], [filter]
 												, [for_instance_id], [job_name], [job_step_name], [job_database_name]
 												, [job_command])
-						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], CASE WHEN L.[log_type_name] <> '%' THEN L.[log_type_name] ELSE NULL END AS [filter],
+						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, CASE WHEN L.[log_type_name] <> '%' THEN L.[log_type_name] ELSE NULL END AS [filter],
 								X.[instance_id] AS [for_instance_id], 
 								DB_NAME() + ' - ' + 'usp_hcCollectOSEventLogs' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END  + CASE WHEN L.[log_type_name] <> '%' THEN ' (' + L.[log_type_name] + ')' ELSE '' END + ' - ' + @projectCode AS [job_name],
 								'Run Collect'	AS [job_step_name],
@@ -368,10 +371,10 @@ WHILE @@FETCH_STATUS=0
 													AND jeq.[job_step_name] = S.[job_step_name]
 													AND jeq.[job_database_name] = S.[job_database_name]
 
-		INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
+		INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor], [task_id]
 												, [for_instance_id], [job_name], [job_step_name], [job_database_name]
 												, [job_command])
-				SELECT	  S.[instance_id], S.[project_id], S.[module], S.[descriptor]
+				SELECT	  S.[instance_id], S.[project_id], S.[module], S.[descriptor], S.[task_id]
 						, S.[for_instance_id]
 						, REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_')	/* manage special characters in job names */
 						, S.[job_step_name], S.[job_database_name]
@@ -387,7 +390,7 @@ WHILE @@FETCH_STATUS=0
 															AND jeq.[job_database_name] = S.[job_database_name]
 				WHERE	jeq.[job_name] IS NULL
 			
-		FETCH NEXT FROM crsCollectorDescriptor INTO @codeDescriptor
+		FETCH NEXT FROM crsCollectorDescriptor INTO @codeDescriptor, @taskID
 	end
 CLOSE crsCollectorDescriptor
 DEALLOCATE crsCollectorDescriptor
