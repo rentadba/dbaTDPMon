@@ -321,6 +321,9 @@ echo *--------------------------------------------------------------------------
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\schema\create-schema-maintenance-plan.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\insert-into-dbo.appInternalTasks.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.logInternalAction.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -447,6 +450,9 @@ echo *--------------------------------------------------------------------------
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\schema\create-schema-health-check.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\insert-into-dbo.appInternalTasks.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsDatabaseDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -500,7 +506,6 @@ if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsDatabaseAlwaysOnDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
-
 
 
 echo *-----------------------------------------------------------------------------*
@@ -567,6 +572,9 @@ echo Monitoring: Creating Table / Views and Indexes...
 echo *-----------------------------------------------------------------------------*
 
 sqlcmd.exe -S%server% %autentif% -i "..\monitoring\schema\create-schema-monitoring.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\insert-into-dbo.appInternalTasks.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\monitoring.alertThresholds.sql" -d %dbname%  -b -r 1

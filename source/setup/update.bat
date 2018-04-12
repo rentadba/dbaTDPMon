@@ -269,6 +269,9 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20180301-patch-upgrade-from-v2018_1-to-v2018_3-mp.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20180411-patch-upgrade-from-v2018_3-to-v2018_4-mp.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20180412-patch-upgrade-from-v2018_3-to-v2018_4-mp.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -374,6 +377,9 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20170526-patch-upgrade-from-v2017_4-to-v2017_6-hc.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20180411-patch-upgrade-from-v2018_3-to-v2018_4-hc.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 
 echo *-----------------------------------------------------------------------------*
 echo Health Check: Creating Views ...
@@ -473,7 +479,7 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20180128-patch-upgrade-from-v2017_12-to-v2018_1-mon.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180411-patch-upgrade-from-v2018_3-to-v2018_4_mon.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20180411-patch-upgrade-from-v2018_3-to-v2018_4-mon.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 

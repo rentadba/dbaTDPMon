@@ -9,7 +9,7 @@ SET NOCOUNT ON
 */
 
 /*---------------------------------------------------------------------------------------------------------------------*/
-/* patch module: monitoring																							   */
+/* patch module: monitoring																								   */
 /*---------------------------------------------------------------------------------------------------------------------*/
 RAISERROR('* Patch: 20180411-patch-upgrade-from-v2018_3-to-v2018_4-mon.sql', 10, 1) WITH NOWAIT
 
@@ -24,4 +24,15 @@ GO
 UPDATE [dbo].[jobExecutionQueue]
 	SET [descriptor] = 'dbo.usp_monAlarmCustomTransactionsStatus'
 WHERE [descriptor] = 'usp_monAlarmCustomTransactionsStatus'
+GO
+
+INSERT	INTO [dbo].[appInternalTasks] ([id], [descriptor], [task_name], [flg_actions])
+		SELECT S.[id], S.[descriptor], S.[task_name], S.[flg_actions]
+		FROM (
+				SELECT 1048576 AS [id], 'dbo.usp_monAlarmCustomReplicationLatency' AS [descriptor], 'Monitor Replication Latency' AS [task_name], NULL AS [flg_actions] UNION ALL
+				SELECT 2097152, 'dbo.usp_monAlarmCustomSQLAgentFailedJobs', 'Monitor Failed SQL Server Agent Jobs', NULL UNION ALL
+				SELECT 4194304, 'dbo.usp_monAlarmCustomTransactionsStatus', 'Monitor Transaction and Session Status', NULL
+			)S
+		LEFT JOIN [dbo].[appInternalTasks] ait ON S.[id] = ait.[id]
+		WHERE ait.[id] IS NULL
 GO

@@ -145,7 +145,7 @@ WHILE @@FETCH_STATUS=0
 												, [job_command])
 						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, 
 								X.[instance_id] AS [for_instance_id], 
-								DB_NAME() + ' - ' + 'usp_hcCollectDatabaseDetails' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END + ' - ' + @projectCode AS [job_name],
+								SUBSTRING(DB_NAME() + ' - ' + 'usp_hcCollectDatabaseDetails' + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') + ' '  ELSE ' - ' END + @projectCode, 1, 128) AS [job_name],
 								'Run Collect'	AS [job_step_name],
 								DB_NAME()		AS [job_database_name],
 								'EXEC [dbo].[usp_hcCollectDatabaseDetails] @projectCode = ''' + @projectCode + ''', @sqlServerNameFilter = ''' + X.[instance_name] + ''', @databaseNameFilter = ''%'', @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -173,7 +173,7 @@ WHILE @@FETCH_STATUS=0
 												, [job_command])
 						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, 
 								X.[instance_id] AS [for_instance_id], 
-								DB_NAME() + ' - ' + 'usp_hcCollectSQLServerAgentJobsStatus' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END + ' - ' + @projectCode AS [job_name],
+								SUBSTRING(DB_NAME() + ' - ' + 'usp_hcCollectSQLServerAgentJobsStatus' + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') + ' '  ELSE ' - ' END + @projectCode, 1, 128) AS [job_name],
 								'Run Collect'	AS [job_step_name],
 								DB_NAME()		AS [job_database_name],
 								'EXEC [dbo].[usp_hcCollectSQLServerAgentJobsStatus] @projectCode = ''' + @projectCode + ''', @sqlServerNameFilter = ''' + X.[instance_name] + ''', @jobNameFilter = ''%'', @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -201,7 +201,7 @@ WHILE @@FETCH_STATUS=0
 												, [job_command])
 						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, 
 								X.[instance_id] AS [for_instance_id], 
-								DB_NAME() + ' - ' + 'usp_hcCollectDiskSpaceUsage' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END + ' - ' + @projectCode AS [job_name],
+								SUBSTRING(DB_NAME() + ' - ' + 'usp_hcCollectDiskSpaceUsage' + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') + ' '  ELSE ' - ' END + @projectCode, 1, 128) AS [job_name],
 								'Run Collect'	AS [job_step_name],
 								DB_NAME()		AS [job_database_name],
 								'EXEC [dbo].[usp_hcCollectDiskSpaceUsage] @projectCode = ''' + @projectCode + ''', @sqlServerNameFilter = ''' + X.[instance_name] + ''', @enableXPCMDSHELL = ' + CAST(@enableXPCMDSHELL AS [varchar]) + ', @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -231,7 +231,7 @@ WHILE @@FETCH_STATUS=0
 												, [job_command])
 						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, 
 								X.[instance_id] AS [for_instance_id], 
-								DB_NAME() + ' - ' + 'usp_hcCollectErrorlogMessages' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END + ' - ' + @projectCode AS [job_name],
+								SUBSTRING(DB_NAME() + ' - ' + 'usp_hcCollectErrorlogMessages' + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') + ' '  ELSE ' - ' END + @projectCode, 1, 128) AS [job_name],
 								'Run Collect'	AS [job_step_name],
 								DB_NAME()		AS [job_database_name],
 								'EXEC [dbo].[usp_hcCollectErrorlogMessages] @projectCode = ''' + @projectCode + ''', @sqlServerNameFilter = ''' + X.[instance_name] + ''', @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -259,7 +259,7 @@ WHILE @@FETCH_STATUS=0
 												, [job_command])
 						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, 
 								X.[instance_id] AS [for_instance_id], 
-								DB_NAME() + ' - ' + 'usp_hcCollectEventMessages' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END + ' - ' + @projectCode AS [job_name],
+								SUBSTRING(DB_NAME() + ' - ' + 'usp_hcCollectEventMessages' + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') + ' '  ELSE ' - ' END + @projectCode, 1, 128) AS [job_name],
 								'Run Collect'	AS [job_step_name],
 								DB_NAME()		AS [job_database_name],
 								'EXEC [dbo].[usp_hcCollectEventMessages] @projectCode = ''' + @projectCode + ''', @sqlServerNameFilter = ''' + X.[instance_name] + ''', @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -288,7 +288,7 @@ WHILE @@FETCH_STATUS=0
 												, [job_command])
 						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, CASE WHEN L.[log_type_name] <> '%' THEN L.[log_type_name] ELSE NULL END AS [filter],
 								X.[instance_id] AS [for_instance_id], 
-								DB_NAME() + ' - ' + 'usp_hcCollectOSEventLogs' + CASE WHEN X.[instance_name] <> '%' THEN ' - ' + X.[instance_name] ELSE '' END  + CASE WHEN L.[log_type_name] <> '%' THEN ' (' + L.[log_type_name] + ')' ELSE '' END + ' - ' + @projectCode AS [job_name],
+								SUBSTRING(DB_NAME() + ' - ' + 'usp_hcCollectOSEventLogs' + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') ELSE '' END + CASE WHEN L.[log_type_name] <> '%' THEN ' (' + L.[log_type_name] + ')' ELSE '' END + ' - ' + @projectCode, 1, 128) AS [job_name],
 								'Run Collect'	AS [job_step_name],
 								DB_NAME()		AS [job_database_name],
 								'EXEC [dbo].[usp_hcCollectOSEventLogs] @projectCode = ''' + @projectCode + ''', @sqlServerNameFilter = ''' + X.[instance_name] + ''', @logNameFilter = ''' + L.[log_type_name] + ''', @enableXPCMDSHELL = ' + CAST(@enableXPCMDSHELL AS [varchar]) + ', @debugMode = ' + CAST(@debugMode AS [varchar])
