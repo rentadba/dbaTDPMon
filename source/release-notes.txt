@@ -674,3 +674,6 @@
 
 /* 11.04.2018 */
 	- add jobExecutionStatistics, live and history, mechanism for internal parallelism and jobs execution stats (developed by Razvan Puscasu)
+
+/* 13.04.2018 */
+	- added database_id in the name of the internal maintenance sql agent jobs
