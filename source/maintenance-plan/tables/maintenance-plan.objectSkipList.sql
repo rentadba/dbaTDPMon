@@ -18,29 +18,24 @@ GO
 CREATE TABLE [maintenance-plan].[objectSkipList] 
 (
 	[id]					[int]			IDENTITY (1, 1)	NOT NULL,
-	[project_id]			[smallint]		NULL,
+	[instance_name]			[sysname]		NOT NULL,
+	[database_name]			[sysname]		NOT NULL,
 	[task_id]				[bigint]		NOT NULL,
 	[schema_name]			[sysname]		NOT NULL,
 	[object_name]			[sysname]		NOT NULL,
+	[object_type]			[varchar](32)	NULL CONSTRAINT [ck_maintenancePlan_objectSkipList_ObjectType] CHECK ([object_type] IN ('table', 'index', 'statistic')),
 	CONSTRAINT [PK_objectSkipList] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
 	) ON [PRIMARY],
 	CONSTRAINT [UK_objectSkipList_Name] UNIQUE  NONCLUSTERED 
 	(
-		[project_id],
+		[instance_name],
+		[database_name],
 		[task_id],
 		[schema_name],
 		[object_name]
 	) ON [PRIMARY],
-	CONSTRAINT [FK_MaintenancePlan_objectSkipList_catalogProjects] FOREIGN KEY 
-	(
-		[project_id]
-	) 
-	REFERENCES [dbo].[catalogProjects] 
-	(
-		[id]
-	),
 	CONSTRAINT [FK_MaintenancePlan_objectSkipList_appInternalTasks] FOREIGN KEY 
 	(
 		[task_id]
@@ -53,7 +48,12 @@ CREATE TABLE [maintenance-plan].[objectSkipList]
 GO
 
 CREATE INDEX [IX_MaintenancePlan_objectSkipList_TaskID] ON [maintenance-plan].[objectSkipList]
-		([task_id], [project_id])
+		([task_id])
+	ON [FG_Statistics_Index]
+GO
+
+CREATE INDEX [IX_MaintenancePlan_objectSkipList_DatabaseName_TaskID_ObjectType] ON [maintenance-plan].[objectSkipList]
+		([instance_name], [database_name], [task_id], [object_type])
 	INCLUDE
 		([schema_name], [object_name])
 	ON [FG_Statistics_Index]

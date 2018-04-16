@@ -681,3 +681,4 @@
 /* 16.04.2018 */
 	- added new option to database transaction log backup: 8192 - use tail log backup - NORECOVERY (developed by Razvan Puscasu)
 	- enhance project specific scheduler for maintenance-plan internal tasks
+	- enhance [maintenance-plan].[vw_objectSkipList] table: add instance/database information

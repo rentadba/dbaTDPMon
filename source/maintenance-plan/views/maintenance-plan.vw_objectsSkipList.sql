@@ -16,19 +16,16 @@ AS
 -- Module			 : Database Analysis & Performance Monitoring
 -- ============================================================================
 
-SELECT 	  cp.[id]				AS [project_id]
-		, cp.[code]				AS [project_code]
-		, cp.[name]				AS [project_name]
-		, osl.[id]
+SELECT 	  osl.[id]
+		, osl.[instance_name]
+		, osl.[database_name]
 		, it.[descriptor]		AS [job_descriptor]
 		, osl.[task_id]
 		, it.[task_name]
 		, osl.[schema_name]
 		, osl.[object_name]
+		, osl.[object_type]
 		, it.[flg_actions]
 FROM [maintenance-plan].[objectSkipList] osl
 INNER JOIN [dbo].[appInternalTasks] it ON it.[id] = osl.[task_id]
-LEFT  JOIN [dbo].[catalogProjects] cp ON cp.[id] = osl.[project_id]
 GO
-
-
