@@ -28,10 +28,11 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseBackup]
 												  128 - when performing cleanup, delete also orphans diff and log backups, when cleanup full database backups(default)
 												  256 - for +2k5 versions, use xp_delete_file option (default)
 												  512 - skip databases involved in log shipping (primary or secondary or logs, secondary for full/diff backups) (default)
-												 1024 - on alwayson availability groups, for secondary replicas, force copy-only backups (default)
+												 1024 - on alwayson availability groups, for secondary replicas, force copy-only backups
 												 2048 - change retention policy from RetentionDays to RetentionBackupsCount (number of full database backups to be kept)
 													  - this may be forced by setting to true property 'Change retention policy from RetentionDays to RetentionBackupsCount'
 												 4096 - use xp_dirtree to identify orphan backup files to be deleted, when using option 128 (default)
+												 8192 - use tail log backup - NORECOVERY
 												*/
 		@retentionDays		[smallint]	= NULL,
 		@executionLevel		[tinyint]	=  0,
@@ -63,6 +64,7 @@ DECLARE		@backupFileName					[nvarchar](1024),
 			@optionBackupWithCompression	[bit],
 			@optionBackupWithCopyOnly		[bit],
 			@optionForceChangeBackupType	[bit],
+			@optionTailLogBackup		    [bit],
 			@serverEdition					[sysname],
 			@serverVersionStr				[sysname],
 			@serverVersionNum				[numeric](9,6),
@@ -473,6 +475,11 @@ SET @optionBackupWithCopyOnly=0
 IF @flgOptions & 4 = 4 AND @serverVersionNum >= 9
 	SET @optionBackupWithCopyOnly=1
 
+-- check TAIL_LOG_BACKUP option
+SET @optionTailLogBackup = 0
+IF @flgActions & 4 = 4 AND @flgOptions & 8192 = 8192
+	SET @optionTailLogBackup=1
+
 --check if another backup is needed (full) / partially applicable to AlwaysOn Availability Groups
 SET @optionForceChangeBackupType=0
 IF @flgOptions & 8 = 8 AND (@agName IS NULL OR (@agName IS NOT NULL AND @agInstanceRoleDesc = 'PRIMARY')) AND @serverVersionNum >= 9
@@ -604,6 +611,8 @@ IF @optionBackupWithCompression=1
 	SET @backupOptions = @backupOptions + N', COMPRESSION'
 IF @optionBackupWithCopyOnly=1
 	SET @backupOptions = @backupOptions + N', COPY_ONLY'
+IF @optionTailLogBackup=1
+	SET @backupOptions = @backupOptions + N', NORECOVERY'
 IF ISNULL(@retentionDays, 0) <> 0
 	SET @backupOptions = @backupOptions + N', RETAINDAYS=' + CAST(@retentionDays AS [nvarchar](32))
 
@@ -722,7 +731,7 @@ ELSE
 	begin
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0	
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
-														@dbName			= @dbName,
+														@dbName			= 'master',
 														@module			= 'dbo.usp_mpDatabaseBackup',
 														@eventName		= 'database backup',
 														@queryToRun  	= @queryToRun,
