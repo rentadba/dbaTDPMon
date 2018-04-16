@@ -1854,6 +1854,14 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 								IF @statsSamplePercent = 100
 									SET @queryToRun=@queryToRun + N' WITH FULLSCAN'
 
+						/* starting with SQL Server 2017 CU3, MAXDOP option is available for UPDATE STATISTICS: https://docs.microsoft.com/en-us/sql/t-sql/statements/update-statistics-transact-sql?view=sql-server-2017 */
+						IF @serverVersionNum >= 14.03015
+							begin
+								IF CHARINDEX(' WITH ', @queryToRun) = 0
+									SET @queryToRun = @queryToRun + ' WITH '
+								SET @queryToRun = @queryToRun + 'MAXDOP = ' + CAST(@maxDOP AS [nvarchar])
+							end
+
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 						
 						SET @nestedExecutionLevel = @executionLevel + 1
