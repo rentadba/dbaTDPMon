@@ -275,6 +275,9 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20180412-patch-upgrade-from-v2018_3-to-v2018_4-mp.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20180416-patch-upgrade-from-v2018_3-to-v2018_4-mp.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 
 echo *-----------------------------------------------------------------------------*
 echo Maintenance Plan: Creating Views ...
