@@ -433,9 +433,13 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 						FROM #databaseObjectsWithIndexList dtl
 						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
 																				AND dtl.[table_name] = osl.[object_name]
-						WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]'
-		SET @queryParameters = '@flgActions [int]'
-		EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
+						WHERE osl.[instance_name] = @sqlServerName
+								AND osl.[database_name] = @dbName
+								AND @flgActions & osl.[flg_actions] = osl.[flg_actions]'
+		SET @queryParameters = '@sqlServerName [sysname], @dbName [sysname], @flgActions [int]'
+		EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
+														, @dbName = @dbName
+														, @flgActions = @flgActions
 
 		SET @queryToRun = N''
 		SET @queryToRun = @queryToRun + N'
@@ -443,9 +447,13 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 						FROM #databaseObjectsWithIndexList dtl
 						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
 																				AND dtl.[index_name] = osl.[object_name]
-						WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]'
-		SET @queryParameters = '@flgActions [int]'
-		EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
+						WHERE osl.[instance_name] = @sqlServerName
+								AND osl.[database_name] = @dbName
+								AND @flgActions & osl.[flg_actions] = osl.[flg_actions]'
+		SET @queryParameters = '@sqlServerName [sysname], @dbName [sysname], @flgActions [int]'
+		EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
+														, @dbName = @dbName
+														, @flgActions = @flgActions
 	end
 
 
@@ -701,9 +709,13 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 								FROM #databaseObjectsWithIndexList dtl
 								INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
 																						AND dtl.[table_name] = osl.[object_name]
-								WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]'
-				SET @queryParameters = '@flgActions [int]'
-				EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
+								WHERE osl.[instance_name] = @sqlServerName
+										AND osl.[database_name] = @dbName
+										AND @flgActions & osl.[flg_actions] = osl.[flg_actions]'
+				SET @queryParameters = '@sqlServerName [sysname], @dbName [sysname], @flgActions [int]'
+				EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
+																, @dbName = @dbName
+																, @flgActions = @flgActions
 
 				SET @queryToRun = N''
 				SET @queryToRun = @queryToRun + N'
@@ -711,9 +723,13 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 								FROM #databaseObjectsWithIndexList dtl
 								INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
 																						AND dtl.[index_name] = osl.[object_name]
-								WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]'
-				SET @queryParameters = '@flgActions [int]'
-				EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
+								WHERE osl.[instance_name] = @sqlServerName
+										AND osl.[database_name] = @dbName
+										AND @flgActions & osl.[flg_actions] = osl.[flg_actions]'
+				SET @queryParameters = '@sqlServerName [sysname], @dbName [sysname], @flgActions [int]'
+				EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
+																, @dbName = @dbName
+																, @flgActions = @flgActions
 			end
 	end
 
@@ -957,9 +973,13 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 								FROM #databaseObjectsWithStatisticsList dtl
 								INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
 																						AND dtl.[table_name] = osl.[object_name]
-								WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]'
-				SET @queryParameters = '@flgActions [int]'
-				EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
+								WHERE osl.[instance_name] = @sqlServerName
+										AND osl.[database_name] = @dbName
+										AND @flgActions & osl.[flg_actions] = osl.[flg_actions]'
+				SET @queryParameters = '@sqlServerName [sysname], @dbName [sysname], @flgActions [int]'
+				EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
+																, @dbName = @dbName
+																, @flgActions = @flgActions
 
 				SET @queryToRun = N''
 				SET @queryToRun = @queryToRun + N'
@@ -967,9 +987,13 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 								FROM #databaseObjectsWithStatisticsList dtl
 								INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
 																						AND dtl.[stats_name] = osl.[object_name]
-								WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]'
-				SET @queryParameters = '@flgActions [int]'
-				EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
+								WHERE osl.[instance_name] = @sqlServerName
+										AND osl.[database_name] = @dbName
+										AND @flgActions & osl.[flg_actions] = osl.[flg_actions]'
+				SET @queryParameters = '@sqlServerName [sysname], @dbName [sysname], @flgActions [int]'
+				EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
+																, @dbName = @dbName
+																, @flgActions = @flgActions
 			end
 	end
 

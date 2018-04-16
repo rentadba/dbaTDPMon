@@ -24,9 +24,6 @@ GO
 IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='maintenance-plan' AND TABLE_NAME='objectSkipList' AND COLUMN_NAME='database_name')
 	ALTER TABLE [maintenance-plan].[objectSkipList] ADD [database_name] [sysname] NOT NULL
 GO
-IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='maintenance-plan' AND TABLE_NAME='objectSkipList' AND COLUMN_NAME='object_type')
-	ALTER TABLE [maintenance-plan].[objectSkipList] ADD [object_type] [varchar](32)	NULL
-GO
 
 IF EXISTS(SELECT * FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA='maintenance-plan' AND CONSTRAINT_NAME='FK_MaintenancePlan_objectSkipList_catalogProjects')
 	ALTER TABLE [maintenance-plan].[objectSkipList] DROP CONSTRAINT [FK_MaintenancePlan_objectSkipList_catalogProjects]
@@ -36,6 +33,9 @@ IF EXISTS(SELECT * FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE CONSTRAINT_SC
 GO
 IF EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='maintenance-plan' AND TABLE_NAME='objectSkipList' AND COLUMN_NAME='project_id')
 	ALTER TABLE [maintenance-plan].[objectSkipList] DROP COLUMN [project_id]
+GO
+IF EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='maintenance-plan' AND TABLE_NAME='objectSkipList' AND COLUMN_NAME='object_type')
+	ALTER TABLE [maintenance-plan].[objectSkipList] DROP COLUMN [object_type]
 GO
 IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA='maintenance-plan' AND CONSTRAINT_NAME='UK_objectSkipList_Name')
 	ALTER TABLE [maintenance-plan].[objectSkipList] 
@@ -47,10 +47,6 @@ IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE CONSTRAIN
 			[schema_name],
 			[object_name]
 		) ON [PRIMARY]
-GO
-IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.CHECK_CONSTRAINTS WHERE CONSTRAINT_SCHEMA='maintenance-plan' AND CONSTRAINT_NAME='ck_maintenancePlan_objectSkipList_ObjectType')
-	ALTER TABLE [maintenance-plan].[objectSkipList] 
-		ADD CONSTRAINT [ck_maintenancePlan_objectSkipList_ObjectType] CHECK ([object_type] IN ('table', 'index', 'statistic'))
 GO
 IF EXISTS(SELECT * FROM sys.indexes WHERE [name]='IX_MaintenancePlan_objectSkipList_TaskID' AND [object_id]=OBJECT_ID('[maintenance-plan].[objectSkipList]'))
 	DROP INDEX [IX_MaintenancePlan_objectSkipList_TaskID] ON [maintenance-plan].[objectSkipList]
@@ -64,7 +60,7 @@ GO
 
 IF NOT EXISTS(SELECT * FROM sys.indexes WHERE [name]='IX_MaintenancePlan_objectSkipList_DatabaseName_TaskID_ObjectType' AND [object_id]=OBJECT_ID('[maintenance-plan].[objectSkipList]'))
 	CREATE INDEX [IX_MaintenancePlan_objectSkipList_DatabaseName_TaskID_ObjectType] ON [maintenance-plan].[objectSkipList]
-			([instance_name], [database_name], [task_id], [object_type])
+			([instance_name], [database_name], [task_id])
 		INCLUDE
 			([schema_name], [object_name])
 		ON [FG_Statistics_Index]

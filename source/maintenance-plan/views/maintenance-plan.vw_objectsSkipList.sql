@@ -17,14 +17,13 @@ AS
 -- ============================================================================
 
 SELECT 	  osl.[id]
-		, osl.[instance_name]
-		, osl.[database_name]
 		, it.[descriptor]		AS [job_descriptor]
 		, osl.[task_id]
 		, it.[task_name]
+		, osl.[instance_name]
+		, osl.[database_name]
 		, osl.[schema_name]
 		, osl.[object_name]
-		, osl.[object_type]
 		, it.[flg_actions]
 FROM [maintenance-plan].[objectSkipList] osl
 INNER JOIN [dbo].[appInternalTasks] it ON it.[id] = osl.[task_id]

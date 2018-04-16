@@ -23,7 +23,6 @@ CREATE TABLE [maintenance-plan].[objectSkipList]
 	[task_id]				[bigint]		NOT NULL,
 	[schema_name]			[sysname]		NOT NULL,
 	[object_name]			[sysname]		NOT NULL,
-	[object_type]			[varchar](32)	NULL CONSTRAINT [ck_maintenancePlan_objectSkipList_ObjectType] CHECK ([object_type] IN ('table', 'index', 'statistic')),
 	CONSTRAINT [PK_objectSkipList] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
@@ -53,7 +52,7 @@ CREATE INDEX [IX_MaintenancePlan_objectSkipList_TaskID] ON [maintenance-plan].[o
 GO
 
 CREATE INDEX [IX_MaintenancePlan_objectSkipList_DatabaseName_TaskID_ObjectType] ON [maintenance-plan].[objectSkipList]
-		([instance_name], [database_name], [task_id], [object_type])
+		([instance_name], [database_name], [task_id])
 	INCLUDE
 		([schema_name], [object_name])
 	ON [FG_Statistics_Index]
