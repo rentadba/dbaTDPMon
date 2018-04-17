@@ -683,3 +683,6 @@
 	- enhance project specific scheduler for maintenance-plan internal tasks
 	- enhance [maintenance-plan].[vw_objectSkipList] table: add instance/database information
 	- add MAXDOP option for update statistics (starting with SQL Server 2017 CU3)
+
+/* 17.04.2018 */
+	- enhance internal job queue execution mechanism (add serial mode and option to skip the execution using SQL Agent jobs) (developed by Razvan Puscasu)

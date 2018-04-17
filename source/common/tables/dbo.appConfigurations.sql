@@ -59,6 +59,7 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 		  SELECT 'common'			AS [module], 'Maximum number of retries at failed job'										AS [name], '3'			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Fail master job if any queued job fails'										AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Maximum SQL Agent jobs started per minute (KB306457)'							AS [name], '60'			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'In "serial" mode (parallel=1), execute tasks using SQL Agent jobs'			AS [name], '0'			AS [value]		UNION ALL
 
 		  SELECT 'maintenance-plan' AS [module], 'Default backup location'														AS [name], NULL			AS [value]		UNION ALL
 		  SELECT 'maintenance-plan' AS [module], 'Default backup retention (days)'												AS [name], '7'			AS [value]		UNION ALL

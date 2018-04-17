@@ -18,6 +18,7 @@ CREATE PROCEDURE dbo.usp_sqlAgentJobStartAndWatch
 		@dontRunIfLastExecutionSuccededLast	[int]=0,		--numarul de minute 
 		@startJobIfPrevisiousErrorOcured	[bit]=1,
 		@watchJob					[bit]=1,
+		@jobQueueID					[int]=NULL,
 		@debugMode					[bit]=0
 /* WITH ENCRYPTION */
 AS
@@ -317,6 +318,14 @@ IF @startJob=1
 											end
 										ELSE
 											begin
+												IF @jobQueueID IS NOT NULL AND EXISTS(SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='jobExecutionQueue')
+													begin
+														SET @queryToRun='UPDATE [dbo].[jobExecutionQueue] 
+																				SET   [status] = 4
+																					, [execution_date] = GETDATE()
+																			WHERE [id] = ' + CAST(@jobQueueID AS [nvarchar])
+														EXEC (@queryToRun)
+													end
 												--monitorizare job
 												IF @watchJob=1
 													begin
