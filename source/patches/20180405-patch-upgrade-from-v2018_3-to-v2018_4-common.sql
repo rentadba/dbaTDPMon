@@ -30,9 +30,6 @@ GO
 IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='jobExecutionQueue' AND COLUMN_NAME='task_id')
 	ALTER TABLE [dbo].[jobExecutionQueue] ADD [task_id]	[smallint] NULL
 GO
-IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='jobExecutionQueue' AND COLUMN_NAME='task_id' AND DATA_TYPE='smallint')
-	ALTER TABLE [dbo].[jobExecutionQueue] ALTER COLUMN [task_id] [smallint] NULL
-GO
 IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='jobExecutionQueue' AND COLUMN_NAME='database_name')
 	ALTER TABLE [dbo].[jobExecutionQueue] ADD [database_name] [sysname] NULL
 GO
