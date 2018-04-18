@@ -592,6 +592,9 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\monitoring.statsSQLAgentJobs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\tables\monitoring.alertAdditionalRecipients.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 
 echo *-----------------------------------------------------------------------------*
 echo Monitoring: Creating Functions / Stored Procedures
@@ -614,7 +617,6 @@ if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\dbo.usp_monAlarmCustomSQLAgentFailedJobs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
-
 
 set healthCheckInstalled=true
 if "%module%"=="monitoring" set healthCheckInstalled=false
@@ -665,7 +667,7 @@ if "%module%"=="all" goto done
 goto done
 
 :done
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2018.04.17' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2018.04.18' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err  
 
 echo *-----------------------------------------------------------------------------*

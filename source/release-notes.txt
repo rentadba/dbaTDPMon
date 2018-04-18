@@ -686,3 +686,6 @@
 
 /* 17.04.2018 */
 	- enhance internal job queue execution mechanism (add serial mode and option to skip the execution using SQL Agent jobs) (developed by Razvan Puscasu)
+
+/* 18.04.2018 */
+	- add mechanism for additional recipients on monitoring alerts

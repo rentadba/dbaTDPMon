@@ -13,32 +13,6 @@ SET NOCOUNT ON
 /*---------------------------------------------------------------------------------------------------------------------*/
 RAISERROR('* Patch: 20180112-patch-upgrade-from-v2017_6-to-v2017_12-mp.sql', 10, 1) WITH NOWAIT
 
-IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE [TABLE_SCHEMA]='maintenance-plan' AND [TABLE_NAME]='internalTasks' AND [COLUMN_NAME]='flg_actions')
-	begin
-		EXEC (' ALTER TABLE [maintenance-plan].[internalTasks] ADD [flg_actions] [smallint]	NULL');
-
-		EXEC (' UPDATE [maintenance-plan].[internalTasks] SET [flg_actions] =  1 WHERE [id] = 1;
-				UPDATE [maintenance-plan].[internalTasks] SET [flg_actions] = 12 WHERE [id] = 2;
-				UPDATE [maintenance-plan].[internalTasks] SET [flg_actions] =  2 WHERE [id] = 4;
-				UPDATE [maintenance-plan].[internalTasks] SET [flg_actions] = 16 WHERE [id] = 8;
-				UPDATE [maintenance-plan].[internalTasks] SET [flg_actions] = 64 WHERE [id] = 16;
-				UPDATE [maintenance-plan].[internalTasks] SET [flg_actions] = 16 WHERE [id] = 32;
-				UPDATE [maintenance-plan].[internalTasks] SET [flg_actions] =  3 WHERE [id] = 64;
-				UPDATE [maintenance-plan].[internalTasks] SET [flg_actions] =  8 WHERE [id] = 128;
-				UPDATE [maintenance-plan].[internalTasks] SET [flg_actions] =  2 WHERE [id] = 256;
-				UPDATE [maintenance-plan].[internalTasks] SET [flg_actions] =  1 WHERE [id] = 512;
-				UPDATE [maintenance-plan].[internalTasks] SET [flg_actions] =  2 WHERE [id] = 1024;
-				UPDATE [maintenance-plan].[internalTasks] SET [flg_actions] =  1 WHERE [id] = 2048;
-				UPDATE [maintenance-plan].[internalTasks] SET [flg_actions] =  1 WHERE [id] = 4096;
-				UPDATE [maintenance-plan].[internalTasks] SET [flg_actions] =  4 WHERE [id] = 8192;');
-
-		EXEC (' ALTER TABLE [maintenance-plan].[internalTasks] ALTER COLUMN [flg_actions] [smallint] NOT NULL');
-	end
-GO
-
-UPDATE [maintenance-plan].[internalTasks] SET [job_descriptor] = 'dbo.usp_mpDatabaseConsistencyCheck' WHERE [id] = 16
-GO
-
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[maintenance-plan].[objectSkipList]') AND type in (N'U'))
 	begin 
 		RAISERROR('	Create table: [maintenance-plan].[objectSkipList]', 10, 1) WITH NOWAIT
@@ -66,14 +40,6 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[maintenance-plan
 				[project_id]
 			) 
 			REFERENCES [dbo].[catalogProjects] 
-			(
-				[id]
-			),
-			CONSTRAINT [FK_MaintenancePlan_objectSkipList_MaintenancePlan_internalTasks] FOREIGN KEY 
-			(
-				[task_id]
-			) 
-			REFERENCES [maintenance-plan].[internalTasks]
 			(
 				[id]
 			)
