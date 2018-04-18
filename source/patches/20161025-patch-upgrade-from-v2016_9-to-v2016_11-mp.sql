@@ -14,47 +14,6 @@ SET NOCOUNT ON
 RAISERROR('* Patch: 20161025-patch-upgrade-from-v2016_9-to-v2016_11-mp.sql', 10, 1) WITH NOWAIT
 
 
-IF NOT EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[maintenance-plan].[internalTasks]') AND type in (N'U'))
-	begin
-		RAISERROR('	Create table: [maintenance-plan].[internalTasks]', 10, 1) WITH NOWAIT
-
-		CREATE TABLE [maintenance-plan].[internalTasks]
-		(
-			[id]					[bigint]		NOT NULL,
-			[job_descriptor]		[varchar](256)	NOT NULL,
-			[task_name]				[varchar](256)	NOT NULL
-			CONSTRAINT [PK_internalTasks] PRIMARY KEY  CLUSTERED 
-			(
-				[id]
-			) ON [PRIMARY],
-			CONSTRAINT [UK_internalTasks] UNIQUE
-			(
-				  [job_descriptor]
-				, [task_name]
-			) ON [PRIMARY]
-		) ON [PRIMARY];
-
-
-		RAISERROR('		...insert default data', 10, 1) WITH NOWAIT
-
-		INSERT	INTO[maintenance-plan].[internalTasks] ([id], [job_descriptor], [task_name])
-				SELECT    1, 'dbo.usp_mpDatabaseConsistencyCheck', 'Database Consistency Check' UNION ALL
-				SELECT    2, 'dbo.usp_mpDatabaseConsistencyCheck', 'Allocation Consistency Check' UNION ALL
-				SELECT    4, 'dbo.usp_mpDatabaseConsistencyCheck', 'Tables Consistency Check' UNION ALL
-				SELECT    8, 'dbo.usp_mpDatabaseConsistencyCheck', 'Reference Consistency Check' UNION ALL
-				SELECT   16, 'dbo.usp_mpDatabaseOptimize', 'Perform Correction to Space Usage' UNION ALL
-				SELECT   32, 'dbo.usp_mpDatabaseOptimize', 'Rebuild Heap Tables' UNION ALL
-				SELECT   64, 'dbo.usp_mpDatabaseOptimize', 'Rebuild or Reorganize Indexes' UNION ALL
-				SELECT  128, 'dbo.usp_mpDatabaseOptimize', 'Update Statistics' UNION ALL
-				SELECT  256, 'dbo.usp_mpDatabaseShrink', 'Shrink Database (TRUNCATEONLY)' UNION ALL
-				SELECT  512, 'dbo.usp_mpDatabaseShrink', 'Shrink Log File' UNION ALL
-				SELECT 1024, 'dbo.usp_mpDatabaseBackup', 'User Databases (diff)' UNION ALL
-				SELECT 2048, 'dbo.usp_mpDatabaseBackup', 'User Databases (full)' UNION ALL
-				SELECT 4096, 'dbo.usp_mpDatabaseBackup', 'System Databases (full)' UNION ALL
-				SELECT 8192, 'dbo.usp_mpDatabaseBackup', 'User Databases Transaction Log'
-	end
-GO
-
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[maintenance-plan].[internalScheduler]') AND type in (N'U'))
 	begin
 		RAISERROR('	Create table: [maintenance-plan].[internalScheduler]', 10, 1) WITH NOWAIT
@@ -82,15 +41,7 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[maintenance-plan
 			REFERENCES [dbo].[catalogProjects] 
 			(
 				[id]
-			),
-			CONSTRAINT [FK_internalScheduler_MaintenancePlan_internalTasks] FOREIGN KEY 
-			(
-				[task_id]
-			) 
-			REFERENCES [maintenance-plan].[internalTasks]
-			(
-				[id]
-			)	
+			)
 		) ON [PRIMARY];
 
 		CREATE INDEX [IX_MaintenancePlan_internalScheduler_TaskID] ON [maintenance-plan].[internalScheduler]
