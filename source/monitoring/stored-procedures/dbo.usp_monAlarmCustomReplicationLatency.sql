@@ -36,6 +36,8 @@ DECLARE   @sqlServerName		[sysname]
 		, @serverToRun			[nvarchar](512)
 		, @eventMessageData		[nvarchar](max)
 		, @runStartTime			[datetime]
+		, @additionalRecipients	[nvarchar](1024)
+		, @eventName			[sysname]
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default projectCode
@@ -200,17 +202,44 @@ WHILE @@FETCH_STATUS=0
 								'<event_date_utc>' + CONVERT([varchar](20), GETUTCDATE(), 120) + '</event_date_utc>' + 
 								'</detail></alert>'
 
+		SET @eventName = 'subscription marked inactive'
+
+		/* check for additional receipients for the alert */		
+		SET @additionalRecipients = N''
+		SELECT @additionalRecipients = @additionalRecipients + [recipients] + N';'
+		FROM (
+				SELECT DISTINCT adr.[recipients]
+				FROM [monitoring].[alertAdditionalRecipients] adr
+				INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[instance_id] = adr.[instance_id]
+																AND cin.[project_id] = adr.[project_id]
+				WHERE cin.[project_id] = @projectID
+						AND cin.[instance_name] = @publicationServer
+						AND adr.[active] = 1
+						AND adr.[event_name] = @eventName
+						AND adr.[object_name] = 'Publication: ' + @publicationName + ' - Subscriber: ' + @subcriptionServer + '.' + @subscriptionDB
+			)x
+		
+		IF @additionalRecipients <> N''
+			begin
+				SELECT @additionalRecipients = [value] + N';' + @additionalRecipients
+				FROM [dbo].[appConfigurations]
+				WHERE [name] = 'Default recipients list - Alerts (semicolon separated)'
+						AND [module] = 'common'
+			end
+		ELSE
+			SET @additionalRecipients = NULL
+
 		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= @projectCode,
 														@sqlServerName			= @publicationServer,
 														@dbName					= @publicationName,
 														@objectName				= @subcriptionServer,
 														@childObjectName		= @subscriptionDB,
 														@module					= 'monitoring',
-														@eventName				= 'subscription marked inactive',
+														@eventName				= @eventName,
 														@parameters				= NULL,			/* may contain the attach file name */
 														@eventMessage			= @eventMessageData,
 														@dbMailProfileName		= NULL,
-														@recipientsList			= NULL,
+														@recipientsList			= @additionalRecipients,
 														@eventType				= 1,	
 														@additionalOption		= 0
 
@@ -254,17 +283,44 @@ WHILE @@FETCH_STATUS=0
 								'<event_date_utc>' + CONVERT([varchar](20), GETUTCDATE(), 120) + '</event_date_utc>' + 
 								'</detail></alert>'
 
+		SET @eventName = 'subscription not active'
+
+		/* check for additional receipients for the alert */		
+		SET @additionalRecipients = N''
+		SELECT @additionalRecipients = @additionalRecipients + [recipients] + N';'
+		FROM (
+				SELECT DISTINCT adr.[recipients]
+				FROM [monitoring].[alertAdditionalRecipients] adr
+				INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[instance_id] = adr.[instance_id]
+																AND cin.[project_id] = adr.[project_id]
+				WHERE cin.[project_id] = @projectID
+						AND cin.[instance_name] = @publicationServer
+						AND adr.[active] = 1
+						AND adr.[event_name] = 'subscription not active'
+						AND adr.[object_name] = 'Publication: ' + @publicationName + ' - Subscriber: ' + @subcriptionServer + '.' + @subscriptionDB
+			)x
+		
+		IF @additionalRecipients <> N''
+			begin
+				SELECT @additionalRecipients = [value] + N';' + @additionalRecipients
+				FROM [dbo].[appConfigurations]
+				WHERE [name] = 'Default recipients list - Alerts (semicolon separated)'
+						AND [module] = 'common'
+			end
+		ELSE
+			SET @additionalRecipients = NULL
+
 		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= @projectCode,
 														@sqlServerName			= @publicationServer,
 														@dbName					= @publicationName,
 														@objectName				= @subcriptionServer,
 														@childObjectName		= @subscriptionDB,
 														@module					= 'monitoring',
-														@eventName				= 'subscription not active',
+														@eventName				= @eventName,
 														@parameters				= NULL,			/* may contain the attach file name */
 														@eventMessage			= @eventMessageData,
 														@dbMailProfileName		= NULL,
-														@recipientsList			= NULL,
+														@recipientsList			= @additionalRecipients,
 														@eventType				= 1,	
 														@additionalOption		= 0
 
@@ -743,14 +799,13 @@ EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrin
 
 DECLARE   @instanceName		[sysname]
 		, @objectName		[nvarchar](512)
-		, @eventName		[sysname]
 		, @severity			[sysname]
 		, @eventMessage		[nvarchar](max)
 
 
 DECLARE crsReplicationAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINCT
 																	  srl.[publisher_server] AS [instance_name]
-																	, 'Publication: ' + srl.[publication_name] + ' - Subscriber:' + srl.[subscriber_server] + '.' + srl.[subscriber_db] AS [object_name]
+																	, 'Publication: ' + srl.[publication_name] + ' - Subscriber: ' + srl.[subscriber_server] + '.' + srl.[subscriber_db] AS [object_name]
 																	, 'critical'			AS [severity]
 																	, 'replication latency'	AS [event_name]
 																	, '<alert><detail>' + 
@@ -784,6 +839,31 @@ OPEN crsReplicationAlarms
 FETCH NEXT FROM crsReplicationAlarms INTO @instanceName, @objectName, @severity, @eventName, @eventMessage
 WHILE @@FETCH_STATUS=0
 	begin
+		/* check for additional receipients for the alert */		
+		SET @additionalRecipients = N''
+		SELECT @additionalRecipients = @additionalRecipients + [recipients] + N';'
+		FROM (
+				SELECT DISTINCT adr.[recipients]
+				FROM [monitoring].[alertAdditionalRecipients] adr
+				INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[instance_id] = adr.[instance_id]
+																AND cin.[project_id] = adr.[project_id]
+				WHERE cin.[project_id] = @projectID
+						AND cin.[instance_name] = @publicationServer
+						AND adr.[active] = 1
+						AND adr.[event_name] = @eventName
+						AND adr.[object_name] = 'Publication: ' + @publicationName + ' - Subscriber: ' + @subcriptionServer + '.' + @subscriptionDB
+			)x
+		
+		IF @additionalRecipients <> N''
+			begin
+				SELECT @additionalRecipients = [value] + N';' + @additionalRecipients
+				FROM [dbo].[appConfigurations]
+				WHERE [name] = 'Default recipients list - Alerts (semicolon separated)'
+						AND [module] = 'common'
+			end
+		ELSE
+			SET @additionalRecipients = NULL
+
 		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= @projectCode,
 														@sqlServerName			= @instanceName,
 														@dbName					= @severity,
@@ -794,7 +874,7 @@ WHILE @@FETCH_STATUS=0
 														@parameters				= NULL,	
 														@eventMessage			= @eventMessage,
 														@dbMailProfileName		= NULL,
-														@recipientsList			= NULL,
+														@recipientsList			= @additionalRecipients,
 														@eventType				= 6,	/* 6 - alert-custom */
 														@additionalOption		= 0
 
