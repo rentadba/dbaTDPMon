@@ -58,9 +58,9 @@ IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[monitori
 						SELECT 'blocked transaction' AS [event_name], '<database_name>' AS [object_name], 0 AS [active] UNION ALL
 						SELECT 'long session request' AS [event_name], '<database_name>' AS [object_name], 0 AS [active] UNION ALL
 						SELECT 'tempdb space' AS [event_name], NULL AS [object_name], 0 AS [active] UNION ALL
-						SELECT 'replication latency' AS [event_name], 'Publication: <publication_name> - Subscriber:<subscriber_server>.<subscriber_db>' AS [object_name], 0 AS [active] UNION ALL
-						SELECT 'subscription marked inactive' AS [event_name] , 'Publication: <publication_name> - Subscriber:<subscriber_server>.<subscriber_db>' AS [object_name], 0 AS [active] UNION ALL
-						SELECT 'subscription not active' AS [event_name], 'Publication: <publication_name> - Subscriber:<subscriber_server>.<subscriber_db>' AS [object_name], 0 AS [active] UNION ALL
+						SELECT 'replication latency' AS [event_name], 'Publication: <publication_name> - Subscriber: <subscriber_server>.<subscriber_db>' AS [object_name], 0 AS [active] UNION ALL
+						SELECT 'subscription marked inactive' AS [event_name] , 'Publication: <publication_name> - Subscriber: <subscriber_server>.<subscriber_db>' AS [object_name], 0 AS [active] UNION ALL
+						SELECT 'subscription not active' AS [event_name], 'Publication: <publication_name> - Subscriber: <subscriber_server>.<subscriber_db>' AS [object_name], 0 AS [active] UNION ALL
 						SELECT 'low disk space', '<mount_point>' AS [object_name], 0 AS [active]
 					)ev ON 1=1;
 	end
@@ -69,6 +69,6 @@ IF NOT EXISTS(SELECT * FROM sys.indexes WHERE [name]='IX_Monitoring_alertAdditio
 	CREATE INDEX [IX_Monitoring_alertAdditionalRecipients_ProjectID] ON [monitoring].[alertAdditionalRecipients] ([instance_id], [project_id]) ON [FG_Statistics_Index]
 GO
 IF NOT EXISTS(SELECT * FROM sys.indexes WHERE [name]='IX_Monitoring_alertAdditionalRecipients_PublicationName' AND [object_id]=OBJECT_ID('[monitoring].[alertAdditionalRecipients]'))
-	CREATE INDEX [IX_Monitoring_alertAdditionalRecipients_PublicationName] ON [monitoring].[alertAdditionalRecipients]([event_name], [active], [instance_id], [project_id], [object_name]) ON [FG_Statistics_Index]
+	CREATE INDEX [IX_Monitoring_alertAdditionalRecipients_PublicationName] ON [monitoring].[alertAdditionalRecipients]([event_name], [active], [instance_id], [project_id], [object_name]) INCLUDE ([recipients]) ON [FG_Statistics_Index]
 GO
 GO
