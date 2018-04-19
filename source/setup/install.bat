@@ -600,6 +600,9 @@ echo *--------------------------------------------------------------------------
 echo Monitoring: Creating Functions / Stored Procedures
 echo *-----------------------------------------------------------------------------*
 
+sqlcmd.exe -S%server% %autentif% -i "..\monitoring\functions\dbo.ufn_monGetAdditionalAlertRecipients.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\dbo.usp_monAlarmCustomFreeDiskSpace.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -667,7 +670,7 @@ if "%module%"=="all" goto done
 goto done
 
 :done
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2018.04.18' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2018.04.19' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err  
 
 echo *-----------------------------------------------------------------------------*

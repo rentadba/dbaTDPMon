@@ -193,29 +193,7 @@ FETCH NEXT FROM crsDiskSpaceAlarms INTO @instanceName, @objectName, @severity, @
 WHILE @@FETCH_STATUS=0
 	begin
 		/* check for additional receipients for the alert */		
-		SET @additionalRecipients = N''
-		SELECT @additionalRecipients = @additionalRecipients + [recipients] + N';'
-		FROM (
-				SELECT DISTINCT adr.[recipients]
-				FROM [monitoring].[alertAdditionalRecipients] adr
-				INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[instance_id] = adr.[instance_id]
-																AND cin.[project_id] = adr.[project_id]
-				WHERE cin.[project_id] = @projectID
-						AND cin.[instance_name] = @instanceName
-						AND adr.[active] = 1
-						AND adr.[event_name] = @eventName
-						AND adr.[object_name] = @objectName
-			)x
-		
-		IF @additionalRecipients <> N''
-			begin
-				SELECT @additionalRecipients = [value] + N';' + @additionalRecipients
-				FROM [dbo].[appConfigurations]
-				WHERE [name] = 'Default recipients list - Alerts (semicolon separated)'
-						AND [module] = 'common'
-			end
-		ELSE
-			SET @additionalRecipients = NULL
+		SET @additionalRecipients = [dbo].[ufn_monGetAdditionalAlertRecipients](@projectID, @instanceName, @eventName, @objectName)
 
 		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= @projectCode,
 														@sqlServerName			= @instanceName,
@@ -227,7 +205,7 @@ WHILE @@FETCH_STATUS=0
 														@parameters				= NULL,	
 														@eventMessage			= @eventMessage,
 														@dbMailProfileName		= NULL,
-														@recipientsList			= NULL,
+														@recipientsList			= @additionalRecipients,
 														@eventType				= 6,	/* 6 - alert-custom */
 														@additionalOption		= 0
 
