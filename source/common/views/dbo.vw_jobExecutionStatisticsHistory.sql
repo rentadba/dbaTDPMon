@@ -21,6 +21,8 @@ AS
 
 /* previous / history executions */
 SELECT	  jesh.[project_id]
+		, jesh.[instance_id]
+		, cin.[name] AS [instance_name]
 		, cp.[code] AS [project_code]
 		, jesh.[module]
 		, jesh.[descriptor]
@@ -31,12 +33,15 @@ SELECT	  jesh.[project_id]
 		, jesh.[status]
 FROM  [dbo].[jobExecutionStatisticsHistory] jesh
 INNER JOIN [dbo].[catalogProjects] AS cp ON cp.[id] = jesh.[project_id]
+INNER JOIN [dbo].[catalogInstanceNames] AS cin ON cin.[id] = jesh.[instance_id] AND cin.[project_id] = jesh.[project_id]
 
 UNION ALL
 
 /* current / last executions */
 
 SELECT    jes.[project_id]
+		, jes.[instance_id]
+		, jes.[instance_name]
 		, jes.[project_code]
 		, jes.[module]
 		, jes.[descriptor]
