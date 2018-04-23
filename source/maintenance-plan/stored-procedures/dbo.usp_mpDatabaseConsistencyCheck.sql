@@ -391,7 +391,7 @@ IF @flgActions & 1 = 1
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 		
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
-														@dbName			= 'master',
+														@dbName			= @dbName,
 														@module			= 'dbo.usp_mpDatabaseConsistencyCheck',
 														@eventName		= 'database consistency check',
 														@queryToRun  	= @queryToRun,
@@ -467,7 +467,7 @@ IF @flgActions & 4 = 4
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
-														@dbName			= 'master',
+														@dbName			= @dbName,
 														@module			= 'dbo.usp_mpDatabaseConsistencyCheck',
 														@eventName		= 'database consistency check - allocation structures',
 														@queryToRun  	= @queryToRun,
@@ -492,7 +492,7 @@ IF @flgActions & 8 = 8
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
-														@dbName			= 'master',
+														@dbName			= @dbName,
 														@module			= 'dbo.usp_mpDatabaseConsistencyCheck',
 														@eventName		= 'database consistency check - catalogs',
 														@queryToRun  	= @queryToRun,
