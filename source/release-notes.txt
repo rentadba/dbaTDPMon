@@ -689,3 +689,7 @@
 
 /* 18.04.2018 */
 	- add mechanism for additional recipients on monitoring alerts
+
+/* 23.04.2018 */
+	- include dbo.jobExecutionStatisticsHistory in internal retention policy
+	- health-check: do not show saved detailed information in the daily report for inactive instances

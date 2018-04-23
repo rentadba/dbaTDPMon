@@ -1579,11 +1579,13 @@ BEGIN TRY
 			SET @dateTimeLowerLimit = DATEADD(hh, -@configFailuresInLastHours, GETDATE())
 			DECLARE crsSQLServerAgentJobsStatusIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT	ssajh.[instance_name], ssajh.[job_name], ssajh.[last_execution_status], ssajh.[last_execution_date], ssajh.[last_execution_time], ssajh.[message]
 																								FROM	[health-check].[vw_statsSQLAgentJobsHistory] ssajh
+																								INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[project_id] = ssajh.[project_id] AND cin.[instance_id] = ssajh.[instance_id]
 																								LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																			AND rsr.[rule_id] = 16
 																																			AND rsr.[active] = 1
 																																			AND (rsr.[skip_value]=ssajh.[instance_name])
 																								WHERE	ssajh.[project_id]=@projectID
+																										AND cin.[instance_active]=1
 																										AND ssajh.[last_execution_status] IN (0, 2, 3) /* 0 = Failed; 2 = Retry; 3 = Canceled */
 																										AND CONVERT([datetime], ssajh.[last_execution_date] + ' ' + ssajh.[last_execution_time], 120) >= @dateTimeLowerLimit
 																										AND rsr.[id] IS NULL
@@ -1670,6 +1672,7 @@ BEGIN TRY
 																									, [dbo].[ufn_reportHTMLFormatTimeValue](CAST(ssajh.[running_time_sec]*1000 AS [bigint])) AS [running_time]
 																									, ssajh.[message]
 																							FROM [health-check].[vw_statsSQLAgentJobsHistory] ssajh
+																							INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[project_id] = ssajh.[project_id] AND cin.[instance_id] = ssajh.[instance_id]
 																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																		AND rsr.[rule_id] = 33554432
 																																		AND rsr.[active] = 1
@@ -1677,6 +1680,7 @@ BEGIN TRY
 																																			 AND ISNULL(rsr.[skip_value2], '') = ISNULL(ssajh.[job_name], '') 
 																																			)
 																							WHERE	ssajh.[project_id]=@projectID
+																									AND cin.[instance_active]=1
 																									AND ssajh.[last_execution_status] = 4
 																									AND ssajh.[last_execution_date] IS NOT NULL
 																									AND ssajh.[last_execution_time] IS NOT NULL
@@ -3323,11 +3327,13 @@ BEGIN TRY
 			
 			DECLARE crsSQLServerAgentJobsInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT	ssajh.[instance_name], COUNT(*) AS [job_count]
 																					FROM	[health-check].[vw_statsSQLAgentJobsHistory] ssajh
+																					INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[project_id] = ssajh.[project_id] AND cin.[instance_id] = ssajh.[instance_id]
 																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																AND rsr.[rule_id] = 32
 																																AND rsr.[active] = 1
 																																AND (rsr.[skip_value]=ssajh.[instance_name])
 																					WHERE	ssajh.[project_id]=@projectID
+																							AND cin.[instance_active]=1
 																							AND rsr.[id] IS NULL
 																					GROUP BY ssajh.[instance_name]
 																					ORDER BY ssajh.[instance_name]
