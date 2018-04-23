@@ -55,7 +55,7 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 		  SELECT 'common'			AS [module], 'Default lock timeout (ms)'													AS [name], '5000'		AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Default folder for logs'														AS [name], NULL			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Parallel Execution Jobs'														AS [name], '16'			AS [value]		UNION ALL
-		  SELECT 'common'			AS [module], 'Internal jobs log retention (days)'											AS [name], '30'			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Internal jobs log retention (days)'											AS [name], '367'		AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Maximum number of retries at failed job'										AS [name], '3'			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Fail master job if any queued job fails'										AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Maximum SQL Agent jobs started per minute (KB306457)'							AS [name], '60'			AS [value]		UNION ALL

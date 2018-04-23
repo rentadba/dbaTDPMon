@@ -86,6 +86,18 @@ IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[jobExecutionH
 							BREAK
 					end
 				SET ROWCOUNT 0
+
+				SET @queryToRun = 'DELETE FROM [dbo].[jobExecutionStatisticsHistory]
+									WHERE [start_date] < DATEADD(dd, -' + CAST(@retentionDays AS [varchar]) + ', GETDATE())'
+				SET ROWCOUNT 4096
+				WHILE 1=1
+					begin
+						EXEC (@queryToRun)
+						
+						IF @@ROWCOUNT=0
+							BREAK
+					end
+				SET ROWCOUNT 0
 			end
 		SET @customMessage = 'Done.'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
