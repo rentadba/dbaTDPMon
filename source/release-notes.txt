@@ -692,4 +692,7 @@
 
 /* 23.04.2018 */
 	- include dbo.jobExecutionStatisticsHistory in internal retention policy
-	- health-check: do not show saved detailed information in the daily report for inactive instances
+	- health check: do not show saved detailed information in the daily report for inactive instances
+
+/* 24.04.2018 */
+	- maintenance plan: fix defect when rebuilding heaps with ONLINE=ON

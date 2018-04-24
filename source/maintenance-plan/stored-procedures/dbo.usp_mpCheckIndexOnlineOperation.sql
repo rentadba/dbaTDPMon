@@ -161,7 +161,7 @@ IF @serverVersionNum < 11
 -----------------------------------------------------------------------------------------
 /* check if table definition contains a LOB data type */
 -----------------------------------------------------------------------------------------
-IF @serverVersionNum < 11
+IF @serverVersionNum < 11 OR @indexID = 0 /* heap */
 	begin
 		IF @indexID IS NULL
 			begin
@@ -184,7 +184,7 @@ IF @serverVersionNum < 11
 				SELECT TOP 1 @indexID = [value] FROM @onlineConstraintCheck
 			end
 
-		IF @indexID=1
+		IF @indexID IN (0, 1)
 			begin
 				SET @queryToRun = N''
 				SET @queryToRun = @queryToRun + CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
