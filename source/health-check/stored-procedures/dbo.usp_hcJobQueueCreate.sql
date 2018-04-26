@@ -84,10 +84,10 @@ END CATCH
 SET @configParallelJobs = ISNULL(@configParallelJobs, 1)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-SELECT @instanceID = [id]
+SELECT TOP 1 @instanceID = [id]
 FROM [dbo].[catalogInstanceNames]
-WHERE [project_id] = @projectID
-		AND [name] = @@SERVERNAME
+WHERE [name] = @@SERVERNAME
+		--AND [project_id] = @projectID
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 DECLARE crsCollectorDescriptor CURSOR LOCAL FAST_FORWARD FOR	SELECT x.[descriptor], it.[id] AS [task_id]

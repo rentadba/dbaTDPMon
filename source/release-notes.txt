@@ -696,3 +696,6 @@
 
 /* 24.04.2018 */
 	- maintenance plan: fix defect when rebuilding heaps with ONLINE=ON
+
+/* 26.04.2018 */
+	- fix small defects related to easy of use on large deploymnets (health-check, maintenance-plan, job queueing)

@@ -17,7 +17,7 @@ GO
 CREATE TABLE [health-check].[statsDatabaseAlwaysOnDetails]
 (
 	[id]							[int]	 IDENTITY (1, 1)	NOT NULL,
-	[catalog_database_id]			[smallint]		NOT NULL,
+	[catalog_database_id]			[int]			NOT NULL,
 	[instance_id]					[smallint]		NOT NULL,
 	[cluster_name]					[sysname]		NOT NULL,
 	[ag_name]						[sysname]		NOT NULL,

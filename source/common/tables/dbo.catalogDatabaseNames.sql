@@ -17,7 +17,7 @@ GO
 
 CREATE TABLE [dbo].[catalogDatabaseNames] 
 (
-	[id]					[smallint] IDENTITY (1, 1)	NOT NULL,
+	[id]					[int]			IDENTITY (1, 1)	NOT NULL,
 	[instance_id]			[smallint]		NOT NULL,
 	[project_id]			[smallint]		NOT NULL,
 	[database_id]			[int]			NOT NULL,

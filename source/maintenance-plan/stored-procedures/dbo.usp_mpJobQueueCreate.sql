@@ -94,10 +94,10 @@ IF @projectID IS NULL
 	end
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-SELECT @instanceID = [id]
+SELECT TOP 1 @instanceID = [id]
 FROM [dbo].[catalogInstanceNames]
-WHERE [project_id] = @projectID
-		AND [name] = @@SERVERNAME
+WHERE [name] = @@SERVERNAME
+		--AND [project_id] = @projectID
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR	SELECT	cin.[instance_id], cin.[instance_name]

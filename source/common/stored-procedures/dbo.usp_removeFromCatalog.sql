@@ -93,6 +93,13 @@ BEGIN TRY
 				AND cin.[name] = @sqlServerName
 	
 		-----------------------------------------------------------------------------------------------------
+		DELETE jesh
+		FROM dbo.jobExecutionStatisticsHistory jesh
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = jesh.[project_id] AND cin.[id] = jesh.[instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[name] = @sqlServerName
+
+		-----------------------------------------------------------------------------------------------------
 		DELETE lem
 		FROM dbo.logEventMessages lem
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = lem.[project_id] AND cin.[id] = lem.[instance_id]

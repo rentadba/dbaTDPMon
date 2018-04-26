@@ -138,7 +138,7 @@ BEGIN TRY
 			EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		end
 
-	IF ISNULL(@dbFilter, '')='' SET @dbFilter = '%'
+	--IF ISNULL(@dbFilter, '')='' SET @dbFilter = '%'
 		
 	-----------------------------------------------------------------------------------------------------
 	--check if the connection to machine can be made & discover instance name

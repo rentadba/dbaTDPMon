@@ -485,11 +485,11 @@ EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrin
 DECLARE   @publisherInstanceID	[int]
 		, @currentInstanceID	[int]
 
-SELECT	@currentInstanceID = [id]
+SELECT	TOP 1 @currentInstanceID = [id]
 FROM	[dbo].[catalogInstanceNames] cin
 WHERE	cin.[active] = 1
-		AND cin.[project_id] = @projectID
 		AND cin.[name] = @@SERVERNAME
+		--AND cin.[project_id] = @projectID
 
 /* save the previous executions statistics */
 EXEC [dbo].[usp_jobExecutionSaveStatistics]	@projectCode		= @projectCode,

@@ -35,7 +35,7 @@ SET NOCOUNT ON
 DECLARE @projectID				[smallint],
 		@sqlServerName			[sysname],
 		@instanceID				[smallint],
-		@catalogDatabaseID		[smallint],
+		@catalogDatabaseID		[int],
 		@databaseID				[int],
 		@databaseName			[sysname],
 		@queryToRun				[nvarchar](4000),

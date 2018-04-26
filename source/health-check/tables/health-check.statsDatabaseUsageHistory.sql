@@ -17,7 +17,7 @@ GO
 CREATE TABLE [health-check].[statsDatabaseUsageHistory]
 (
 	[id]						[int]	 IDENTITY (1, 1)	NOT NULL,
-	[catalog_database_id]		[smallint]		NOT NULL,
+	[catalog_database_id]		[int]			NOT NULL,
 	[instance_id]				[smallint]		NOT NULL,
 	[data_size_mb]				[numeric](20,3)	NULL,
 	[data_space_used_percent]	[numeric](6,2)	NULL,

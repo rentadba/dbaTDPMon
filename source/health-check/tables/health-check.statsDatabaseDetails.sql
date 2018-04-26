@@ -17,7 +17,7 @@ GO
 CREATE TABLE [health-check].[statsDatabaseDetails]
 (
 	[id]						[int]	 IDENTITY (1, 1)	NOT NULL,
-	[catalog_database_id]		[smallint]		NOT NULL,
+	[catalog_database_id]		[int]			NOT NULL,
 	[instance_id]				[smallint]		NOT NULL,
 	[recovery_model]			[tinyint]		NULL,
 	[page_verify_option]		[tinyint]		NULL,

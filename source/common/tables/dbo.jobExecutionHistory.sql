@@ -46,16 +46,6 @@ CREATE TABLE [dbo].[jobExecutionHistory]
 	(
 		[id]
 	),
-	CONSTRAINT [FK_jobExecutionHistory_InstanceID_catalogInstanceNames] FOREIGN KEY 
-	(
-		[instance_id],
-		[project_id]
-	) 
-	REFERENCES [dbo].[catalogInstanceNames] 
-	(
-		[id],
-		[project_id]
-	),
 	CONSTRAINT [FK_jobExecutionHistory_ForInstanceID_catalogInstanceNames] FOREIGN KEY 
 	(
 		[for_instance_id],
