@@ -115,6 +115,7 @@ WHILE @@FETCH_STATUS=0
 		--refresh current server information on internal metadata tables
 		EXEC [dbo].[usp_refreshMachineCatalogs]	@projectCode	= @projectCode,
 												@sqlServerName	= @forSQLServerName,
+												@addNewDatabasesToProject = 0,
 												@debugMode		= @debugMode
 
 
