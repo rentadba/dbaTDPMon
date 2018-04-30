@@ -9,10 +9,11 @@ DROP PROCEDURE [dbo].[usp_refreshProjectCatalogsAndDiscovery]
 GO
 
 CREATE PROCEDURE [dbo].[usp_refreshProjectCatalogsAndDiscovery]
-		@projectCode		[varchar](32),
-		@runDiscovery		[bit]=0,	/* using sqlcmd -L*/
-		@enableXPCMDSHELL	[bit]=1,
-		@debugMode			[bit]=0
+		@projectCode				[varchar](32),
+		@runDiscovery				[bit] = 0,	/* using sqlcmd -L*/
+		@enableXPCMDSHELL			[bit] = 1,
+		@addNewDatabasesToProject	[bit] = 1,
+		@debugMode					[bit] = 0
 /* WITH ENCRYPTION */
 AS
 
@@ -143,9 +144,10 @@ IF @runDiscovery=1
 					end
 					
 				/* catalog the instance */
-				EXEC @instanceID = [dbo].[usp_refreshMachineCatalogs] 	@projectCode	= @projectCode,
-																		@sqlServerName	= @sqlServerName,
-																		@debugMode		= @debugMode
+				EXEC @instanceID = [dbo].[usp_refreshMachineCatalogs] 	@projectCode			  = @projectCode,
+																		@sqlServerName			  = @sqlServerName,
+																		@addNewDatabasesToProject = @addNewDatabasesToProject,
+																		@debugMode				  = @debugMode
 
 
 				INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
@@ -186,9 +188,10 @@ WHILE @@FETCH_STATUS=0
 			end
 					
 		/* update instance information */
-		EXEC [dbo].[usp_refreshMachineCatalogs] 	@projectCode	= @projectCode,
-													@sqlServerName	= @sqlServerName,
-													@debugMode		= @debugMode
+		EXEC [dbo].[usp_refreshMachineCatalogs] 	@projectCode			  = @projectCode,
+													@sqlServerName			  = @sqlServerName,
+													@addNewDatabasesToProject = @addNewDatabasesToProject,
+													@debugMode				  = @debugMode
 												
 		FETCH NEXT FROM crsDiscoveredServer INTO @sqlServerName, @existingServerID
 	end

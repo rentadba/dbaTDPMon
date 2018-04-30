@@ -9,9 +9,10 @@ DROP PROCEDURE [dbo].[usp_refreshMachineCatalogs]
 GO
 
 CREATE PROCEDURE [dbo].[usp_refreshMachineCatalogs]
-		@projectCode		[varchar](32)=NULL,
-		@sqlServerName		[sysname],
-		@debugMode			[bit] = 0
+		@projectCode				[varchar](32)=NULL,
+		@sqlServerName				[sysname],
+		@addNewDatabasesToProject	[bit] = 1,
+		@debugMode					[bit] = 0
 /* WITH ENCRYPTION */
 AS
 
@@ -138,7 +139,7 @@ BEGIN TRY
 			EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		end
 
-	--IF ISNULL(@dbFilter, '')='' SET @dbFilter = '%'
+	IF ISNULL(@dbFilter, '')='' SET @dbFilter = '%'
 		
 	-----------------------------------------------------------------------------------------------------
 	--check if the connection to machine can be made & discover instance name
@@ -517,23 +518,23 @@ BEGIN TRY
 			INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[name] = srcIN.[name] AND cin.[machine_id] = cmn.[id]
 		  ) AS src ON dest.[instance_id] = src.[instance_id] AND dest.[name] = src.[name];
 
-
-	INSERT INTO [dbo].[catalogDatabaseNames]([instance_id], [project_id], [database_id], [name], [state], [state_desc], [active])
-			SELECT src.[instance_id], @projectID, src.[database_id], src.[name], src.[state], src.[state_desc], 1
-			FROM (	
-					SELECT  cin.[id] AS [instance_id]
-						  , src.[name]
-						  , src.[database_id]
-						  , src.[state]
-						  , src.[state_desc]
-					FROM  #catalogDatabaseNames src
-					INNER JOIN #catalogMachineNames srcMn ON 1=1
-					INNER JOIN #catalogInstanceNames srcIN ON 1=1
-					INNER JOIN [dbo].[catalogMachineNames] cmn ON cmn.[name] = srcMn.[name] AND cmn.[project_id]=@projectID
-					INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[name] = srcIN.[name] AND cin.[machine_id] = cmn.[id]
-				  ) AS src
-			LEFT JOIN [dbo].[catalogDatabaseNames] AS dest ON dest.[instance_id] = src.[instance_id] AND dest.[name] = src.[name]
-			WHERE dest.[instance_id] IS NULL;
+	IF @addNewDatabasesToProject = 1
+		INSERT INTO [dbo].[catalogDatabaseNames]([instance_id], [project_id], [database_id], [name], [state], [state_desc], [active])
+				SELECT src.[instance_id], @projectID, src.[database_id], src.[name], src.[state], src.[state_desc], 1
+				FROM (	
+						SELECT  cin.[id] AS [instance_id]
+							  , src.[name]
+							  , src.[database_id]
+							  , src.[state]
+							  , src.[state_desc]
+						FROM  #catalogDatabaseNames src
+						INNER JOIN #catalogMachineNames srcMn ON 1=1
+						INNER JOIN #catalogInstanceNames srcIN ON 1=1
+						INNER JOIN [dbo].[catalogMachineNames] cmn ON cmn.[name] = srcMn.[name] AND cmn.[project_id]=@projectID
+						INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[name] = srcIN.[name] AND cin.[machine_id] = cmn.[id]
+					  ) AS src
+				LEFT JOIN [dbo].[catalogDatabaseNames] AS dest ON dest.[instance_id] = src.[instance_id] AND dest.[name] = src.[name]
+				WHERE dest.[instance_id] IS NULL;
 
 	SELECT TOP 1 @instanceID = cin.[id]
 	FROM  #catalogMachineNames srcMn

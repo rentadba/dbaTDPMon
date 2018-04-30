@@ -20,6 +20,7 @@ AS
 -- ============================================================================
 
 SELECT 	  cin.[project_id]		AS [project_id]
+		, cp.[code]				AS [project_code]
 		, cin.[id]				AS [instance_id]
 		, cin.[name]			AS [instance_name]
 		, cdn.[id]				AS [catalog_database_id]
@@ -30,5 +31,6 @@ SELECT 	  cin.[project_id]		AS [project_id]
 		, cdn.[state_desc] 
 FROM [dbo].[catalogInstanceNames]	cin	
 INNER JOIN [dbo].[catalogDatabaseNames] cdn ON cin.[id] = cdn.[instance_id] AND cin.[project_id] = cdn.[project_id]
+INNER JOIN [dbo].[catalogProjects] cp ON cp.[id] = cin.[project_id]
 GO
 

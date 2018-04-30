@@ -47,7 +47,8 @@ DECLARE @currentRunning 		[int],
 		@lastStepSuccesAction	[int],
 		@lastStepFailureAction	[int],
 		@tmpServer				[varchar](1024),
-		@queryToRun				[nvarchar](4000)
+		@queryToRun				[nvarchar](4000),
+		@Error					[int]
 
 SET NOCOUNT ON
 
@@ -285,7 +286,7 @@ IF @startJob=1
 						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 						EXEC (@queryToRun)
 
-						IF @@Error<>0
+						IF @@ERROR<>0
 							begin
 								SET @strMessage = 'Failed in modifying job''s execution Stop Step.'
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
@@ -310,12 +311,21 @@ IF @startJob=1
 										SET @queryToRun='[' + @sqlServerName + '].[msdb].[dbo].[sp_start_job] @job_id=''' + @jobID + ''', @step_name=''' + [dbo].[ufn_getObjectQuoteName](@stepName, 'sql') + ''''
 										IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-										EXEC (@queryToRun)
-										IF @@Error<>0
-											begin
-												SET @strMessage = 'Failed in starting job.'
-												EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
-											end
+										BEGIN TRY
+											EXEC (@queryToRun)	
+											SET @Error = @@ERROR
+										END TRY
+										BEGIN CATCH
+											SET @Error = @@ERROR
+											SET @queryToRun= ERROR_MESSAGE()
+											EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
+										END CATCH
+										
+										IF @Error<>0
+												begin
+													SET @strMessage = 'Failed in starting job.'
+													EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+												end
 										ELSE
 											begin
 												IF @jobQueueID IS NOT NULL AND EXISTS(SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='jobExecutionQueue')
@@ -373,7 +383,7 @@ IF @startJob=1
 						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 						EXEC(@queryToRun)
-						IF @@Error<>0
+						IF @@ERROR<>0
 							begin
 								SET @strMessage = 'Failed in modifying back job''s execution Stop Step.'
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
@@ -391,7 +401,7 @@ IF @startJob=1
 				IF OBJECT_ID('#tmpCheckParameters') IS NOT NULL DROP TABLE #tmpCheckParameters
 				RETURN 1
 			end
-		IF @@Error <> 0
+		IF @@ERROR <> 0
 			begin
 				SET @strMessage= 'Execution failed. Please notify your Database Administrator.'
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
