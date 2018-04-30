@@ -323,34 +323,56 @@ WHILE @@FETCH_STATUS=0
 
 				IF @jobCurrentRunning=1
 					begin
-						SET @queryToRun = 'Job is still running. Stopping...'
+						/* wait / retry mechanism for high active systems */
+						SET @queryToRun = 'Job is still running. Waiting ' + @waitForDelay + ' before stopping it...'
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-						SET @retryAttempts = 1
-						WHILE @jobCurrentRunning = 1 AND @retryAttempts <= @configMaxNumberOfRetries
+						WAITFOR DELAY @waitForDelay
+
+						SET @jobCurrentRunning = 0
+						EXEC  dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
+																@jobName				= @jobName,
+																@strMessage				= DEFAULT,	
+																@currentRunning			= @jobCurrentRunning OUTPUT,			
+																@lastExecutionStatus	= DEFAULT,			
+																@lastExecutionDate		= DEFAULT,		
+																@lastExecutionTime 		= DEFAULT,	
+																@runningTimeSec			= DEFAULT,
+																@selectResult			= DEFAULT,
+																@extentedStepDetails	= DEFAULT,		
+																@debugMode				= DEFAULT
+						IF @jobCurrentRunning=1
 							begin
+								SET @queryToRun = 'Job is still running. Stopping...'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 								EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
 																@jobName		= @jobName,
 																@operation		= 'Stop',
 																@dbName			= @jobDBName, 
 																@jobStepName 	= @jobStepName,
 																@debugMode		= @debugMode
-								WAITFOR DELAY @waitForDelay
 
-								SET @jobCurrentRunning = 0
-								EXEC  dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
-																		@jobName				= @jobName,
-																		@strMessage				= DEFAULT,	
-																		@currentRunning			= @jobCurrentRunning OUTPUT,			
-																		@lastExecutionStatus	= DEFAULT,			
-																		@lastExecutionDate		= DEFAULT,		
-																		@lastExecutionTime 		= DEFAULT,	
-																		@runningTimeSec			= DEFAULT,
-																		@selectResult			= DEFAULT,
-																		@extentedStepDetails	= DEFAULT,		
-																		@debugMode				= DEFAULT
+								SET @retryAttempts = 1
+								WHILE @jobCurrentRunning = 1 AND @retryAttempts <= @configMaxNumberOfRetries
+									begin
+										WAITFOR DELAY @waitForDelay
+
+										SET @jobCurrentRunning = 0
+										EXEC  dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
+																				@jobName				= @jobName,
+																				@strMessage				= DEFAULT,	
+																				@currentRunning			= @jobCurrentRunning OUTPUT,			
+																				@lastExecutionStatus	= DEFAULT,			
+																				@lastExecutionDate		= DEFAULT,		
+																				@lastExecutionTime 		= DEFAULT,	
+																				@runningTimeSec			= DEFAULT,
+																				@selectResult			= DEFAULT,
+																				@extentedStepDetails	= DEFAULT,		
+																				@debugMode				= DEFAULT
 						
-								SET @retryAttempts = @retryAttempts + 1
+										SET @retryAttempts = @retryAttempts + 1
+								end
 							end
 					end
 
