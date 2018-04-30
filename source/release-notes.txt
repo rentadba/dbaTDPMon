@@ -699,3 +699,10 @@
 
 /* 26.04.2018 */
 	- fix small defects related to easy of use on large deploymnets (health-check, maintenance-plan, job queueing)
+
+/* 27.04.2018 */
+	- fix defects on SQL Agent job handling: start/stop under high concurency
+
+/* 30.04.2018 */
+	- maintenance-plan: fix date/time value used for file backup when running against a remote server
+	- monitoring: allow SQL Agent jobs to be excluded from transaction status alerts
