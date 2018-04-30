@@ -620,7 +620,12 @@ IF ISNULL(@retentionDays, 0) <> 0
 --run a full database backup, in order to perform an additional diff or log backup
 IF @optionForceChangeBackupType=1
 	begin
-		SET @currentDate = GETDATE()
+		SET @queryToRun='SELECT GETDATE() AS [server_date]'
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		SET @queryToRun = 'SELECT @currentDate = [server_date] FROM (' + @queryToRun + ')Y'
+		SET @queryParameters = '@currentDate [datetime] OUTPUT'
+		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 1, @messageTreelevel = 0, @stopExecution=0
+		EXEC sp_executesql @queryToRun, @queryParameters, @currentDate = @currentDate OUT
 		
 		IF @agName IS NULL
 			SET @backupFileName = dbo.[ufn_mpBackupBuildFileName](@sqlServerName, @dbName, 'full', @currentDate)
@@ -675,7 +680,13 @@ IF @optionForceChangeBackupType=1
 	end
 
 --------------------------------------------------------------------------------------------------
-SET @currentDate = GETDATE()
+SET @queryToRun='SELECT GETDATE() AS [server_date]'
+SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+SET @queryToRun = 'SELECT @currentDate = [server_date] FROM (' + @queryToRun + ')Y'
+SET @queryParameters = '@currentDate [datetime] OUTPUT'
+IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 1, @messageTreelevel = 0, @stopExecution=0
+EXEC sp_executesql @queryToRun, @queryParameters, @currentDate = @currentDate OUT
+
 IF @agName IS NULL
 	SET @backupFileName = dbo.[ufn_mpBackupBuildFileName](@sqlServerName, @dbName, @backupType, @currentDate)
 ELSE
