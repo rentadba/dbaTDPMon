@@ -706,3 +706,10 @@
 /* 30.04.2018 */
 	- maintenance-plan: fix date/time value used for file backup when running against a remote server
 	- monitoring: allow SQL Agent jobs to be excluded from transaction status alerts
+
+/*----------------------------------------------------------------------*/
+/* May 2018 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 01.05.2018 */
+	- maintenance-plan: fix defect when generating job queue on a a very large number of databases
+	- add maximum value for how many internal jobs can be started on a system (Maximum SQL Agent jobs running property)

@@ -43,6 +43,7 @@ DECLARE   @projectID				[smallint]
 		, @configMaxNumberOfRetries	[smallint]
 		, @configFailMasterJob		[bit]
 		, @configMaxSQLJobsOneMin	[smallint]
+		, @configMaxSQLJobsRunning	[smallint]
 		, @runningJobs				[smallint]
 		, @executedJobs				[smallint]
 		, @jobQueueCount			[smallint]
@@ -64,6 +65,13 @@ DECLARE   @ErrorNumber [int]
 		, @ErrorSeverity [int]
 		, @ErrorState [int]
 
+DECLARE	  @serverEdition			[sysname]
+		, @serverVersionStr			[sysname]
+		, @serverVersionNum			[numeric](9,6)
+		, @nestedExecutionLevel		[tinyint]
+
+DECLARE	  @queryToRun  			[nvarchar](2048)
+		, @queryParameters		[nvarchar](512)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default projectCode
@@ -149,6 +157,20 @@ END CATCH
 SET @configMaxSQLJobsOneMin = ISNULL(@configMaxSQLJobsOneMin, 60)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
+--get the maximum numbers of jobs that can be running, across all projects/tasks
+BEGIN TRY
+	SELECT	@configMaxSQLJobsRunning = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = N'Maximum SQL Agent jobs running (0=unlimited)'
+			AND [module] = 'common'
+END TRY
+BEGIN CATCH
+	SET @configMaxSQLJobsRunning = 0
+END CATCH
+
+SET @configMaxSQLJobsRunning = ISNULL(@configMaxSQLJobsRunning, 0)
+
+------------------------------------------------------------------------------------------------------------------------------------------
 --get the number of retries in case of a failure
 BEGIN TRY
 	SELECT	@configFailMasterJob = CASE WHEN lower([value])='true' THEN 1 ELSE 0 END
@@ -187,7 +209,6 @@ SET @defaultLogFileLocation = [dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAM
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --create folder on disk
-DECLARE @queryToRun nvarchar(1024)
 SET @queryToRun = N'EXEC ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @@SERVERNAME + N''',
 																			@folderName		= ''' + @defaultLogFileLocation + N''',
 																			@executionLevel	= 1,
@@ -238,6 +259,16 @@ FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStep
 SET @executedJobs = 1
 WHILE @@FETCH_STATUS=0
 	begin
+		------------------------------------------------------------------------------------------------------------------------------------------
+		--get destination server running version/edition
+		EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName		= @sqlServerName,
+												@serverEdition		= @serverEdition OUT,
+												@serverVersionStr	= @serverVersionStr OUT,
+												@serverVersionNum	= @serverVersionNum OUT,
+												@executionLevel		= 0,
+												@debugMode			= 1
+
+
 		SET @strMessage='Executing job# : ' + CAST(@executedJobs AS [varchar]) + ' / ' + CAST(@jobQueueCount AS [varchar])
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
@@ -409,6 +440,43 @@ WHILE @@FETCH_STATUS=0
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 						WAITFOR DELAY '00:00:01'
+					end
+
+				---------------------------------------------------------------------------------------------------
+				/* check how many jobs are running. if cap is set, waiting for jobs to complete */
+				IF @configMaxSQLJobsRunning > 0 AND @serialExecutionMode = 0 AND @serverVersionNum > 10 
+					begin
+						SET @runningJobs = @configMaxSQLJobsRunning
+						WHILE @runningJobs >= @configMaxSQLJobsRunning
+							begin
+								SET @strMessage='Checking Maximum SQL Agent jobs running ...'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+								SET @queryToRun = N''
+								SET @queryToRun = @queryToRun + N'	SELECT	j.[name] 
+																	FROM  [msdb].[dbo].[sysjobactivity] ja WITH (NOLOCK)
+																	LEFT  JOIN [msdb].[dbo].[sysjobhistory] jh WITH (NOLOCK) ON ja.[job_history_id] = jh.[instance_id]
+																	INNER JOIN [msdb].[dbo].[sysjobs] j WITH (NOLOCK) ON ja.[job_id] = j.[job_id]
+																	INNER JOIN [msdb].[dbo].[sysjobsteps] js WITH (NOLOCK) ON ja.[job_id] = js.[job_id] AND ISNULL(ja.[last_executed_step_id], 0)+ 1  = js.[step_id]
+																	INNER JOIN [dbo].[jobExecutionQueue] jeq WITH (NOLOCK) ON j.[name] = jeq.[job_name]
+																	WHERE	ja.[session_id] = (
+																								SELECT TOP 1 [session_id] 
+																								FROM [msdb].[dbo].[syssessions] 
+																								ORDER BY [agent_start_date] DESC
+																								)
+																			AND ja.[start_execution_date] IS NOT NULL
+																			AND ja.[stop_execution_date] IS NULL'
+								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+								SET @queryToRun = N'SELECT @currentRunningJobs = COUNT(*)
+													FROM (' + @queryToRun + N') j
+													INNER JOIN [dbo].[jobExecutionQueue] jeq WITH (NOLOCK) ON j.[name] = jeq.[job_name]'
+								SET @queryParameters = '@currentRunningJobs [int] OUTPUT'
+								IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+								EXEC sp_executesql @queryToRun, @queryParameters, @currentRunningJobs = @runningJobs OUT
+
+								IF @runningJobs >= @configMaxSQLJobsRunning
+									WAITFOR DELAY @waitForDelay
+							end
 					end
 
 				---------------------------------------------------------------------------------------------------
