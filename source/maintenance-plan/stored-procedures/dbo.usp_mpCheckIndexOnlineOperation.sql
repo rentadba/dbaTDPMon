@@ -121,6 +121,7 @@ IF (SELECT COUNT(*) FROM @onlineConstraintCheck) > 0
 
 -----------------------------------------------------------------------------------------
 /* check if index definition contains a LOB data type */
+/* Nonunique nonclustered indexes can be created online when the table contains LOB data types but none of these columns are used in the index definition as either key or nonkey (included) columns.*/
 -----------------------------------------------------------------------------------------
 IF @serverVersionNum < 11
 	begin
@@ -160,8 +161,9 @@ IF @serverVersionNum < 11
 
 -----------------------------------------------------------------------------------------
 /* check if table definition contains a LOB data type */
+/* Clustered indexes must be created, rebuilt, or dropped offline when the underlying table contains the following large object (LOB) data types: image, ntext, and text. */
 -----------------------------------------------------------------------------------------
-IF @serverVersionNum < 11 OR @indexID = 0 /* heap */
+IF @serverVersionNum < 11 OR @indexID In (0, 1)
 	begin
 		IF @indexID IS NULL
 			begin
