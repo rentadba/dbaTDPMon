@@ -713,3 +713,6 @@
 /* 01.05.2018 */
 	- maintenance-plan: fix defect when generating job queue on a a very large number of databases
 	- add maximum value for how many internal jobs can be started on a system (Maximum SQL Agent jobs running property)
+
+/* 02.05.2018 */
+	- fix defect when forcing to stop a running SQL Agent job

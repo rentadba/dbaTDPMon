@@ -266,7 +266,7 @@ WHILE @@FETCH_STATUS=0
 												@serverVersionStr	= @serverVersionStr OUT,
 												@serverVersionNum	= @serverVersionNum OUT,
 												@executionLevel		= 0,
-												@debugMode			= 1
+												@debugMode			= @debugMode
 
 
 		SET @strMessage='Executing job# : ' + CAST(@executedJobs AS [varchar]) + ' / ' + CAST(@jobQueueCount AS [varchar])
@@ -458,7 +458,6 @@ WHILE @@FETCH_STATUS=0
 																	LEFT  JOIN [msdb].[dbo].[sysjobhistory] jh WITH (NOLOCK) ON ja.[job_history_id] = jh.[instance_id]
 																	INNER JOIN [msdb].[dbo].[sysjobs] j WITH (NOLOCK) ON ja.[job_id] = j.[job_id]
 																	INNER JOIN [msdb].[dbo].[sysjobsteps] js WITH (NOLOCK) ON ja.[job_id] = js.[job_id] AND ISNULL(ja.[last_executed_step_id], 0)+ 1  = js.[step_id]
-																	INNER JOIN [dbo].[jobExecutionQueue] jeq WITH (NOLOCK) ON j.[name] = jeq.[job_name]
 																	WHERE	ja.[session_id] = (
 																								SELECT TOP 1 [session_id] 
 																								FROM [msdb].[dbo].[syssessions] 
