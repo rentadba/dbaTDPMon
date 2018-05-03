@@ -449,9 +449,6 @@ WHILE @@FETCH_STATUS=0
 						SET @runningJobs = @configMaxSQLJobsRunning
 						WHILE @runningJobs >= @configMaxSQLJobsRunning
 							begin
-								SET @strMessage='Checking Maximum SQL Agent jobs running ...'
-								EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
 								SET @queryToRun = N''
 								SET @queryToRun = @queryToRun + N'	SELECT	j.[name] 
 																	FROM  [msdb].[dbo].[sysjobactivity] ja WITH (NOLOCK)
@@ -474,7 +471,11 @@ WHILE @@FETCH_STATUS=0
 								EXEC sp_executesql @queryToRun, @queryParameters, @currentRunningJobs = @runningJobs OUT
 
 								IF @runningJobs >= @configMaxSQLJobsRunning
-									WAITFOR DELAY @waitForDelay
+									begin
+										SET @strMessage='Warning: Maximum SQL Agent jobs running limit reached. Waiting for some job(s) to complete.'
+										EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+										WAITFOR DELAY @waitForDelay
+									end
 							end
 					end
 
