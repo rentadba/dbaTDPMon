@@ -50,7 +50,7 @@ AS
 --						 2	- Rebuild heavy fragmented indexes (ALTER INDEX REBUILD)						(default)
 --							  should be performed daily
 --					     4  - Rebuild all indexes (ALTER INDEX REBUILD)
---						 8  - Update statistics for table (UPDATE STATISTICS)								(default)
+--						 8  - Update/create statistics for table (UPDATE STATISTICS)						(default)
 --							  should be performed daily
 --						16  - Rebuild heap tables (SQL versions +2K5 only)									(default)
 --		@flgOptions		 1  - Compact large objects (LOB) (default)
@@ -365,7 +365,52 @@ CREATE TABLE #incrementalStatisticsList (
 										)
 
 ---------------------------------------------------------------------------------------------
+IF object_id('tempdb..#objectsInOfflineFileGroups') IS NOT NULL 
+	DROP TABLE #objectsInOfflineFileGroups
+
+CREATE TABLE #objectsInOfflineFileGroups (
+											[object_id]			[int],
+											[index_id]			[int],										
+											[filegroup_name]	[sysname]
+										 )
+
+---------------------------------------------------------------------------------------------
 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+--------------------------------------------------------------------------------------------------
+--get objects for which maintenance cannot be perform as the filegroup is offline
+--------------------------------------------------------------------------------------------------
+IF (@serverVersionNum >= 9)
+	begin
+		SET @queryToRun=N'Create list of "offline" tables/indexes ...' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		SET @queryToRun = N''				
+		SET @queryToRun = @queryToRun + 
+							CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
+							SELECT si.[object_id], si.[index_id], df.[name]
+							FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[indexes]		si
+							INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects]	ob	ON ob.[object_id] = si.[object_id]
+							INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]	sc	ON sc.[schema_id] = ob.[schema_id]
+							INNER JOIN  (	/* "offline" filegroups */
+											SELECT df.[data_space_id], ds.[name]
+											FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[database_files] df
+											INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[data_spaces] ds ON ds.[data_space_id] = df.[data_space_id]
+											LEFT JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[database_files] df2 ON df2.[data_space_id] = df.[data_space_id] AND df2.[state_desc] = ''ONLINE''
+											WHERE df.[state_desc]<>''ONLINE''
+													AND df2.[file_id] IS NULL
+										)df ON si.[data_space_id] = df.[data_space_id]
+							WHERE	ob.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+									AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
+									AND si.[is_disabled] = 0
+									AND ob.[type] IN (''U'', ''V'')'
+
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+		INSERT	INTO #objectsInOfflineFileGroups([object_id], [index_id], [filegroup_name])
+				EXEC (@queryToRun)	
+	end
 
 --------------------------------------------------------------------------------------------------
 --16 - get current heap tables list
@@ -454,6 +499,12 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 		EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
 														, @dbName = @dbName
 														, @flgActions = @flgActions
+
+		--delete entries which are for objects in "offline" filegroups
+		DELETE dtl
+		FROM #databaseObjectsWithIndexList dtl
+		INNER JOIN #objectsInOfflineFileGroups oofg ON dtl.[object_id] = oofg.[object_id] 
+													AND dtl.[index_id] = oofg.[index_id]
 	end
 
 
@@ -730,6 +781,12 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 				EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
 																, @dbName = @dbName
 																, @flgActions = @flgActions
+
+				--delete entries which are for objects in "offline" filegroups
+				DELETE dtl
+				FROM #databaseObjectsWithIndexList dtl
+				INNER JOIN #objectsInOfflineFileGroups oofg ON dtl.[object_id] = oofg.[object_id] 
+															AND dtl.[index_id] = oofg.[index_id]
 			end
 	end
 
@@ -994,6 +1051,12 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
 																, @dbName = @dbName
 																, @flgActions = @flgActions
+
+				--delete entries which are for objects in "offline" filegroups
+				DELETE dtl
+				FROM #databaseObjectsWithStatisticsList dtl
+				INNER JOIN #objectsInOfflineFileGroups oofg ON dtl.[object_id] = oofg.[object_id] 
+															AND dtl.[stats_id] = oofg.[index_id]
 			end
 	end
 
@@ -1960,6 +2023,10 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 					end
 				ELSE
 					SET @missingColumnStatsCounter = 1
+
+				/* detect if sp_createstats should be executed: check for objects in "offline" filegroups */
+				IF @serverVersionNum >= 9 AND EXISTS(SELECT * FROM #objectsInOfflineFileGroups)
+						SET @missingColumnStatsCounter = 0
 
 				IF @missingColumnStatsCounter > 0
 					begin
