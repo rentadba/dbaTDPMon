@@ -1917,8 +1917,10 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 								IF @statsSamplePercent = 100
 									SET @queryToRun=@queryToRun + N' WITH FULLSCAN'
 
-						/* starting with SQL Server 2017 CU3, MAXDOP option is available for UPDATE STATISTICS: https://docs.microsoft.com/en-us/sql/t-sql/statements/update-statistics-transact-sql?view=sql-server-2017 */
-						IF @serverVersionNum >= 14.03015
+						/* starting with SQL Server 2017 CU3 and SQL Server 2016 SP2
+							MAXDOP option is available for UPDATE STATISTICS: https://docs.microsoft.com/en-us/sql/t-sql/statements/update-statistics-transact-sql?view=sql-server-2017 
+						*/
+						IF @serverVersionNum >= 14.03015 OR (@serverVersionNum >= 13.05026 AND @serverVersionNum < 14)
 							begin
 								IF CHARINDEX(' WITH ', @queryToRun) = 0
 									SET @queryToRun = @queryToRun + ' WITH '
