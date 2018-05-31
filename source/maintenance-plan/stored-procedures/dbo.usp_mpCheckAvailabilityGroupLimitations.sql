@@ -360,7 +360,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 								/* check if there are secondary replicas available to perform the log backup */
 								DECLARE @agAvailableSecondaryReplicas [smallint]
 
-								SET @queryToRun = N'SELECT @agAvailableSecondaryReplicas = COUNT(*)
+								SET @queryToRun = N'SELECT COUNT(*) AS  [count_replicas]
 													FROM sys.dm_hadr_database_replica_states hdrs
 													INNER JOIN sys.availability_replicas ar ON ar.[replica_id]=hdrs.[replica_id]
 													INNER JOIN sys.availability_databases_cluster adc ON adc.[group_id]=hdrs.[group_id] AND adc.[group_database_id]=hdrs.[group_database_id]
@@ -370,8 +370,9 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 													WHERE	adc.[database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
 															AND hdrs.[synchronization_state_desc] IN (''SYNCHRONIZED'', ''SYNCHRONIZING'')
 															AND ars.[role_desc] = ''SECONDARY'''
-
 								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+								SET @queryToRun = N'SELECT @agAvailableSecondaryReplicas = [count_replicas]
+													FROM (' + @queryToRun + ')z'
 
 								SET @queryParameters = N'@agAvailableSecondaryReplicas [smallint] OUTPUT'
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0

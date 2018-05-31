@@ -345,7 +345,6 @@ IF @serverVersionNum >= 11
 IF @agStopLimit <> 0
 	RETURN 0
 
-select @clusterName
 --------------------------------------------------------------------------------------------------
 --check recovery model for database. transaction log backup is allowed only for FULL
 --if force option is selected, for SIMPLE recovery model, backup type will be changed to diff
