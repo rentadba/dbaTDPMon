@@ -101,7 +101,7 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
-DECLARE @agName				[sysname],
+DECLARE @clusterName		[sysname],
 		@agInstanceRoleDesc	[sysname],
 		@agStopLimit		[int],
 		@actionType			[sysname],
@@ -128,7 +128,7 @@ IF @serverVersionNum >= 11 AND @flgActions IS NOT NULL
 																			@actionType			= @actionType,
 																			@flgActions			= @flgActions,
 																			@flgOptions			= @flgOptions OUTPUT,
-																			@agName				= @agName OUTPUT,
+																			@clusterName		= @clusterName OUTPUT,
 																			@agInstanceRoleDesc = @agInstanceRoleDesc OUTPUT,
 																			@executionLevel		= @executionLevel,
 																			@debugMode			= @debugMode

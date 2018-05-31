@@ -16,7 +16,7 @@ CREATE PROCEDURE [dbo].[usp_mpCheckAvailabilityGroupLimitations]
 		@actionType			[sysname],
 		@flgActions			[smallint]	= 0,
 		@flgOptions			[int]	  OUTPUT,
-		@agName				[sysname] OUTPUT,
+		@clusterName		[sysname] OUTPUT,
 		@agInstanceRoleDesc	[sysname] OUTPUT,
 		@executionLevel		[tinyint]	= 0,
 		@debugMode			[bit]		= 0
@@ -35,13 +35,14 @@ DECLARE		@queryToRun  					[nvarchar](2048),
 SET @nestedExecutionLevel = @executionLevel + 1
 
 --------------------------------------------------------------------------------------------------
-DECLARE @clusterName				 [sysname],		
+DECLARE @agName						 [sysname],		
 		@agSynchronizationState		 [sysname],
 		@agPreferredBackupReplica	 [bit],
 		@agAutomatedBackupPreference [tinyint],
 		@agReadableSecondary		 [sysname]
 
 SET @agName = NULL
+SET @clusterName = NULL
 
 /* get cluster name */
 SET @queryToRun = N'SELECT [cluster_name] FROM sys.dm_hadr_cluster'
@@ -54,6 +55,7 @@ SET @queryParameters = N'@clusterName [sysname] OUTPUT'
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 EXEC sp_executesql @queryToRun, @queryParameters, @clusterName = @clusterName OUTPUT
+IF @clusterName = '' SET @clusterName = NULL
 
 
 /* availability group configuration */
@@ -476,11 +478,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 						RETURN 1
 
 					end
-
-				SET @agName = @clusterName + '$' + @agName
 			end
-		ELSE
-			SET @agName=NULL
 	end
 
 RETURN 0

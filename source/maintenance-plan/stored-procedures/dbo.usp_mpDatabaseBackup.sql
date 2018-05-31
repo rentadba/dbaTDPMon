@@ -325,7 +325,7 @@ IF @flgOptions & 512 = 512
 
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
-DECLARE @agName				[sysname],
+DECLARE @clusterName		[sysname],
 		@agInstanceRoleDesc	[sysname],
 		@agStopLimit		[int]
 
@@ -337,14 +337,15 @@ IF @serverVersionNum >= 11
 																		@actionType			= @backupType,
 																		@flgActions			= @flgActions,
 																		@flgOptions			= @flgOptions OUTPUT,
-																		@agName				= @agName OUTPUT,
+																		@clusterName		= @clusterName OUTPUT,
 																		@agInstanceRoleDesc = @agInstanceRoleDesc OUTPUT,
 																		@executionLevel		= @executionLevel,
 																		@debugMode			= @debugMode
 
 IF @agStopLimit <> 0
 	RETURN 0
-																				
+
+select @clusterName
 --------------------------------------------------------------------------------------------------
 --check recovery model for database. transaction log backup is allowed only for FULL
 --if force option is selected, for SIMPLE recovery model, backup type will be changed to diff
@@ -391,10 +392,10 @@ IF NOT (@serverVersionNum >= 14 AND @hostPlatform='linux' )
 	begin
 		--create destination path: <@backupLocation>\@sqlServerName\@dbName
 		IF RIGHT(@backupLocation, 1)<>'\' SET @backupLocation = @backupLocation + N'\'
-		IF @agName IS NULL
+		IF @clusterName IS NULL
 			SET @backupLocation = @backupLocation + REPLACE(@sqlServerName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'filename') + '\' ELSE '' END
 		ELSE
-			SET @backupLocation = @backupLocation + REPLACE(@agName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'filename') + '\' ELSE '' END
+			SET @backupLocation = @backupLocation + REPLACE(@clusterName, '\', '$') + '\' + CASE WHEN @flgOptions & 64 = 64 THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'filename') + '\' ELSE '' END
 		SET @backupLocation = SUBSTRING(@backupLocation, 1, 2) + REPLACE(REPLACE(REPLACE(REPLACE(SUBSTRING(@backupLocation, 3, LEN(@backupLocation)), '<', '_'), '>', '_'), ':', '_'), '"', '_')
 
 		SET @backupLocation = [dbo].[ufn_formatPlatformSpecificPath](@sqlServerName, @backupLocation)
@@ -482,7 +483,7 @@ IF @flgActions & 4 = 4 AND @flgOptions & 8192 = 8192
 
 --check if another backup is needed (full) / partially applicable to AlwaysOn Availability Groups
 SET @optionForceChangeBackupType=0
-IF @flgOptions & 8 = 8 AND (@agName IS NULL OR (@agName IS NOT NULL AND @agInstanceRoleDesc = 'PRIMARY')) AND @serverVersionNum >= 9
+IF @flgOptions & 8 = 8 AND (@clusterName IS NULL OR (@clusterName IS NOT NULL AND @agInstanceRoleDesc = 'PRIMARY')) AND @serverVersionNum >= 9
 	begin
 		--check for any full database backup (when differential should be made) or any full/incremental database backup (when transaction log should be made)
 		IF @flgActions & 2 = 2 OR @flgActions & 4 = 4
@@ -627,10 +628,10 @@ IF @optionForceChangeBackupType=1
 		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 1, @messageTreelevel = 0, @stopExecution=0
 		EXEC sp_executesql @queryToRun, @queryParameters, @currentDate = @currentDate OUT
 		
-		IF @agName IS NULL
+		IF @clusterName IS NULL
 			SET @backupFileName = dbo.[ufn_mpBackupBuildFileName](@sqlServerName, @dbName, 'full', @currentDate)
 		ELSE
-			SET @backupFileName = dbo.[ufn_mpBackupBuildFileName](@agName, @dbName, 'full', @currentDate)
+			SET @backupFileName = dbo.[ufn_mpBackupBuildFileName](@clusterName, @dbName, 'full', @currentDate)
 
 		--check for maximum length of the file path
 		--https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
@@ -687,10 +688,10 @@ SET @queryParameters = '@currentDate [datetime] OUTPUT'
 IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 1, @messageTreelevel = 0, @stopExecution=0
 EXEC sp_executesql @queryToRun, @queryParameters, @currentDate = @currentDate OUT
 
-IF @agName IS NULL
+IF @clusterName IS NULL
 	SET @backupFileName = dbo.[ufn_mpBackupBuildFileName](@sqlServerName, @dbName, @backupType, @currentDate)
 ELSE
-	SET @backupFileName = dbo.[ufn_mpBackupBuildFileName](@agName, @dbName, @backupType, @currentDate)
+	SET @backupFileName = dbo.[ufn_mpBackupBuildFileName](@clusterName, @dbName, @backupType, @currentDate)
 
 IF @flgActions & 1 = 1 
 	begin

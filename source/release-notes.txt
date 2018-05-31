@@ -725,3 +725,6 @@
 
 /* 30.05.2018 */
 	- replace EXEC() with EXEC sp_executesql to reduce the CPU usage for the dbaTDPMon utility
+
+/* 31.05.2018 */
+	- maintenance-plan: in an AlwaysOn Availability Group environment, save the database backups in ClusterName folder
