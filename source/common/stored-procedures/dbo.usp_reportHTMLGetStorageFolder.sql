@@ -33,7 +33,7 @@ DECLARE @ReturnValue		[int],			-- will contain 1 : Succes  -1 : Fail
 		@ErrNumber			[int],
 		@projectName		[nvarchar](128),
 		@instanceName		[sysname],
-		@queryToRun			[varchar](4000)
+		@queryToRun			[nvarchar](4000)
 
 SET NOCOUNT ON
 

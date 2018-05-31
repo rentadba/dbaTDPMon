@@ -54,7 +54,7 @@ SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @que
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 INSERT INTO @tableRowCount([row_count])
-		EXEC (@queryToRun)
+		EXEC sp_executesql  @queryToRun
 
 SELECT TOP 1 @recordCount = [row_count]
 FROM @tableRowCount

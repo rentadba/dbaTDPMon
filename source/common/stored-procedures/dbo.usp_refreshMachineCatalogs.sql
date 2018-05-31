@@ -158,7 +158,7 @@ BEGIN TRY
 
 	BEGIN TRY
 		INSERT	INTO #catalogInstanceNames([name], [version], [edition], [machine_name])
-				EXEC (@queryToRun)
+				EXEC sp_executesql @queryToRun
 		SET @isActive=1
 	END TRY
 	BEGIN CATCH
@@ -214,7 +214,7 @@ BEGIN TRY
 			
 			BEGIN TRY
 				INSERT	INTO #catalogMachineNames([name])
-						EXEC (@queryToRun)		
+						EXEC sp_executesql @queryToRun
 			END TRY
 			BEGIN CATCH
 				IF @debugMode=1 
@@ -241,7 +241,7 @@ BEGIN TRY
 
 					BEGIN TRY
 						INSERT	INTO #catalogMachineNames([name])
-								EXEC (@queryToRun)
+								EXEC sp_executesql @queryToRun
 					END TRY
 					BEGIN CATCH
 						SET @errMessage=ERROR_MESSAGE()
@@ -299,7 +299,7 @@ BEGIN TRY
 
 			BEGIN TRY
 				INSERT	INTO #catalogDatabaseNames([database_id], [name], [state], [state_desc])
-						EXEC (@queryToRun)		
+						EXEC sp_executesql @queryToRun
 			END TRY
 			BEGIN CATCH
 				SET @errMessage=ERROR_MESSAGE()
@@ -330,11 +330,11 @@ BEGIN TRY
 							SET @queryToRun = @queryToRun + N'DECLARE @cmdQuery [varchar](102); SET @cmdQuery=''wmic computersystem get Domain''; EXEC xp_cmdshell @cmdQuery;'
 			
 							IF @sqlServerName<>@@SERVERNAME
-								SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+								SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
 							IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 							INSERT	INTO #xpCMDShellOutput([output])
-									EXEC (@queryToRun)
+									EXEC sp_executesql @queryToRun
 									
 							UPDATE #xpCMDShellOutput SET [output]=REPLACE(REPLACE(REPLACE(LTRIM(RTRIM([output])), ' ', ''), CHAR(10), ''), CHAR(13), '')
 			
@@ -350,10 +350,10 @@ BEGIN TRY
 							SET @queryToRun = N''
 							SET @queryToRun = @queryToRun + N'SELECT DEFAULT_DOMAIN()';
 							IF @sqlServerName<>@@SERVERNAME
-							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
 							IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 							INSERT	INTO #xpCMDShellOutput([output])
-									EXEC (@queryToRun)
+									EXEC sp_executesql @queryToRun
 
 							SELECT TOP 1 @domainName = LOWER([output])
 							FROM #xpCMDShellOutput
@@ -389,7 +389,7 @@ BEGIN TRY
 					BEGIN TRY
 						TRUNCATE TABLE #xpCMDShellOutput
 						INSERT	INTO #xpCMDShellOutput([output])
-								EXEC (@queryToRun)
+								EXEC sp_executesql @queryToRun
 
 						SELECT @hostPlatform = LOWER([output])
 						FROM #xpCMDShellOutput

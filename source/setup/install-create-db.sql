@@ -40,7 +40,7 @@ SET @queryToRun = N'CREATE DATABASE [$(dbName)] ON  PRIMARY
  LOG ON 
 ( NAME = N''Log_1'', FILENAME = ''' + @logFilePath + N'$(dbName)_log_1.ldf'' , SIZE = 32MB , MAXSIZE = UNLIMITED , FILEGROWTH = 1024MB)'
 
-EXEC (@queryToRun)
+EXEC sp_executesql @queryToRun
 GO
 
 ALTER DATABASE [$(dbName)] SET ANSI_NULL_DEFAULT OFF 
@@ -109,31 +109,31 @@ DECLARE @queryToRun [nvarchar](1024)
 IF @SQLMajorVersion > 8
 	begin
 		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET DISABLE_BROKER'
-		EXEC (@queryToRun)
+		EXEC sp_executesql  @queryToRun
 
 		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET AUTO_UPDATE_STATISTICS_ASYNC OFF'
-		EXEC (@queryToRun)
+		EXEC sp_executesql  @queryToRun
 
 		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET DATE_CORRELATION_OPTIMIZATION OFF'
-		EXEC (@queryToRun)
+		EXEC sp_executesql  @queryToRun
 
 		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET TRUSTWORTHY OFF'
-		EXEC (@queryToRun)
+		EXEC sp_executesql  @queryToRun
 
 		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET ALLOW_SNAPSHOT_ISOLATION ON'
-		EXEC (@queryToRun)
+		EXEC sp_executesql  @queryToRun
 
 		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET PARAMETERIZATION SIMPLE'
-		EXEC (@queryToRun)
+		EXEC sp_executesql  @queryToRun
 
 		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET READ_COMMITTED_SNAPSHOT ON'
-		EXEC (@queryToRun)
+		EXEC sp_executesql  @queryToRun
 
 		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET PAGE_VERIFY CHECKSUM'
-		EXEC (@queryToRun)
+		EXEC sp_executesql  @queryToRun
 
 		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET DB_CHAINING OFF'
-		EXEC (@queryToRun)
+		EXEC sp_executesql  @queryToRun
 	end
 
 PRINT '"$(dbName)" database created.'

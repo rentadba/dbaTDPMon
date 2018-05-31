@@ -105,7 +105,7 @@ WHILE @@FETCH_STATUS=0
 		BEGIN TRY
 			TRUNCATE TABLE #checkIfObjectExists
 			INSERT	INTO #checkIfObjectExists([object_id])
-					EXEC (@queryToRun)
+					EXEC sp_executesql  @queryToRun
 		END TRY
 		BEGIN CATCH
 			SET @strMessage = ERROR_MESSAGE()
@@ -145,7 +145,7 @@ WHILE @@FETCH_STATUS=0
 
 				BEGIN TRY
 					INSERT	INTO [dbo].[logEventMessages]([remote_event_id], [project_id], [instance_id], [event_date_utc], [module], [parameters], [event_name], [database_name], [object_name], [child_object_name], [message], [send_email_to], [event_type], [is_email_sent], [flood_control])
-							EXEC (@queryToRun)
+							EXEC sp_executesql  @queryToRun
 				END TRY
 				BEGIN CATCH
 					SET @strMessage = ERROR_MESSAGE()

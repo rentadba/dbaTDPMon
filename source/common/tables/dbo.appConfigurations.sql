@@ -92,7 +92,7 @@ DECLARE @queryToRun [nvarchar](1024)
 IF @SQLMajorVersion>8
 	begin
 		SET @queryToRun=N'UPDATE [dbo].[appConfigurations] SET [value]=(select top 1 [name] from msdb.dbo.sysmail_profile) WHERE [name]=''Database Mail profile name to use for sending emails'''
-		EXEC (@queryToRun)
+		EXEC sp_executesql  @queryToRun
 	end
 GO
 

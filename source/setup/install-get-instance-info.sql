@@ -11,7 +11,7 @@ DECLARE   @dataFilePath		[nvarchar](260)
 		, @serverVersionStr	[sysname]
 		, @serverVersionNum	[numeric](9,6)
 		, @hostPlatform		[sysname]
-		, @queryToRun		[varchar](512)
+		, @queryToRun		[nvarchar](512)
 
 SELECT @serverVersionStr = CAST(SERVERPROPERTY('ProductVersion') AS [sysname]) 
 PRINT 'productVersion=' + CAST(SERVERPROPERTY('ProductVersion') AS [sysname]) 
@@ -31,7 +31,7 @@ IF @serverVersionNum >= 14
 		)
 
 		INSERT	INTO #tmpOutput([output])
-				EXEC (@queryToRun)
+				EXEC sp_executesql @queryToRun
 
 		SELECT @hostPlatform = LOWER([output])
 		FROM #tmpOutput

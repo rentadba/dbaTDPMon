@@ -25,7 +25,7 @@ SET NOCOUNT ON
 
 DECLARE @retentionDays	[int],
 		@customMessage	[varchar](256),
-		@queryToRun		[varchar](1024)
+		@queryToRun		[nvarchar](1024)
 
 SET NOCOUNT ON
 
@@ -80,7 +80,7 @@ IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[jobExecutionH
 				SET ROWCOUNT 4096
 				WHILE 1=1
 					begin
-						EXEC (@queryToRun)
+						EXEC sp_executesql  @queryToRun
 						
 						IF @@ROWCOUNT=0
 							BREAK
@@ -92,7 +92,7 @@ IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[jobExecutionH
 				SET ROWCOUNT 4096
 				WHILE 1=1
 					begin
-						EXEC (@queryToRun)
+						EXEC sp_executesql  @queryToRun
 						
 						IF @@ROWCOUNT=0
 							BREAK
@@ -124,7 +124,7 @@ IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[health-check].[stat
 				SET ROWCOUNT 4096
 				WHILE 1=1
 					begin
-						EXEC (@queryToRun)
+						EXEC sp_executesql  @queryToRun
 						
 						IF @@ROWCOUNT=0
 							BREAK

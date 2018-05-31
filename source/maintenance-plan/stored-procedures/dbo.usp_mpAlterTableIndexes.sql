@@ -141,7 +141,7 @@ BEGIN TRY
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		INSERT	INTO #tmpTableList ([table_schema], [table_name])
-				EXEC (@queryToRun)
+				EXEC sp_executesql  @queryToRun
 
 		---------------------------------------------------------------------------------------------
 		IF EXISTS(SELECT 1 FROM #tmpTableList)
@@ -216,7 +216,7 @@ BEGIN TRY
 
 						DELETE FROM @tmpTableToAlterIndexes
 						INSERT	INTO @tmpTableToAlterIndexes([index_id], [index_name], [index_type], [allow_page_locks], [is_disabled], [is_primary_xml], [has_dependent_fk], [is_replicated], [partition_number], [is_partitioned])
-								EXEC (@queryToRun)
+								EXEC sp_executesql  @queryToRun
 
 						FETCH NEXT FROM crsTableList INTO @crtTableSchema, @crtTableName
 					end
@@ -300,7 +300,7 @@ BEGIN TRY
 												IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 												INSERT INTO @DependentIndexes ([index_name], [is_primary_xml])
-													EXEC (@queryToRun)
+													EXEC sp_executesql  @queryToRun
 											end
 
 										--8  - Disable non-clustered index before rebuild (save space)
@@ -360,7 +360,7 @@ BEGIN TRY
 													IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 													INSERT INTO @DependentIndexes ([index_name])
-														EXEC (@queryToRun)
+														EXEC sp_executesql  @queryToRun
 												end
 
 											--8  - Disable non-clustered index before rebuild (save space)

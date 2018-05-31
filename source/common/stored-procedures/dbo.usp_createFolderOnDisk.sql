@@ -82,12 +82,12 @@ else
 		IF @serverVersionNum < 11	
 			SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC master.dbo.xp_fileexist ''''' + @folderName + ''''';'')x'
 		ELSE
-			SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''master.dbo.xp_fileexist ''''''''' + @folderName + ''''''''' '''') WITH RESULT SETS(([File Exists] [int], [File is a Directory] [int], [Parent Directory Exists] [int])) '')x'
+			SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''master.dbo.xp_fileexist ''''''''' + @folderName + ''''''''' '''') WITH RESULT SETS(([File Exists] [int], [File is a Directory] [int], [Parent Directory Exists] [int])) '')x'
 	end
 
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 INSERT	INTO #fileExists([file_exists], [file_is_directory], [parent_directory_exists])
-		EXEC (@queryToRun)
+		EXEC sp_executesql @queryToRun
 
 SET @warningMessage = N''
 IF (SELECT [parent_directory_exists] FROM #fileExists)=0
@@ -122,7 +122,7 @@ ELSE
 						/*-------------------------------------------------------------------------------------------------------------------------------*/
 						SET @queryToRun = N'[' + @sqlServerName + '].master.sys.xp_create_subdir N''' + @folderName + ''''
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-						EXEC (@queryToRun)
+						EXEC sp_executesql @queryToRun
 				
 						IF @@ERROR=0
 							SET @runWithxpCreateSubdir=1
@@ -191,13 +191,13 @@ ELSE
 						IF @serverVersionNum < 11	
 							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC master.dbo.xp_fileexist ''''' + @folderName + ''''';'')x'
 						ELSE
-							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''master.dbo.xp_fileexist ''''''''' + @folderName + ''''''''' '''') WITH RESULT SETS(([File Exists] [int], [File is a Directory] [int], [Parent Directory Exists] [int])) '')x'
+							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''master.dbo.xp_fileexist ''''''''' + @folderName + ''''''''' '''') WITH RESULT SETS(([File Exists] [int], [File is a Directory] [int], [Parent Directory Exists] [int])) '')x'
 					end
 
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 				DELETE FROM #fileExists
 				INSERT	INTO #fileExists([file_exists], [file_is_directory], [parent_directory_exists])
-						EXEC (@queryToRun)
+						EXEC sp_executesql @queryToRun
 
 				IF (SELECT [file_is_directory] FROM #fileExists)=0
 					SET @retryAttempts=@retryAttempts - 1

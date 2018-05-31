@@ -88,7 +88,7 @@ BEGIN TRY
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		INSERT	INTO #tmpTableList ([table_schema], [table_name])
-				EXEC (@queryToRun)
+				EXEC sp_executesql  @queryToRun
 
 		---------------------------------------------------------------------------------------------
 		IF EXISTS(SELECT 1 FROM #tmpTableList)
@@ -133,7 +133,7 @@ BEGIN TRY
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								INSERT	INTO #tmpTableToAlterConstraints([TableSchema], [TableName], [ConstraintName])
-										EXEC (@queryToRun)
+										EXEC sp_executesql  @queryToRun
 							end
 
 						IF (@flgOptions & 2 = 2)
@@ -155,7 +155,7 @@ BEGIN TRY
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 								INSERT	INTO #tmpTableToAlterConstraints ([TableSchema], [TableName], [ConstraintName])
-										EXEC (@queryToRun)
+										EXEC sp_executesql  @queryToRun
 							end
 
 						DECLARE crsTableToAlterConstraints CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [TableSchema], [TableName], [ConstraintName]

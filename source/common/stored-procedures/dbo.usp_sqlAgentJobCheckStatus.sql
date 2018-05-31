@@ -84,7 +84,7 @@ IF @sqlServerName != @@SERVERNAME
 	begin
 		SET @queryToRun=N'SELECT [srvid] FROM master.dbo.sysservers WHERE [srvname]=''' + @sqlServerName + ''''
 		TRUNCATE TABLE #tmpCheck
-		INSERT INTO #tmpCheck EXEC (@queryToRun)
+		INSERT INTO #tmpCheck EXEC sp_executesql  @queryToRun
 		IF (SELECT count(*) FROM #tmpCheck)=0
 			begin
 				SET @queryToRun=N'ERROR: SOURCE server [' + @sqlServerName + '] is not defined as linked server on THIS server [' + @sqlServerName + '].'
@@ -101,7 +101,7 @@ SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @que
 IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 TRUNCATE TABLE #tmpCheck
-INSERT INTO #tmpCheck EXEC (@queryToRun)
+INSERT INTO #tmpCheck EXEC sp_executesql  @queryToRun
 ------------------------------------------------------------------------------------------------------------------------------------------
 IF (SELECT COUNT(*) FROM #tmpCheck)=0
 	begin
@@ -150,7 +150,7 @@ ELSE
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		INSERT	INTO #runningSQLAgentJobsProcess([step_id], [job_id], [session_id])
-				EXEC (@queryToRun)
+				EXEC sp_executesql  @queryToRun
 
 		SET @StepID = NULL
 		SET @JobSessionID = NULL
@@ -170,7 +170,7 @@ ELSE
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				TRUNCATE TABLE #tmpCheck
-				INSERT INTO #tmpCheck EXEC (@queryToRun)
+				INSERT INTO #tmpCheck EXEC sp_executesql  @queryToRun
 				SELECT TOP 1 @StepName=Result FROM #tmpCheck
 
 				SET @lastExecutionStatus=4 -- in progress
@@ -207,7 +207,7 @@ ELSE
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				INSERT	INTO #jobStartInfo([start_date], [start_time], [run_status], [event_time])
-						EXEC (@queryToRun)
+						EXEC sp_executesql  @queryToRun
 
 				
 				IF (SELECT COUNT(*) FROM #jobStartInfo)=0
@@ -244,7 +244,7 @@ ELSE
 						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 						INSERT	INTO #jobStartInfo([start_date], [start_time], [run_status], [event_time])
-								EXEC (@queryToRun)
+								EXEC sp_executesql  @queryToRun
 					end
 									
 				SET @RunDate	= NULL
@@ -301,7 +301,7 @@ ELSE
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				INSERT	INTO #jobLastRunDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
-						EXEC (@queryToRun)
+						EXEC sp_executesql  @queryToRun
 				
 				SET @Message	=null
 				SET @StepID		=null
@@ -332,7 +332,7 @@ ELSE
 
 				TRUNCATE TABLE #jobLastRunDetails
 				INSERT	INTO #jobLastRunDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
-						EXEC (@queryToRun)
+						EXEC sp_executesql  @queryToRun
 				
 				SET @RunDurationLast=null
 				SET @RunStatus=null
@@ -358,7 +358,7 @@ ELSE
 
 						TRUNCATE TABLE #jobLastRunDetails
 						INSERT	INTO #jobLastRunDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
-								EXEC (@queryToRun)
+								EXEC sp_executesql  @queryToRun
 
 						SELECT TOP 1 @Message=[message] 
 						FROM #jobLastRunDetails
@@ -480,7 +480,7 @@ ELSE
 
 					TRUNCATE TABLE #jobRunStepDetails
 					INSERT	INTO #jobRunStepDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
-							EXEC (@queryToRun)
+							EXEC sp_executesql  @queryToRun
 						
 					DECLARE @maxLengthStepName [int]
 					SELECT @maxLengthStepName = MAX(LEN([step_name]))

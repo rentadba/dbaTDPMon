@@ -152,7 +152,7 @@ IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		INSERT	INTO #backupSET([backup_set_id], [backup_start_date], [type], [first_lsn])
-				EXEC (@queryToRun)
+				EXEC sp_executesql @queryToRun
 
 		--check for remote server msdb information
 		IF @sqlServerName<>@@SERVERNAME
@@ -161,7 +161,7 @@ IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 				INSERT	INTO #backupSET([backup_set_id], [backup_start_date], [type])
-						EXEC (@queryToRun)
+						EXEC sp_executesql @queryToRun
 			end
 		
 
@@ -190,7 +190,7 @@ IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'
 
 				DELETE FROM #backupSET
 				INSERT	INTO #backupSET([backup_set_id], [backup_start_date], [type])
-						EXEC (@queryToRun)
+						EXEC sp_executesql @queryToRun
 
 				IF @sqlServerName<>@@SERVERNAME
 					begin
@@ -198,7 +198,7 @@ IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 						INSERT	INTO #backupSET([backup_set_id], [backup_start_date], [type])
-								EXEC (@queryToRun)
+								EXEC sp_executesql @queryToRun
 					end
 
 				SELECT TOP 1  @maxAllowedDate  = DATEADD(ss, -1, [backup_start_date])
@@ -221,7 +221,7 @@ IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'
 
 		DELETE FROM #backupSET
 		INSERT	INTO #backupSET([backup_set_id])
-				EXEC (@queryToRun)
+				EXEC sp_executesql @queryToRun
 
 		IF @sqlServerName<>@@SERVERNAME
 			begin
@@ -229,7 +229,7 @@ IF @flgOptions & 2048 = 2048 OR @forceChangeRetentionPolicy='true'
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 				INSERT	INTO #backupSET([backup_set_id])
-						EXEC (@queryToRun)
+						EXEC sp_executesql @queryToRun
 			end
 
 		SELECT TOP 1  @lastDiffRemainingBackupSetID  = [backup_set_id]
@@ -254,7 +254,7 @@ ELSE
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		INSERT	INTO #backupSET([backup_set_id], [backup_start_date])
-				EXEC (@queryToRun)
+				EXEC sp_executesql @queryToRun
 
 		IF @sqlServerName<>@@SERVERNAME
 			begin
@@ -262,7 +262,7 @@ ELSE
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 				INSERT	INTO #backupSET([backup_set_id], [backup_start_date])
-						EXEC (@queryToRun)
+						EXEC sp_executesql @queryToRun
 			end
 
 		SELECT TOP 1  @maxAllowedDate = DATEADD(ss, -1, [backup_start_date])
@@ -284,7 +284,7 @@ ELSE
 
 		DELETE FROM #backupSET
 		INSERT	INTO #backupSET([backup_set_id])
-				EXEC (@queryToRun)
+				EXEC sp_executesql @queryToRun
 
 		IF @sqlServerName<>@@SERVERNAME
 			begin
@@ -292,7 +292,7 @@ ELSE
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 				INSERT	INTO #backupSET([backup_set_id])
-						EXEC (@queryToRun)
+						EXEC sp_executesql @queryToRun
 			end
 
 		SELECT TOP 1  @lastDiffRemainingBackupSetID = [backup_set_id]
@@ -384,7 +384,7 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		INSERT	INTO #backupDevice([backup_set_id], [physical_device_name])
-				EXEC (@queryToRun)
+				EXEC sp_executesql @queryToRun
 
 		IF @sqlServerName<>@@SERVERNAME
 			begin
@@ -392,7 +392,7 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 				INSERT	INTO #backupDevice([backup_set_id], [physical_device_name])
-						EXEC (@queryToRun)
+						EXEC sp_executesql @queryToRun
 			end
 
 		/* identify backup files to be deleted, based on file existence on disk */
@@ -413,16 +413,16 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 				IF @sqlServerName<>@@SERVERNAME
 					begin
 						IF @serverVersionNum < 11
-							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
 						ELSE
-							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''') WITH RESULT SETS(([subdirectory] [nvarchar](260), [depth] [int], [file] [int]))'')'
+							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''') WITH RESULT SETS(([subdirectory] [nvarchar](260), [depth] [int], [file] [int]))'')'
 					end
 
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 				DELETE FROM #backupFilesOnDisk
 				INSERT INTO #backupFilesOnDisk([file_name], [depth], [is_file])
-						EXEC (@queryToRun)
+						EXEC sp_executesql @queryToRun
 
 				/* remove files which are no longer on disk */
 				IF EXISTS(SELECT * FROM #backupFilesOnDisk)

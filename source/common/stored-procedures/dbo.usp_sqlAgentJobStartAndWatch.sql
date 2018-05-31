@@ -74,7 +74,7 @@ SET @queryToRun='SELECT [srvid] FROM master.dbo.sysservers WHERE [srvname]=''' +
 IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 TRUNCATE TABLE #tmpCheckParameters
-INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
+INSERT INTO #tmpCheckParameters EXEC sp_executesql @queryToRun
 IF (SELECT count(*) FROM #tmpCheckParameters)=0
 	begin
 		SET @queryToRun='ERROR: SOURCE server [' + @sqlServerName + '] is not defined as linked server on THIS server [' + @sqlServerName + '].'
@@ -89,7 +89,7 @@ IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun,
 SET @tmpServer='[' + @sqlServerName + '].master.dbo.sp_executesql'
 
 TRUNCATE TABLE #tmpCheckParameters
-INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
+INSERT INTO #tmpCheckParameters EXEC sp_executesql @queryToRun
 IF (SELECT count(*) FROM #tmpCheckParameters)=0
 	begin
 		SET @queryToRun='ERROR: THIS server [' + @sqlServerName + '] is not defined as linked server on SOURCE server [' + @sqlServerName + '].'
@@ -197,7 +197,7 @@ IF @startJob=1
 		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 		TRUNCATE TABLE #tmpCheckParameters
-		INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
+		INSERT INTO #tmpCheckParameters EXEC sp_executesql @queryToRun
 
 		SET @jobID=NULL
 		SELECT @jobID=Result FROM #tmpCheckParameters
@@ -209,7 +209,7 @@ IF @startJob=1
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				TRUNCATE TABLE #tmpCheckParameters
-				INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
+				INSERT INTO #tmpCheckParameters EXEC sp_executesql @queryToRun
 				
 				IF (SELECT CAST(Result AS numeric) FROM #tmpCheckParameters)>@stepToStart
 					begin
@@ -228,7 +228,7 @@ IF @startJob=1
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				TRUNCATE TABLE #tmpCheckParameters
-				INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
+				INSERT INTO #tmpCheckParameters EXEC sp_executesql @queryToRun
 				
 				IF (SELECT CAST(Result AS numeric) FROM #tmpCheckParameters)<@stepToStop
 					begin
@@ -253,7 +253,7 @@ IF @startJob=1
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				TRUNCATE TABLE #tmpCheckParameters
-				INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
+				INSERT INTO #tmpCheckParameters EXEC sp_executesql @queryToRun
 				SELECT @lastStepSuccesAction=CAST(Result AS numeric) FROM #tmpCheckParameters
 
 				SET @queryToRun='SELECT [on_fail_action] FROM [msdb].[dbo].[sysjobsteps] WHERE [job_id]=''' + @jobID + ''' AND [step_id]=' + CAST(@stepToStop AS varchar)
@@ -261,7 +261,7 @@ IF @startJob=1
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				TRUNCATE TABLE #tmpCheckParameters
-				INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
+				INSERT INTO #tmpCheckParameters EXEC sp_executesql @queryToRun
 				SELECT @lastStepFailureAction=CAST(Result AS numeric) FROM #tmpCheckParameters
 
 				IF (@lastStepSuccesAction IS NULL) OR (@lastStepFailureAction IS NULL)
@@ -280,11 +280,11 @@ IF @startJob=1
 						--modific ultimul pas important
 						SET @queryToRun='[' + @sqlServerName + '].[msdb].[dbo].[sp_update_jobstep] @job_id = ''' + @jobID + ''', @step_id = ' + CAST(@stepToStop AS varchar) + ', @on_success_action = 1, @on_fail_action=2'
 						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-						EXEC (@queryToRun)
+						EXEC sp_executesql @queryToRun
 
 						SET @queryToRun='[' + @sqlServerName + '].[msdb].[dbo].[sp_update_jobstep] @job_id = ''' + @jobID + ''', @step_id = ' + CAST(@stepToStop AS varchar) + ', @on_success_action = 1, @on_fail_action=2'
 						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-						EXEC (@queryToRun)
+						EXEC sp_executesql @queryToRun
 
 						IF @@ERROR<>0
 							begin
@@ -300,7 +300,7 @@ IF @startJob=1
 								IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 								TRUNCATE TABLE #tmpCheckParameters
-								INSERT INTO #tmpCheckParameters EXEC (@queryToRun)
+								INSERT INTO #tmpCheckParameters EXEC sp_executesql @queryToRun
 								SELECT @stepName=Result FROM #tmpCheckParameters
 
 								IF @stepName IS NOT NULL
@@ -312,7 +312,7 @@ IF @startJob=1
 										IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 										BEGIN TRY
-											EXEC (@queryToRun)	
+											EXEC sp_executesql @queryToRun
 											SET @Error = @@ERROR
 										END TRY
 										BEGIN CATCH
@@ -334,7 +334,7 @@ IF @startJob=1
 																				SET   [status] = 4
 																					, [execution_date] = GETDATE()
 																			WHERE [id] = ' + CAST(@jobQueueID AS [nvarchar])
-														EXEC (@queryToRun)
+														EXEC sp_executesql @queryToRun
 													end
 												--monitorizare job
 												IF @watchJob=1
@@ -382,7 +382,7 @@ IF @startJob=1
 						SET @queryToRun='[' + @sqlServerName + '].[msdb].[dbo].[sp_update_jobstep] @job_id = ''' + @jobID + ''', @step_id = ' + CAST(@stepToStop AS varchar) + ', @on_success_action = ' + CAST(@lastStepSuccesAction AS varchar) + ', @on_fail_action=' + CAST(@lastStepFailureAction AS varchar)
 						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-						EXEC(@queryToRun)
+						EXEC sp_executesql @queryToRun
 						IF @@ERROR<>0
 							begin
 								SET @strMessage = 'Failed in modifying back job''s execution Stop Step.'

@@ -3823,7 +3823,7 @@ BEGIN TRY
 	IF @optionXPValue = 1
 		begin
 			SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [html_content] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[report].[htmlContent] WHERE [id]=' + CAST(@reportID AS [varchar]) + '" queryout ' + @reportFilePath + ' -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'''
-			EXEC (@queryToRun)
+			EXEC sp_executesql  @queryToRun
 
 			/* disable xp_cmdshell configuration option */
 			EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @@SERVERNAME

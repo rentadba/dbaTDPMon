@@ -45,7 +45,7 @@ SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @que
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 INSERT	INTO #serverProperty([value])
-		EXEC (@queryToRun)
+		EXEC sp_executesql  @queryToRun
 
 SELECT @serverEdition = [value] 
 FROM #serverProperty
@@ -60,7 +60,7 @@ IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @
 
 DELETE FROM #serverProperty
 INSERT	INTO #serverProperty([value])
-		EXEC (@queryToRun)
+		EXEC sp_executesql  @queryToRun
 
 SELECT @serverVersionStr = [value] 
 FROM #serverProperty

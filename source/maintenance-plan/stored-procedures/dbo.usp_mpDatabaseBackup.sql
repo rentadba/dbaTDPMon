@@ -168,7 +168,7 @@ IF @serverVersionNum >= 9
 
 		DELETE FROM #serverPropertyConfig
 		INSERT	INTO #serverPropertyConfig([value])
-				EXEC (@queryToRun)
+				EXEC sp_executesql @queryToRun
 
 		SELECT @databaseStateDesc = [value]
 		FROM #serverPropertyConfig
@@ -184,7 +184,7 @@ IF @serverVersionNum >= 9
 
 				DELETE FROM #serverPropertyConfig
 				INSERT	INTO #serverPropertyConfig([value])
-						EXEC (@queryToRun)
+						EXEC sp_executesql @queryToRun
 
 				IF (SELECT [value] FROM #serverPropertyConfig) = '1'
 					SET @databaseStateDesc = 'STANDBY'
@@ -199,7 +199,7 @@ ELSE
 
 		DELETE FROM #serverPropertyConfig
 		INSERT	INTO #serverPropertyConfig([value])
-				EXEC (@queryToRun)
+				EXEC sp_executesql @queryToRun
 
 		SELECT @databaseStatus = [value]
 		FROM #serverPropertyConfig
@@ -292,7 +292,7 @@ IF @flgOptions & 512 = 512
 
 		DELETE FROM #serverPropertyConfig
 		INSERT	INTO #serverPropertyConfig([value])
-				EXEC (@queryToRun)
+				EXEC sp_executesql @queryToRun
 
 		IF (SELECT COUNT(*) FROM #serverPropertyConfig)>0
 			begin
@@ -358,7 +358,7 @@ IF @flgActions & 4 = 4
 
 		DELETE FROM #serverPropertyConfig
 		INSERT	INTO #serverPropertyConfig([value])
-				EXEC (@queryToRun)
+				EXEC sp_executesql @queryToRun
 
 		IF (SELECT UPPER([value]) FROM #serverPropertyConfig) = 'SIMPLE'
 			begin
@@ -494,7 +494,7 @@ IF @flgOptions & 8 = 8 AND (@agName IS NULL OR (@agName IS NOT NULL AND @agInsta
 
 				DELETE FROM #serverPropertyConfig
 				INSERT	INTO #serverPropertyConfig([value])
-						EXEC (@queryToRun)
+						EXEC sp_executesql @queryToRun
 
 				DECLARE @differentialBaseLSN	[numeric](25,0)
 
@@ -524,7 +524,7 @@ IF @flgOptions & 8 = 8 AND (@agName IS NULL OR (@agName IS NOT NULL AND @agInsta
 
 						DELETE FROM #serverPropertyConfig
 						INSERT	INTO #serverPropertyConfig([value])
-								EXEC (@queryToRun)
+								EXEC sp_executesql @queryToRun
 
 						IF (SELECT [value] FROM #serverPropertyConfig) = 0
 							begin
@@ -560,11 +560,11 @@ IF @flgOptions & 8 = 8 AND (@agName IS NULL OR (@agName IS NOT NULL AND @agInsta
 							begin
 								IF @serverVersionNum < 11
 									SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
-														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''')'')x
+														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''')'')x
 														WHERE [Field]=''dbi_dbbackupLSN'''
 								ELSE
 									SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
-														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
+														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
 														WHERE [Field]=''dbi_differentialBaseLSN'''
 							end
 						ELSE
@@ -573,7 +573,7 @@ IF @flgOptions & 8 = 8 AND (@agName IS NULL OR (@agName IS NOT NULL AND @agInsta
 								IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 								INSERT	INTO #dbccDBINFO([ParentObject], [Object], [Field], [Value])
-										EXEC (@queryToRun)
+										EXEC sp_executesql @queryToRun
 								
 								IF @serverVersionNum < 11 
 									SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_dbbackupLSN'''											
@@ -584,7 +584,7 @@ IF @flgOptions & 8 = 8 AND (@agName IS NULL OR (@agName IS NOT NULL AND @agInsta
 						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 				
 						INSERT	INTO #dbi_dbbackupLSN([Value])
-								EXEC (@queryToRun)
+								EXEC sp_executesql @queryToRun
 
 						SELECT @dbi_dbbackupLSN = ISNULL([Value], 0)
 						FROM #dbi_dbbackupLSN

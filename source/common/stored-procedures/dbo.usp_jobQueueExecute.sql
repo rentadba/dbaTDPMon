@@ -292,7 +292,7 @@ WHILE @@FETCH_STATUS=0
 					SET @jobCommand = REPLACE(@jobCommand, '''''', '''')	
 					SET @jobCommand = REPLACE(@jobCommand, 'EXEC ', '')	
 								
-					EXEC (@jobCommand)
+					EXEC sp_executesql @jobCommand
 					SET @endTime = GETDATE();
 					SET @runningTimeSec = DATEDIFF(second, @startTime, @endTime) 
 				

@@ -193,7 +193,7 @@ IF @minJobToRunBeforeExit=0
 			)
 
 		INSERT	INTO #existingSQLAgentJobs([job_name])
-				EXEC (@queryToRun)
+				EXEC sp_executesql  @queryToRun
 
 		SET @runningJobs = 0
 		DECLARE crsRunningJobs CURSOR LOCAL FAST_FORWARD FOR	SELECT  jeq.[id], jeq.[instance_name], jeq.[job_name]

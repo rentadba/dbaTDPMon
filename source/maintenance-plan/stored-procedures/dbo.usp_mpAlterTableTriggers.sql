@@ -82,7 +82,7 @@ BEGIN TRY
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		INSERT	INTO #tmpTableList ([table_schema], [table_name])
-				EXEC (@queryToRun)
+				EXEC sp_executesql  @queryToRun
 
 		---------------------------------------------------------------------------------------------
 		IF EXISTS(SELECT 1 FROM #tmpTableList)
@@ -123,7 +123,7 @@ BEGIN TRY
 
 						TRUNCATE TABLE #tmpTableToAlterTriggers
 						INSERT	INTO #tmpTableToAlterTriggers([TriggerName])
-								EXEC (@queryToRun)
+								EXEC sp_executesql  @queryToRun
 								
 						DECLARE crsTableToAlterTriggers CURSOR	LOCAL FAST_FORWARD FOR	SELECT DISTINCT [TriggerName]
 																						FROM #tmpTableToAlterTriggers

@@ -140,7 +140,7 @@ BEGIN TRY
 
 		DELETE FROM @IndexDetails
 		INSERT INTO @IndexDetails ([IndexName], [IndexType], [FillFactor], [FileGroupName], [IsUniqueConstraint], [IsPadded], [AllowRowLocks], [AllowPageLocks], [IgnoreDupKey])
-			EXEC (@queryToRun)
+			EXEC sp_executesql @queryToRun
 
 		--get index fill factor and file group
 		SELECT	  @crtIndexName		= ISNULL(@indexName, [IndexName])
@@ -193,7 +193,7 @@ BEGIN TRY
 
 		DELETE FROM @IndexColumnDetails
 		INSERT INTO @IndexColumnDetails ([KeyOrdinal], [IndexColumnID], [IsIncludedColumn], [IsDescendingKey], [ColumnName])
-			EXEC (@queryToRun)
+			EXEC sp_executesql @queryToRun
 
 		SET @sqlIndexCreate=N''
 		IF EXISTS (SELECT 1 FROM @IndexColumnDetails)

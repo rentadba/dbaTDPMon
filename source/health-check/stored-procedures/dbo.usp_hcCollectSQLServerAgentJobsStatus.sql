@@ -123,7 +123,7 @@ WHILE @@FETCH_STATUS=0
 			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 			IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-			INSERT INTO #msdbSysJobs EXEC (@queryToRun)
+			INSERT INTO #msdbSysJobs EXEC sp_executesql  @queryToRun
 		END TRY
 		BEGIN CATCH
 			INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])

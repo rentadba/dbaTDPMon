@@ -163,7 +163,7 @@ WHILE @@FETCH_STATUS=0
 				
 				BEGIN TRY
 						INSERT	INTO #statsSQLAgentJobs([job_name], [job_completion_status], [last_completion_time], [last_completion_time_utc], [local_server_date_utc])
-								EXEC (@queryToRun)
+								EXEC sp_executesql @queryToRun
 				END TRY
 				BEGIN CATCH
 					SET @strMessage = ERROR_MESSAGE()

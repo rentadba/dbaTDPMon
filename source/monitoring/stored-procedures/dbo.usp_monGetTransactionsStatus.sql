@@ -193,7 +193,7 @@ WHILE @@FETCH_STATUS=0
 				
 				BEGIN TRY
 						INSERT	INTO #blockedSessionInfo([session_id], [blocking_session_id], [wait_duration_sec], [wait_type])
-								EXEC (@queryToRun)
+								EXEC sp_executesql @queryToRun
 				END TRY
 				BEGIN CATCH
 					SET @strMessage = ERROR_MESSAGE()
@@ -223,7 +223,7 @@ WHILE @@FETCH_STATUS=0
 				
 				BEGIN TRY
 						INSERT	INTO #transactionInfo([transaction_begin_time], [elapsed_time_seconds], [session_id], [database_name])
-								EXEC (@queryToRun)
+								EXEC sp_executesql @queryToRun
 				END TRY
 				BEGIN CATCH
 					SET @strMessage = ERROR_MESSAGE()
@@ -253,7 +253,7 @@ WHILE @@FETCH_STATUS=0
 				
 				BEGIN TRY
 						INSERT	INTO #sessionTempdbUsage([session_id], [request_id], [space_used_mb])
-								EXEC (@queryToRun)
+								EXEC sp_executesql @queryToRun
 				END TRY
 				BEGIN CATCH
 					SET @strMessage = ERROR_MESSAGE()
@@ -333,7 +333,7 @@ WHILE @@FETCH_STATUS=0
 
 				BEGIN TRY
 						INSERT	INTO #monTransactionsStatus([server_name], [session_id], [database_name], [host_name], [program_name], [login_name], [transaction_begin_time], [last_request_elapsed_time_seconds], [transaction_elapsed_time_seconds], [sessions_blocked], [sql_handle], [request_completed], [is_session_blocked], [wait_duration_sec], [wait_type], [tempdb_space_used_mb])
-								EXEC (@queryToRun)
+								EXEC sp_executesql @queryToRun
 				END TRY
 				BEGIN CATCH
 					SET @strMessage = ERROR_MESSAGE()

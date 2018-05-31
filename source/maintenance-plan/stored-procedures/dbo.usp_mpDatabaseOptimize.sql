@@ -236,7 +236,7 @@ SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @que
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 INSERT	INTO #databaseCompatibility([compatibility_level])
-		EXEC (@queryToRun)
+		EXEC sp_executesql  @queryToRun
 
 SELECT TOP 1 @compatibilityLevel = [compatibility_level] FROM #databaseCompatibility
 
@@ -409,7 +409,7 @@ IF (@serverVersionNum >= 9)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		INSERT	INTO #objectsInOfflineFileGroups([object_id], [index_id], [filegroup_name])
-				EXEC (@queryToRun)	
+				EXEC sp_executesql  @queryToRun	
 	end
 
 --------------------------------------------------------------------------------------------------
@@ -469,7 +469,7 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		INSERT	INTO #databaseObjectsWithIndexList([database_id], [object_id], [table_schema], [table_name], [index_id], [index_name], [index_type], [fill_factor], [partition_number], [is_partitioned])
-				EXEC (@queryToRun)
+				EXEC sp_executesql  @queryToRun
 
 		--delete entries which should be excluded from current maintenance actions, as they are part of [maintenance-plan].[vw_objectSkipList]
 		SET @queryToRun = N''
@@ -554,7 +554,7 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 				IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 						
 				INSERT	INTO #CurrentIndexFragmentationStats([ObjectName], [ObjectId], [IndexName], [IndexId], [LogicalFragmentation], [Pages], [Rows], [ForwardedRecords], [AverageRecordSize], [AveragePageDensity], [ghost_record_count], [partition_number])  
-						EXEC (@queryToRun)
+						EXEC sp_executesql  @queryToRun
 
 				FETCH NEXT FROM crsObjectsWithIndexes INTO @DatabaseID, @ObjectID, @CurrentTableSchema, @CurrentTableName, @IndexID, @IndexName, @IndexType, @IndexFillFactor
 			end
@@ -749,7 +749,7 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		INSERT	INTO #databaseObjectsWithIndexList([database_id], [object_id], [table_schema], [table_name], [index_id], [index_name], [index_type], [fill_factor], [partition_number], [is_partitioned])
-				EXEC (@queryToRun)
+				EXEC sp_executesql  @queryToRun
 
 		--delete entries which should be excluded from current maintenance actions, as they are part of [maintenance-plan].[vw_objectSkipList]
 		IF @serverVersionNum >= 9
@@ -934,7 +934,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		INSERT	INTO #databaseObjectsWithStatisticsList([database_id], [object_id], [table_schema], [table_name], [stats_id], [stats_name], [auto_created], [last_updated], [rows], [modification_counter], [percent_changes])
-				EXEC (@queryToRun)
+				EXEC sp_executesql  @queryToRun
 
 
 		/* starting with SQL Server 2014, incremental statistics are available */
@@ -961,7 +961,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 				INSERT	INTO #incrementalStatisticsList([object_id], [stats_id])
-						EXEC (@queryToRun)
+						EXEC sp_executesql  @queryToRun
 
 				DECLARE crsIncrementalStatisticsList CURSOR LOCAL FAST_FORWARD FOR	SELECT [object_id], [stats_id]
 																					FROM #incrementalStatisticsList																	
@@ -1012,7 +1012,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 						INSERT	INTO #databaseObjectsWithStatisticsList([database_id], [object_id], [table_schema], [table_name], [stats_id], [stats_name], [auto_created], [last_updated], [rows], [modification_counter], [percent_changes], [is_incremental], [partition_number])
-								EXEC (@queryToRun)
+								EXEC sp_executesql  @queryToRun
 
 						FETCH NEXT FROM crsIncrementalStatisticsList INTO @ObjectID, @IndexID
 					end
@@ -1099,7 +1099,7 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AN
 
 						IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 						INSERT	INTO #CurrentIndexFragmentationStats([ObjectName], [ObjectId], [IndexName], [IndexId], [Level], [Pages], [Rows], [MinimumRecordSize], [MaximumRecordSize], [AverageRecordSize], [ForwardedRecords], [Extents], [ExtentSwitches], [AverageFreeBytes], [AveragePageDensity], [ScanDensity], [BestCount], [ActualCount], [LogicalFragmentation], [ExtentFragmentation])
-								EXEC (@queryToRun)
+								EXEC sp_executesql  @queryToRun
 					end
 				ELSE
 					begin
@@ -1126,7 +1126,7 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AN
 						IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 						
 						INSERT	INTO #CurrentIndexFragmentationStats([ObjectName], [ObjectId], [IndexName], [IndexId], [LogicalFragmentation], [Pages], [Rows], [ForwardedRecords], [AverageRecordSize], [AveragePageDensity], [ghost_record_count], [partition_number])  
-								EXEC (@queryToRun)
+								EXEC sp_executesql  @queryToRun
 					end
 
 				FETCH NEXT FROM crsObjectsWithIndexes INTO @DatabaseID, @ObjectID, @CurrentTableSchema, @CurrentTableName, @IndexID, @IndexName, @IndexType, @IndexFillFactor
@@ -2018,7 +2018,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 				
 						INSERT	INTO #checkMissingColumnStatistics([counter])
-								EXEC (@queryToRun)
+								EXEC sp_executesql  @queryToRun
 				
 						SELECT @missingColumnStatsCounter = [counter] 
 						FROM #checkMissingColumnStatistics

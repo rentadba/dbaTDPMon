@@ -161,7 +161,7 @@ WHILE @@FETCH_STATUS=0
 				TRUNCATE TABLE #diskSpaceInfo
 				BEGIN TRY
 						INSERT	INTO #diskSpaceInfo([logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [percent_available])
-							EXEC (@queryToRun)
+							EXEC sp_executesql @queryToRun
 						SET @runwmicLogicalDisk=0
 						SET @runxpFixedDrives=0
 				END TRY
@@ -202,11 +202,11 @@ WHILE @@FETCH_STATUS=0
 								SET @queryToRun = @queryToRun + N'DECLARE @cmdQuery [varchar](102); SET @cmdQuery=''wmic volume get Name, Capacity, FreeSpace, BlockSize, DriveType''; EXEC xp_cmdshell @cmdQuery;'
 			
 								IF @sqlServerName<>@@SERVERNAME
-									SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+									SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
 								IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 								INSERT	INTO #xpCMDShellOutput([output])
-										EXEC (@queryToRun)
+										EXEC sp_executesql @queryToRun
 
 								DELETE FROM #xpCMDShellOutput WHERE LEN([output])<=3 OR [output] LIKE '%\\?\Volume%' OR [output] IS NULL
 
@@ -275,7 +275,7 @@ WHILE @@FETCH_STATUS=0
 						TRUNCATE TABLE #diskSpaceInfo
 						BEGIN TRY
 								INSERT	INTO #diskSpaceInfo([logical_drive], [available_space_mb])
-									EXEC (@queryToRun)
+									EXEC sp_executesql @queryToRun
 						END TRY
 						BEGIN CATCH
 							SET @strMessage = ERROR_MESSAGE()

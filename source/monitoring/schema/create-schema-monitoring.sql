@@ -9,6 +9,6 @@
 IF NOT EXISTS(SELECT * FROM sys.schemas WHERE [name] = 'monitoring' AND [principal_id] IN (SELECT [principal_id] FROM sys.database_principals WHERE [name] = 'dbo'))
 	begin
 		RAISERROR('Create schema: [monitoring]', 10, 1) WITH NOWAIT
-		EXEC ('CREATE SCHEMA [monitoring] AUTHORIZATION [dbo]')
+		EXEC sp_executesql N'CREATE SCHEMA [monitoring] AUTHORIZATION [dbo]'
 	end
 GO

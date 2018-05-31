@@ -74,15 +74,15 @@ SET @queryToRun = @queryToRun + N'EXEC master.dbo.sp_configure'
 IF @sqlServerName<>@@SERVERNAME
 	begin
 		IF @serverVersionNum < 11
-			SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+			SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
 		ELSE
-			SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''') WITH RESULT SETS(([name] [nvarchar](70), [minimum] [sql_variant], [maximum] [sql_variant], [config_value] [sql_variant], [run_value] [sql_variant]))'')'
+			SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''') WITH RESULT SETS(([name] [nvarchar](70), [minimum] [sql_variant], [maximum] [sql_variant], [config_value] [sql_variant], [run_value] [sql_variant]))'')'
 	end
 
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 INSERT	INTO #serverPropertyConfig--([config_name], [minimum], [maximum], [config_value], [run_value])
-		EXEC (@queryToRun)
+		EXEC sp_executesql @queryToRun
 
 SET @queryToRun = N'SELECT   @optionIsAvailable = CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
 						   , @optionCurrentValue = MAX(CAST(config_value AS [int]))
@@ -117,16 +117,16 @@ IF @optionIsAvailable=1 AND ISNULL(@optionCurrentValue, 0) <> @configOptionValue
 		IF @sqlServerName<>@@SERVERNAME
 			begin
 				IF @serverVersionNum < 11
-					SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+					SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
 				ELSE
-					SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC(''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''') WITH RESULT SETS(([name] [nvarchar](70), [minimum] [sql_variant], [maximum] [sql_variant], [config_value] [sql_variant], [run_value] [sql_variant]))'')'
+					SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''') WITH RESULT SETS(([name] [nvarchar](70), [minimum] [sql_variant], [maximum] [sql_variant], [config_value] [sql_variant], [run_value] [sql_variant]))'')'
 			end
 
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		DELETE FROM #serverPropertyConfig
 		INSERT	INTO #serverPropertyConfig--([name], [minimum], [maximum], [config_value], [run_value])
-				EXEC (@queryToRun)
+				EXEC sp_executesql @queryToRun
 
 		SET @queryToRun = N'SELECT @optionCurrentValue = CONVERT([int], [config_value])
 							FROM #serverPropertyConfig

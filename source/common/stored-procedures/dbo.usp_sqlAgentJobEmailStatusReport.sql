@@ -186,7 +186,7 @@ SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @que
 
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 INSERT	INTO #jobHistory([step_id], [step_name], [run_status], [run_date], [run_time], [duration], [message], [log_filename])
-		EXEC (@queryToRun)
+		EXEC sp_executesql @queryToRun
 
 -----------------------------------------------------------------------------------------------------
 SET @eventMessageData = ''
@@ -244,11 +244,11 @@ IF @logFileLocation IS NOT NULL
 			IF @serverVersionNum < 11
 				SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC master.dbo.xp_fileexist ''''' + @logFileLocation + ''''';'')x'
 			ELSE
-				SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''master.dbo.xp_fileexist ''''''''' + @logFileLocation + ''''''''' '''') WITH RESULT SETS(([File Exists] [int], [File is a Directory] [int], [Parent Directory Exists] [int])) '')x'
+				SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''master.dbo.xp_fileexist ''''''''' + @logFileLocation + ''''''''' '''') WITH RESULT SETS(([File Exists] [int], [File is a Directory] [int], [Parent Directory Exists] [int])) '')x'
 
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		INSERT	INTO #fileExists([file_exists], [file_is_directory], [parent_directory_exists])
-				EXEC (@queryToRun)
+				EXEC sp_executesql @queryToRun
 
 		IF (SELECT [file_exists] FROM #fileExists)=0
 			SET @logFileLocation = NULL

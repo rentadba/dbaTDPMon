@@ -111,7 +111,7 @@ IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @
 
 DELETE FROM @onlineConstraintCheck
 INSERT	INTO @onlineConstraintCheck([value])
-		EXEC (@queryToRun)
+		EXEC sp_executesql  @queryToRun
 
 IF (SELECT COUNT(*) FROM @onlineConstraintCheck) > 0
 	begin
@@ -150,7 +150,7 @@ IF @serverVersionNum < 11
 
 		DELETE FROM @onlineConstraintCheck
 		INSERT	INTO @onlineConstraintCheck([value])
-				EXEC (@queryToRun)
+				EXEC sp_executesql  @queryToRun
 
 		IF (SELECT COUNT(*) FROM @onlineConstraintCheck) > 0
 			begin
@@ -181,7 +181,7 @@ IF @serverVersionNum < 11 OR @indexID In (0, 1)
 
 				DELETE FROM @onlineConstraintCheck
 				INSERT	INTO @onlineConstraintCheck([value])
-						EXEC (@queryToRun)
+						EXEC sp_executesql  @queryToRun
 
 				SELECT TOP 1 @indexID = [value] FROM @onlineConstraintCheck
 			end
@@ -205,7 +205,7 @@ IF @serverVersionNum < 11 OR @indexID In (0, 1)
 
 				DELETE FROM @onlineConstraintCheck
 				INSERT	INTO @onlineConstraintCheck([value])
-						EXEC (@queryToRun)
+						EXEC sp_executesql  @queryToRun
 
 				IF (SELECT COUNT(*) FROM @onlineConstraintCheck) > 0
 					begin

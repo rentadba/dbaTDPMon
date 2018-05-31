@@ -17,7 +17,7 @@ IF EXISTS(SELECT 1 FROM sysdatabases WHERE [name]='$(dbName)')
 		FROM sysprocesses
 		WHERE [dbid]=DB_ID('$(dbName)')
 
-		EXEC (@queryToRun)
+		EXEC sp_executesql @queryToRun
 
 		DROP DATABASE [$(dbName)]
 		PRINT '"$(dbName)" database dropped.'

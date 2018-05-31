@@ -213,7 +213,7 @@ WHILE @@FETCH_STATUS=0
 				/* get space allocated / used details */
 				IF @sqlServerName <> @@SERVERNAME
 					SET @queryToRun = N'SELECT *
-										FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC(''''USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
+										FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC (''''USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
 												SELECT    [drive]
 														, CAST([is_logfile]		AS [bit]) AS [is_logfile]
 														, SUM([size_mb])		AS [size_mb]
@@ -258,7 +258,7 @@ WHILE @@FETCH_STATUS=0
 				TRUNCATE TABLE #databaseSpaceInfo
 				BEGIN TRY
 						INSERT	INTO #databaseSpaceInfo([drive], [is_log_file], [size_mb], [space_used_mb], [is_growth_limited])
-							EXEC (@queryToRun)
+							EXEC sp_executesql @queryToRun
 				END TRY
 				BEGIN CATCH
 					SET @strMessage = ERROR_MESSAGE()
@@ -279,11 +279,11 @@ WHILE @@FETCH_STATUS=0
 							begin
 								IF @SQLMajorVersion < 11
 									SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
-														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''')'')x
+														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''')'')x
 														WHERE [Field]=''dbi_dbccLastKnownGood'''
 								ELSE
 									SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
-														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
+														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
 														WHERE [Field]=''dbi_dbccLastKnownGood'''
 							end
 						ELSE
@@ -291,7 +291,7 @@ WHILE @@FETCH_STATUS=0
 								BEGIN TRY
 									SET @queryToRun = N'DBCC DBINFO (''' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'sql') + N''') WITH TABLERESULTS, NO_INFOMSGS'
 									INSERT INTO #dbccDBINFO
-											EXEC (@queryToRun)
+											EXEC sp_executesql @queryToRun
 								END TRY
 								BEGIN CATCH
 									SET @strMessage = ERROR_MESSAGE()
@@ -313,7 +313,7 @@ WHILE @@FETCH_STATUS=0
 						TRUNCATE TABLE #dbccLastKnownGood
 						BEGIN TRY
 							INSERT	INTO #dbccLastKnownGood([Value])
-									EXEC (@queryToRun)
+									EXEC sp_executesql @queryToRun
 						END TRY
 						BEGIN CATCH
 							SET @strMessage = ERROR_MESSAGE()
@@ -416,7 +416,7 @@ WHILE @@FETCH_STATUS=0
 		
 		BEGIN TRY
 			INSERT	INTO #statsDatabaseDetails([query_type], [database_id], [last_backup_time], [is_auto_close], [is_auto_shrink], [recovery_model], [page_verify_option], [compatibility_level])
-					EXEC (@queryToRun)
+					EXEC sp_executesql @queryToRun
 		END TRY
 		BEGIN CATCH
 			SET @strMessage = ERROR_MESSAGE()
@@ -465,7 +465,7 @@ WHILE @@FETCH_STATUS=0
 		
 				BEGIN TRY
 					INSERT	INTO #statsDatabaseAlwaysOnDetails([cluster_name], [ag_name], [host_name], [instance_name], [database_name], [role_desc], [synchronization_health_desc], [synchronization_state_desc], [data_loss_sec])
-							EXEC (@queryToRun)
+							EXEC sp_executesql @queryToRun
 				END TRY
 				BEGIN CATCH
 					SET @strMessage = ERROR_MESSAGE()

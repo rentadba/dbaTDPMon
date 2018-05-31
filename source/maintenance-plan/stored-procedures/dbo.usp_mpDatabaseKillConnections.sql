@@ -103,7 +103,7 @@ BEGIN TRY
 
 		DELETE FROM @DatabaseList
 		INSERT	INTO @DatabaseList([dbname])
-				EXEC (@queryToRun)
+				EXEC sp_executesql  @queryToRun
 
 
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [dbname]
@@ -129,7 +129,7 @@ BEGIN TRY
 
 				DELETE FROM @RowCount
 				INSERT	INTO @RowCount([rowcount])
-						EXEC (@queryToRun)
+						EXEC sp_executesql  @queryToRun
 				
 				SELECT @ConnectionsLeft = [rowcount] FROM @RowCount
 
@@ -150,7 +150,7 @@ BEGIN TRY
 
 				DELETE FROM @RowCount
 				INSERT	INTO @RowCount([rowcount])
-						EXEC (@queryToRun)
+						EXEC sp_executesql  @queryToRun
 				
 				SELECT @LocksLeft = [rowcount] FROM @RowCount
 
@@ -183,7 +183,7 @@ BEGIN TRY
 										IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 										INSERT	INTO @SessionDetails([spid])
-												EXEC (@queryToRun)
+												EXEC sp_executesql  @queryToRun
 								end
 
 								IF @flgOptions & 2 = 2
@@ -209,7 +209,7 @@ BEGIN TRY
 										IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 										INSERT	INTO @SessionDetails([uow])
-												EXEC (@queryToRun)
+												EXEC sp_executesql  @queryToRun
 									end
 							end
 
@@ -238,7 +238,7 @@ BEGIN TRY
 										IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 										INSERT	INTO @SessionDetails([uow])
-												EXEC (@queryToRun)
+												EXEC sp_executesql  @queryToRun
 									end
 							end
 
@@ -322,7 +322,7 @@ BEGIN TRY
 
 						DELETE FROM @RowCount
 						INSERT	INTO @RowCount([rowcount])
-								EXEC (@queryToRun)
+								EXEC sp_executesql  @queryToRun
 						
 						SELECT @ConnectionsLeft = [rowcount] FROM @RowCount
 
@@ -343,7 +343,7 @@ BEGIN TRY
 
 						DELETE FROM @RowCount
 						INSERT	INTO @RowCount([rowcount])
-								EXEC (@queryToRun)
+								EXEC sp_executesql  @queryToRun
 						
 						SELECT @LocksLeft = [rowcount] FROM @RowCount
 					end
@@ -382,7 +382,7 @@ BEGIN TRY
 
 		DELETE FROM @RowCount
 		INSERT	INTO @RowCount([rowcount])
-				EXEC (@queryToRun)
+				EXEC sp_executesql  @queryToRun
 		
 		SELECT @LocksLeft = [rowcount] FROM @RowCount
 			

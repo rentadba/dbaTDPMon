@@ -722,3 +722,6 @@
 
 /* 23.05.2018 */
 	- add MAXDOP option for update statistics on SQL Server 2016 SP2
+
+/* 30.05.2018 */
+	- replace EXEC() with EXEC sp_executesql to reduce the CPU usage for the dbaTDPMon utility

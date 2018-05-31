@@ -152,10 +152,10 @@ WHILE @@FETCH_STATUS=0
 				BEGIN TRY
 					IF @SQLMajorVersion > 8 
 						INSERT	INTO #xpReadErrorLog([log_date], [process_info], [text])
-								EXEC (@queryToRun)
+								EXEC sp_executesql  @queryToRun
 					ELSE
 						INSERT	INTO #xpReadErrorLog([text], [continuation_row])
-								EXEC (@queryToRun)
+								EXEC sp_executesql  @queryToRun
 				END TRY
 				BEGIN CATCH
 					SET @strMessage = ERROR_MESSAGE()

@@ -148,7 +148,7 @@ WHILE @@FETCH_STATUS=0
 
 		BEGIN TRY
 			INSERT	INTO [monitoring].[statsReplicationLatency]([project_id], [distributor_server], [publication_name], [publication_type], [publisher_server], [publisher_db], [subscriber_server], [subscriber_db], [subscription_status], [subscription_type], [subscription_articles])
-					EXEC (@queryToRun)
+					EXEC sp_executesql @queryToRun
 		END TRY
 		BEGIN CATCH
 			SET @strMessage = ERROR_MESSAGE()

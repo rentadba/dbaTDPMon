@@ -294,7 +294,7 @@ WHILE @@FETCH_STATUS=0
 				TRUNCATE TABLE #psOutput
 				BEGIN TRY
 					INSERT	INTO #psOutput([xml])
-							EXEC (@queryToRun)
+							EXEC sp_executesql  @queryToRun
 
 					SELECT TOP 1 @endTime = CONVERT([datetime], [xml], 120)
 					FROM #psOutput
@@ -359,7 +359,7 @@ WHILE @@FETCH_STATUS=0
 						SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [message] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[dbo].[logAnalysisMessages] WHERE [descriptor]=''''' + @eventDescriptor + ''''' AND [instance_id]=' + CAST(@instanceID AS [varchar]) + ' AND [project_id]=' + CAST(@projectID AS [varchar]) + '" queryout "' + @psFileLocation + @psFileName + '" -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'', no_output'
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
 
-						EXEC (@queryToRun) 
+						EXEC sp_executesql  @queryToRun 
 					end
 
 				-------------------------------------------------------------------------------------------------------------------------
@@ -375,7 +375,7 @@ WHILE @@FETCH_STATUS=0
 						TRUNCATE TABLE #psOutput
 						BEGIN TRY
 							INSERT	INTO #psOutput([xml])
-									EXEC (@queryToRun)
+									EXEC sp_executesql  @queryToRun
 						END TRY
 						BEGIN CATCH
 							SET @strMessage = ERROR_MESSAGE()
@@ -392,7 +392,7 @@ WHILE @@FETCH_STATUS=0
 						BEGIN TRY
 							SET @queryToRun=N'master.dbo.xp_cmdshell ''del "' + [dbo].[ufn_getObjectQuoteName](@psFileLocation + @psFileName, 'sql') + '"'', no_output'
 							IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
-							EXEC (@queryToRun) 
+							EXEC sp_executesql  @queryToRun 
 						END TRY
 						BEGIN CATCH
 							SET @strMessage = ERROR_MESSAGE()

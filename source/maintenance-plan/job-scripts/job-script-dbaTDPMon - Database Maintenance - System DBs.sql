@@ -439,7 +439,7 @@ EXEC msdb.dbo.sysmail_delete_log_sp @logged_before = @oldestDate'
 		SET @queryToRun = N'
 /* keep only last 6 months of replication alerts history */
 BEGIN TRY
-	EXEC (''DELETE FROM msdb.dbo.sysreplicationalerts WHERE time <= DATEADD(month, -6, GETDATE())'')
+	EXEC sp_executesql N''DELETE FROM msdb.dbo.sysreplicationalerts WHERE time <= DATEADD(month, -6, GETDATE())''
 END TRY
 BEGIN CATCH
 	PRINT ERROR_MESSAGE()

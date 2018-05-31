@@ -157,7 +157,7 @@ SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@compatibilityLevel,
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 INSERT	INTO #databaseCompatibility([compatibility_level])
-		EXEC (@queryToRun)
+		EXEC sp_executesql @queryToRun
 
 SELECT TOP 1 @compatibilityLevel = [compatibility_level] FROM #databaseCompatibility
 
@@ -197,7 +197,7 @@ IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @
 
 DELETE FROM #serverPropertyConfig
 INSERT	INTO #serverPropertyConfig([value])
-		EXEC (@queryToRun)
+		EXEC sp_executesql @queryToRun
 
 SELECT @databaseStatus = [value]
 FROM #serverPropertyConfig
@@ -295,7 +295,7 @@ INNER JOIN
 
 		DELETE FROM #databaseTableList
 		INSERT	INTO #databaseTableList([table_schema], [table_name], [type])
-				EXEC (@queryToRun)
+				EXEC sp_executesql @queryToRun
 
 		--delete entries which should be excluded from current maintenance actions, as they are part of [maintenance-plan].[vw_objectSkipList]
 		IF @serverVersionNum >= 9
@@ -337,18 +337,18 @@ IF @flgActions & 1 = 1 AND @serverVersionNum >= 9 AND @flgOptions & 1 = 0
 			begin
 				IF @serverVersionNum < 11
 					SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
-										FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''')'')x
+										FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''')'')x
 										WHERE [Field]=''dbi_dbccFlags'''
 				ELSE
 					SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
-										FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC(''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
+										FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
 										WHERE [Field]=''dbi_dbccFlags'''
 			end
 		ELSE
 			begin							
 				SET @queryToRun='DBCC DBINFO (''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''') WITH TABLERESULTS, NO_INFOMSGS'
 				INSERT	INTO #dbccDBINFO
-						EXEC (@queryToRun)
+						EXEC sp_executesql @queryToRun
 
 				SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_dbccFlags'''											
 			end
@@ -357,7 +357,7 @@ IF @flgActions & 1 = 1 AND @serverVersionNum >= 9 AND @flgOptions & 1 = 0
 				
 		TRUNCATE TABLE #dbi_dbccFlags
 		INSERT	INTO #dbi_dbccFlags([Value])
-				EXEC (@queryToRun)
+				EXEC sp_executesql @queryToRun
 
 		SELECT @dbi_dbccFlags = ISNULL([Value], 0)
 		FROM #dbi_dbccFlags
@@ -639,7 +639,7 @@ IF @flgActions & 32 = 32
 
 				DELETE FROM #databaseTableListIdent
 				INSERT	INTO #databaseTableListIdent([table_schema], [table_name])
-						EXEC (@queryToRun)
+						EXEC sp_executesql @queryToRun
 
 				--delete entries which should be excluded from current maintenance actions, as they are part of [maintenance-plan].[vw_objectSkipList]
 				IF @serverVersionNum >= 9

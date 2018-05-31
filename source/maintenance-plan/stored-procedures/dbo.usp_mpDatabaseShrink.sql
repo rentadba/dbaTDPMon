@@ -147,7 +147,7 @@ IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @
 
 DELETE FROM #DatabaseList
 INSERT	INTO #DatabaseList([dbname])
-		EXEC (@queryToRun)
+		EXEC sp_executesql @queryToRun
 
 
 DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT	[dbname] 
@@ -193,7 +193,7 @@ WHILE @@FETCH_STATUS=0
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 				
 				INSERT	INTO #databaseFiles
-						EXEC (@queryToRun)
+						EXEC sp_executesql @queryToRun
 
 				DECLARE crsLogFile CURSOR LOCAL FAST_FORWARD FOR SELECT LTRIM(RTRIM([name])) FROM #databaseFiles
 				OPEN crsLogFile
