@@ -1,3 +1,4 @@
+SET NOCOUNT ON
 /*
 *-----------------------------------------------------------------------------*
 * dbaTDPMon (Troubleshoot Database Performance / Monitoring)                  *
