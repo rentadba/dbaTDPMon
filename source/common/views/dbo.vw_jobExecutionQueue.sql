@@ -48,6 +48,7 @@ SELECT    jeq.[id]
 			END AS [status_desc]
 		, jeq.[log_message]
 		, jeq.[event_date_utc]
+		, jeq.[priority]
 FROM [dbo].[jobExecutionQueue]		jeq
 INNER JOIN [dbo].[catalogInstanceNames]	 cinF	ON cinF.[id] = jeq.[for_instance_id] AND cinF.[project_id] = jeq.[project_id]
 INNER JOIN [dbo].[catalogProjects]		 cp		ON cp.[id] = jeq.[project_id]

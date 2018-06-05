@@ -729,3 +729,9 @@
 
 /* 31.05.2018 */
 	- maintenance-plan: in an AlwaysOn Availability Group environment, save the database backups in ClusterName folder
+
+/*----------------------------------------------------------------------*/
+/* June 2018 new features & fixes
+/*----------------------------------------------------------------------*/
+/* 05.06.2018 */
+	- add dbo.vw_jobSchedulerDetails view with details on SQL Agent jobs scheduler definition for dbaTDPMon jobs

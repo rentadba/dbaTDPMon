@@ -34,6 +34,7 @@ CREATE TABLE [dbo].[jobExecutionQueue]
 	[log_message]			[nvarchar](max) NULL,
 	[status]				[smallint]		NOT NULL CONSTRAINT [DF_jobExecutionQueue_Status] DEFAULT (-1),
 	[event_date_utc]		[datetime]		NOT NULL CONSTRAINT [DF_jobExecutionQueue_EventDateUTC] DEFAULT (GETUTCDATE()),
+	[priority]				[int]			NOT NULL CONSTRAINT [DF_jobExecutionQueue_Priority] DEFAULT (1),
 	CONSTRAINT [PK_jobExecutionQueue] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
