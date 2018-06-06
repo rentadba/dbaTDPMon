@@ -158,6 +158,14 @@ BEGIN TRY
 				AND cin.[name] = @sqlServerName
 
 		-----------------------------------------------------------------------------------------------------
+		DELETE sdaod
+		FROM [health-check].[statsDatabaseAlwaysOnDetails] sdaod
+		INNER JOIN dbo.catalogDatabaseNames cdb ON cdb.[instance_id] = sdaod.[instance_id] AND cdb.[id] = sdaod.[catalog_database_id]
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[id] = cdb.[instance_id] AND cin.[project_id] = cdb.[project_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[name] = @sqlServerName
+
+		-----------------------------------------------------------------------------------------------------
 		DELETE ssaj
 		FROM [monitoring].statsSQLAgentJobs ssaj
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = ssaj.[project_id] AND cin.[id] = ssaj.[instance_id]
