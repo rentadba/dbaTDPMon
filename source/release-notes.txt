@@ -735,3 +735,6 @@
 /*----------------------------------------------------------------------*/
 /* 05.06.2018 */
 	- add dbo.vw_jobSchedulerDetails view with details on SQL Agent jobs scheduler definition for dbaTDPMon jobs
+
+/* 07.06.2018 */
+	- maintenance-plan: fix clusterName path when running backup for a databases not in an AG but on a AlwaysOn setup

@@ -481,6 +481,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 					end
 			end
 	end
-
+ELSE
+	SET @clusterName=NULL	
 RETURN 0
 GO
