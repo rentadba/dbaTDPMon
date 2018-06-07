@@ -321,9 +321,6 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\functions\dbo.ufn_mpCheckTaskSchedulerForDate.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\functions\dbo.ufn_mpObjectQuoteName.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpCheckIndexOnlineOperation.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -357,9 +354,6 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDatabaseShrink.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpUpdateStatisticsBasedOnStrategy.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpTableDataSynchronizeInsert.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -376,9 +370,6 @@ sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.u
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDatabaseBackup.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDatabaseGetMostRecentBackupFromLocation.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpJobQueueCreate.sql" -d %dbname%  -b -r 1
@@ -418,16 +409,10 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsDatabaseDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsSQLServerAgentJobsHistory.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsSQLAgentJobsHistory.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsDiskSpaceInfo.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsSQLServerErrorlogDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\views\health-check.vw_statsErrorlogDetails.sql" -d %dbname%  -b -r 1

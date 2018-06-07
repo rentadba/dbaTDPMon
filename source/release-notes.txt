@@ -738,3 +738,4 @@
 
 /* 07.06.2018 */
 	- maintenance-plan: fix clusterName path when running backup for a databases not in an AG but on a AlwaysOn setup
+	- removed obsolete objects from install & update utility
