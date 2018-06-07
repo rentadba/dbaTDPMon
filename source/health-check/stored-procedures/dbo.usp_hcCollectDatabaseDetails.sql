@@ -208,7 +208,7 @@ WHILE @@FETCH_STATUS=0
 		WHILE @@FETCH_STATUS=0
 			begin
 				SET @strMessage='database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted')
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 2, @stopExecution=0
 
 				/* get space allocated / used details */
 				IF @sqlServerName <> @@SERVERNAME
