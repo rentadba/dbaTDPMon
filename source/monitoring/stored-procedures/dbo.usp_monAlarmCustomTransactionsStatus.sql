@@ -292,6 +292,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																													AND (   asr.[skip_value2] IS NULL 
 																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])			/* SQL Handle skip */
 																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[program_name] LIKE asr.[skip_value2])	/* program name/application skip */
+																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[login_name] LIKE asr.[skip_value2])		/* login_name skip */
 																														)
 
 																	WHERE cin.[instance_active]=1
@@ -372,6 +373,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																													AND (   asr.[skip_value2] IS NULL 
 																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])			/* SQL Handle skip */
 																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[program_name] LIKE asr.[skip_value2])	/* program name/application skip */
+																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[login_name] LIKE asr.[skip_value2])		/* login_name skip */
 																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
@@ -450,6 +452,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																													AND (   asr.[skip_value2] IS NULL 
 																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])			/* SQL Handle skip */
 																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[program_name] LIKE asr.[skip_value2])	/* program name/application skip */
+																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[login_name] LIKE asr.[skip_value2])		/* login_name skip */
 																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
@@ -529,6 +532,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																													AND (   asr.[skip_value2] IS NULL 
 																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])			/* SQL Handle skip */
 																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[program_name] LIKE asr.[skip_value2])	/* program name/application skip */
+																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[login_name] LIKE asr.[skip_value2])		/* login_name skip */
 																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
@@ -607,6 +611,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																													AND (   asr.[skip_value2] IS NULL 
 																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])			/* SQL Handle skip */
 																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[program_name] LIKE asr.[skip_value2])	/* program name/application skip */
+																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[login_name] LIKE asr.[skip_value2])		/* login_name skip */
 																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
@@ -686,6 +691,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																													AND (   asr.[skip_value2] IS NULL 
 																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])			/* SQL Handle skip */
 																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[program_name] LIKE asr.[skip_value2])	/* program name/application skip */
+																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[login_name] LIKE asr.[skip_value2])		/* login_name skip */
 																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
@@ -764,6 +770,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																													AND (   asr.[skip_value2] IS NULL 
 																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])			/* SQL Handle skip */
 																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[program_name] LIKE asr.[skip_value2])	/* program name/application skip */
+																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[login_name] LIKE asr.[skip_value2])		/* login_name skip */
 																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
@@ -842,6 +849,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																													AND (   asr.[skip_value2] IS NULL 
 																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])			/* SQL Handle skip */
 																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[program_name] LIKE asr.[skip_value2])	/* program name/application skip */
+																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[login_name] LIKE asr.[skip_value2])		/* login_name skip */
 																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
@@ -917,6 +925,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																													AND (   asr.[skip_value2] IS NULL 
 																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])			/* SQL Handle skip */
 																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[program_name] LIKE asr.[skip_value2])	/* program name/application skip */
+																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[login_name] LIKE asr.[skip_value2])		/* login_name skip */
 																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
@@ -995,6 +1004,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																													AND (   asr.[skip_value2] IS NULL 
 																														 OR (asr.[skip_value2] IS NOT NULL AND asr.[skip_value2] = sh.[sql_handle])			/* SQL Handle skip */
 																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[program_name] LIKE asr.[skip_value2])	/* program name/application skip */
+																														 OR (asr.[skip_value2] IS NOT NULL AND sts.[login_name] LIKE asr.[skip_value2])		/* login_name skip */
 																														)
 																	WHERE cin.[instance_active]=1
 																			AND cin.[project_id] = @projectID
