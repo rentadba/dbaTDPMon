@@ -18,7 +18,7 @@ IF NOT EXISTS(SELECT * FROM [report].[htmlOptions] WHERE [name] = 'OS Event Mess
 		  SELECT 'health-check' AS [module], N'OS Event Messages in last hours'	AS [name], '24'	AS [value], 'report OS messages in the last hours; default 24' AS [description]
 GO
 
-IF NOT EXISTS(SELECT * FROM [report].[htmlOptions] WHERE [name] = 'Online Instance Get Databases Size per Projects' and [module] = 'health-check')
+IF NOT EXISTS(SELECT * FROM [report].[htmlOptions] WHERE [name] = 'Online Instance Get Databases Size per Project' and [module] = 'health-check')
 	INSERT	INTO [report].[htmlOptions] ([module], [name], [value], [description])
 		  SELECT 'health-check' AS [module], N'Online Instance Get Databases Size per Project'	AS [name], 'false'	AS [value], 'get only project databases size for an instance; default get all dbs' AS [description]
 GO

@@ -13,7 +13,7 @@ CREATE PROCEDURE dbo.usp_jobQueueGetStatus
 		@projectCode			[varchar](32) = NULL,
 		@moduleFilter			[varchar](32) = '%',
 		@descriptorFilter		[varchar](256)= '%',
-		@waitForDelay			[varchar](8) = '00:00:01',
+		@waitForDelay			[varchar](8) = '00:00:05',
 		@minJobToRunBeforeExit	[smallint] = 0,
 		@executionLevel			[tinyint] = 0,
 		@debugMode				[bit]=0

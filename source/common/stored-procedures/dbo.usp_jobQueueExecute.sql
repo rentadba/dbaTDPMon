@@ -13,7 +13,7 @@ CREATE PROCEDURE dbo.usp_jobQueueExecute
 		@projectCode			[varchar](32) = NULL,
 		@moduleFilter			[varchar](32) = '%',
 		@descriptorFilter		[varchar](256)= '%',
-		@waitForDelay			[varchar](8) = '00:00:01',
+		@waitForDelay			[varchar](8) = '00:00:05',
 		@parallelJobs			[int] = NULL,
 		@debugMode				[bit] = 0
 /* WITH ENCRYPTION */
