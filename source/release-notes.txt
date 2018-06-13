@@ -745,3 +745,4 @@
 
 /* 13.06.2018 */
 	- health-check: fix small defects on health-check report generation for projects having multiple instances
+	- maintenance-plan: add priority for internal maintenance tasks jobs

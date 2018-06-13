@@ -253,7 +253,7 @@ DECLARE crsJobQueue CURSOR LOCAL FAST_FORWARD FOR	SELECT  [id], [instance_name]
 																  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
 																)			
 															AND [status]=-1
-													ORDER BY [id]
+													ORDER BY [priority], [id]
 OPEN crsJobQueue
 FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand
 SET @executedJobs = 1

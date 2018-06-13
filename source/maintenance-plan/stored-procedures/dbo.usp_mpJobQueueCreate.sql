@@ -58,6 +58,7 @@ DECLARE   @codeDescriptor		[varchar](260)
 		, @featureflgActions	[int]
 		, @forInstanceID		[int]
 		, @forSQLServerName		[sysname]
+		, @maxPriorityValue		[int]
 
 DECLARE		@serverEdition					[sysname],
 			@serverVersionStr				[sysname],
@@ -65,6 +66,7 @@ DECLARE		@serverEdition					[sysname],
 
 DECLARE @jobExecutionQueue TABLE
 		(
+			[id]					[int]			NOT NULL IDENTITY(1,1),
 			[instance_id]			[smallint]		NOT NULL,
 			[project_id]			[smallint]		NOT NULL,
 			[module]				[varchar](32)	NOT NULL,
@@ -75,7 +77,8 @@ DECLARE @jobExecutionQueue TABLE
 			[job_database_name]		[sysname]		NOT NULL,
 			[job_command]			[nvarchar](max) NOT NULL,
 			[task_id]				[bigint]		NULL,
-			[database_name]			[sysname]		NULL
+			[database_name]			[sysname]		NULL,
+			[priority]				[int]			NULL
 		)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
@@ -200,10 +203,10 @@ WHILE @@FETCH_STATUS=0
 					begin
 						/*-------------------------------------------------------------------*/
 						/* Weekly: Database Consistency Check - only once a week on Saturday */
-						IF @flgActions & 1 = 1 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Database Consistency Check', GETDATE()) = 1
+						IF @flgActions & 1 = 1 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, @codeDescriptor, 'Database Consistency Check', GETDATE()) = 1
 							begin
 								SET @taskID = NULL
-								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseConsistencyCheck' AND [task_name] = 'Database Consistency Check'
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = @codeDescriptor AND [task_name] = 'Database Consistency Check'
 
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
@@ -231,15 +234,15 @@ WHILE @@FETCH_STATUS=0
 						/*-------------------------------------------------------------------*/
 						/* Daily: Allocation Consistency Check */
 						/* when running DBCC CHECKDB, skip running DBCC CHECKALLOC*/
-						IF [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Database Consistency Check', GETDATE()) = 1
+						IF [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, @codeDescriptor, 'Database Consistency Check', GETDATE()) = 1
 							SET @featureflgActions = 8
 						ELSE
 							SET @featureflgActions = 12
 
-						IF @flgActions & 2 = 2 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Allocation Consistency Check', GETDATE()) = 1
+						IF @flgActions & 2 = 2 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, @codeDescriptor, 'Allocation Consistency Check', GETDATE()) = 1
 							begin
 								SET @taskID = NULL
-								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseConsistencyCheck' AND [task_name] = 'Allocation Consistency Check'
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = @codeDescriptor AND [task_name] = 'Allocation Consistency Check'
 
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
@@ -266,10 +269,10 @@ WHILE @@FETCH_STATUS=0
 
 						/*-------------------------------------------------------------------*/
 						/* Weekly: Tables Consistency Check - only once a week on Sunday*/
-						IF @flgActions & 4 = 4 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Tables Consistency Check', GETDATE()) = 1
+						IF @flgActions & 4 = 4 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, @codeDescriptor, 'Tables Consistency Check', GETDATE()) = 1
 							begin
 								SET @taskID = NULL
-								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseConsistencyCheck' AND [task_name] = 'Tables Consistency Check'
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = @codeDescriptor AND [task_name] = 'Tables Consistency Check'
 
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
@@ -296,10 +299,10 @@ WHILE @@FETCH_STATUS=0
 
 						/*-------------------------------------------------------------------*/
 						/* Weekly: Reference Consistency Check - only once a week on Sunday*/
-						IF @flgActions & 8 = 8 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Reference Consistency Check', GETDATE()) = 1
+						IF @flgActions & 8 = 8 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, @codeDescriptor, 'Reference Consistency Check', GETDATE()) = 1
 							begin
 								SET @taskID = NULL
-								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseConsistencyCheck' AND [task_name] = 'Reference Consistency Check'
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = @codeDescriptor AND [task_name] = 'Reference Consistency Check'
 
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
@@ -326,10 +329,10 @@ WHILE @@FETCH_STATUS=0
 
 						/*-------------------------------------------------------------------*/
 						/* Monthly: Perform Correction to Space Usage - on the first Saturday of the month */
-						IF @flgActions & 16 = 16 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseConsistencyCheck', 'Perform Correction to Space Usage', GETDATE()) = 1
+						IF @flgActions & 16 = 16 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, @codeDescriptor, 'Perform Correction to Space Usage', GETDATE()) = 1
 							begin
 								SET @taskID = NULL
-								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseConsistencyCheck' AND [task_name] = 'Perform Correction to Space Usage'
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = @codeDescriptor AND [task_name] = 'Perform Correction to Space Usage'
 
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
@@ -361,10 +364,10 @@ WHILE @@FETCH_STATUS=0
 					begin
 						/*-------------------------------------------------------------------*/
 						/* Daily: Rebuild Heap Tables - only for SQL versions +2K5*/
-						IF @flgActions & 32 = 32 AND @serverVersionNum > 9 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseOptimize', 'Rebuild Heap Tables', GETDATE()) = 1
+						IF @flgActions & 32 = 32 AND @serverVersionNum > 9 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, @codeDescriptor, 'Rebuild Heap Tables', GETDATE()) = 1
 							begin
 								SET @taskID = NULL
-								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseOptimize' AND [task_name] = 'Rebuild Heap Tables'
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = @codeDescriptor AND [task_name] = 'Rebuild Heap Tables'
 
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
@@ -391,14 +394,14 @@ WHILE @@FETCH_STATUS=0
 
 						/*-------------------------------------------------------------------*/
 						/* Daily: Rebuild or Reorganize Indexes*/			
-						IF @flgActions & 64 = 64 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseOptimize', 'Rebuild or Reorganize Indexes', GETDATE()) = 1
+						IF @flgActions & 64 = 64 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, @codeDescriptor, 'Rebuild or Reorganize Indexes', GETDATE()) = 1
 							begin
 								SET @taskID = NULL
-								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseOptimize' AND [task_name] = 'Rebuild or Reorganize Indexes'
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = @codeDescriptor AND [task_name] = 'Rebuild or Reorganize Indexes'
 
 								SET @featureflgActions = 3
 								
-								IF @flgActions & 128 = 128 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseOptimize', 'Update Statistics', GETDATE()) = 1 /* Daily: Update Statistics */
+								IF @flgActions & 128 = 128 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, @codeDescriptor, 'Update Statistics', GETDATE()) = 1 /* Daily: Update Statistics */
 									SET @featureflgActions = 11
 
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
@@ -426,10 +429,10 @@ WHILE @@FETCH_STATUS=0
 
 						/*-------------------------------------------------------------------*/
 						/* Daily: Update Statistics */
-						IF @flgActions & 128 = 128 AND NOT (@flgActions & 64 = 64) AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseOptimize', 'Update Statistics', GETDATE()) = 1
+						IF @flgActions & 128 = 128 AND NOT (@flgActions & 64 = 64) AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, @codeDescriptor, 'Update Statistics', GETDATE()) = 1
 							begin
 								SET @taskID = NULL
-								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseOptimize' AND [task_name] = 'Update Statistics'
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = @codeDescriptor AND [task_name] = 'Update Statistics'
 
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
@@ -460,10 +463,10 @@ WHILE @@FETCH_STATUS=0
 					begin
 						/*-------------------------------------------------------------------*/
 						/* Weekly: Shrink Database (TRUNCATEONLY) - only once a week on Sunday*/
-						IF @flgActions & 256 = 256 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseShrink', 'Shrink Database (TRUNCATEONLY)', GETDATE()) = 1
+						IF @flgActions & 256 = 256 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, @codeDescriptor, 'Shrink Database (TRUNCATEONLY)', GETDATE()) = 1
 							begin
 								SET @taskID = NULL
-								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseShrink' AND [task_name] = 'Shrink Database (TRUNCATEONLY)'
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = @codeDescriptor AND [task_name] = 'Shrink Database (TRUNCATEONLY)'
 
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
@@ -490,10 +493,10 @@ WHILE @@FETCH_STATUS=0
 
 						/*-------------------------------------------------------------------*/
 						/* Monthly: Shrink Log File - on the first Saturday of the month */
-						IF @flgActions & 512 = 512 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, 'dbo.usp_mpDatabaseShrink', 'Shrink Log File', GETDATE()) = 1
+						IF @flgActions & 512 = 512 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, @codeDescriptor, 'Shrink Log File', GETDATE()) = 1
 							begin
 								SET @taskID = NULL
-								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = 'dbo.usp_mpDatabaseShrink' AND [task_name] = 'Shrink Log File'
+								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = @codeDescriptor AND [task_name] = 'Shrink Log File'
 
 								INSERT INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 																, [for_instance_id], [job_name], [job_step_name], [job_database_name]
@@ -647,11 +650,58 @@ WHILE @@FETCH_STATUS=0
 				------------------------------------------------------------------------------------------------------------------------------------------
 
 				IF @recreateMode = 0
+					begin
+						/* preserve any unfinished job and increase its priority */
+						UPDATE jeqX
+							SET jeqX.[priority] = X.[new_priority]
+						FROM  @jobExecutionQueue jeqX
+						INNER JOIN (
+									SELECT	S.[id], 
+											ROW_NUMBER() OVER (ORDER BY jeq.[id]) AS [new_priority]
+									FROM [dbo].[jobExecutionQueue] jeq
+									INNER JOIN @jobExecutionQueue S ON		jeq.[instance_id] = S.[instance_id]
+																		AND jeq.[project_id] = S.[project_id]
+																		AND jeq.[module] = S.[module]
+																		AND jeq.[descriptor] = S.[descriptor]
+																		AND jeq.[for_instance_id] = S.[for_instance_id]
+																		AND (jeq.[job_name] = S.[job_name] OR jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_'))
+																		AND jeq.[job_step_name] = S.[job_step_name]
+																		AND jeq.[job_database_name] = S.[job_database_name]
+									WHERE (     @skipDatabasesList IS NULL
+											OR (    @skipDatabasesList IS NOT NULL	
+													AND (
+														SELECT COUNT(*)
+														FROM [dbo].[ufn_getTableFromStringList](@skipDatabasesList, ',') X
+														WHERE S.[job_name] LIKE (DB_NAME() + ' - ' + S.[descriptor] + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + REPLACE(@@SERVERNAME, '\', '$') + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
+													) = 0
+												)
+										  )
+										  AND [status] = -1 /* previosly not completed jobs */
+								   ) X ON jeqX.[id] = X.[id]
+
+						SELECT @maxPriorityValue = MAX([priority])	
+						FROM @jobExecutionQueue
+						
+						SET @maxPriorityValue = ISNULL(@maxPriorityValue, 0)
+
+						/* assign priorities to current generated queue */
+						UPDATE jeqX
+							SET jeqX.[priority] = X.[new_priority]
+						FROM  @jobExecutionQueue jeqX
+						INNER JOIN (
+									SELECT	[id], 
+											@maxPriorityValue + ROW_NUMBER() OVER (ORDER BY [id]) AS [new_priority]
+									FROM @jobExecutionQueue 
+									WHERE [priority] IS NULL
+								   ) X ON jeqX.[id] = X.[id] 
+
+						/* reset current jobs state */
 						UPDATE jeq
 							SET   jeq.[execution_date] = NULL
 								, jeq.[running_time_sec] = NULL
 								, jeq.[log_message] = NULL
 								, jeq.[status] = -1
+								, jeq.[priority] = S.[priority]
 								, jeq.[event_date_utc] = GETUTCDATE()
 								, jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_')	/* manage special characters in job names */
 								, jeq.[task_id] = S.[task_id]
@@ -674,16 +724,17 @@ WHILE @@FETCH_STATUS=0
 										) = 0
 									)
 							  )
+					end
 
 				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 														, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-														, [job_command], [task_id], [database_name])
+														, [job_command], [task_id], [database_name], [priority])
 						SELECT	  S.[instance_id], S.[project_id], S.[module], S.[descriptor]
 								, S.[for_instance_id]
 								, REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_')	/* manage special characters in job names */
 								, S.[job_step_name], S.[job_database_name]
 								, S.[job_command]
-								, S.[task_id], S.[database_name]
+								, S.[task_id], S.[database_name], S.[priority]
 						FROM @jobExecutionQueue S
 						LEFT JOIN [dbo].[jobExecutionQueue] jeq ON		jeq.[instance_id] = S.[instance_id]
 																	AND jeq.[project_id] = S.[project_id]
