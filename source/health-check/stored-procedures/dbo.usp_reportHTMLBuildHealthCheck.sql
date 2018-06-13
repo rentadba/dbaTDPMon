@@ -40,13 +40,13 @@ CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 														    262144 - Low Free Disk Space - Issues Detected
 															524288 - Errorlog messages - Permission errors
 														   1048576 - Errorlog messages - Issues Detected
-														   2097152 - Errorlog messages - Complete Details
+														   2097152 - NOT USED
 														   4194304 - Databases with Fixed File(s) Size - Issues Detected													
 														   8388608 - Databases with (Page Verify not CHECKSUM) or (Page Verify is NONE)
 														  16777216 - Frequently Fragmented Indexes (consider lowering the fill-factor)
 														  33554432 - SQL Server Agent Jobs - Long Running SQL Agent Jobs
 														  67108864 - OS Event messages - Permission errors
-														 134217728 - OS Event messages - Complete Details
+														 134217728 - OS Event messages - Issues Detected
 															*/
 		@reportDescription		[nvarchar](256) = NULL,
 		@reportFileName			[nvarchar](max) = NULL,	/* if file name is null, than the name will be generated */
@@ -87,30 +87,32 @@ DECLARE   @reportID								[int]
 		, @projectName							[nvarchar](128)
 		, @reportBuildStartTime					[datetime]
 	
-DECLARE   @databaseName							[sysname]
-		, @configAdmittedState					[sysname]
-		, @configDBMaxSizeMaster				[int]
-		, @configDBMaxSizeMSDB					[int]
-		, @configLogMaxSize						[int]
-		, @configLogVsDataPercent				[numeric](6,2)
-		, @configDataSpaceMinPercent			[numeric](6,2)
-		, @configLogSpaceMaxPercent				[numeric](6,2)
-		, @configDBMinSizeForAnalysis			[int]
-		, @configFailuresInLastHours			[int]
-		, @configUserDBCCCHECKDBAgeDays			[int]
-		, @configSystemDBCCCHECKDBAgeDays		[int]
-		, @configUserDatabaseBACKUPAgeDays		[int]
-		, @configSystemDatabaseBACKUPAgeDays	[int]
-		, @configFreeDiskMinPercent				[numeric](6,2)
-		, @configFreeDiskMinSpace				[int]
-		, @configErrorlogMessageLastHours		[int]
-		, @configErrorlogMessageLimit			[int]
-		, @configMaxJobRunningTimeInHours		[int]
-		, @configOSEventMessageLastHours		[int]
-		, @configOSEventMessageLimit			[int]
-		, @configOSEventGetInformationEvent		[bit]
-		, @configOSEventGetWarningsEvent		[bit]
-		, @configOSEventsTimeOutSeconds			[int]
+DECLARE   @databaseName								[sysname]
+		, @reportOptionDatabaseAdmittedState		[sysname]
+		, @reportOptionDatabaseMaxSizeMaster		[int]
+		, @reportOptionDatabaseMaxSizeMSDB			[int]
+		, @reportOptionLogMaxSize					[int]
+		, @reportOptionLogVsDataPercent				[numeric](6,2)
+		, @reportOptionDataSpaceMinPercent			[numeric](6,2)
+		, @reportOptionLogSpaceMaxPercent			[numeric](6,2)
+		, @reportOptionDBMinSizeForAnalysis 		[int]
+		, @reportOptionJobFailuresInLastHours		[int]
+		, @reportOptionUserDBCCCHECKDBAgeDays		[int]
+		, @reportOptionSystemDBCCCHECKDBAgeDays		[int]
+		, @reportOptionUserDatabaseBACKUPAgeDays	[int]
+		, @reportOptionSystemDatabaseBACKUPAgeDays	[int]
+		, @reportOptionFreeDiskMinPercent 			[numeric](6,2)
+		, @reportOptionFreeDiskMinSpace				[int]
+		, @reportOptionErrorlogMessageLastHours		[int]
+		, @reportOptionErrorlogMessageLimit			[int]
+		, @reportOptionMaxJobRunningTimeInHours		[int]
+		, @reportOptionOSEventMessageLimit			[int]
+		, @reportOptionOSEventMessageLastHours		[int]
+		, @reportOptionGetProjectDBSize				[bit]
+		, @configOSEventMessageLastHours			[int]
+		, @configOSEventGetInformationEvent			[bit]
+		, @configOSEventGetWarningsEvent			[bit]
+		, @configOSEventsTimeOutSeconds				[int]
 
 		, @logSizeMB							[numeric](20,3)
 		, @dataSizeMB							[numeric](18,3)
@@ -186,218 +188,218 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	--reading report options
 	-----------------------------------------------------------------------------------------------------
-	SELECT	@configAdmittedState = [value]
+	SELECT	@reportOptionDatabaseAdmittedState = [value]
 	FROM	[report].[htmlOptions]
 	WHERE	[name] = N'Database online admitted state'
 			AND [module] = 'health-check'
 
-	SET @configAdmittedState = ISNULL(@configAdmittedState, 'ONLINE, READ ONLY')
+	SET @reportOptionDatabaseAdmittedState = ISNULL(@reportOptionDatabaseAdmittedState, 'ONLINE, READ ONLY')
 			
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configDBMaxSizeMaster = [value]
+		SELECT	@reportOptionDatabaseMaxSizeMaster = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'Database max size (mb) - master'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configDBMaxSizeMaster = 0
+		SET @reportOptionDatabaseMaxSizeMaster = 0
 	END CATCH
-	SET @configDBMaxSizeMaster = ISNULL(@configDBMaxSizeMaster, 0)
+	SET @reportOptionDatabaseMaxSizeMaster = ISNULL(@reportOptionDatabaseMaxSizeMaster, 0)
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configDBMaxSizeMSDB = [value]
+		SELECT	@reportOptionDatabaseMaxSizeMSDB = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'Database max size (mb) - msdb'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configDBMaxSizeMSDB = 0
+		SET @reportOptionDatabaseMaxSizeMSDB = 0
 	END CATCH
-	SET @configDBMaxSizeMSDB = ISNULL(@configDBMaxSizeMSDB, 0)
+	SET @reportOptionDatabaseMaxSizeMSDB = ISNULL(@reportOptionDatabaseMaxSizeMSDB, 0)
 			
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configLogMaxSize = [value]
+		SELECT	@reportOptionLogMaxSize = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'Database Max Log Size (mb)'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configLogMaxSize = 32768
+		SET @reportOptionLogMaxSize = 32768
 	END CATCH
-	SET @configLogMaxSize = ISNULL(@configLogMaxSize, 32768)
+	SET @reportOptionLogMaxSize = ISNULL(@reportOptionLogMaxSize, 32768)
 			
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configDataSpaceMinPercent = [value]
+		SELECT	@reportOptionDataSpaceMinPercent = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'Database Min Data Usage (percent)'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configDataSpaceMinPercent = 50
+		SET @reportOptionDataSpaceMinPercent = 50
 	END CATCH
-	SET @configDataSpaceMinPercent = ISNULL(@configDataSpaceMinPercent, 50)
+	SET @reportOptionDataSpaceMinPercent = ISNULL(@reportOptionDataSpaceMinPercent, 50)
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configLogSpaceMaxPercent = [value]
+		SELECT	@reportOptionLogSpaceMaxPercent = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'Database Max Log Usage (percent)'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configLogSpaceMaxPercent = 90
+		SET @reportOptionLogSpaceMaxPercent = 90
 	END CATCH
-	SET @configLogSpaceMaxPercent = ISNULL(@configLogSpaceMaxPercent, 90)
+	SET @reportOptionLogSpaceMaxPercent = ISNULL(@reportOptionLogSpaceMaxPercent, 90)
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configDBMinSizeForAnalysis = [value]
+		SELECT	@reportOptionDBMinSizeForAnalysis  = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'Database Min Size for Analysis (mb)'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configDBMinSizeForAnalysis = 512
+		SET @reportOptionDBMinSizeForAnalysis  = 512
 	END CATCH
-	SET @configDBMinSizeForAnalysis = ISNULL(@configDBMinSizeForAnalysis, 512)
+	SET @reportOptionDBMinSizeForAnalysis  = ISNULL(@reportOptionDBMinSizeForAnalysis , 512)
 
 	-----------------------------------------------------------------------------------------------------			
 	BEGIN TRY
-		SELECT	@configLogVsDataPercent = [value]
+		SELECT	@reportOptionLogVsDataPercent = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'Database Log vs. Data Size (percent)'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configLogVsDataPercent = 50
+		SET @reportOptionLogVsDataPercent = 50
 	END CATCH
-	SET @configLogVsDataPercent = ISNULL(@configLogVsDataPercent, 50)
+	SET @reportOptionLogVsDataPercent = ISNULL(@reportOptionLogVsDataPercent, 50)
 									
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configFailuresInLastHours = [value]
+		SELECT	@reportOptionJobFailuresInLastHours = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'SQL Agent Job - Failures in last hours'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configFailuresInLastHours = 24
+		SET @reportOptionJobFailuresInLastHours = 24
 	END CATCH
-	SET @configFailuresInLastHours = ISNULL(@configFailuresInLastHours, 24)
+	SET @reportOptionJobFailuresInLastHours = ISNULL(@reportOptionJobFailuresInLastHours, 24)
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configUserDatabaseBACKUPAgeDays = [value]
+		SELECT	@reportOptionUserDatabaseBACKUPAgeDays = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'User Database BACKUP Age (days)'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configUserDatabaseBACKUPAgeDays = 2
+		SET @reportOptionUserDatabaseBACKUPAgeDays = 2
 	END CATCH
-	SET @configUserDatabaseBACKUPAgeDays = ISNULL(@configUserDatabaseBACKUPAgeDays, 2)
+	SET @reportOptionUserDatabaseBACKUPAgeDays = ISNULL(@reportOptionUserDatabaseBACKUPAgeDays, 2)
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configSystemDatabaseBACKUPAgeDays = [value]
+		SELECT	@reportOptionSystemDatabaseBACKUPAgeDays = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'System Database BACKUP Age (days)'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configSystemDatabaseBACKUPAgeDays = 14
+		SET @reportOptionSystemDatabaseBACKUPAgeDays = 14
 	END CATCH
-	SET @configSystemDatabaseBACKUPAgeDays = ISNULL(@configSystemDatabaseBACKUPAgeDays, 14)
+	SET @reportOptionSystemDatabaseBACKUPAgeDays = ISNULL(@reportOptionSystemDatabaseBACKUPAgeDays, 14)
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configUserDBCCCHECKDBAgeDays = [value]
+		SELECT	@reportOptionUserDBCCCHECKDBAgeDays = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'User Database DBCC CHECKDB Age (days)'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configUserDBCCCHECKDBAgeDays = 30
+		SET @reportOptionUserDBCCCHECKDBAgeDays = 30
 	END CATCH
-	SET @configUserDBCCCHECKDBAgeDays = ISNULL(@configUserDBCCCHECKDBAgeDays, 30)
+	SET @reportOptionUserDBCCCHECKDBAgeDays = ISNULL(@reportOptionUserDBCCCHECKDBAgeDays, 30)
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configSystemDBCCCHECKDBAgeDays = [value]
+		SELECT	@reportOptionSystemDBCCCHECKDBAgeDays = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'System Database DBCC CHECKDB Age (days)'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configSystemDBCCCHECKDBAgeDays = 90
+		SET @reportOptionSystemDBCCCHECKDBAgeDays = 90
 	END CATCH
-	SET @configSystemDBCCCHECKDBAgeDays = ISNULL(@configSystemDBCCCHECKDBAgeDays, 90)
+	SET @reportOptionSystemDBCCCHECKDBAgeDays = ISNULL(@reportOptionSystemDBCCCHECKDBAgeDays, 90)
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configFreeDiskMinPercent = [value]
+		SELECT	@reportOptionFreeDiskMinPercent  = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'Free Disk Space Min Percent (percent)'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configFreeDiskMinPercent = 10
+		SET @reportOptionFreeDiskMinPercent  = 10
 	END CATCH
-	SET @configFreeDiskMinPercent = ISNULL(@configFreeDiskMinPercent, 10)
+	SET @reportOptionFreeDiskMinPercent  = ISNULL(@reportOptionFreeDiskMinPercent , 10)
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configFreeDiskMinSpace = [value]
+		SELECT	@reportOptionFreeDiskMinSpace = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'Free Disk Space Min Space (mb)'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configFreeDiskMinSpace = 3000
+		SET @reportOptionFreeDiskMinSpace = 3000
 	END CATCH
-	SET @configFreeDiskMinSpace = ISNULL(@configFreeDiskMinSpace, 3000)
+	SET @reportOptionFreeDiskMinSpace = ISNULL(@reportOptionFreeDiskMinSpace, 3000)
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configErrorlogMessageLastHours = [value]
+		SELECT	@reportOptionErrorlogMessageLastHours = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'Errorlog Messages in last hours'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configErrorlogMessageLastHours = 24
+		SET @reportOptionErrorlogMessageLastHours = 24
 	END CATCH
-	SET @configErrorlogMessageLastHours = ISNULL(@configErrorlogMessageLastHours, 24)
+	SET @reportOptionErrorlogMessageLastHours = ISNULL(@reportOptionErrorlogMessageLastHours, 24)
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configErrorlogMessageLimit = [value]
+		SELECT	@reportOptionErrorlogMessageLimit = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'Errorlog Messages Limit to Max'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configErrorlogMessageLimit = 1000
+		SET @reportOptionErrorlogMessageLimit = 1000
 	END CATCH
-	SET @configErrorlogMessageLimit = ISNULL(@configErrorlogMessageLimit, 1000)
+	SET @reportOptionErrorlogMessageLimit = ISNULL(@reportOptionErrorlogMessageLimit, 1000)
 
-	IF @configErrorlogMessageLimit= 0 SET @configErrorlogMessageLimit=2147483647
+	IF @reportOptionErrorlogMessageLimit= 0 SET @reportOptionErrorlogMessageLimit=2147483647
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configMaxJobRunningTimeInHours = [value]
+		SELECT	@reportOptionMaxJobRunningTimeInHours = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'SQL Agent Job - Maximum Running Time (hours)'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configMaxJobRunningTimeInHours = 3
+		SET @reportOptionMaxJobRunningTimeInHours = 3
 	END CATCH
-	SET @configMaxJobRunningTimeInHours = ISNULL(@configMaxJobRunningTimeInHours, 3)
+	SET @reportOptionMaxJobRunningTimeInHours = ISNULL(@reportOptionMaxJobRunningTimeInHours, 3)
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
@@ -413,18 +415,42 @@ BEGIN TRY
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@configOSEventMessageLimit = [value]
+		SELECT	@reportOptionOSEventMessageLimit = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'OS Event Messages Limit to Max'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @configOSEventMessageLimit = 1000
+		SET @reportOptionOSEventMessageLimit = 1000
 	END CATCH
-	SET @configOSEventMessageLimit = ISNULL(@configOSEventMessageLimit, 1000)
+	SET @reportOptionOSEventMessageLimit = ISNULL(@reportOptionOSEventMessageLimit, 1000)
 
-	IF @configOSEventMessageLimit= 0 SET @configOSEventMessageLimit=2147483647
+	IF @reportOptionOSEventMessageLimit= 0 SET @reportOptionOSEventMessageLimit=2147483647
 		
+	-----------------------------------------------------------------------------------------------------
+	BEGIN TRY
+		SELECT	@reportOptionOSEventMessageLastHours = [value]
+		FROM	[report].[htmlOptions]
+		WHERE	[name] = N'OS Event Messages in last hours'
+				AND [module] = 'health-check'
+	END TRY
+	BEGIN CATCH
+		SET @reportOptionOSEventMessageLastHours = 24
+	END CATCH
+	SET @reportOptionOSEventMessageLastHours = ISNULL(@reportOptionOSEventMessageLastHours, 24)
+
+	-----------------------------------------------------------------------------------------------------
+	BEGIN TRY
+		SELECT	@reportOptionGetProjectDBSize = CASE WHEN [value]='true' THEN 1 ELSE 0 END
+		FROM	[report].[htmlOptions]
+		WHERE	[name] = N'Online Instance Get Databases Size per Project'
+				AND [module] = 'health-check'
+	END TRY
+	BEGIN CATCH
+		SET @reportOptionGetProjectDBSize = 0
+	END CATCH
+	SET @reportOptionGetProjectDBSize = ISNULL(@reportOptionGetProjectDBSize, 0)
+
 	------------------------------------------------------------------------------------------------------------------------------------------
 	--option for timeout when fetching OS events
 	BEGIN TRY
@@ -897,11 +923,8 @@ BEGIN TRY
 					<TD ALIGN=LEFT class="summary-style add-border color-1">
 						Errorlog Messages
 					</TD>
-					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
-					CASE WHEN (@flgOptions & 2097152 = 2097152)
-						  THEN N'<A HREF="#ErrorlogMessagesCompleteDetails" class="summary-style color-1">Complete Details</A>'
-						  ELSE N'Complete Details'
-					END + N'
+					<TD ALIGN=CENTER class="summary-style add-border color-1">
+						<A HREF="#ErrorlogMessagesIssuesDetected" class="summary-style color-1">Issues Detected {ErrorlogMessagesIssuesDetectedCount}</A>
 					</TD>
 					<TD ALIGN=CENTER class="summary-style add-border color-1">' +
 					CASE WHEN (@flgOptions & 524288 = 524288)
@@ -920,7 +943,7 @@ BEGIN TRY
 					</TD>
 					<TD ALIGN=CENTER class="summary-style add-border color-2">' +
 					CASE WHEN (@flgOptions & 134217728 = 134217728)
-						  THEN N'<A HREF="#OSEventMessagesCompleteDetails" class="summary-style color-2">Complete Details</A>'
+						  THEN N'<A HREF="#OSEventMessagesIssuesDetected" class="summary-style color-2">Issues Detected {OSEventMessagesIssuesDetectedCount}</A>'
 						  ELSE N'Complete Details'
 					END + N'
 					</TD>
@@ -1029,29 +1052,24 @@ BEGIN TRY
 				</TR> 
 				<TR VALIGN="TOP" class="color-1">
 					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
-					CASE WHEN (@flgActions & 16 = 16) AND (@flgOptions & 1048576 = 1048576)
-						  THEN N'<A HREF="#ErrorlogMessagesIssuesDetected" class="summary-style color-1">Errorlog Messages {ErrorlogMessagesIssuesDetectedCount}</A>'
-						  ELSE N'ErrorlogMessagesIssuesDetected (N/A)'
+					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 16777216 = 16777216)
+						  THEN N'<A HREF="#FrequentlyFragmentedIndexesIssuesDetected" class="summary-style color-1">Frequently Fragmented Indexes {FrequentlyFragmentedIndexesIssuesDetectedCount}</A>'
+						  ELSE N'Frequently Fragmented Indexes (N/A)'
 					END + N'
 					</TD>
 					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
 					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 4194304 = 4194304)
 						  THEN N'<A HREF="#DatabaseFixedFileSizeIssuesDetected" class="summary-style color-1">Databases with Fixed File(s) Size {DatabaseFixedFileSizeIssuesDetectedCount}</A>'
-						  ELSE N'>Databases with Fixed File(s) Size (N/A)'
+						  ELSE N'Databases with Fixed File(s) Size (N/A)'
 					END + N'
 					</TD>
 				</TR> 
 				<TR VALIGN="TOP" class="color-2">
-					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
-					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 16777216 = 16777216)
-						  THEN N'<A HREF="#FrequentlyFragmentedIndexesIssuesDetected" class="summary-style color-2">Frequently Fragmented Indexes {FrequentlyFragmentedIndexesIssuesDetectedCount}</A>'
-						  ELSE N'>Frequently Fragmented Indexes (N/A)'
-					END + N'
-					</TD>
+					<TD ALIGN=LEFT class="summary-style add-border color-2">&nbsp;</TD>
 					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
 					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 8388608 = 8388608)
 						  THEN N'<A HREF="#DatabasePageVerifyIssuesDetected" class="summary-style color-2">Databases with Improper Page Verify Option {DatabasePageVerifyIssuesDetectedCount}</A>'
-						  ELSE N'>Databases with Improper Page Verify Option (N/A)'
+						  ELSE N'Databases with Improper Page Verify Option (N/A)'
 					END + N'
 					</TD>
 				</TR>
@@ -1062,6 +1080,86 @@ BEGIN TRY
 	<HR WIDTH="1130px" ALIGN=LEFT><br>'
 
 
+	-----------------------------------------------------------------------------------------------------
+	--prepare data for the report. apply filters where needed. build temporary tables
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 16 = 16) AND (@flgOptions & 1048576 = 1048576)
+		begin
+			SET @ErrMessage = 'analyzing errorlog messages'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
+
+			IF OBJECT_ID('tempdb..#filteredStatsSQLServerErrorlogDetail') IS NOT NULL
+				DROP TABLE #filteredStatsSQLServerErrorlogDetail
+
+			SET @dateTimeLowerLimit = DATEADD(hh, -@reportOptionErrorlogMessageLastHours, GETDATE())
+
+			SELECT DISTINCT 
+					cin.[instance_name], 
+					eld.[log_date], eld.[id], 
+					eld.[process_info], eld.[text]
+			INTO #filteredStatsSQLServerErrorlogDetail
+			FROM [dbo].[vw_catalogInstanceNames]  cin
+			INNER JOIN [health-check].[vw_statsErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
+			LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+														AND rsr.[rule_id] = 1048576
+														AND rsr.[active] = 1
+														AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+			WHERE cin.[instance_active]=1
+					AND cin.[project_id] = @projectID																							
+					AND eld.[log_date] >= @dateTimeLowerLimit
+					AND NOT EXISTS	( 
+										SELECT 1
+										FROM	[report].[hardcodedFilters] chf 
+										WHERE	chf.[module] = 'health-check'
+												AND chf.[object_name] = 'statsErrorlogDetails'
+												AND chf.[active] = 1
+												AND PATINDEX(chf.[filter_pattern], eld.[text]) > 0
+									)
+					AND rsr.[id] IS NULL
+			
+			CREATE INDEX IX_filteredStatsSQLServerErrorlogDetail_InstanceName ON #filteredStatsSQLServerErrorlogDetail([instance_name])
+
+			SET @ErrMessage = 'done'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
+		end
+
+	IF (@flgActions & 32 = 32) AND (@flgOptions & 134217728 = 134217728)
+		begin
+			SET @ErrMessage = 'analyzing os event messages'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
+
+			IF OBJECT_ID('tempdb..#filteredStatsOSEventMessagesDetail') IS NOT NULL
+				DROP TABLE #filteredStatsOSEventMessagesDetail
+			SET @dateTimeLowerLimit = DATEADD(hh, -@reportOptionOSEventMessageLastHours, GETDATE())
+
+			SELECT DISTINCT
+					oel.[machine_name], oel.[time_created], oel.[log_type_desc], oel.[level_desc], 
+					oel.[event_id], oel.[record_id], oel.[source], oel.[message]
+			INTO #filteredStatsOSEventMessagesDetail
+			FROM [dbo].[vw_catalogInstanceNames]	cin
+			INNER JOIN [health-check].[vw_statsOSEventLogs]	oel	ON oel.[project_id] = cin.[project_id] AND oel.[instance_id] = cin.[instance_id]
+			LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+														AND rsr.[rule_id] = 134217728
+														AND rsr.[active] = 1
+														AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+			WHERE cin.[instance_active]=1
+					AND cin.[project_id] = @projectID
+					AND oel.[time_created] >= @dateTimeLowerLimit
+					AND NOT EXISTS	( 
+										SELECT 1
+										FROM	[report].[hardcodedFilters] chf 
+										WHERE	chf.[module] = 'health-check'
+												AND chf.[object_name] = 'statsOSEventLogs]'
+												AND chf.[active] = 1
+												AND PATINDEX(chf.[filter_pattern], oel.[message]) > 0
+									)
+					AND rsr.[id] IS NULL
+			
+			CREATE INDEX IX_filteredStatsOSEventMessagesDetail_MachineName ON #filteredStatsOSEventMessagesDetail([machine_name])
+
+			SET @ErrMessage = 'done'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
+		end
 
 	-----------------------------------------------------------------------------------------------------
 	--Offline Instances
@@ -1140,6 +1238,8 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{InstancesOfflineCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{InstancesOfflineCount}', '(N/A)')
 
 
 	-----------------------------------------------------------------------------------------------------
@@ -1182,16 +1282,22 @@ BEGIN TRY
 			DECLARE crsInstancesOffline CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																				, cin.[is_clustered], cin.[cluster_node_machine_name]
 																				, cin.[version], cin.[edition], cin.[last_refresh_date_utc]	
-																				, shcdd.[size_mb]
+																				, SUM(shcdd.[size_mb]) AS [size_mb]
 																		FROM [dbo].[vw_catalogInstanceNames]  cin
 																		LEFT JOIN 
 																			(
-																				SELECT    [project_id], [instance_id]
+																				SELECT    [project_id], [instance_name]
 																						, SUM(ISNULL([size_mb], 0)) [size_mb]
 																				FROM [health-check].[vw_statsDatabaseDetails]
-																				WHERE [project_id] = @projectID
-																				GROUP BY [project_id], [instance_id]
-																			) shcdd ON shcdd.[instance_id] = cin.[instance_id] AND shcdd.[project_id] = cin.[project_id]
+																				WHERE ( 
+																						  @reportOptionGetProjectDBSize = 0
+																					   OR (@reportOptionGetProjectDBSize = 1 AND [project_id] = @projectID)
+																					 )
+																				GROUP BY [project_id], [instance_name]
+																			) shcdd ON	shcdd.[instance_name] = cin.[instance_name] 
+																						AND (   (@reportOptionGetProjectDBSize =1 AND shcdd.[project_id] = cin.[project_id])
+																							 OR @reportOptionGetProjectDBSize = 0
+																							)
 																		LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																													AND rsr.[rule_id] = 2
 																													AND rsr.[active] = 1
@@ -1199,35 +1305,41 @@ BEGIN TRY
 																		WHERE cin.[instance_active]=1
 																				AND cin.[project_id] = @projectID
 																				AND rsr.[id] IS NULL
+																		GROUP BY  cin.[machine_name], cin.[instance_name]
+																				, cin.[is_clustered], cin.[cluster_node_machine_name]
+																				, cin.[version], cin.[edition], cin.[last_refresh_date_utc]	
 																		ORDER BY cin.[instance_name], cin.[machine_name]
 			OPEN crsInstancesOffline
 			FETCH NEXT FROM crsInstancesOffline INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @version, @edition, @lastRefreshDate, @dbSize
 			WHILE @@FETCH_STATUS=0
 				begin
+					SET @hasDatabaseDetails = 0
 					SELECT	@hasDatabaseDetails = COUNT(*)
 					FROM	[dbo].[vw_catalogDatabaseNames]
 					WHERE	[project_id]=@projectID
 							AND [instance_name] = @instanceName
 
+					SET @hasSQLagentJob = 0
 					SELECT	@hasSQLagentJob = COUNT(*)
 					FROM	[health-check].[vw_statsSQLAgentJobsHistory]
 					WHERE	[project_id]=@projectID
 							AND [instance_name] = @instanceName
 
+					SET @hasDiskSpaceInfo = 0
 					SELECT	@hasDiskSpaceInfo = COUNT(*)
 					FROM	[health-check].[vw_statsDiskSpaceInfo]
 					WHERE	[project_id]=@projectID
 							AND [instance_name] = @instanceName
 					
+					SET @hasErrorlogMessages = 0
 					SELECT	@hasErrorlogMessages = COUNT(*)
-					FROM	[health-check].[vw_statsErrorlogDetails]
-					WHERE	[project_id]=@projectID
-							AND [instance_name] = @instanceName
+					FROM	#filteredStatsSQLServerErrorlogDetail
+					WHERE	[instance_name] = @instanceName
 
+					SET @hasOSEventMessages = 0
 					SELECT	@hasOSEventMessages = COUNT(*)
-					FROM	[health-check].[vw_statsOSEventLogs] 
-					WHERE	[project_id]=@projectID
-							AND [instance_name] = @machineName
+					FROM	#filteredStatsOSEventMessagesDetail
+					WHERE	[machine_name] = @machineName
 																				  
 
 					SET @HTMLReportArea = @HTMLReportArea + 
@@ -1245,8 +1357,12 @@ BEGIN TRY
 												THEN N'<BR><A HREF="#DiskSpaceInformationCompleteDetails' + CASE WHEN @isClustered=0 THEN @machineName ELSE @clusterNodeName END + N'">Disk Space</A>'
 												ELSE N''
 										END +  
-										CASE WHEN @hasErrorlogMessages<>0 AND @flgOptions & 2097152 = 2097152
-												THEN N'<BR><A HREF="#ErrorlogMessagesCompleteDetails' + @instanceName + N'">Errorlog</A>'
+										CASE WHEN @hasErrorlogMessages<>0 AND @flgOptions & 1048576 = 1048576
+												THEN N'<BR><A HREF="#ErrorlogMessagesIssuesDetected' + @instanceName + N'">Errorlog</A>'
+												ELSE N''
+										END +  
+										CASE WHEN @hasOSEventMessages<>0 AND @flgOptions & 134217728 = 134217728
+												THEN N'<BR><A HREF="#OSEventMessagesIssuesDetected' + @machineName + N'">OS Events</A>'
 												ELSE N''
 										END +  
 											N'<BR><BR>
@@ -1276,7 +1392,9 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{InstancesOnlineCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
-		
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{InstancesOnlineCount}', '(N/A)')
+
 
 	-----------------------------------------------------------------------------------------------------
 	--Databases Status - Permission Errors
@@ -1394,6 +1512,8 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasesStatusPermissionErrorsCount}', '(' + CAST((@idx) AS [nvarchar]) + ')')
 		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasesStatusPermissionErrorsCount}', '(N/A)')
 
 
 	-----------------------------------------------------------------------------------------------------
@@ -1409,7 +1529,7 @@ BEGIN TRY
 							N'<A NAME="DatabasesStatusIssuesDetected" class="category-style">Databases Status - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">	
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="5">database status not in (' + @configAdmittedState + N')</TD>
+								<TD class="small-size" COLLSPAN="5">database status not in (' + @reportOptionDatabaseAdmittedState + N')</TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -1437,7 +1557,7 @@ BEGIN TRY
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
 																							AND cin.[project_id] = @projectID	
-																							AND CHARINDEX(cdn.[state_desc], @configAdmittedState)=0
+																							AND CHARINDEX(cdn.[state_desc], @reportOptionDatabaseAdmittedState)=0
 																							AND rsr.[id] IS NULL
 																					ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
 			OPEN crsDatabasesStatusIssuesDetected
@@ -1469,12 +1589,14 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasesStatusIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasesStatusIssuesDetectedCount}', '(N/A)')
 
 
 	-----------------------------------------------------------------------------------------------------
 	--SQL Server Agent Jobs Status - Permission Errors
 	-----------------------------------------------------------------------------------------------------
-	IF (@flgActions & 4 = 4) AND (@flgOptions & 64 = 64)
+	IF (@flgActions & 4 = 4) AND (@flgOptions & 32 = 32)
 		begin
 			SET @ErrMessage = 'Build Report: SQL Server Agent Jobs Status - Permission Errors'
 			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
@@ -1540,6 +1662,8 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{SQLServerAgentJobsStatusPermissionErrorsCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{SQLServerAgentJobsStatusPermissionErrorsCount}', '(N/A)')
 
 
 	-----------------------------------------------------------------------------------------------------
@@ -1552,7 +1676,7 @@ BEGIN TRY
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
-							N'<A NAME="SQLServerAgentJobsStatusIssuesDetected" class="category-style">SQL Server Agent Jobs Status - Issues Detected (last ' + CAST(@configFailuresInLastHours AS [nvarchar]) + N'h)</A><br>
+							N'<A NAME="SQLServerAgentJobsStatusIssuesDetected" class="category-style">SQL Server Agent Jobs Status - Issues Detected (last ' + CAST(@reportOptionJobFailuresInLastHours AS [nvarchar]) + N'h)</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
 								<TD class="small-size" COLLSPAN="6">job status in (Failed, Retry, Canceled)</TD>
@@ -1576,7 +1700,7 @@ BEGIN TRY
 					, @lastExecDate		[varchar](10)
 					, @lastExecTime		[varchar](8)
 			
-			SET @dateTimeLowerLimit = DATEADD(hh, -@configFailuresInLastHours, GETDATE())
+			SET @dateTimeLowerLimit = DATEADD(hh, -@reportOptionJobFailuresInLastHours, GETDATE())
 			DECLARE crsSQLServerAgentJobsStatusIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT	ssajh.[instance_name], ssajh.[job_name], ssajh.[last_execution_status], ssajh.[last_execution_date], ssajh.[last_execution_time], ssajh.[message]
 																								FROM	[health-check].[vw_statsSQLAgentJobsHistory] ssajh
 																								INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[project_id] = ssajh.[project_id] AND cin.[instance_id] = ssajh.[instance_id]
@@ -1633,6 +1757,8 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{SQLServerAgentJobsStatusIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{SQLServerAgentJobsStatusIssuesDetectedCount}', '(N/A)')
 
 
 	-----------------------------------------------------------------------------------------------------
@@ -1648,7 +1774,7 @@ BEGIN TRY
 							N'<A NAME="LongRunningSQLAgentJobsIssuesDetected" class="category-style">Long Running SQL Agent Jobs - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="6">jobs currently running for more than ' + CAST(@configMaxJobRunningTimeInHours AS [nvarchar]) + N'hours</TD>
+								<TD class="small-size" COLLSPAN="6">jobs currently running for more than ' + CAST(@reportOptionMaxJobRunningTimeInHours AS [nvarchar]) + N'hours</TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -1666,7 +1792,7 @@ BEGIN TRY
 
 			DECLARE   @runningTime		[varchar](32)
 			
-			SET @dateTimeLowerLimit = DATEADD(hh, -@configFailuresInLastHours, GETDATE())
+			SET @dateTimeLowerLimit = DATEADD(hh, -@reportOptionJobFailuresInLastHours, GETDATE())
 			DECLARE crsLongRunningSQLAgentJobsIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT	  ssajh.[instance_name], ssajh.[job_name]
 																									, ssajh.[last_execution_date] AS [start_date], ssajh.[last_execution_time] AS [start_time]
 																									, [dbo].[ufn_reportHTMLFormatTimeValue](CAST(ssajh.[running_time_sec]*1000 AS [bigint])) AS [running_time]
@@ -1684,7 +1810,7 @@ BEGIN TRY
 																									AND ssajh.[last_execution_status] = 4
 																									AND ssajh.[last_execution_date] IS NOT NULL
 																									AND ssajh.[last_execution_time] IS NOT NULL
-																									AND (ssajh.[running_time_sec]/3600) >= @configMaxJobRunningTimeInHours
+																									AND (ssajh.[running_time_sec]/3600) >= @reportOptionMaxJobRunningTimeInHours
 																									AND rsr.[id] IS NULL
 																							ORDER BY [start_date], [start_time]
 
@@ -1724,8 +1850,10 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{LongRunningSQLAgentJobsIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{LongRunningSQLAgentJobsIssuesDetectedCount}', '(N/A)')	
 		
-		
+
 	-----------------------------------------------------------------------------------------------------
 	--Low Free Disk Space - Permission Errors
 	-----------------------------------------------------------------------------------------------------
@@ -1838,7 +1966,9 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DiskSpaceInformationPermissionErrorsCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
-	
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DiskSpaceInformationPermissionErrorsCount}', '(N/A)')
+
 
 	-----------------------------------------------------------------------------------------------------
 	--Low Free Disk Space - Issues Detected
@@ -1853,7 +1983,7 @@ BEGIN TRY
 							N'<A NAME="DiskSpaceInformationIssuesDetected" class="category-style">Low Free Disk Space - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="8">free disk space (%) &lt; ' + CAST(@configFreeDiskMinPercent AS [nvarchar](32)) + N' OR free disk space (MB) &lt; ' + CAST(@configFreeDiskMinSpace AS [nvarchar](32)) + N'</TD>
+								<TD class="small-size" COLLSPAN="8">free disk space (%) &lt; ' + CAST(@reportOptionFreeDiskMinPercent  AS [nvarchar](32)) + N' OR free disk space (MB) &lt; ' + CAST(@reportOptionFreeDiskMinSpace AS [nvarchar](32)) + N'</TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -1889,12 +2019,12 @@ BEGIN TRY
 																							WHERE cin.[instance_active]=1
 																									AND cin.[project_id] = @projectID
 																									AND (    (	  dsi.[percent_available] IS NOT NULL 
-																												AND dsi.[percent_available] < @configFreeDiskMinPercent
+																												AND dsi.[percent_available] < @reportOptionFreeDiskMinPercent 
 																												)
 																											OR 
 																											(	   dsi.[percent_available] IS NULL 
 																												AND dsi.[available_space_mb] IS NOT NULL 
-																												AND dsi.[available_space_mb] < @configFreeDiskMinSpace
+																												AND dsi.[available_space_mb] < @reportOptionFreeDiskMinSpace
 																											)
 																										)
 																									AND (dsi.[logical_drive] IN ('C') OR CHARINDEX(dsi.[logical_drive], cdd.[physical_drives])>0)
@@ -1932,8 +2062,10 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DiskSpaceInformationIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DiskSpaceInformationIssuesDetectedCount}', '(N/A)')
 	
-	
+
 	-----------------------------------------------------------------------------------------------------
 	--System Databases Size - Issues Detected
 	-----------------------------------------------------------------------------------------------------
@@ -1947,7 +2079,7 @@ BEGIN TRY
 							N'<A NAME="SystemDatabasesSizeIssuesDetected" class="category-style">System Databases Size - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="5">size master (MB) &ge; ' + CAST(@configDBMaxSizeMaster AS [nvarchar](32)) + N' OR size msdb (MB) &ge; ' + CAST(@configDBMaxSizeMSDB AS [nvarchar](32)) + N'</TD>
+								<TD class="small-size" COLLSPAN="5">size master (MB) &ge; ' + CAST(@reportOptionDatabaseMaxSizeMaster AS [nvarchar](32)) + N' OR size msdb (MB) &ge; ' + CAST(@reportOptionDatabaseMaxSizeMSDB AS [nvarchar](32)) + N'</TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -1975,8 +2107,8 @@ BEGIN TRY
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
 																							AND cin.[project_id] = @projectID	
-																							AND (   (cdn.[database_name]='master' AND shcdd.[size_mb] >= @configDBMaxSizeMaster AND @configDBMaxSizeMaster<>0)
-																								 OR (cdn.[database_name]='msdb'   AND shcdd.[size_mb] >= @configDBMaxSizeMSDB   AND @configDBMaxSizeMSDB<>0)
+																							AND (   (cdn.[database_name]='master' AND shcdd.[size_mb] >= @reportOptionDatabaseMaxSizeMaster AND @reportOptionDatabaseMaxSizeMaster<>0)
+																								 OR (cdn.[database_name]='msdb'   AND shcdd.[size_mb] >= @reportOptionDatabaseMaxSizeMSDB   AND @reportOptionDatabaseMaxSizeMSDB<>0)
 																								)
 																							AND rsr.[id] IS NULL
 																					ORDER BY shcdd.[size_mb] DESC, cin.[instance_name], cin.[machine_name], cdn.[database_name]
@@ -2009,8 +2141,10 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{SystemDatabasesSizeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{SystemDatabasesSizeIssuesDetectedCount}', '(N/A)')	
 		
-		
+
 	-----------------------------------------------------------------------------------------------------
 	--Databases with Auto Close / Shrink - Issues Detected
 	-----------------------------------------------------------------------------------------------------
@@ -2087,8 +2221,10 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasesWithAutoCloseShrinkIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
-		
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasesWithAutoCloseShrinkIssuesDetectedCount}', '(N/A)')	
 	
+
 	-----------------------------------------------------------------------------------------------------
 	--Big Size for Database Log files - Issues Detected
 	-----------------------------------------------------------------------------------------------------
@@ -2102,7 +2238,7 @@ BEGIN TRY
 							N'<A NAME="DatabaseMaxLogSizeIssuesDetected" class="category-style">Big Size for Database Log files - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="6">log size (MB) &ge; ' + CAST(@configLogMaxSize AS [nvarchar](32)) + N'</TD>
+								<TD class="small-size" COLLSPAN="6">log size (MB) &ge; ' + CAST(@reportOptionLogMaxSize AS [nvarchar](32)) + N'</TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -2132,7 +2268,7 @@ BEGIN TRY
 																						WHERE cin.[instance_active]=1
 																								AND cdn.[active]=1
 																								AND cin.[project_id] = @projectID	
-																								AND shcdd.[log_size_mb] >= @configLogMaxSize 
+																								AND shcdd.[log_size_mb] >= @reportOptionLogMaxSize 
 																								AND rsr.[id] IS NULL
 																						ORDER BY shcdd.[log_size_mb] DESC, cin.[instance_name], cin.[machine_name], cdn.[database_name]
 			OPEN crsDatabaseMaxLogSizeIssuesDetected
@@ -2165,6 +2301,8 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseMaxLogSizeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseMaxLogSizeIssuesDetectedCount}', '(N/A)')
 
 
 	-----------------------------------------------------------------------------------------------------
@@ -2180,7 +2318,7 @@ BEGIN TRY
 							N'<A NAME="DatabaseMinDataSpaceIssuesDetected" class="category-style">Low Usage of Data Space - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="8">size (MB) &ge; ' + CAST(@configDBMinSizeForAnalysis AS [nvarchar](32)) + N' AND data size used (%) &le; ' + CAST(@configDataSpaceMinPercent AS [nvarchar](32)) + N'</TD>
+								<TD class="small-size" COLLSPAN="8">size (MB) &ge; ' + CAST(@reportOptionDBMinSizeForAnalysis  AS [nvarchar](32)) + N' AND data size used (%) &le; ' + CAST(@reportOptionDataSpaceMinPercent AS [nvarchar](32)) + N'</TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -2215,9 +2353,9 @@ BEGIN TRY
 																						WHERE cin.[instance_active]=1
 																								AND cdn.[active]=1
 																								AND cin.[project_id] = @projectID	
-																								AND shcdd.[size_mb]>=@configDBMinSizeForAnalysis
-																								AND shcdd.[data_space_used_percent] <= @configDataSpaceMinPercent 
-																								AND @configDataSpaceMinPercent<>0
+																								AND shcdd.[size_mb]>=@reportOptionDBMinSizeForAnalysis 
+																								AND shcdd.[data_space_used_percent] <= @reportOptionDataSpaceMinPercent 
+																								AND @reportOptionDataSpaceMinPercent<>0
 																								AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb', 'distribution')
 																								AND rsr.[id] IS NULL
 																						ORDER BY --[reclaimable_space_mb] DESC, 
@@ -2254,8 +2392,10 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseMinDataSpaceIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
-		
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseMinDataSpaceIssuesDetectedCount}', '(N/A)')
 	
+
 	-----------------------------------------------------------------------------------------------------
 	--High Usage of Log Space - Issues Detected
 	-----------------------------------------------------------------------------------------------------
@@ -2269,7 +2409,7 @@ BEGIN TRY
 							N'<A NAME="DatabaseMaxLogSpaceIssuesDetected" class="category-style">High Usage of Log Space - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="8">size (MB) &ge; ' + CAST(@configDBMinSizeForAnalysis AS [nvarchar](32)) + N' AND log size used (%) &ge; ' + CAST(@configLogSpaceMaxPercent AS [nvarchar](32)) + N'</TD>
+								<TD class="small-size" COLLSPAN="8">size (MB) &ge; ' + CAST(@reportOptionDBMinSizeForAnalysis  AS [nvarchar](32)) + N' AND log size used (%) &ge; ' + CAST(@reportOptionLogSpaceMaxPercent AS [nvarchar](32)) + N'</TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -2304,9 +2444,9 @@ BEGIN TRY
 																						WHERE cin.[instance_active]=1
 																								AND cdn.[active]=1
 																								AND cin.[project_id] = @projectID	
-																								AND shcdd.[size_mb]>=@configDBMinSizeForAnalysis
-																								AND shcdd.[log_space_used_percent] >= @configLogSpaceMaxPercent 
-																								AND @configLogSpaceMaxPercent<>0
+																								AND shcdd.[size_mb]>=@reportOptionDBMinSizeForAnalysis 
+																								AND shcdd.[log_space_used_percent] >= @reportOptionLogSpaceMaxPercent 
+																								AND @reportOptionLogSpaceMaxPercent<>0
 																								AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb', 'distribution')
 																								AND rsr.[id] IS NULL
 																						ORDER BY --[available_space_mb] DESC, 
@@ -2343,8 +2483,10 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseMaxLogSpaceIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
-		
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseMaxLogSpaceIssuesDetectedCount}', '(N/A)')	
 	
+
 	-----------------------------------------------------------------------------------------------------
 	--Log vs. Data - Allocated Size - Issues Detected
 	-----------------------------------------------------------------------------------------------------
@@ -2358,7 +2500,7 @@ BEGIN TRY
 							N'<A NAME="DatabaseLogVsDataSizeIssuesDetected" class="category-style">Log vs. Data - Allocated Size - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="8">size (MB) &ge; ' + CAST(@configDBMinSizeForAnalysis AS [nvarchar](32)) + N' AND log/data size (%) &gt; ' + CAST(@configLogVsDataPercent AS [nvarchar](32)) + N'</TD>
+								<TD class="small-size" COLLSPAN="8">size (MB) &ge; ' + CAST(@reportOptionDBMinSizeForAnalysis  AS [nvarchar](32)) + N' AND log/data size (%) &gt; ' + CAST(@reportOptionLogVsDataPercent AS [nvarchar](32)) + N'</TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -2397,12 +2539,12 @@ BEGIN TRY
 																											AND cdn.[active]=1
 																											AND cin.[project_id] = @projectID	
 																											AND shcdd.[data_size_mb] <> 0
-																											AND (shcdd.[log_size_mb] / shcdd.[data_size_mb] * 100.) > @configLogVsDataPercent
-																											AND shcdd.[size_mb]>=@configDBMinSizeForAnalysis
+																											AND (shcdd.[log_size_mb] / shcdd.[data_size_mb] * 100.) > @reportOptionLogVsDataPercent
+																											AND shcdd.[size_mb]>=@reportOptionDBMinSizeForAnalysis 
 																											AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb', 'distribution')
 																											AND rsr.[id] IS NULL
 																								)X
-																							WHERE [log_vs_data] >= @configLogVsDataPercent
+																							WHERE [log_vs_data] >= @reportOptionLogVsDataPercent
 																							ORDER BY [instance_name], [machine_name], [log_vs_data] DESC, [database_name]
 			OPEN crsDatabaseLogVsDataSizeIssuesDetected
 			FETCH NEXT FROM crsDatabaseLogVsDataSizeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @dataSizeMB, @logSizeMB, @logVSDataPercent
@@ -2436,7 +2578,9 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseLogVsDataSizeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
-		
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseLogVsDataSizeIssuesDetectedCount}', '(N/A)')	
+
 
 	-----------------------------------------------------------------------------------------------------
 	--Databases with Fixed File(s) Size - Issues Detected
@@ -2516,6 +2660,8 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseFixedFileSizeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseFixedFileSizeIssuesDetectedCount}', '(N/A)')
 
 
 	-----------------------------------------------------------------------------------------------------
@@ -2572,7 +2718,7 @@ BEGIN TRY
 																										  AND cin.[version] LIKE '8.%'
 																										)
 																									)
-																								AND CHARINDEX(cdn.[state_desc], @configAdmittedState)<>0
+																								AND CHARINDEX(cdn.[state_desc], @reportOptionDatabaseAdmittedState)<>0
 																								AND rsr.[id] IS NULL
 																						ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
 			OPEN crsDatabasePageVerifyIssuesDetected
@@ -2606,6 +2752,8 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasePageVerifyIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')			
 		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasePageVerifyIssuesDetectedCount}', '(N/A)')
 
 
 	-----------------------------------------------------------------------------------------------------
@@ -2772,8 +2920,10 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{FrequentlyFragmentedIndexesIssuesDetectedCount}', '(' + CAST((@indexAnalyzedCount) AS [nvarchar]) + ')')			
 		end
-		
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{FrequentlyFragmentedIndexesIssuesDetectedCount}', '(N/A)')				
 	
+
 	-----------------------------------------------------------------------------------------------------
 	--Outdated Backup for Databases - Issues Detected
 	-----------------------------------------------------------------------------------------------------
@@ -2787,7 +2937,7 @@ BEGIN TRY
 							N'<A NAME="DatabaseBACKUPAgeIssuesDetected" class="category-style">Outdated Backup for Databases - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="7">backup age (system db) &gt; ' + CAST(@configSystemDatabaseBACKUPAgeDays AS [nvarchar](32)) + N' OR backup age (user db) &gt; ' + CAST(@configUserDatabaseBACKUPAgeDays AS [nvarchar](32)) + N'</TD>
+								<TD class="small-size" COLLSPAN="7">backup age (system db) &gt; ' + CAST(@reportOptionSystemDatabaseBACKUPAgeDays AS [nvarchar](32)) + N' OR backup age (user db) &gt; ' + CAST(@reportOptionUserDatabaseBACKUPAgeDays AS [nvarchar](32)) + N'</TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -2811,10 +2961,10 @@ BEGIN TRY
 																									, shcdd.[last_backup_time]
 																									, DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) AS [backup_age_days]
 																									, CASE WHEN (    cdn.[database_name] NOT IN ('master', 'model', 'msdb', 'distribution') 
-																												AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @configUserDatabaseBACKUPAgeDays
+																												AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @reportOptionUserDatabaseBACKUPAgeDays
 																												)
 																												OR (    cdn.[database_name] IN ('master', 'model', 'msdb', 'distribution') 
-																													AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @configSystemDatabaseBACKUPAgeDays
+																													AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @reportOptionSystemDatabaseBACKUPAgeDays
 																												)
 																												OR (
 																														cdn.[database_name] NOT IN ('tempdb')
@@ -2836,7 +2986,7 @@ BEGIN TRY
 																							WHERE cin.[instance_active]=1
 																									AND cdn.[active]=1
 																									AND cin.[project_id] = @projectID
-																									AND CHARINDEX(cdn.[state_desc], @configAdmittedState) <> 0
+																									AND CHARINDEX(cdn.[state_desc], @reportOptionDatabaseAdmittedState) <> 0
 																									AND rsr.[id] IS NULL
 																						)
 																						SELECT   dbad.[machine_name], dbad.[instance_name], dbad.[is_clustered], dbad.[cluster_node_machine_name]
@@ -2887,8 +3037,10 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseBACKUPAgeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
-
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseBACKUPAgeIssuesDetectedCount}', '(N/A)')
 		
+
 	-----------------------------------------------------------------------------------------------------
 	--Outdated DBCC CHECKDB Databases - Issues Detected
 	-----------------------------------------------------------------------------------------------------
@@ -2902,7 +3054,7 @@ BEGIN TRY
 							N'<A NAME="DatabaseDBCCCHECKDBAgeIssuesDetected" class="category-style">Outdated DBCC CHECKDB Databases - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="7">dbcc checkdb age (system db) &gt; ' + CAST(@configSystemDBCCCHECKDBAgeDays AS [nvarchar](32)) + N' OR dbcc checkdb age (user db) &gt; ' + CAST(@configUserDBCCCHECKDBAgeDays AS [nvarchar](32)) + N'</TD>
+								<TD class="small-size" COLLSPAN="7">dbcc checkdb age (system db) &gt; ' + CAST(@reportOptionSystemDBCCCHECKDBAgeDays AS [nvarchar](32)) + N' OR dbcc checkdb age (user db) &gt; ' + CAST(@reportOptionUserDBCCCHECKDBAgeDays AS [nvarchar](32)) + N'</TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -2938,10 +3090,10 @@ BEGIN TRY
 																									AND cin.[project_id] = @projectID	
 																									AND (
 																											(    cdn.[database_name] NOT IN ('master', 'model', 'msdb', 'distribution') 
-																												AND DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) > @configUserDBCCCHECKDBAgeDays
+																												AND DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) > @reportOptionUserDBCCCHECKDBAgeDays
 																											)
 																											OR (    cdn.[database_name] IN ('master', 'model', 'msdb', 'distribution') 
-																												AND DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) > @configSystemDBCCCHECKDBAgeDays
+																												AND DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) > @reportOptionSystemDBCCCHECKDBAgeDays
 																											)
 																											OR (
 																													cdn.[database_name] NOT IN ('tempdb')
@@ -2983,7 +3135,9 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseDBCCCHECKDBAgeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
-		
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseDBCCCHECKDBAgeIssuesDetectedCount}', '(N/A)')
+
 
 	-----------------------------------------------------------------------------------------------------
 	--Errorlog Messages - Permission Errors
@@ -3054,6 +3208,8 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{ErrorlogMessagesPermissionErrorsCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{ErrorlogMessagesPermissionErrorsCount}', '(N/A)')
 
 
 	-----------------------------------------------------------------------------------------------------
@@ -3066,10 +3222,10 @@ BEGIN TRY
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
-							N'<A NAME="ErrorlogMessagesIssuesDetected" class="category-style">Errorlog Messages - Issues Detected (last ' + CAST(@configErrorlogMessageLastHours AS [nvarchar]) + N'h)</A><br>
+							N'<A NAME="ErrorlogMessagesIssuesDetected" class="category-style">Errorlog Messages - Issues Detected (last ' + CAST(@reportOptionErrorlogMessageLastHours AS [nvarchar]) + N'h)</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="7">limit messages per instance to maximum ' + CAST(@configErrorlogMessageLimit AS [nvarchar](32)) + N' </TD>
+								<TD class="small-size" COLLSPAN="7">limit messages per instance to maximum ' + CAST(@reportOptionErrorlogMessageLimit AS [nvarchar](32)) + N' </TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -3083,44 +3239,6 @@ BEGIN TRY
 			SET @idx=1		
 
 			-----------------------------------------------------------------------------------------------------
-			SET @ErrMessage = 'analyzing errorlog messages'
-			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
-
-			IF OBJECT_ID('tempdb..#filteredStatsSQLServerErrorlogDetail') IS NOT NULL
-				DROP TABLE #filteredStatsSQLServerErrorlogDetail
-
-			SET @dateTimeLowerLimit = DATEADD(hh, -@configErrorlogMessageLastHours, GETDATE())
-
-			SELECT DISTINCT 
-					cin.[instance_name], 
-					eld.[log_date], eld.[id], 
-					eld.[process_info], eld.[text]
-			INTO #filteredStatsSQLServerErrorlogDetail
-			FROM [dbo].[vw_catalogInstanceNames]  cin
-			INNER JOIN [health-check].[vw_statsErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
-			LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-														AND rsr.[rule_id] = 1048576
-														AND rsr.[active] = 1
-														AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-			WHERE cin.[instance_active]=1
-					AND cin.[project_id] = @projectID																							
-					AND eld.[log_date] >= @dateTimeLowerLimit
-					AND NOT EXISTS	( 
-										SELECT 1
-										FROM	[report].[hardcodedFilters] chf 
-										WHERE	chf.[module] = 'health-check'
-												AND chf.[object_name] = 'statsErrorlogDetails'
-												AND chf.[active] = 1
-												AND PATINDEX(chf.[filter_pattern], eld.[text]) > 0
-									)
-					AND rsr.[id] IS NULL
-			
-			CREATE INDEX IX_filteredStatsSQLServerErrorlogDetail_InstanceName ON #filteredStatsSQLServerErrorlogDetail([instance_name])
-
-			SET @ErrMessage = 'done'
-			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
-
-			-----------------------------------------------------------------------------------------------------
 			SET @issuesDetectedCount = 0 
 			DECLARE crsErrorlogMessagesInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT
 																							  [instance_name]
@@ -3132,12 +3250,12 @@ BEGIN TRY
 			FETCH NEXT FROM crsErrorlogMessagesInstanceName INTO @instanceName, @messageCount
 			WHILE @@FETCH_STATUS=0
 				begin
-					IF @messageCount > @configErrorlogMessageLimit SET @messageCount = @configErrorlogMessageLimit
+					IF @messageCount > @reportOptionErrorlogMessageLimit SET @messageCount = @reportOptionErrorlogMessageLimit
 					SET @issuesDetectedCount = @issuesDetectedCount + @messageCount
 
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + '"><A NAME="ErrorlogMessagesCompleteDetails' + @instanceName + N'">' + @instanceName + N'</A></TD>' 
+										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + '"><A NAME="ErrorlogMessagesIssuesDetected' + @instanceName + N'">' + @instanceName + N'</A></TD>' 
 
 					SET @tmpHTMLReport=N''
 					SELECT @tmpHTMLReport=((
@@ -3181,8 +3299,10 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{ErrorlogMessagesIssuesDetectedCount}', '(' + CAST((@issuesDetectedCount) AS [nvarchar]) + ')')
 		end
-
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{ErrorlogMessagesIssuesDetectedCount}', '(N/A)')
 	
+
 	-----------------------------------------------------------------------------------------------------
 	--Databases Status - Complete Details
 	-----------------------------------------------------------------------------------------------------
@@ -3301,7 +3421,7 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	--SQL Server Agent Jobs Status - Complete Details
 	-----------------------------------------------------------------------------------------------------
-	IF (@flgActions & 4 = 4) AND (@flgOptions & 32 = 32)
+	IF (@flgActions & 4 = 4) AND (@flgOptions & 64 = 64)
 		begin
 			SET @ErrMessage = 'Build Report: SQL Server Agent Jobs Status - Complete Details'
 			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
@@ -3427,12 +3547,25 @@ BEGIN TRY
 
 			SET @idx=1		
 
+			SET @volumeCount = 0
 			DECLARE crsDiskSpaceInformationMachineNames CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT
 																								  cin.[machine_name]/*, cin.[instance_name]*/
 																								, cin.[is_clustered], cin.[cluster_node_machine_name]
 																								, COUNT(*) AS [volume_count]
 																						FROM [dbo].[vw_catalogInstanceNames]  cin
-																						INNER JOIN [health-check].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
+																						INNER JOIN 
+																								(
+																								 SELECT  DISTINCT 
+																									  	  dsi.[instance_id]
+																										, dsi.[project_id] 
+																										, dsi.[logical_drive]
+																										, dsi.[volume_mount_point]
+																										, MAX(dsi.[total_size_mb])		AS [total_size_mb]
+																										, MIN(dsi.[available_space_mb]) AS [available_space_mb]
+																										, MIN(dsi.[percent_available])	AS [percent_available]
+																								 FROM [health-check].[vw_statsDiskSpaceInfo]		dsi
+																								 GROUP BY  dsi.[instance_id], dsi.[project_id], dsi.[logical_drive], dsi.[volume_mount_point]
+																								)dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
 																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																	AND rsr.[rule_id] = 65536
 																																	AND rsr.[active] = 1
@@ -3473,7 +3606,19 @@ BEGIN TRY
 																, ROW_NUMBER() OVER(ORDER BY dsi.[logical_drive], dsi.[volume_mount_point]) [row_no]
 																, SUM(1) OVER() AS [row_count]
 													FROM [dbo].[vw_catalogInstanceNames] cin
-													INNER JOIN [health-check].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
+													INNER JOIN 
+															(
+																SELECT  DISTINCT 
+																		dsi.[instance_id]
+																	, dsi.[project_id] 
+																	, dsi.[logical_drive]
+																	, dsi.[volume_mount_point]
+																	, MAX(dsi.[total_size_mb])		AS [total_size_mb]
+																	, MIN(dsi.[available_space_mb]) AS [available_space_mb]
+																	, MIN(dsi.[percent_available])	AS [percent_available]
+																FROM [health-check].[vw_statsDiskSpaceInfo]		dsi
+																GROUP BY  dsi.[instance_id], dsi.[project_id], dsi.[logical_drive], dsi.[volume_mount_point]
+															) dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
 													WHERE	cin.[instance_active]=1
 															AND cin.[project_id] = @projectID	
 															/*AND cin.[instance_name] =  @instanceName*/
@@ -3504,101 +3649,6 @@ BEGIN TRY
 
 			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
-		end
-
-
-	-----------------------------------------------------------------------------------------------------
-	--Errorlog Messages - Complete Details
-	-----------------------------------------------------------------------------------------------------
-	IF (@flgActions & 16 = 16) AND (@flgOptions & 2097152 = 2097152)
-		begin
-			SET @ErrMessage = 'Build Report: Errorlog Messages - Complete Details'
-			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
-			SET @idx=1		
-			
-			SET @HTMLReportArea = N''
-			SET @HTMLReportArea = @HTMLReportArea + 
-					N'<A NAME="ErrorlogMessagesCompleteDetails" class="category-style">Errorlog Messages - Complete Details (last ' + CAST(@configErrorlogMessageLastHours AS [nvarchar]) + N'h)</A><br>
-							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
-							<TR VALIGN=TOP>
-								<TD WIDTH="1130px">
-									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
-										N'<TR class="color-3">
-											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
-											<TH WIDTH="160px" class="details-bold" nowrap>Log Date</TH>
-											<TH WIDTH= "60px" class="details-bold" nowrap>Process Info</TH>
-											<TH WIDTH="710px" class="details-bold">Message</TH>'
-
-			SET @dateTimeLowerLimit = DATEADD(hh, -@configErrorlogMessageLastHours, GETDATE())
-			
-			DECLARE crsErrorlogMessagesInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT
-																							  cin.[instance_name]
-																							, COUNT(*) AS [messages_count]
-																					FROM [dbo].[vw_catalogInstanceNames]  cin
-																					INNER JOIN [health-check].[vw_statsErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
-																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																AND rsr.[rule_id] = 2097152
-																																AND rsr.[active] = 1
-																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																					WHERE cin.[instance_active]=1
-																							AND cin.[project_id] = @projectID	
-																							AND eld.[log_date] >= @dateTimeLowerLimit
-																							AND rsr.[id] IS NULL
-																					GROUP BY cin.[instance_name]
-																					ORDER BY cin.[instance_name]
-			OPEN crsErrorlogMessagesInstanceName
-			FETCH NEXT FROM crsErrorlogMessagesInstanceName INTO @instanceName, @messageCount
-			WHILE @@FETCH_STATUS=0
-				begin
-					SET @HTMLReportArea = @HTMLReportArea + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + '"><A NAME="ErrorlogMessagesCompleteDetails' + @instanceName + N'">' + @instanceName + N'</A></TD>' 
-
-					SET @tmpHTMLReport=N''
-					SELECT @tmpHTMLReport=((
-											SELECT	N'<TD WIDTH="160px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), [log_date], 121), N'&nbsp;') + N'</TD>' + 
-														N'<TD WIDTH="60px" class="details" ALIGN="LEFT">' + ISNULL([process_info], N'&nbsp;') + N'</TD>' + 
-														N'<TD WIDTH="710px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText]([text], 0), N'&nbsp;') + N'</TD>' + 
-													N'</TR>' + 
-													CASE WHEN [row_count] > [row_no]
-														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
-														 ELSE N''
-													END
-
-											FROM (
-													SELECT	eld.[log_date], eld.[id], eld.[process_info], eld.[text]
-															, ROW_NUMBER() OVER(ORDER BY eld.[log_date], eld.[id]) [row_no]
-															, SUM(1) OVER() AS [row_count]
-													FROM	[health-check].[vw_statsErrorlogDetails] eld
-													WHERE	eld.[project_id]=@projectID
-															AND eld.[instance_name] = @instanceName
-															AND eld.[log_date] >= @dateTimeLowerLimit
-												)X
-											ORDER BY [log_date], [id]
-											FOR XML PATH(''), TYPE
-											).value('.', 'nvarchar(max)'))
-
-					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
-					SET @idx=@idx + 1
-
-					FETCH NEXT FROM crsErrorlogMessagesInstanceName INTO @instanceName, @messageCount
-
-					IF @@FETCH_STATUS=0
-						SET @HTMLReportArea = @HTMLReportArea + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
-											<TD class="details" COLSPAN=4>&nbsp;</TD>
-									</TR>'
-				end
-			CLOSE crsErrorlogMessagesInstanceName
-			DEALLOCATE crsErrorlogMessagesInstanceName
-
-			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
-								</TD>
-							</TR>
-						</TABLE>'
-
-			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
-			SET @HTMLReport = @HTMLReport + @HTMLReportArea						
 		end
 
 
@@ -3671,22 +3721,24 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesPermissionErrorsCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
 		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesPermissionErrorsCount}', '(N/A)')
 
 
 	-----------------------------------------------------------------------------------------------------
-	--OS Event messages - Complete Details
+	--OS Event messages - Issues Detected
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 32 = 32) AND (@flgOptions & 134217728 = 134217728)
 		begin
-			SET @ErrMessage = 'Build Report: OS Event messages - Complete Details'
+			SET @ErrMessage = 'Build Report: OS Event messages - Issues Detected'
 			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
-							N'<A NAME="OSEventMessagesCompleteDetails" class="category-style">OS Event messages - Complete Details (last ' + CAST(@configOSEventMessageLastHours AS [nvarchar]) + N'h)</A><br>
+							N'<A NAME="OSEventMessagesIssuesDetected" class="category-style">OS Events Messages - Issues Detected (last ' + CAST(@reportOptionOSEventMessageLastHours AS [nvarchar]) + N'h)</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="7">limit messages per machine to maximum ' + CAST(@configOSEventMessageLimit AS [nvarchar](32)) + N' </TD>
+								<TD class="small-size" COLLSPAN="7">limit messages per machine to maximum ' + CAST(@reportOptionOSEventMessageLimit AS [nvarchar](32)) + N' </TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD class="small-size" COLLSPAN="7">Severity: Critical, Error' + CASE WHEN @configOSEventGetWarningsEvent=1 THEN N', Warning' ELSE N'' END + CASE WHEN @configOSEventGetInformationEvent=1 THEN N', Information' ELSE N'' END + N' </TD>
@@ -3704,33 +3756,25 @@ BEGIN TRY
 											<TH WIDTH="480px" class="details-bold">Message</TH>'
 			SET @idx=1		
 
-			SET @dateTimeLowerLimit = DATEADD(hh, -@configOSEventMessageLastHours, GETDATE())
+			SET @dateTimeLowerLimit = DATEADD(hh, -@reportOptionOSEventMessageLastHours, GETDATE())
 			SET @issuesDetectedCount = 0 
 			
 			DECLARE crsOSEventMessagesInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT
-																							  oel.[machine_name]
+																							  [machine_name]
 																							, COUNT(*) AS [messages_count]
-																					FROM [dbo].[vw_catalogInstanceNames]	cin
-																					INNER JOIN [health-check].[vw_statsOSEventLogs]	oel	ON oel.[project_id] = cin.[project_id] AND oel.[instance_id] = cin.[instance_id]
-																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																AND rsr.[rule_id] = 134217728
-																																AND rsr.[active] = 1
-																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																					WHERE cin.[instance_active]=1
-																							AND cin.[project_id] = @projectID
-																							AND rsr.[id] IS NULL
-																					GROUP BY oel.[machine_name]
-																					ORDER BY oel.[machine_name]
+																					FROM #filteredStatsOSEventMessagesDetail
+																					GROUP BY [machine_name]
+																					ORDER BY [machine_name]
 			OPEN crsOSEventMessagesInstanceName
 			FETCH NEXT FROM crsOSEventMessagesInstanceName INTO @machineName, @messageCount
 			WHILE @@FETCH_STATUS=0
 				begin
-					IF @messageCount > @configOSEventMessageLimit SET @messageCount = @configOSEventMessageLimit
+					IF @messageCount > @reportOptionOSEventMessageLimit SET @messageCount = @reportOptionOSEventMessageLimit
 					SET @issuesDetectedCount = @issuesDetectedCount + @messageCount
 
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + '"><A NAME="OSEventMessagesCompleteDetails' + @machineName + N'">' + @machineName + N'</A></TD>' 
+										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + '"><A NAME="OSEventMessagesIssuesDetected' + @machineName + N'">' + @machineName + N'</A></TD>' 
 
 					SET @tmpHTMLReport=N''
 					SELECT @tmpHTMLReport=((
@@ -3747,14 +3791,13 @@ BEGIN TRY
 													END
 
 											FROM (
-													SELECT  TOP (@configOSEventMessageLimit)
-															oel.[time_created], oel.[log_type_desc], oel.[level_desc], 
-															oel.[event_id], oel.[record_id], oel.[source], oel.[message]
-															, ROW_NUMBER() OVER(ORDER BY oel.[time_created], oel.[record_id]) [row_no]
+													SELECT  TOP (@reportOptionOSEventMessageLimit)
+															[time_created], [log_type_desc], [level_desc], 
+															[event_id], [record_id], [source], [message]
+															, ROW_NUMBER() OVER(ORDER BY [time_created], [record_id]) [row_no]
 															, SUM(1) OVER() AS [row_count]
-													FROM [health-check].[vw_statsOSEventLogs]	oel
-													WHERE	oel.[project_id]=@projectID
-															AND oel.[machine_name] = @machineName
+													FROM #filteredStatsOSEventMessagesDetail
+													WHERE	[machine_name] = @machineName
 												)X
 											ORDER BY [time_created], [record_id]
 											FOR XML PATH(''), TYPE
@@ -3778,6 +3821,8 @@ BEGIN TRY
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesIssuesDetectedCount}', '(' + CAST((@issuesDetectedCount) AS [nvarchar]) + ')')
 		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesIssuesDetectedCount}', '(N/A)')
 
 
 	-----------------------------------------------------------------------------------------------------

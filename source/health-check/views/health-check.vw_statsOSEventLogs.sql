@@ -16,10 +16,11 @@ AS
 -- Module			 : Database Analysis & Performance Monitoring
 -- ============================================================================
 
-SELECT 	  cin.[project_id]		AS [project_id]
-		, cin.[id]				AS [instance_id]
-		, cin.[name]			AS [instance_name]
-		, cmn.[id]				AS [machine_id]
+SELECT 	  cin.[project_id]
+		, cin.[instance_id]
+		, cin.[instance_name]
+		, cin.[machine_id]
+		, cin.[machine_name]
 		, soel.[event_date_utc]
 		, soel.[log_type_id]
 		, CASE soel.[log_type_id] WHEN 1 THEN 'Application'
@@ -39,11 +40,9 @@ SELECT 	  cin.[project_id]		AS [project_id]
 		, soel.[source]
 		, soel.[process_id]
 		, soel.[thread_id]
-		, soel.[machine_name]
 		, soel.[user_id]
 		, soel.[time_created]
 		, soel.[message]
 FROM [health-check].[statsOSEventLogs]	soel
-INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = soel.[instance_id] AND cin.[project_id] = soel.[project_id]
-INNER JOIN [dbo].[catalogMachineNames]  cmn ON cmn.[id] = soel.[machine_id] AND cmn.[project_id] = soel.[project_id]
+INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[instance_id] = soel.[instance_id] AND cin.[project_id] = soel.[project_id] AND cin.[machine_id] = soel.[machine_id]
 GO

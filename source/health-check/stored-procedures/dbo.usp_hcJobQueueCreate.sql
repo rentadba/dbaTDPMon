@@ -37,10 +37,11 @@ DECLARE   @codeDescriptor		[varchar](260)
 		, @projectID			[smallint]
 		, @instanceID			[smallint]
 		, @configParallelJobs	[int]
+		, @maxPriorityValue		[int]
 
 DECLARE @jobExecutionQueue TABLE
 		(
-			[id]					[smallint]		NOT NULL IDENTITY(1,1),
+			[id]					[int]			NOT NULL IDENTITY(1,1),
 			[instance_id]			[smallint]		NOT NULL,
 			[project_id]			[smallint]		NOT NULL,
 			[module]				[varchar](32)	NOT NULL,
@@ -51,7 +52,8 @@ DECLARE @jobExecutionQueue TABLE
 			[job_step_name]			[sysname]		NOT NULL,
 			[job_database_name]		[sysname]		NOT NULL,
 			[job_command]			[nvarchar](max) NOT NULL,
-			[task_id]				[bigint]		NOT NULL
+			[task_id]				[bigint]		NOT NULL,
+			[priority]				[int]			NULL
 		)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
@@ -145,7 +147,7 @@ WHILE @@FETCH_STATUS=0
 												, [job_command])
 						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, 
 								X.[instance_id] AS [for_instance_id], 
-								SUBSTRING(DB_NAME() + ' - ' + 'usp_hcCollectDatabaseDetails' + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') + ' '  ELSE ' - ' END + @projectCode, 1, 128) AS [job_name],
+								SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') + ' '  ELSE ' - ' END + @projectCode, 1, 128) AS [job_name],
 								'Run Collect'	AS [job_step_name],
 								DB_NAME()		AS [job_database_name],
 								'EXEC [dbo].[usp_hcCollectDatabaseDetails] @projectCode = ''' + @projectCode + ''', @sqlServerNameFilter = ''' + X.[instance_name] + ''', @databaseNameFilter = ''%'', @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -173,7 +175,7 @@ WHILE @@FETCH_STATUS=0
 												, [job_command])
 						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, 
 								X.[instance_id] AS [for_instance_id], 
-								SUBSTRING(DB_NAME() + ' - ' + 'usp_hcCollectSQLServerAgentJobsStatus' + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') + ' '  ELSE ' - ' END + @projectCode, 1, 128) AS [job_name],
+								SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') + ' '  ELSE ' - ' END + @projectCode, 1, 128) AS [job_name],
 								'Run Collect'	AS [job_step_name],
 								DB_NAME()		AS [job_database_name],
 								'EXEC [dbo].[usp_hcCollectSQLServerAgentJobsStatus] @projectCode = ''' + @projectCode + ''', @sqlServerNameFilter = ''' + X.[instance_name] + ''', @jobNameFilter = ''%'', @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -201,7 +203,7 @@ WHILE @@FETCH_STATUS=0
 												, [job_command])
 						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, 
 								X.[instance_id] AS [for_instance_id], 
-								SUBSTRING(DB_NAME() + ' - ' + 'usp_hcCollectDiskSpaceUsage' + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') + ' '  ELSE ' - ' END + @projectCode, 1, 128) AS [job_name],
+								SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') + ' '  ELSE ' - ' END + @projectCode, 1, 128) AS [job_name],
 								'Run Collect'	AS [job_step_name],
 								DB_NAME()		AS [job_database_name],
 								'EXEC [dbo].[usp_hcCollectDiskSpaceUsage] @projectCode = ''' + @projectCode + ''', @sqlServerNameFilter = ''' + X.[instance_name] + ''', @enableXPCMDSHELL = ' + CAST(@enableXPCMDSHELL AS [varchar]) + ', @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -231,7 +233,7 @@ WHILE @@FETCH_STATUS=0
 												, [job_command])
 						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, 
 								X.[instance_id] AS [for_instance_id], 
-								SUBSTRING(DB_NAME() + ' - ' + 'usp_hcCollectErrorlogMessages' + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') + ' '  ELSE ' - ' END + @projectCode, 1, 128) AS [job_name],
+								SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') + ' '  ELSE ' - ' END + @projectCode, 1, 128) AS [job_name],
 								'Run Collect'	AS [job_step_name],
 								DB_NAME()		AS [job_database_name],
 								'EXEC [dbo].[usp_hcCollectErrorlogMessages] @projectCode = ''' + @projectCode + ''', @sqlServerNameFilter = ''' + X.[instance_name] + ''', @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -259,7 +261,7 @@ WHILE @@FETCH_STATUS=0
 												, [job_command])
 						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, 
 								X.[instance_id] AS [for_instance_id], 
-								SUBSTRING(DB_NAME() + ' - ' + 'usp_hcCollectEventMessages' + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') + ' '  ELSE ' - ' END + @projectCode, 1, 128) AS [job_name],
+								SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') + ' '  ELSE ' - ' END + @projectCode, 1, 128) AS [job_name],
 								'Run Collect'	AS [job_step_name],
 								DB_NAME()		AS [job_database_name],
 								'EXEC [dbo].[usp_hcCollectEventMessages] @projectCode = ''' + @projectCode + ''', @sqlServerNameFilter = ''' + X.[instance_name] + ''', @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -288,7 +290,7 @@ WHILE @@FETCH_STATUS=0
 												, [job_command])
 						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, CASE WHEN L.[log_type_name] <> '%' THEN L.[log_type_name] ELSE NULL END AS [filter],
 								X.[instance_id] AS [for_instance_id], 
-								SUBSTRING(DB_NAME() + ' - ' + 'usp_hcCollectOSEventLogs' + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') ELSE '' END + CASE WHEN L.[log_type_name] <> '%' THEN ' (' + L.[log_type_name] + ')' ELSE '' END + ' - ' + @projectCode, 1, 128) AS [job_name],
+								SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + REPLACE(X.[instance_name], '\', '$') ELSE '' END + CASE WHEN L.[log_type_name] <> '%' THEN ' (' + L.[log_type_name] + ')' ELSE '' END + ' - ' + @projectCode, 1, 128) AS [job_name],
 								'Run Collect'	AS [job_step_name],
 								DB_NAME()		AS [job_database_name],
 								'EXEC [dbo].[usp_hcCollectOSEventLogs] @projectCode = ''' + @projectCode + ''', @sqlServerNameFilter = ''' + X.[instance_name] + ''', @logNameFilter = ''' + L.[log_type_name] + ''', @enableXPCMDSHELL = ' + CAST(@enableXPCMDSHELL AS [varchar]) + ', @debugMode = ' + CAST(@debugMode AS [varchar])
@@ -313,11 +315,6 @@ WHILE @@FETCH_STATUS=0
 								WHERE [priority] = 1
 							)X,
 							(
-								/*
-								SELECT 'Application' AS [log_type_name], 1 AS [log_type_id] UNION ALL
-								SELECT 'System'		 AS [log_type_name], 2 AS [log_type_id] UNION ALL
-								SELECT 'Setup'		 AS [log_type_name], 3 AS [log_type_id] 
-								*/
 								SELECT '%'		 AS [log_type_name], 3 AS [log_type_id] 
 							)L
 
@@ -354,6 +351,43 @@ WHILE @@FETCH_STATUS=0
 			end
 
 		IF @recreateMode = 0
+			begin
+				/* preserve any unfinished job and increase its priority */
+				UPDATE jeqX
+					SET jeqX.[priority] = X.[new_priority]
+				FROM  @jobExecutionQueue jeqX
+				INNER JOIN (
+							SELECT	S.[id], 
+									ROW_NUMBER() OVER (ORDER BY jeq.[id]) AS [new_priority]
+							FROM [dbo].[jobExecutionQueue] jeq
+							INNER JOIN @jobExecutionQueue S ON		jeq.[instance_id] = S.[instance_id]
+																AND jeq.[project_id] = S.[project_id]
+																AND jeq.[module] = S.[module]
+																AND jeq.[descriptor] = S.[descriptor]
+																AND jeq.[for_instance_id] = S.[for_instance_id]
+																AND (jeq.[job_name] = S.[job_name] OR jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_'))
+																AND jeq.[job_step_name] = S.[job_step_name]
+																AND jeq.[job_database_name] = S.[job_database_name]
+							WHERE [status] = -1 /* previosly not completed jobs */
+							) X ON jeqX.[id] = X.[id]
+
+				SELECT @maxPriorityValue = MAX([priority])	
+				FROM @jobExecutionQueue
+						
+				SET @maxPriorityValue = ISNULL(@maxPriorityValue, 0)
+
+				/* assign priorities to current generated queue */
+				UPDATE jeqX
+					SET jeqX.[priority] = X.[new_priority]
+				FROM  @jobExecutionQueue jeqX
+				INNER JOIN (
+							SELECT	[id], 
+									@maxPriorityValue + ROW_NUMBER() OVER (ORDER BY [id]) AS [new_priority]
+							FROM @jobExecutionQueue 
+							WHERE [priority] IS NULL
+							) X ON jeqX.[id] = X.[id] 
+
+				/* reset current jobs state */
 				UPDATE jeq
 					SET   jeq.[execution_date] = NULL
 						, jeq.[running_time_sec] = NULL
@@ -370,6 +404,7 @@ WHILE @@FETCH_STATUS=0
 													AND (jeq.[job_name] = S.[job_name] OR jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_'))
 													AND jeq.[job_step_name] = S.[job_step_name]
 													AND jeq.[job_database_name] = S.[job_database_name]
+			end
 
 		INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor], [task_id]
 												, [for_instance_id], [job_name], [job_step_name], [job_database_name]

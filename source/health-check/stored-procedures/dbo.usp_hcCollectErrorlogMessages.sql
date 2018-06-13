@@ -41,7 +41,8 @@ DECLARE @projectID				[smallint],
 
 DECLARE @SQLMajorVersion		[int],
 		@sqlServerVersion		[sysname],
-		@configErrorlogFileNo	[int]
+		@configErrorlogFileNo	[int],
+		@errorlogFileNo			[int]
 
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
@@ -133,20 +134,21 @@ WHILE @@FETCH_STATUS=0
 		TRUNCATE TABLE #xpReadErrorLog
 
 		/* get errorlog messages */
-		WHILE @configErrorlogFileNo > 0
+		SET @errorlogFileNo = @configErrorlogFileNo
+		WHILE @errorlogFileNo > 0
 			begin
 				IF @sqlServerName <> @@SERVERNAME
 					begin
 						IF @SQLMajorVersion < 11
 							IF @SQLMajorVersion > 8
-								SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@configErrorlogFileNo-1) AS [nvarchar]) + ''')x'
+								SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar]) + ''')x'
 							ELSE 
 								SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog'')x'
 						ELSE
-							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@configErrorlogFileNo-1) AS [nvarchar]) + ' WITH RESULT SETS(([log_date] [datetime] NULL, [process_info] [sysname] NULL, [text] [varchar](max) NULL))'')x'
+							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar]) + ' WITH RESULT SETS(([log_date] [datetime] NULL, [process_info] [sysname] NULL, [text] [varchar](max) NULL))'')x'
 					end
 				ELSE
-					SET @queryToRun = N'xp_readerrorlog ' + CAST((@configErrorlogFileNo-1) AS [nvarchar])
+					SET @queryToRun = N'xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar])
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				BEGIN TRY
@@ -169,7 +171,7 @@ WHILE @@FETCH_STATUS=0
 									, @strMessage
 				END CATCH
 
-				SET @configErrorlogFileNo = @configErrorlogFileNo - 1
+				SET @errorlogFileNo = @errorlogFileNo - 1
 			end
 
 		/* re-parse messages for 2k version */

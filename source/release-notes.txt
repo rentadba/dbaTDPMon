@@ -742,3 +742,6 @@
 
 /* 11.06.2018 */
 	- monitoring: add option for Transaction Status to exclude alerts based on login_name (monitoring.alertSkipRules skip_value2 column)
+
+/* 13.06.2018 */
+	- health-check: fix small defects on health-check report generation for projects having multiple instances
