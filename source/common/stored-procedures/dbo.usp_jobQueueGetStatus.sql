@@ -264,7 +264,20 @@ IF @minJobToRunBeforeExit=0
 
 		SET @strMessage='Currently running jobs : ' + CAST(@runningJobs AS [varchar])
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-	end
 
+		/* if there are "skipped" jobs, update status to success */
+		UPDATE [dbo].[jobExecutionQueue]
+			SET [status] = 0
+		WHERE [id] IN (
+						SELECT  [id]
+						FROM [dbo].[vw_jobExecutionQueue]
+						WHERE  [project_id] = @projectID 
+								AND [module] LIKE @moduleFilter
+								AND (    [descriptor] LIKE @descriptorFilter
+										OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
+									)			
+								AND [status]=4 /* in progress */
+					  )
+	end
 RETURN @runningJobs
 GO
