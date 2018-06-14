@@ -1133,7 +1133,7 @@ BEGIN TRY
 			SET @dateTimeLowerLimit = DATEADD(hh, -@reportOptionOSEventMessageLastHours, GETDATE())
 
 			SELECT DISTINCT
-					oel.[machine_name], oel.[time_created], oel.[log_type_desc], oel.[level_desc], 
+					oel.[machine_name], CONVERT([datetime], oel.[time_created]) [time_created], oel.[log_type_desc], oel.[level_desc], 
 					oel.[event_id], oel.[record_id], oel.[source], oel.[message]
 			INTO #filteredStatsOSEventMessagesDetail
 			FROM [dbo].[vw_catalogInstanceNames]	cin
@@ -1144,7 +1144,7 @@ BEGIN TRY
 														AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 			WHERE cin.[instance_active]=1
 					AND cin.[project_id] = @projectID
-					AND oel.[time_created] >= @dateTimeLowerLimit
+					AND CONVERT([datetime], oel.[time_created]) >= @dateTimeLowerLimit
 					AND NOT EXISTS	( 
 										SELECT 1
 										FROM	[report].[hardcodedFilters] chf 

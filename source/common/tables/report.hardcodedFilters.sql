@@ -97,5 +97,11 @@ INSERT	INTO [report].[hardcodedFilters] ([module], [object_name], [filter_patter
 		SELECT 'health-check', 'statsErrorlogDetails', '%Login failed for user %', 1 UNION ALL
 		SELECT 'health-check', 'statsErrorlogDetails', '%SQL Trace%', 1  UNION ALL
 		SELECT 'health-check', 'statsErrorlogDetails', '%UTC adjustment%', 1  UNION ALL
-		SELECT 'health-check', 'statsErrorlogDetails', '%Default collation:%', 1 
+		SELECT 'health-check', 'statsErrorlogDetails', '%Default collation:%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Error: 18470, Severity: 14, State: 1.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Error: 17892, Severity: 20, State: 1.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Logon failed for login ''%'' due to trigger execution.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%The transaction ended in the trigger. The batch has been aborted.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Error: 18487, Severity: 14, State: 1.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Error: 3609, Severity: 16, State: 2.%', 1 
 GO
