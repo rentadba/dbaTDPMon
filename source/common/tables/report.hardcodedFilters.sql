@@ -103,5 +103,16 @@ INSERT	INTO [report].[hardcodedFilters] ([module], [object_name], [filter_patter
 		SELECT 'health-check', 'statsErrorlogDetails', '%Logon failed for login ''%'' due to trigger execution.%', 1 UNION ALL
 		SELECT 'health-check', 'statsErrorlogDetails', '%The transaction ended in the trigger. The batch has been aborted.%', 1 UNION ALL
 		SELECT 'health-check', 'statsErrorlogDetails', '%Error: 18487, Severity: 14, State: 1.%', 1 UNION ALL
-		SELECT 'health-check', 'statsErrorlogDetails', '%Error: 3609, Severity: 16, State: 2.%', 1 
+		SELECT 'health-check', 'statsErrorlogDetails', '%Error: 3609, Severity: 16, State: 2.%', 1  UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%FlushCache: cleaned up % bufs with % writes in % ms%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%average writes per second%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%average throughput%I/O saturation%context switches%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%last target outstanding%avgWriteLatency%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%DbMgrPartnerCommitPolicy::SetSyncAndRecoveryPoint:%', 1 UNION ALL
+
+		SELECT 'health-check', 'statsOSEventLogs', '%Logon failed for login%', 1 UNION ALL
+		SELECT 'health-check', 'statsOSEventLogs', '%Unable to retrieve steps for job%', 1 UNION ALL
+		SELECT 'health-check', 'statsOSEventLogs', '%Unable to determine if the owner%of job%has server access%', 1
 GO
+
+
