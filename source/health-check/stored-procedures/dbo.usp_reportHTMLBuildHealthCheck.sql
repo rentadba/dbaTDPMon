@@ -1149,7 +1149,7 @@ BEGIN TRY
 										SELECT 1
 										FROM	[report].[hardcodedFilters] chf 
 										WHERE	chf.[module] = 'health-check'
-												AND chf.[object_name] = 'statsOSEventLogs]'
+												AND chf.[object_name] = 'statsOSEventLogs'
 												AND chf.[active] = 1
 												AND PATINDEX(chf.[filter_pattern], oel.[message]) > 0
 									)

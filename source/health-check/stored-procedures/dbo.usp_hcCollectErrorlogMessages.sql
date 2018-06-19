@@ -37,7 +37,10 @@ DECLARE @projectID				[smallint],
 		@queryToRun				[nvarchar](4000),
 		@strMessage				[nvarchar](max),
 		@errorCode				[int],
-		@lineID					[int]
+		@lineID					[int],
+		@hoursOffsetToUTC		[smallint],
+		@queryParam				[nvarchar](max)
+
 
 DECLARE @SQLMajorVersion		[int],
 		@sqlServerVersion		[sysname],
@@ -124,6 +127,17 @@ WHILE @@FETCH_STATUS=0
 		SET @strMessage= 'Analyzing server: ' + @sqlServerName
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
+		-------------------------------------------------------------------------------------------------------------------------
+		/* get local time to UTC offset */
+		SET @queryToRun='SELECT DATEDIFF(hh, GETDATE(), GETUTCDATE()) AS [offset_to_utc]' 
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		SET @queryToRun = 'SELECT @hoursOffsetToUTC = [offset_to_utc] FROM (' + @queryToRun + ')y'
+		SET @queryParam = '@hoursOffsetToUTC [smallint] OUTPUT'
+		
+		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+		EXEC sp_executesql @queryToRun, @queryParam, @hoursOffsetToUTC = @hoursOffsetToUTC OUT
+
+		-------------------------------------------------------------------------------------------------------------------------
 		BEGIN TRY
 			SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(@sqlServerVersion, ''), 2), '.', '') 
 		END TRY
@@ -180,24 +194,6 @@ WHILE @@FETCH_STATUS=0
 				SET @strMessage= 'rebuild messages for ContinuationRows'
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
 
-				/*
-				DECLARE crsErrorlogContinuation CURSOR LOCAL FAST_FORWARD FOR	SELECT [id], [text]
-																				FROM #xpReadErrorLog
-																				WHERE [continuation_row]=1
-				OPEN crsErrorlogContinuation
-				FETCH NEXT FROM crsErrorlogContinuation INTO @lineID, @strMessage
-				WHILE @@FETCH_STATUS=0
-					begin
-						UPDATE #xpReadErrorLog
-							SET [text] = [text] + @strMessage
-						WHERE [id] = @lineID-1
-
-						FETCH NEXT FROM crsErrorlogContinuation INTO @lineID, @strMessage
-					end
-				CLOSE crsErrorlogContinuation
-				DEALLOCATE crsErrorlogContinuation
-				*/
-
 				UPDATE S
 					SET S.[text] = S.[text] + D.[text]
 				FROM #xpReadErrorLog S
@@ -234,8 +230,9 @@ WHILE @@FETCH_STATUS=0
 			end
 
 		/* save results to stats table */
-		INSERT	INTO [health-check].[statsErrorlogDetails]([instance_id], [project_id], [event_date_utc], [log_date], [process_info], [text])
-				SELECT @instanceID, @projectID, GETUTCDATE(), [log_date], [process_info], [text]
+		INSERT	INTO [health-check].[statsErrorlogDetails]([instance_id], [project_id], [event_date_utc], [log_date], [process_info], [text], [log_date_utc])
+				SELECT   @instanceID, @projectID, GETUTCDATE(), [log_date], [process_info], [text]
+						, DATEADD(hh, @hoursOffsetToUTC, CAST([log_date] AS [datetime])) AS [log_date_utc]
 				FROM #xpReadErrorLog
 				WHERE [log_date] IS NOT NULL
 				ORDER BY [log_date], [id]

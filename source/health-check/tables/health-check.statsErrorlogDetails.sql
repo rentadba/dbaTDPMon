@@ -21,6 +21,7 @@ CREATE TABLE [health-check].[statsErrorlogDetails]
 	[project_id]			[smallint]		NOT NULL,
 	[event_date_utc]		[datetime]		NOT NULL,
 	[log_date]				[datetime]		NULL,
+	[log_date_utc]			[datetime]		NULL,
 	[process_info]			[sysname]		NULL,
 	[text]					[varchar](max)	NULL,
 	CONSTRAINT [PK_statsErrorlogDetails] PRIMARY KEY  CLUSTERED 

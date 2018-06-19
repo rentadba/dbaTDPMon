@@ -24,6 +24,7 @@ CREATE TABLE [health-check].[statsSQLAgentJobsHistory]
 	[last_execution_status] [int]			NOT NULL,
 	[last_execution_date]	[varchar](10)	NULL, 
 	[last_execution_time]	[varchar](8)	NULL,
+	[last_execution_utc]	[datetime]		NULL,
 	[running_time_sec]		[bigint]		NULL,
 	[message]				[varchar](max)	NULL, 
 	CONSTRAINT [PK_statsSQLAgentJobsHistory] PRIMARY KEY  CLUSTERED 

@@ -24,6 +24,7 @@ SELECT 	  cin.[project_id]		AS [project_id]
 		, ssajh.[last_execution_status]
 		, ssajh.[last_execution_date]
 		, ssajh.[last_execution_time]
+		, ssajh.[last_execution_utc]
 		, ssajh.[running_time_sec]
 		, ssajh.[message]
 FROM [health-check].[statsSQLAgentJobsHistory]	ssajh

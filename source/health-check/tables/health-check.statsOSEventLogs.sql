@@ -33,6 +33,7 @@ CREATE TABLE [health-check].[statsOSEventLogs]
 	[machine_name]			[sysname]			NULL,
 	[user_id]				[nvarchar](256)		NULL,
 	[time_created]			[varchar](32)		NULL,
+	[time_created_utc]		[datetime]			NULL,
 	[message] 				[nvarchar](max)		NULL
 	CONSTRAINT [PK_statsOSEventLogs] PRIMARY KEY  CLUSTERED 
 	(

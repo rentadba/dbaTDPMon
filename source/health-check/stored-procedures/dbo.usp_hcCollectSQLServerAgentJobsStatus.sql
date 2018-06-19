@@ -43,7 +43,9 @@ DECLARE @sqlServerName			[sysname],
 		@projectID				[smallint],
 		@instanceID				[smallint],
 		@collectStepDetails		[bit],
-		@strMessage				[nvarchar](max)
+		@strMessage				[nvarchar](max),
+		@hoursOffsetToUTC		[smallint],
+		@queryParam				[nvarchar](max)
 
 
 -----------------------------------------------------------------------------------------------------
@@ -117,6 +119,17 @@ WHILE @@FETCH_STATUS=0
 		SET @strMessage='Analyzing server: ' + @sqlServerName
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 		
+		-------------------------------------------------------------------------------------------------------------------------
+		/* get local time to UTC offset */
+		SET @queryToRun='SELECT DATEDIFF(hh, GETDATE(), GETUTCDATE()) AS [offset_to_utc]' 
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		SET @queryToRun = 'SELECT @hoursOffsetToUTC = [offset_to_utc] FROM (' + @queryToRun + ')y'
+		SET @queryParam = '@hoursOffsetToUTC [smallint] OUTPUT'
+		
+		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+		EXEC sp_executesql @queryToRun, @queryParam, @hoursOffsetToUTC = @hoursOffsetToUTC OUT
+
+		-------------------------------------------------------------------------------------------------------------------------
 		TRUNCATE TABLE #msdbSysJobs
 		BEGIN TRY
 			SET @queryToRun='SELECT [name] FROM msdb.dbo.sysjobs WHERE [name] LIKE ''' + @jobNameFilter + ''' ORDER BY [name]'
@@ -160,10 +173,11 @@ WHILE @@FETCH_STATUS=0
 															@extentedStepDetails	= @collectStepDetails,		
 															@debugMode				= @debugMode
 
-					INSERT	INTO [health-check].[statsSQLAgentJobsHistory]([instance_id], [project_id], [event_date_utc], [job_name], [message], [last_execution_status], [last_execution_date], [last_execution_time], [running_time_sec])
+					INSERT	INTO [health-check].[statsSQLAgentJobsHistory]([instance_id], [project_id], [event_date_utc], [job_name], [message], [last_execution_status], [last_execution_date], [last_execution_time], [running_time_sec], [last_execution_utc])
 							SELECT	  @instanceID, @projectID, GETUTCDATE(), @jobName, @strMessage
 									, @lastExecutionStatus, @lastExecutionDate, @lastExecutionTime
 									, @runningTimeSec
+									, DATEADD(hh, @hoursOffsetToUTC, CAST((@lastExecutionDate + ' ' +  @lastExecutionTime) AS [datetime])) AS [last_execution_utc]
 				END TRY
 				BEGIN CATCH
 					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])

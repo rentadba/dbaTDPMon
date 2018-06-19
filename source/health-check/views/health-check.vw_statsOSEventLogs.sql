@@ -42,6 +42,7 @@ SELECT 	  cin.[project_id]
 		, soel.[thread_id]
 		, soel.[user_id]
 		, soel.[time_created]
+		, soel.[time_created_utc]
 		, soel.[message]
 FROM [health-check].[statsOSEventLogs]	soel
 INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[instance_id] = soel.[instance_id] AND cin.[project_id] = soel.[project_id] AND cin.[machine_id] = soel.[machine_id]

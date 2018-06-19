@@ -749,3 +749,6 @@
 
 /* 13.06.2018 */
 	- implemented a workaround for internal jobs left in "in progress" state
+
+/* 19.06.2018 */
+	- health-check: convert local time for OS events, errorlog messages and SQL Agent jobs to UTC

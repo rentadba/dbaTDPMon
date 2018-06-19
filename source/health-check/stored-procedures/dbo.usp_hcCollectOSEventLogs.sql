@@ -55,6 +55,8 @@ DECLARE   @eventDescriptor				[varchar](256)
 		, @getInformationEvent			[bit]
 		, @getWarningsEvent				[bit]
 		, @optionXPValue				[int]
+		, @hoursOffsetToUTC				[smallint]
+		, @queryParam					[nvarchar](max)
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
 IF object_id('tempdb..#psOutput') IS NOT NULL DROP TABLE #psOutput
@@ -260,6 +262,15 @@ WHILE @@FETCH_STATUS=0
 		SET @strMessage='Analyzing server: ' + @machineName
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
 
+		-------------------------------------------------------------------------------------------------------------------------
+		/* get local time to UTC offset */
+		SET @queryToRun='SELECT DATEDIFF(hh, GETDATE(), GETUTCDATE()) AS [offset_to_utc]' 
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@instanceName, @queryToRun)
+		SET @queryToRun = 'SELECT @hoursOffsetToUTC = [offset_to_utc] FROM (' + @queryToRun + ')y'
+		SET @queryParam = '@hoursOffsetToUTC [smallint] OUTPUT'
+		
+		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+		EXEC sp_executesql @queryToRun, @queryParam, @hoursOffsetToUTC = @hoursOffsetToUTC OUT
 
 		-------------------------------------------------------------------------------------------------------------------------
 		DECLARE crsLogName CURSOR LOCAL FAST_FORWARD FOR	SELECT [log_type_name], [log_type_id]
@@ -460,11 +471,13 @@ WHILE @@FETCH_STATUS=0
 						/* save results to stats table */
 						INSERT	INTO [health-check].[statsOSEventLogs](   [instance_id], [project_id], [machine_id], [event_date_utc], [log_type_id]
 																		, [event_id], [level_id], [record_id], [category_id], [category_name]
-																		, [source], [process_id], [thread_id], [machine_name], [user_id], [time_created], [message])
+																		, [source], [process_id], [thread_id], [machine_name], [user_id], [time_created], [message]
+																		, [time_created_utc])
 								SELECT    @instanceID, @projectID, @machineID, GETUTCDATE(), @psLogTypeID
 										, [Id] AS [EventID], [Level], [RecordId], [Task] AS [Category], [TaskDisplayName] AS [CategoryName]
 										, [ProviderName] AS [Source]
 										, [ProcessId], [ThreadId], [MachineName], [UserId], [TimeCreated], [Message]
+										, DATEADD(hh, @hoursOffsetToUTC, CAST([TimeCreated] AS [datetime])) AS [time_created_utc]
 								FROM (
 										SELECT [value], [attribute], [unique_object] AS [idX]
 										FROM (
