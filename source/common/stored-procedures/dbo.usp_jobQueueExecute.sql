@@ -29,35 +29,37 @@ AS
 
 SET NOCOUNT ON
 
-DECLARE   @projectID				[smallint]
-		, @jobName					[sysname]
-		, @jobStepName				[sysname]
-		, @jobDBName				[sysname]
-		, @sqlServerName			[sysname]
-		, @jobCommand				[nvarchar](max)
-		, @defaultLogFileLocation	[nvarchar](512)
-		, @logFileLocation			[nvarchar](512)
-		, @jobQueueID				[int]
+DECLARE   @projectID					[smallint]
+		, @jobName						[sysname]
+		, @jobStepName					[sysname]
+		, @jobDBName					[sysname]
+		, @sqlServerName				[sysname]
+		, @jobCommand					[nvarchar](max)
+		, @jobCreateTimeUTC				[datetime]
+		, @defaultLogFileLocation		[nvarchar](512)
+		, @logFileLocation				[nvarchar](512)
+		, @jobQueueID					[int]
 
-		, @configParallelJobs		[smallint]
-		, @configMaxNumberOfRetries	[smallint]
-		, @configFailMasterJob		[bit]
-		, @configMaxSQLJobsOneMin	[smallint]
-		, @configMaxSQLJobsRunning	[smallint]
-		, @runningJobs				[smallint]
-		, @executedJobs				[smallint]
-		, @jobQueueCount			[smallint]
-
-		, @strMessage				[varchar](8000)	
-		, @currentRunning			[int]
-		, @lastExecutionStatus		[int]
-		, @lastExecutionDate		[varchar](10)
-		, @lastExecutionTime 		[varchar](8)
-		, @runningTimeSec			[bigint]
-		, @jobCurrentRunning		[bit]
-		, @retryAttempts			[tinyint]
-		, @serialExecutionMode		[bit]
-		, @serialExecutionUsingJobs	[bit]
+		, @configParallelJobs			[smallint]
+		, @configMaxNumberOfRetries		[smallint]
+		, @configFailMasterJob			[bit]
+		, @configMaxSQLJobsOneMin		[smallint]
+		, @configMaxSQLJobsRunning		[smallint]
+		, @configMaxQueueExecutionTime	[smallint]
+		, @runningJobs					[smallint]
+		, @executedJobs					[smallint]
+		, @jobQueueCount				[smallint]
+			
+		, @strMessage					[varchar](8000)	
+		, @currentRunning				[int]
+		, @lastExecutionStatus			[int]
+		, @lastExecutionDate			[varchar](10)
+		, @lastExecutionTime 			[varchar](8)
+		, @runningTimeSec				[bigint]
+		, @jobCurrentRunning			[bit]
+		, @retryAttempts				[tinyint]
+		, @serialExecutionMode			[bit]
+		, @serialExecutionUsingJobs		[bit]
 
 DECLARE   @ErrorNumber [int]
 		, @ErrorLine [int]
@@ -171,6 +173,20 @@ END CATCH
 SET @configMaxSQLJobsRunning = ISNULL(@configMaxSQLJobsRunning, 0)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
+--get the time limit for which the queue can execute (hours)
+BEGIN TRY
+	SELECT	@configMaxQueueExecutionTime = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = N'Maximum job queue execution time (hours) (0=unlimited)'
+			AND [module] = 'common'
+END TRY
+BEGIN CATCH
+	SET @configMaxQueueExecutionTime = 0
+END CATCH
+
+SET @configMaxQueueExecutionTime = ISNULL(@configMaxQueueExecutionTime, 0)
+
+------------------------------------------------------------------------------------------------------------------------------------------
 --get the number of retries in case of a failure
 BEGIN TRY
 	SELECT	@configFailMasterJob = CASE WHEN lower([value])='true' THEN 1 ELSE 0 END
@@ -233,7 +249,9 @@ WHERE  [project_id] = @projectID
 			  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
 			)			
 		AND [status]=-1
-
+		AND (    DATEDIFF(minute, [event_date_utc], GETUTCDATE()) < (@configMaxQueueExecutionTime * 60)
+				OR @configMaxQueueExecutionTime = 0
+			)																
 
 SET @strMessage='Number of jobs in the queue to be executed : ' + CAST(@jobQueueCount AS [varchar]) 
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
@@ -244,8 +262,9 @@ IF @jobQueueCount=0
 SET @runningJobs  = 0
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-DECLARE crsJobQueue CURSOR LOCAL FAST_FORWARD FOR	SELECT  [id], [instance_name]
+DECLARE crsJobQueue CURSOR LOCAL FAST_FORWARD FOR	SELECT    [id], [instance_name]
 															, [job_name], [job_step_name], [job_database_name], REPLACE([job_command], '''', '''''') AS [job_command]
+															, [event_date_utc]
 													FROM [dbo].[vw_jobExecutionQueue]
 													WHERE  [project_id] = @projectID 
 															AND [module] LIKE @moduleFilter
@@ -253,113 +272,103 @@ DECLARE crsJobQueue CURSOR LOCAL FAST_FORWARD FOR	SELECT  [id], [instance_name]
 																  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
 																)			
 															AND [status]=-1
+															AND (    DATEDIFF(minute, [event_date_utc], GETUTCDATE()) < (@configMaxQueueExecutionTime * 60)
+																  OR @configMaxQueueExecutionTime = 0
+																)																
 													ORDER BY [priority], [id]
 OPEN crsJobQueue
-FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand
+FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @jobCreateTimeUTC
 SET @executedJobs = 1
 WHILE @@FETCH_STATUS=0
 	begin
-		------------------------------------------------------------------------------------------------------------------------------------------
-		--get destination server running version/edition
-		EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName		= @sqlServerName,
-												@serverEdition		= @serverEdition OUT,
-												@serverVersionStr	= @serverVersionStr OUT,
-												@serverVersionNum	= @serverVersionNum OUT,
-												@executionLevel		= 0,
-												@debugMode			= @debugMode
-
-
-		SET @strMessage='Executing job# : ' + CAST(@executedJobs AS [varchar]) + ' / ' + CAST(@jobQueueCount AS [varchar])
-		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
-		IF @serialExecutionMode = 1 AND @serialExecutionUsingJobs = 0
+		/* check if job should be "skipped" */
+		IF NOT (DATEDIFF(minute, @jobCreateTimeUTC, GETUTCDATE()) < (@configMaxQueueExecutionTime * 60) OR @configMaxQueueExecutionTime = 0)
 			begin
-				/* for "serial" mode, will not execute tasks/jobs as SQL Agent jobs but as an inline command */
-				DECLARE   @startTime	[datetime]
-						, @endTime		[datetime]
-				
-				/* mark job as running */
-				SET @startTime = GETDATE()
-				UPDATE [dbo].[jobExecutionQueue] 
-					SET   [status] = 4
-						, [execution_date] = @startTime
-				WHERE [id] = @jobQueueID	
-				
-				-- start the job
-				BEGIN TRY
-					SET @strMessage='Executing command : ' + @jobCommand
-					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
-					SET @jobCommand = REPLACE(@jobCommand, '''''', '''')	
-					SET @jobCommand = REPLACE(@jobCommand, 'EXEC ', '')	
-								
-					EXEC sp_executesql @jobCommand
-					SET @endTime = GETDATE();
-					SET @runningTimeSec = DATEDIFF(second, @startTime, @endTime) 
-				
-					UPDATE [dbo].[jobExecutionQueue]
-						SET [status] = 1,
-							[running_time_sec] = @runningTimeSec
-					WHERE [id] = @jobQueueID
-
-					SET @executedJobs = @executedJobs + 1
-
-					FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand
-				END TRY
-				BEGIN CATCH		
-						SET @ErrorNumber = ERROR_NUMBER();
-						SET @ErrorLine = ERROR_LINE();
-						SET @ErrorMessage = ERROR_MESSAGE();
-						SET @ErrorSeverity = ERROR_SEVERITY();
-						SET @ErrorState = ERROR_STATE();	
-					
-						SET @endTime = GETDATE();
-						SET @runningTimeSec = DATEDIFF(second, @startTime, @endTime)
-																				
-						PRINT 'Actual error number: ' + CAST(@ErrorNumber AS VARCHAR(10));
-						PRINT 'Actual line number: ' + CAST(@ErrorLine AS VARCHAR(10));
-						SET @strMessage=N'Error executing command ' + @jobCommand + '. Error: ' + @ErrorMessage + '. Line number: ' + CAST(@ErrorLine AS VARCHAR(10));
-
-						UPDATE [dbo].[jobExecutionQueue]
-							SET [status] = 0,
-								[running_time_sec] = @runningTimeSec,
-								[log_message] = @strMessage
-						WHERE [id] = @jobQueueID
-
-						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
-				END CATCH
+				FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @jobCreateTimeUTC
 			end
+		/* execute the job */
 		ELSE
 			begin
-				SET @strMessage='Create SQL Agent job : "' + @jobName + '"'
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
+				------------------------------------------------------------------------------------------------------------------------------------------
+				--get destination server running version/edition
+				EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName		= @sqlServerName,
+														@serverEdition		= @serverEdition OUT,
+														@serverVersionStr	= @serverVersionStr OUT,
+														@serverVersionNum	= @serverVersionNum OUT,
+														@executionLevel		= 0,
+														@debugMode			= @debugMode
 
-				---------------------------------------------------------------------------------------------------
-				/* setting the job name & job log location */	
-				SET @logFileLocation = @defaultLogFileLocation + [dbo].[ufn_getObjectQuoteName](N'job-' + @jobName + N'.log', 'filename')
 
-				---------------------------------------------------------------------------------------------------
-				/* check if job is running and stop it */
-				SET @jobCurrentRunning = 0
-				EXEC  dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
-														@jobName				= @jobName,
-														@strMessage				= DEFAULT,	
-														@currentRunning			= @jobCurrentRunning OUTPUT,			
-														@lastExecutionStatus	= DEFAULT,			
-														@lastExecutionDate		= DEFAULT,		
-														@lastExecutionTime 		= DEFAULT,	
-														@runningTimeSec			= DEFAULT,
-														@selectResult			= DEFAULT,
-														@extentedStepDetails	= DEFAULT,		
-														@debugMode				= DEFAULT
+				SET @strMessage='Executing job# : ' + CAST(@executedJobs AS [varchar]) + ' / ' + CAST(@jobQueueCount AS [varchar])
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-				IF @jobCurrentRunning=1
+				IF @serialExecutionMode = 1 AND @serialExecutionUsingJobs = 0
 					begin
-						/* wait / retry mechanism for high active systems */
-						SET @queryToRun = 'Job is still running. Waiting ' + @waitForDelay + ' before stopping it...'
-						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+						/* for "serial" mode, will not execute tasks/jobs as SQL Agent jobs but as an inline command */
+						DECLARE   @startTime	[datetime]
+								, @endTime		[datetime]
+				
+						/* mark job as running */
+						SET @startTime = GETDATE()
+						UPDATE [dbo].[jobExecutionQueue] 
+							SET   [status] = 4
+								, [execution_date] = @startTime
+						WHERE [id] = @jobQueueID	
+				
+						-- start the job
+						BEGIN TRY
+							SET @strMessage='Executing command : ' + @jobCommand
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
+							SET @jobCommand = REPLACE(@jobCommand, '''''', '''')	
+							SET @jobCommand = REPLACE(@jobCommand, 'EXEC ', '')	
+								
+							EXEC sp_executesql @jobCommand
+							SET @endTime = GETDATE();
+							SET @runningTimeSec = DATEDIFF(second, @startTime, @endTime) 
+				
+							UPDATE [dbo].[jobExecutionQueue]
+								SET [status] = 1,
+									[running_time_sec] = @runningTimeSec
+							WHERE [id] = @jobQueueID
 
-						WAITFOR DELAY @waitForDelay
+							SET @executedJobs = @executedJobs + 1
 
+							FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @jobCreateTimeUTC
+						END TRY
+						BEGIN CATCH		
+								SET @ErrorNumber = ERROR_NUMBER();
+								SET @ErrorLine = ERROR_LINE();
+								SET @ErrorMessage = ERROR_MESSAGE();
+								SET @ErrorSeverity = ERROR_SEVERITY();
+								SET @ErrorState = ERROR_STATE();	
+					
+								SET @endTime = GETDATE();
+								SET @runningTimeSec = DATEDIFF(second, @startTime, @endTime)
+																				
+								PRINT 'Actual error number: ' + CAST(@ErrorNumber AS VARCHAR(10));
+								PRINT 'Actual line number: ' + CAST(@ErrorLine AS VARCHAR(10));
+								SET @strMessage=N'Error executing command ' + @jobCommand + '. Error: ' + @ErrorMessage + '. Line number: ' + CAST(@ErrorLine AS VARCHAR(10));
+
+								UPDATE [dbo].[jobExecutionQueue]
+									SET [status] = 0,
+										[running_time_sec] = @runningTimeSec,
+										[log_message] = @strMessage
+								WHERE [id] = @jobQueueID
+
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+						END CATCH
+					end
+				ELSE
+					begin
+						SET @strMessage='Create SQL Agent job : "' + @jobName + '"'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
+
+						---------------------------------------------------------------------------------------------------
+						/* setting the job name & job log location */	
+						SET @logFileLocation = @defaultLogFileLocation + [dbo].[ufn_getObjectQuoteName](N'job-' + @jobName + N'.log', 'filename')
+
+						---------------------------------------------------------------------------------------------------
+						/* check if job is running and stop it */
 						SET @jobCurrentRunning = 0
 						EXEC  dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
 																@jobName				= @jobName,
@@ -372,154 +381,176 @@ WHILE @@FETCH_STATUS=0
 																@selectResult			= DEFAULT,
 																@extentedStepDetails	= DEFAULT,		
 																@debugMode				= DEFAULT
+
 						IF @jobCurrentRunning=1
 							begin
-								SET @queryToRun = 'Job is still running. Stopping...'
+								/* wait / retry mechanism for high active systems */
+								SET @queryToRun = 'Job is still running. Waiting ' + @waitForDelay + ' before stopping it...'
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-								EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
-																@jobName		= @jobName,
-																@operation		= 'Stop',
-																@dbName			= @jobDBName, 
-																@jobStepName 	= @jobStepName,
-																@debugMode		= @debugMode
+								WAITFOR DELAY @waitForDelay
 
-								SET @retryAttempts = 1
-								WHILE @jobCurrentRunning = 1 AND @retryAttempts <= @configMaxNumberOfRetries
+								SET @jobCurrentRunning = 0
+								EXEC  dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
+																		@jobName				= @jobName,
+																		@strMessage				= DEFAULT,	
+																		@currentRunning			= @jobCurrentRunning OUTPUT,			
+																		@lastExecutionStatus	= DEFAULT,			
+																		@lastExecutionDate		= DEFAULT,		
+																		@lastExecutionTime 		= DEFAULT,	
+																		@runningTimeSec			= DEFAULT,
+																		@selectResult			= DEFAULT,
+																		@extentedStepDetails	= DEFAULT,		
+																		@debugMode				= DEFAULT
+								IF @jobCurrentRunning=1
 									begin
-										WAITFOR DELAY @waitForDelay
+										SET @queryToRun = 'Job is still running. Stopping...'
+										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-										SET @jobCurrentRunning = 0
-										EXEC  dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
-																				@jobName				= @jobName,
-																				@strMessage				= DEFAULT,	
-																				@currentRunning			= @jobCurrentRunning OUTPUT,			
-																				@lastExecutionStatus	= DEFAULT,			
-																				@lastExecutionDate		= DEFAULT,		
-																				@lastExecutionTime 		= DEFAULT,	
-																				@runningTimeSec			= DEFAULT,
-																				@selectResult			= DEFAULT,
-																				@extentedStepDetails	= DEFAULT,		
-																				@debugMode				= DEFAULT
+										EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
+																		@jobName		= @jobName,
+																		@operation		= 'Stop',
+																		@dbName			= @jobDBName, 
+																		@jobStepName 	= @jobStepName,
+																		@debugMode		= @debugMode
+
+										SET @retryAttempts = 1
+										WHILE @jobCurrentRunning = 1 AND @retryAttempts <= @configMaxNumberOfRetries
+											begin
+												WAITFOR DELAY @waitForDelay
+
+												SET @jobCurrentRunning = 0
+												EXEC  dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
+																						@jobName				= @jobName,
+																						@strMessage				= DEFAULT,	
+																						@currentRunning			= @jobCurrentRunning OUTPUT,			
+																						@lastExecutionStatus	= DEFAULT,			
+																						@lastExecutionDate		= DEFAULT,		
+																						@lastExecutionTime 		= DEFAULT,	
+																						@runningTimeSec			= DEFAULT,
+																						@selectResult			= DEFAULT,
+																						@extentedStepDetails	= DEFAULT,		
+																						@debugMode				= DEFAULT
 						
-										SET @retryAttempts = @retryAttempts + 1
-								end
-							end
-					end
-
-				---------------------------------------------------------------------------------------------------
-				/* defining job and start it */
-				EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
-												@jobName		= @jobName,
-												@operation		= 'Clean',
-												@dbName			= @jobDBName, 
-												@jobStepName 	= @jobStepName,
-												@debugMode		= @debugMode
-
-				EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
-												@jobName		= @jobName,
-												@operation		= 'Add',
-												@dbName			= @jobDBName, 
-												@jobStepName 	= @jobStepName,
-												@jobStepCommand	= @jobCommand,
-												@jobLogFileName	= @logFileLocation,
-												@jobStepRetries = @configMaxNumberOfRetries,
-												@debugMode		= @debugMode
-
-				---------------------------------------------------------------------------------------------------
-				/* https://blogs.msdn.microsoft.com/sqlserverfaq/2012/03/14/inf-limitations-for-sql-agent-when-you-have-many-jobs-running-in-sql-simultaneously/ */
-				/* A design limitation imposes a one second delay between jobs. Because of this limitation, up to 60 jobs can be started in the same one-minute interval. */
-		
-				--jobs started within the last minute
-				IF (SELECT COUNT(*) 
-					FROM [dbo].[jobExecutionQueue]
-					WHERE CONVERT([varchar](16), [execution_date], 120) = CONVERT([varchar](16), GETDATE(), 120)
-					) >= @configMaxSQLJobsOneMin
-					begin
-						SET @strMessage='KB 306457 limitation: add one second delay between starting jobs.'
-						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
-						WAITFOR DELAY '00:00:01'
-					end
-
-				---------------------------------------------------------------------------------------------------
-				/* check how many jobs are running. if cap is set, waiting for jobs to complete */
-				IF @configMaxSQLJobsRunning > 0 AND @serialExecutionMode = 0 AND @serverVersionNum > 10 
-					begin
-						SET @runningJobs = @configMaxSQLJobsRunning
-						WHILE @runningJobs >= @configMaxSQLJobsRunning
-							begin
-								SET @queryToRun = N''
-								SET @queryToRun = @queryToRun + N'	SELECT	j.[name] 
-																	FROM  [msdb].[dbo].[sysjobactivity] ja WITH (NOLOCK)
-																	LEFT  JOIN [msdb].[dbo].[sysjobhistory] jh WITH (NOLOCK) ON ja.[job_history_id] = jh.[instance_id]
-																	INNER JOIN [msdb].[dbo].[sysjobs] j WITH (NOLOCK) ON ja.[job_id] = j.[job_id]
-																	INNER JOIN [msdb].[dbo].[sysjobsteps] js WITH (NOLOCK) ON ja.[job_id] = js.[job_id] AND ISNULL(ja.[last_executed_step_id], 0)+ 1  = js.[step_id]
-																	WHERE	ja.[session_id] = (
-																								SELECT TOP 1 [session_id] 
-																								FROM [msdb].[dbo].[syssessions] 
-																								ORDER BY [agent_start_date] DESC
-																								)
-																			AND ja.[start_execution_date] IS NOT NULL
-																			AND ja.[stop_execution_date] IS NULL'
-								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-								SET @queryToRun = N'SELECT @currentRunningJobs = COUNT(*)
-													FROM (' + @queryToRun + N') j
-													INNER JOIN [dbo].[jobExecutionQueue] jeq WITH (NOLOCK) ON j.[name] = jeq.[job_name]'
-								SET @queryParameters = '@currentRunningJobs [int] OUTPUT'
-								IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-								EXEC sp_executesql @queryToRun, @queryParameters, @currentRunningJobs = @runningJobs OUT
-
-								IF @runningJobs >= @configMaxSQLJobsRunning
-									begin
-										SET @strMessage='Warning: Maximum SQL Agent jobs running limit reached. Waiting for some job(s) to complete.'
-										EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-										WAITFOR DELAY @waitForDelay
+												SET @retryAttempts = @retryAttempts + 1
+										end
 									end
 							end
-					end
 
-				---------------------------------------------------------------------------------------------------
-				/* starting job: 0 = job started, 1 = error occured */
-				EXEC @lastExecutionStatus = dbo.usp_sqlAgentJobStartAndWatch	@sqlServerName						= @sqlServerName,
-																				@jobName							= @jobName,
-																				@stepToStart						= 1,
-																				@stepToStop							= 1,
-																				@waitForDelay						= @waitForDelay,
-																				@dontRunIfLastExecutionSuccededLast	= 0,
-																				@startJobIfPrevisiousErrorOcured	= 1,
-																				@watchJob							= @serialExecutionMode,
-																				@jobQueueID							= @jobQueueID,
-																				@debugMode							= @debugMode
-				SET @runningJobs = @executedJobs
-				BEGIN TRY
-					EXEC @runningJobs = dbo.usp_jobQueueGetStatus	@projectCode			= @projectCode,
-																	@moduleFilter			= @moduleFilter,
-																	@descriptorFilter		= @descriptorFilter,
-																	@waitForDelay			= @waitForDelay,
-																	@minJobToRunBeforeExit	= @configParallelJobs,
-																	@executionLevel			= 1,
-																	@debugMode				= @debugMode
-				END TRY
-				BEGIN CATCH
-						SET @ErrorNumber = ERROR_NUMBER();
-						SET @ErrorLine = ERROR_LINE();
-						SET @ErrorMessage = ERROR_MESSAGE();
-						SET @ErrorSeverity = ERROR_SEVERITY();
-						SET @ErrorState = ERROR_STATE();
- 
-						SET @strMessage='Actual error number: ' + CAST(@ErrorNumber AS VARCHAR(10))
-						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
-				
-						SET @strMessage='Actual line number: ' + CAST(@ErrorLine AS VARCHAR(10));
-						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
-				END CATCH
+						---------------------------------------------------------------------------------------------------
+						/* defining job and start it */
+						EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
+														@jobName		= @jobName,
+														@operation		= 'Clean',
+														@dbName			= @jobDBName, 
+														@jobStepName 	= @jobStepName,
+														@debugMode		= @debugMode
+
+						EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
+														@jobName		= @jobName,
+														@operation		= 'Add',
+														@dbName			= @jobDBName, 
+														@jobStepName 	= @jobStepName,
+														@jobStepCommand	= @jobCommand,
+														@jobLogFileName	= @logFileLocation,
+														@jobStepRetries = @configMaxNumberOfRetries,
+														@debugMode		= @debugMode
+
+						---------------------------------------------------------------------------------------------------
+						/* https://blogs.msdn.microsoft.com/sqlserverfaq/2012/03/14/inf-limitations-for-sql-agent-when-you-have-many-jobs-running-in-sql-simultaneously/ */
+						/* A design limitation imposes a one second delay between jobs. Because of this limitation, up to 60 jobs can be started in the same one-minute interval. */
 		
-				---------------------------------------------------------------------------------------------------
-				IF @runningJobs < @jobQueueCount
-					begin
-						FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand
-						SET @executedJobs = @executedJobs + 1
+						--jobs started within the last minute
+						IF (SELECT COUNT(*) 
+							FROM [dbo].[jobExecutionQueue]
+							WHERE CONVERT([varchar](16), [execution_date], 120) = CONVERT([varchar](16), GETDATE(), 120)
+							) >= @configMaxSQLJobsOneMin
+							begin
+								SET @strMessage='KB 306457 limitation: add one second delay between starting jobs.'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+								WAITFOR DELAY '00:00:01'
+							end
+
+						---------------------------------------------------------------------------------------------------
+						/* check how many jobs are running. if cap is set, waiting for jobs to complete */
+						IF @configMaxSQLJobsRunning > 0 AND @serialExecutionMode = 0 AND @serverVersionNum > 10 
+							begin
+								SET @runningJobs = @configMaxSQLJobsRunning
+								WHILE @runningJobs >= @configMaxSQLJobsRunning
+									begin
+										SET @queryToRun = N''
+										SET @queryToRun = @queryToRun + N'	SELECT	j.[name] 
+																			FROM  [msdb].[dbo].[sysjobactivity] ja WITH (NOLOCK)
+																			LEFT  JOIN [msdb].[dbo].[sysjobhistory] jh WITH (NOLOCK) ON ja.[job_history_id] = jh.[instance_id]
+																			INNER JOIN [msdb].[dbo].[sysjobs] j WITH (NOLOCK) ON ja.[job_id] = j.[job_id]
+																			INNER JOIN [msdb].[dbo].[sysjobsteps] js WITH (NOLOCK) ON ja.[job_id] = js.[job_id] AND ISNULL(ja.[last_executed_step_id], 0)+ 1  = js.[step_id]
+																			WHERE	ja.[session_id] = (
+																										SELECT TOP 1 [session_id] 
+																										FROM [msdb].[dbo].[syssessions] 
+																										ORDER BY [agent_start_date] DESC
+																										)
+																					AND ja.[start_execution_date] IS NOT NULL
+																					AND ja.[stop_execution_date] IS NULL'
+										SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+										SET @queryToRun = N'SELECT @currentRunningJobs = COUNT(*)
+															FROM (' + @queryToRun + N') j
+															INNER JOIN [dbo].[jobExecutionQueue] jeq WITH (NOLOCK) ON j.[name] = jeq.[job_name]'
+										SET @queryParameters = '@currentRunningJobs [int] OUTPUT'
+										IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+										EXEC sp_executesql @queryToRun, @queryParameters, @currentRunningJobs = @runningJobs OUT
+
+										IF @runningJobs >= @configMaxSQLJobsRunning
+											begin
+												SET @strMessage='Warning: Maximum SQL Agent jobs running limit reached. Waiting for some job(s) to complete.'
+												EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+												WAITFOR DELAY @waitForDelay
+											end
+									end
+							end
+
+						---------------------------------------------------------------------------------------------------
+						/* starting job: 0 = job started, 1 = error occured */
+						EXEC @lastExecutionStatus = dbo.usp_sqlAgentJobStartAndWatch	@sqlServerName						= @sqlServerName,
+																						@jobName							= @jobName,
+																						@stepToStart						= 1,
+																						@stepToStop							= 1,
+																						@waitForDelay						= @waitForDelay,
+																						@dontRunIfLastExecutionSuccededLast	= 0,
+																						@startJobIfPrevisiousErrorOcured	= 1,
+																						@watchJob							= @serialExecutionMode,
+																						@jobQueueID							= @jobQueueID,
+																						@debugMode							= @debugMode
+						SET @runningJobs = @executedJobs
+						BEGIN TRY
+							EXEC @runningJobs = dbo.usp_jobQueueGetStatus	@projectCode			= @projectCode,
+																			@moduleFilter			= @moduleFilter,
+																			@descriptorFilter		= @descriptorFilter,
+																			@waitForDelay			= @waitForDelay,
+																			@minJobToRunBeforeExit	= @configParallelJobs,
+																			@executionLevel			= 1,
+																			@debugMode				= @debugMode
+						END TRY
+						BEGIN CATCH
+								SET @ErrorNumber = ERROR_NUMBER();
+								SET @ErrorLine = ERROR_LINE();
+								SET @ErrorMessage = ERROR_MESSAGE();
+								SET @ErrorSeverity = ERROR_SEVERITY();
+								SET @ErrorState = ERROR_STATE();
+ 
+								SET @strMessage='Actual error number: ' + CAST(@ErrorNumber AS VARCHAR(10))
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+				
+								SET @strMessage='Actual line number: ' + CAST(@ErrorLine AS VARCHAR(10));
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+						END CATCH
+		
+						---------------------------------------------------------------------------------------------------
+						IF @runningJobs < @jobQueueCount
+							begin
+								FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @jobCreateTimeUTC
+								SET @executedJobs = @executedJobs + 1
+							end
 					end
 			end
 	end
