@@ -1353,23 +1353,23 @@ BEGIN TRY
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="CENTER" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="100px" class="details" ALIGN="CENTER">' + 
-										CASE	WHEN @hasDatabaseDetails<>0 AND @flgOptions & 8 = 8
+										CASE	WHEN @flgActions & 2 = 2 AND @flgOptions & 8 = 8 AND @hasDatabaseDetails<>0
 												THEN N'<BR><A HREF="#DatabasesStatusCompleteDetails' + @instanceName + N'">Databases</A>'
 												ELSE N''
 										END +
-										CASE WHEN @hasSQLagentJob<>0 AND @flgOptions & 64 = 64
+										CASE WHEN @flgActions & 4 = 4 AND @flgOptions & 64 = 64 AND @hasSQLagentJob<>0
 												THEN N'<BR><A HREF="#SQLServerAgentJobsStatusCompleteDetails' + @instanceName + N'">SQL Agent Jobs</A>'
 												ELSE N''
 										END +
-										CASE WHEN @hasDiskSpaceInfo<>0 AND @flgOptions & 65536 = 65536
+										CASE WHEN @flgActions & 8 = 8 AND @flgOptions & 65536 = 65536 AND @hasDiskSpaceInfo<>0
 												THEN N'<BR><A HREF="#DiskSpaceInformationCompleteDetails' + CASE WHEN @isClustered=0 THEN @machineName ELSE @clusterNodeName END + N'">Disk Space</A>'
 												ELSE N''
 										END +  
-										CASE WHEN @hasErrorlogMessages<>0 AND @flgOptions & 1048576 = 1048576
+										CASE WHEN @flgActions & 16 = 16 AND @flgOptions & 1048576 = 1048576 AND @hasErrorlogMessages<>0
 												THEN N'<BR><A HREF="#ErrorlogMessagesIssuesDetected' + @instanceName + N'">Errorlog</A>'
 												ELSE N''
 										END +  
-										CASE WHEN @hasOSEventMessages<>0 AND @flgOptions & 134217728 = 134217728
+										CASE WHEN @flgActions & 32 = 32 AND @flgOptions & 134217728 = 134217728 AND @hasOSEventMessages<>0
 												THEN N'<BR><A HREF="#OSEventMessagesIssuesDetected' + @machineName + N'">OS Events</A>'
 												ELSE N''
 										END +  
