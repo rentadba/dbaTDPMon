@@ -130,6 +130,7 @@ DECLARE   @databaseName								[sysname]
 		, @diskAvailableSpaceMB					[numeric](18,3)
 		, @diskPercentAvailable					[numeric](6,2)
 		, @dateTimeLowerLimit					[datetime]
+		, @dateTimeLowerLimitUTC				[datetime]
 
 		, @messageCount							[int]
 		, @issuesDetectedCount					[int]
@@ -1091,7 +1092,8 @@ BEGIN TRY
 			IF OBJECT_ID('tempdb..#filteredStatsSQLServerErrorlogDetail') IS NOT NULL
 				DROP TABLE #filteredStatsSQLServerErrorlogDetail
 
-			SET @dateTimeLowerLimit = DATEADD(hh, -@reportOptionErrorlogMessageLastHours, GETDATE())
+			SET @dateTimeLowerLimit		= DATEADD(hh, -@reportOptionErrorlogMessageLastHours, GETDATE())
+			SET @dateTimeLowerLimitUTC	= DATEADD(hh, -@reportOptionErrorlogMessageLastHours, GETUTCDATE())
 
 			SELECT DISTINCT 
 					cin.[instance_name], 
@@ -1104,9 +1106,11 @@ BEGIN TRY
 														AND rsr.[rule_id] = 1048576
 														AND rsr.[active] = 1
 														AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-			WHERE cin.[instance_active]=1
+			WHERE	cin.[instance_active]=1
 					AND cin.[project_id] = @projectID																							
-					AND eld.[log_date] >= @dateTimeLowerLimit
+					AND (   (eld.[log_date_utc] IS NOT NULL AND eld.[log_date_utc] >= @dateTimeLowerLimitUTC)
+						 OR (eld.[log_date_utc] IS NULL     AND eld.[log_date] >= @dateTimeLowerLimit)
+						)
 					AND NOT EXISTS	( 
 										SELECT 1
 										FROM	[report].[hardcodedFilters] chf 
@@ -1130,7 +1134,9 @@ BEGIN TRY
 
 			IF OBJECT_ID('tempdb..#filteredStatsOSEventMessagesDetail') IS NOT NULL
 				DROP TABLE #filteredStatsOSEventMessagesDetail
-			SET @dateTimeLowerLimit = DATEADD(hh, -@reportOptionOSEventMessageLastHours, GETDATE())
+
+			SET @dateTimeLowerLimit		= DATEADD(hh, -@reportOptionOSEventMessageLastHours, GETDATE())
+			SET @dateTimeLowerLimitUTC	= DATEADD(hh, -@reportOptionOSEventMessageLastHours, GETUTCDATE())
 
 			SELECT DISTINCT
 					oel.[machine_name], CONVERT([datetime], oel.[time_created]) [time_created], oel.[log_type_desc], oel.[level_desc], 
@@ -1142,9 +1148,11 @@ BEGIN TRY
 														AND rsr.[rule_id] = 134217728
 														AND rsr.[active] = 1
 														AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-			WHERE cin.[instance_active]=1
+			WHERE	cin.[instance_active]=1
 					AND cin.[project_id] = @projectID
-					AND CONVERT([datetime], oel.[time_created]) >= @dateTimeLowerLimit
+					AND (   (oel.[time_created_utc] IS NOT NULL AND oel.[time_created_utc] >= @dateTimeLowerLimitUTC)
+						 OR (oel.[time_created_utc] IS NULL     AND CONVERT([datetime], oel.[time_created]) >= @dateTimeLowerLimit)
+						)
 					AND NOT EXISTS	( 
 										SELECT 1
 										FROM	[report].[hardcodedFilters] chf 
@@ -1700,7 +1708,9 @@ BEGIN TRY
 					, @lastExecDate		[varchar](10)
 					, @lastExecTime		[varchar](8)
 			
-			SET @dateTimeLowerLimit = DATEADD(hh, -@reportOptionJobFailuresInLastHours, GETDATE())
+			SET @dateTimeLowerLimit		= DATEADD(hh, -@reportOptionJobFailuresInLastHours, GETDATE())
+			SET @dateTimeLowerLimitUTC	= DATEADD(hh, -@reportOptionJobFailuresInLastHours, GETUTCDATE())
+
 			DECLARE crsSQLServerAgentJobsStatusIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT	ssajh.[instance_name], ssajh.[job_name], ssajh.[last_execution_status], ssajh.[last_execution_date], ssajh.[last_execution_time], ssajh.[message]
 																								FROM	[health-check].[vw_statsSQLAgentJobsHistory] ssajh
 																								INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[project_id] = ssajh.[project_id] AND cin.[instance_id] = ssajh.[instance_id]
@@ -1711,7 +1721,9 @@ BEGIN TRY
 																								WHERE	ssajh.[project_id]=@projectID
 																										AND cin.[instance_active]=1
 																										AND ssajh.[last_execution_status] IN (0, 2, 3) /* 0 = Failed; 2 = Retry; 3 = Canceled */
-																										AND CONVERT([datetime], ssajh.[last_execution_date] + ' ' + ssajh.[last_execution_time], 120) >= @dateTimeLowerLimit
+																										AND (   (ssajh.[last_execution_utc] IS NOT NULL AND ssajh.[last_execution_utc] >= @dateTimeLowerLimitUTC)
+																											 OR (ssajh.[last_execution_utc] IS NULL     AND CONVERT([datetime], ssajh.[last_execution_date] + ' ' + ssajh.[last_execution_time], 120) >= @dateTimeLowerLimit)
+																											)
 																										AND rsr.[id] IS NULL
 																								ORDER BY ssajh.[instance_name], ssajh.[job_name], ssajh.[last_execution_date], ssajh.[last_execution_time]
 			OPEN crsSQLServerAgentJobsStatusIssuesDetected
@@ -1792,7 +1804,6 @@ BEGIN TRY
 
 			DECLARE   @runningTime		[varchar](32)
 			
-			SET @dateTimeLowerLimit = DATEADD(hh, -@reportOptionJobFailuresInLastHours, GETDATE())
 			DECLARE crsLongRunningSQLAgentJobsIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT	  ssajh.[instance_name], ssajh.[job_name]
 																									, ssajh.[last_execution_date] AS [start_date], ssajh.[last_execution_time] AS [start_time]
 																									, [dbo].[ufn_reportHTMLFormatTimeValue](CAST(ssajh.[running_time_sec]*1000 AS [bigint])) AS [running_time]
@@ -3756,7 +3767,6 @@ BEGIN TRY
 											<TH WIDTH="480px" class="details-bold">Message</TH>'
 			SET @idx=1		
 
-			SET @dateTimeLowerLimit = DATEADD(hh, -@reportOptionOSEventMessageLastHours, GETDATE())
 			SET @issuesDetectedCount = 0 
 			
 			DECLARE crsOSEventMessagesInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT
