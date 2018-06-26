@@ -718,7 +718,7 @@
 	- fix defect when forcing to stop a running SQL Agent job
 
 /* 16.05.2018 */
-	- do not allow maintenance tasks to run against objects in "offline" filegroups (Msg 1931, Level 16, State 3, Line 7: The SQL statement cannot be executed because filegroup '...' is offline.)
+	- do not allow maintenance tasks to run against objects in "offline" filegroups (Msg 1931, Level 16, State 3, Line 7: The SQL statement cannot be executed because filegroup '...' is ofin fline.)
 
 /* 23.05.2018 */
 	- add MAXDOP option for update statistics on SQL Server 2016 SP2

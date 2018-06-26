@@ -450,16 +450,10 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsDatabaseDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsSQLServerAgentJobsHistory.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsSQLAgentJobsHistory.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsDiskSpaceInfo.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsSQLServerErrorlogDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\tables\health-check.statsErrorlogDetails.sql" -d %dbname%  -b -r 1
