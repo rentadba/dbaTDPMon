@@ -1,18 +1,18 @@
 ------------
-#####Copyright (c) 2004-2018 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+##### Copyright (c) 2004-2018 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
 ------------
 - Author	 	: Andrei STEFAN
 - Module	 	: dbaTDPMon (Troubleshoot Database Performance / Monitoring)
 - Description	: SQL Server 2000-2017 maintenance, checks and monitoring
 ------------
 
-####Initial Release
+#### Initial Release
 31.01.2015
 * original code written between 2004-2014, under various partial solutions, reorganized and updated
 * version 2015.1 released
 	
 ------------
-####February 2015 new features & fixes
+#### February 2015 new features & fixes
 02.02.2015
 * setup default database mail profile (top 1 from msdb.dbo.sysmail_profile)
 * option for different email addresses for: Alerts, Job Status and Reports (dbo.appConfigurations)
@@ -57,7 +57,7 @@
 * version 2015.2 released
 	
 ------------
-####March 2015 new features & fixes
+#### March 2015 new features & fixes
 04.03.2015
 * fix various bugs and corner case scenarious to maintenance-plan
 * made index maintenance plan work on remote servers
@@ -90,7 +90,7 @@
 * version 2015.3 released
 	
 ------------
-####April 2015 new features & fixes
+#### April 2015 new features & fixes
 01.04.2015
 * change job maintenance steps to perform all consistency checks once a week
 * when running dbcc checktable, included also system tables
@@ -132,7 +132,7 @@
 * version 2015.4 released
 	
 ------------
-####May 2015 new features & fixes
+#### May 2015 new features & fixes
 04.05.2015
 * fix various bugs and corner case scenarious to maintenance-plan
 * fix various bugs to health-check
@@ -153,7 +153,7 @@
 * version 2015.5 released
 	
 ------------
-####June 2015 new features & fixes
+#### June 2015 new features & fixes
 03.06.2015
 * add parameter for backup cleanup to change retention policy from days to full database backup count
 
@@ -168,7 +168,7 @@
 * version 2015.6 released
 
 ------------
-####July 2015 new features & fixes
+#### July 2015 new features & fixes
 07.07.2015
 * add batch file for creating maintenance plan jobs for agentless instances
 * fix various bugs to health-check
@@ -198,7 +198,7 @@
 * version 2015.7 released
 	
 ------------
-####August 2015 new features & fixes
+#### August 2015 new features & fixes
 03.08.2015
 * change default algorithm for index rebuild to online mode (alternative will be the "space efficient" one)
 
@@ -251,7 +251,7 @@
 * version 2015.9 released
 	
 ------------
-####September 2015 new features & fixes
+#### September 2015 new features & fixes
 02.09.2015
 * add support for SQL Server 2000 when automatically lower the fill-factor (dbo.usp_hcChangeFillFactorForIndexesFrequentlyFragmented)
 
@@ -285,7 +285,7 @@
 * version 2015.10 released
 
 ------------
-####October 2015 new features & fixes
+#### October 2015 new features & fixes
 01.10.2015
 * add script for creating additional indexes on msdb to help improving system maintenance execution times (http://sqlperformance.com/2015/07/sql-maintenance/msdb)
 
@@ -332,7 +332,7 @@
 * enhance email notification message for failing jobs
 
 ------------
-####November 2015 new features & fixes
+#### November 2015 new features & fixes
 03.11.2015
 * version 2015.11 released
 
@@ -346,7 +346,7 @@
 * add custom alert & monitoring for Replication Subscription Status & Latency
 
 ------------
-####December 2015 new features & fixes
+#### December 2015 new features & fixes
 04.12.2015
 * fix small bugs on maintenance-plans
 
@@ -354,7 +354,7 @@
 * fix small bugs on maintenance-plans
 
 ------------
-####January 2016 new features & fixes
+#### January 2016 new features & fixes
 12.01.2016
 * add monitoring job and alert for detecting long running transactions and long uncommitted transactions
 
@@ -368,12 +368,12 @@
 * enhance transaction monitoring: detect and alert on tempdb space used by a single session
 
 ------------
-####February 2016 new features & fixes
+#### February 2016 new features & fixes
 03.02.2016
 * add monitoring job and alert for detecting SQL Agent failed jobs
 
 ------------
-####June 2016 new features & fixes
+#### June 2016 new features & fixes
 02.06.2016
 * fix various small bugs on monitoring
 
@@ -394,7 +394,7 @@
 * add new option for backup cleanup, in order to speed the process: 4096 - use xp_dirtree to identify orphan backup files to be deleted
 
 ------------
-####August 2016 new features & fixes
+#### August 2016 new features & fixes
 25.08.2016
 * add parallel database maintenance jobs (backups, consistency checks, index and statistics)
 
@@ -402,7 +402,7 @@
 * fix small bugs on failed jobs monitoring
 	
 ------------
-####September 2016 new features & fixes
+#### September 2016 new features & fixes
 05.09.2016
 * parallel database maintenance jobs enhancements
 
@@ -410,7 +410,7 @@
 * fix small bugs on parallel database maintenance jobs
 	
 ------------
-####October 2016 new features & fixes
+#### October 2016 new features & fixes
 14.10.2016
 * fix small bugs on parallel database maintenance jobs
 
@@ -421,7 +421,7 @@
 * add "default" schedule to all internal tasks and to new projects, when added
 
 ------------
-####November 2016 new features & fixes
+#### November 2016 new features & fixes
 12.11.2016
 * add default log folder parameter in appConfigurations; all created jobs will write the logs in the value path, if set
 
@@ -429,17 +429,17 @@
 * fix SQL Server 2000 installation and maintenance plans execution
 
 ------------
-####January 2017 new features & fixes
+#### January 2017 new features & fixes
 21.01.2017
 * code review / code and flow optimization
 
 ------------
-####February 2017 new features & fixes
+#### February 2017 new features & fixes
 25.02.2017
 * code review & bug fixes; merge code with changes made by Razvan Puscasu
 
 ------------
-####March 2017 new features & fixes
+#### March 2017 new features & fixes
 06.03.2017
 * enhance backup: when performing a differential database backup, check database header for existence of a full backup (do not rely solely on msdb.dbo.backupset)
 
@@ -461,7 +461,7 @@
 * allow dbcc checks to be made on secondary replicas / AlwaysOn
 
 ------------
-####April 2017 new features & fixes
+#### April 2017 new features & fixes
 19.04.2017
 * fix "change backup type check" from differential to full when running on AlwaysOn AvaulabilityGroups
 
@@ -470,7 +470,7 @@
 * fix update statistics error when index name contains brackets (reported by Razvan Puscasu)
 
 ------------
-####May 2017 new features & fixes
+#### May 2017 new features & fixes
 04.05.2017
 * fix database shrink error & alert when another database is in a middle of a restore (reported by Razvan Puscasu)
 * fix minor bugs on maintenance-plan module
@@ -505,7 +505,7 @@
 * fix health-check false reporting of outdated backups in AlwaysOn Availability Group configuration
 
 ------------
-####June 2017 new features & fixes
+#### June 2017 new features & fixes
 14.06.2017
 * add new parameter to dbo.usp_mpDatabaseConsistencyCheck stored procedure: @skipObjectsList - comma separated list of the objects (tables, index name or stats name) to be excluded from maintenance.
 
@@ -513,7 +513,7 @@
 * add [maintenance-plan].[objectSkipList] table, to be used the same as @skipObjectsList or @skipDatabasesList - objects to be excluded from the maintenance / per task (reported by Razvan Puscasu)
 
 ------------
-####July 2017 new features & fixes
+#### July 2017 new features & fixes
 04.07.2017
 * allow database consistency checks for non-readable secondary replicas in an AlwaysOn environment (reported by Mihail Grebencio)
 
@@ -524,7 +524,7 @@
 * raise error when backup file name & path are exceeding 259 characters (reported by Mihail Grebencio)
 
 ------------
-####August 2017 new features & fixes
+#### August 2017 new features & fixes
 07.08.2017
 * fix "Unable to post notification to SQLServerAgent (reason: The maximum number of pending SQLServerAgent notifications has been exceeded.  The notification will be ignored.)" (reported by Razvan Puscasu)
 
@@ -538,17 +538,17 @@
 * fix a small bug when checking for an existing full database backup and "SQL Server VSS Writer" service was running
 
 ------------
-####October 2017 new features & fixes
+#### October 2017 new features & fixes
 02.10.2017
 * minimize the number of server configuration option xp_cmdshell enable/disable calls
 
 ------------
-####November 2017 new features & fixes
+#### November 2017 new features & fixes
 27.11.2017	
 * threat special characters in database name, for backup operation: '!@#$%^&()-={};:`"<>.,\/[[ ]
 
 ------------
-####December 2017 new features & fixes
+#### December 2017 new features & fixes
 09.12.2017	
 * threat special characters for all object names, excluding instance name: '!@#$%^&()-={};:`"<>.,\/[[ ]~ by enclose all object names using a custom quote function: [dbo].[ufn_getObjectQuoteName]
 
@@ -569,7 +569,7 @@
 * full testing cycle on SQL Server 2000 up to SQL Server 2017
 
 ------------
-####January 2018 new features & fixes
+#### January 2018 new features & fixes
 12.01.2018
 * fix dbo.ufn_hcGetIndexesFrequentlyFragmented function when using parallel index maintenance
 
@@ -594,7 +594,7 @@
 * health-check: refactoring of daily report header
 	
 ------------
-####February 2018 new features & fixes
+#### February 2018 new features & fixes
 01.02.2018
 * maintenance-plan: allow updating statistics with default sample 
 
@@ -615,13 +615,13 @@
 * maintenance plan: add support for incremental statistics (SQL Server 2014+)
 
 ------------
-####March 2018 new features & fixes
+#### March 2018 new features & fixes
 01.03.2018
 * add support for ignoring error code 1927: There are already statistics on table [...] (reported by Stefan Iancu)
 * disable shrink internal jobs in parallel maintenance plan (reported by Stefan Iancu)
 
 ------------
-####April 2018 new features & fixes
+#### April 2018 new features & fixes
 05.04.2018
 * merging code with a 3rd party client: dbo.catalogSolutions, dbo.catalogProjects, dbo.jobExecutionQueue, dbo.jobExecutionHistory
 
@@ -665,7 +665,7 @@
 * monitoring: allow SQL Agent jobs to be excluded from transaction status alerts
 
 ------------
-####May 2018 new features & fixes
+#### May 2018 new features & fixes
 01.05.2018
 * maintenance-plan: fix defect when generating job queue on a a very large number of databases
 * add maximum value for how many internal jobs can be started on a system (Maximum SQL Agent jobs running property)
@@ -687,7 +687,7 @@
 * maintenance-plan: in an AlwaysOn Availability Group environment, save the database backups in ClusterName folder
 
 ------------
-####June 2018 new features & fixes
+#### June 2018 new features & fixes
 05.06.2018
 * add dbo.vw_jobSchedulerDetails view with details on SQL Agent jobs scheduler definition for dbaTDPMon jobs
 
