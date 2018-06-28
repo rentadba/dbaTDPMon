@@ -24,3 +24,17 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE [object_id] = OBJECT_ID(N'dbo.job
 IF EXISTS (SELECT * FROM sys.tables WHERE [object_id] = OBJECT_ID('dbo.jobExecutionQueue') AND [lock_escalation_desc]='TABLE')
 	ALTER TABLE [dbo].[jobExecutionQueue] SET (LOCK_ESCALATION = DISABLE)
 GO
+
+IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='report' AND TABLE_NAME='htmlContent' AND COLUMN_NAME='project_id' AND IS_NULLABLE='YES')
+	ALTER TABLE [report].[htmlContent] ALTER COLUMN [project_id] [smallint]	NULL
+GO
+IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='report' AND TABLE_NAME='htmlContent' AND COLUMN_NAME='flg_actions' AND IS_NULLABLE='YES')
+	ALTER TABLE [report].[htmlContent] ALTER COLUMN [flg_actions] [int]	NULL
+GO
+IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='report' AND TABLE_NAME='htmlContent' AND COLUMN_NAME='flg_options' AND IS_NULLABLE='YES')
+	ALTER TABLE [report].[htmlContent] ALTER COLUMN [flg_options] [int]	NULL
+GO
+
+
+
+
