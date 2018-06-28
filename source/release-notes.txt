@@ -757,3 +757,4 @@
 
 /* 28.06.2018 */
 	- send custom alert when the number of concurrent running internal jobs reached the limit set
+	- maintenance-plan: fix deadlock on concurrent projects defined their internal queues

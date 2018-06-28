@@ -706,7 +706,7 @@ WHILE @@FETCH_STATUS=0
 								, jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_')	/* manage special characters in job names */
 								, jeq.[task_id] = S.[task_id]
 								, jeq.[database_name] = S.[database_name]
-						FROM [dbo].[jobExecutionQueue] jeq
+						FROM [dbo].[jobExecutionQueue] jeq WITH (INDEX([IX_jobExecutionQueue_JobQueue]))
 						INNER JOIN @jobExecutionQueue S ON		jeq.[instance_id] = S.[instance_id]
 															AND jeq.[project_id] = S.[project_id]
 															AND jeq.[module] = S.[module]
