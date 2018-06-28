@@ -17,12 +17,12 @@ GO
 CREATE TABLE [report].[htmlContent]
 (
 	[id]										[int] IDENTITY (1, 1)NOT NULL,
-	[project_id]								[smallint]			NOT NULL,
+	[project_id]								[smallint]			NULL,
 	[module]									[varchar](32)		NOT NULL,
 	[instance_id]								[smallint]			NULL,
 	[start_date]								[datetime]			NOT NULL,
-	[flg_actions]								[int]				NOT NULL,
-	[flg_options]								[int]				NOT NULL,
+	[flg_actions]								[int]				NULL,
+	[flg_options]								[int]				NULL,
 	[file_name]									[nvarchar](260)		NOT NULL,
 	[file_path]									[nvarchar](260)		NOT NULL,
 	[http_address]								[nvarchar](512)		NULL,
