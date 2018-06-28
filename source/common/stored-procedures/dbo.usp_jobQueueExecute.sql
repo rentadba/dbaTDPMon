@@ -74,6 +74,7 @@ DECLARE	  @serverEdition			[sysname]
 
 DECLARE	  @queryToRun  			[nvarchar](2048)
 		, @queryParameters		[nvarchar](512)
+		, @eventData			[varchar](8000)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default projectCode
@@ -502,8 +503,31 @@ WHILE @@FETCH_STATUS=0
 
 										IF @runningJobs >= @configMaxSQLJobsRunning
 											begin
-												SET @strMessage='Warning: Maximum SQL Agent jobs running limit reached. Waiting for some job(s) to complete.'
+												SET @strMessage='Maximum SQL Agent jobs running limit reached. Waiting for some job(s) to complete.'
 												EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+												SET @eventData='<alert><detail>' + 
+																	'<severity>warning</severity>' + 
+																	'<instance_name>' + @sqlServerName + '</instance_name>' + 
+																	'<name>' + @strMessage + 
+																	'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@jobName, 'xml') + '</affected_object>' + 
+																	'<event_date_utc>' + CONVERT([varchar](24), GETDATE(), 121) + '</event_date_utc>' + 
+																'</detail></alert>'
+
+												EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= NULL,
+																								@sqlServerName			= @sqlServerName,
+																								@dbName					= @jobDBName,
+																								@objectName				= 'warning',
+																								@childObjectName		= 'dbo.usp_jobQueueExecute',
+																								@module					= 'common',
+																								@eventName				= 'job queue execute',
+																								@parameters				= NULL,	
+																								@eventMessage			= @eventData,
+																								@dbMailProfileName		= NULL,
+																								@recipientsList			= NULL,
+																								@eventType				= 6,	/* 6 - alert-custom */
+																								@additionalOption		= 0
+
 												WAITFOR DELAY @waitForDelay
 											end
 									end

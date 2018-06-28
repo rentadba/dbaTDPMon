@@ -754,3 +754,6 @@
 	- health-check: convert local time for OS events, errorlog messages and SQL Agent jobs to UTC
 	- health-check: if possible, the last X hours in health-check report will be filtered on the UTC columns
 	- add new option for job execution: Maximum job queue execution time (hours) (0=unlimited)
+
+/* 28.06.2018 */
+	- send custom alert when the number of concurrent running internal jobs reached the limit set
