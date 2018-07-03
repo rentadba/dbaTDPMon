@@ -11,7 +11,7 @@ SET NOCOUNT ON
 /*---------------------------------------------------------------------------------------------------------------------*/
 /* patch module: health-check																								   */
 /*---------------------------------------------------------------------------------------------------------------------*/
-RAISERROR('* Patch: 20180703-patch-upgrade-from-v2018_5-to-v2018_6-hc.sql', 10, 1) WITH NOWAIT
+RAISERROR('* Patch: 20180703-patch-upgrade-from-v2018_6-to-v2018_7-hc.sql', 10, 1) WITH NOWAIT
 
 
 IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='health-check' AND TABLE_NAME='statsDatabaseDetails' AND COLUMN_NAME='volume_mount_point')
