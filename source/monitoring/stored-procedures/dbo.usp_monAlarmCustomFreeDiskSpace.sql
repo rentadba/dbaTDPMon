@@ -105,7 +105,7 @@ DECLARE crsDiskSpaceAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINCT
 															INNER JOIN [health-check].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
 															LEFT  JOIN 
 																		(
-																			SELECT DISTINCT [project_id], [instance_id], [physical_drives] 
+																			SELECT DISTINCT [project_id], [instance_id], [volume_mount_point] 
 																			FROM [health-check].[vw_statsDatabaseDetails]
 																		)   cdd ON cdd.[project_id] = cin.[project_id] AND cdd.[instance_id] = cin.[instance_id]
 															LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'disk-space'
@@ -130,8 +130,8 @@ DECLARE crsDiskSpaceAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINCT
 																			)
 																		)
 																	AND (   dsi.[logical_drive] IN ('C') 
-																		 OR cdd.[physical_drives] IS NULL
-																		 OR (cdd.[physical_drives] IS NOT NULL AND CHARINDEX(dsi.[logical_drive], cdd.[physical_drives])>0)
+																		 OR cdd.[volume_mount_point] IS NULL
+																		 OR (cdd.[volume_mount_point] IS NOT NULL AND CHARINDEX(dsi.[logical_drive], cdd.[volume_mount_point])>0)
 																		)
 																	AND asr.[id] IS NULL
 																	AND (@warningFreeDiskMinSpaceMB IS NOT NULL AND @warningFreeDiskMinPercent IS NOT NULL)
@@ -159,7 +159,7 @@ DECLARE crsDiskSpaceAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINCT
 															INNER JOIN [health-check].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
 															LEFT  JOIN 
 																		(
-																			SELECT DISTINCT [project_id], [instance_id], [physical_drives] 
+																			SELECT DISTINCT [project_id], [instance_id], [volume_mount_point] 
 																			FROM [health-check].[vw_statsDatabaseDetails]
 																		)   cdd ON cdd.[project_id] = cin.[project_id] AND cdd.[instance_id] = cin.[instance_id]
 															LEFT JOIN [monitoring].[alertSkipRules] asr ON	asr.[category] = 'disk-space'
@@ -182,8 +182,8 @@ DECLARE crsDiskSpaceAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINCT
 																			)
 																		)
 																	AND (   dsi.[logical_drive] IN ('C') 
-																		 OR cdd.[physical_drives] IS NULL
-																		 OR (cdd.[physical_drives] IS NOT NULL AND CHARINDEX(dsi.[logical_drive], cdd.[physical_drives])>0)
+																		 OR cdd.[volume_mount_point] IS NULL
+																		 OR (cdd.[volume_mount_point] IS NOT NULL AND CHARINDEX(dsi.[logical_drive], cdd.[volume_mount_point])>0)
 																		)
 																	AND asr.[id] IS NULL
 																	AND (@criticalFreeDiskMinSpaceMB IS NOT NULL AND @criticalFreeDiskMinPercent IS NOT NULL)										

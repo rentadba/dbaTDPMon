@@ -2020,7 +2020,7 @@ BEGIN TRY
 																							INNER JOIN [health-check].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
 																							LEFT  JOIN 
 																										(
-																											SELECT DISTINCT [project_id], [instance_id], [physical_drives] 
+																											SELECT DISTINCT [project_id], [instance_id], [volume_mount_point] 
 																											FROM [health-check].[vw_statsDatabaseDetails]
 																										)   cdd ON cdd.[project_id] = cin.[project_id] AND cdd.[instance_id] = cin.[instance_id]
 																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
@@ -2038,7 +2038,7 @@ BEGIN TRY
 																												AND dsi.[available_space_mb] < @reportOptionFreeDiskMinSpace
 																											)
 																										)
-																									AND (dsi.[logical_drive] IN ('C') OR CHARINDEX(dsi.[logical_drive], cdd.[physical_drives])>0)
+																									AND (dsi.[logical_drive] IN ('C') OR CHARINDEX(dsi.[logical_drive], cdd.[volume_mount_point])>0)
 																									AND rsr.[id] IS NULL
 																							ORDER BY cin.[instance_name], cin.[machine_name]
 			OPEN crsDiskSpaceInformationIssuesDetected

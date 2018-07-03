@@ -28,7 +28,7 @@ CREATE TABLE [health-check].[statsDatabaseDetails]
 	[log_space_used_percent]	[numeric](6,2)	NULL,
 	[is_auto_close]				[bit]			NULL,
 	[is_auto_shrink]			[bit]			NULL,
-	[physical_drives]			[sysname]		NULL,
+	[volume_mount_point]		[nvarchar](512)	NULL,
 	[last_backup_time]			[datetime]		NULL,
 	[last_dbcc checkdb_time]	[datetime]		NULL,
 	[is_growth_limited]			[bit]			NULL,

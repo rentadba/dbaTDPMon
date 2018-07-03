@@ -49,7 +49,7 @@ DECLARE @SQLMajorVersion		[int],
 IF object_id('#databaseSpaceInfo') IS NOT NULL DROP TABLE #databaseSpaceInfo
 CREATE TABLE #databaseSpaceInfo
 (
-	[drive]					[varchar](2)		NULL,
+	[volume_mount_point]	[nvarchar](512)		NULL,
 	[is_log_file]			[bit]				NULL,
 	[size_mb]				[numeric](20,3)		NULL,
 	[space_used_mb]			[numeric](20,3)		NULL,
@@ -86,7 +86,7 @@ CREATE TABLE #statsDatabaseDetails
 	[log_space_used_percent]	[numeric](6,2)	NULL,
 	[is_auto_close]				[bit]			NULL,
 	[is_auto_shrink]			[bit]			NULL,
-	[physical_drives]			[sysname]		NULL,
+	[volume_mount_point]		[nvarchar](512)	NULL,
 	[last_backup_time]			[datetime]		NULL,
 	[last_dbcc checkdb_time]	[datetime]		NULL,
 	[recovery_model]			[tinyint]		NULL,
@@ -134,10 +134,10 @@ EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrin
 
 INSERT	INTO [health-check].[statsDatabaseUsageHistory]([catalog_database_id], [instance_id], 
 									  				 [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], 
-													 [physical_drives], [event_date_utc])
+													 [volume_mount_point], [event_date_utc])
 		SELECT	shcdd.[catalog_database_id], shcdd.[instance_id], 
 				shcdd.[data_size_mb], shcdd.[data_space_used_percent], shcdd.[log_size_mb], shcdd.[log_space_used_percent], 
-				shcdd.[physical_drives], shcdd.[event_date_utc]
+				shcdd.[volume_mount_point], shcdd.[event_date_utc]
 		FROM [health-check].[statsDatabaseDetails]		shcdd
 		INNER JOIN [dbo].[catalogDatabaseNames]			cdb ON cdb.[id] = shcdd.[catalog_database_id] AND cdb.[instance_id] = shcdd.[instance_id]
 		INNER JOIN [dbo].[catalogInstanceNames]			cin ON cin.[id] = cdb.[instance_id] AND cin.[project_id] = cdb.[project_id]
@@ -214,7 +214,7 @@ WHILE @@FETCH_STATUS=0
 				IF @sqlServerName <> @@SERVERNAME
 					SET @queryToRun = N'SELECT *
 										FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC (''''USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
-												SELECT    [drive]
+												SELECT    [volume_mount_point]
 														, CAST([is_logfile]		AS [bit]) AS [is_logfile]
 														, SUM([size_mb])		AS [size_mb]
 														, SUM([space_used_mb])	AS [space_used_mb]
@@ -223,19 +223,27 @@ WHILE @@FETCH_STATUS=0
 														SELECT    [name]
 																, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
 																, CAST(FILEPROPERTY([name], ''''''''SpaceUsed'''''''') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
-																, CAST(FILEPROPERTY([name], ''''''''IsLogFile'''''''') AS [bit])		AS [is_logfile]
-																, REPLACE(LEFT([' + CASE WHEN @SQLMajorVersion <=8 THEN N'filename' ELSE N'physical_name' END + N'], 2), '''''''':'''''''', '''''''''''''''') AS [drive]
+																, CAST(FILEPROPERTY([name], ''''''''IsLogFile'''''''') AS [bit])		AS [is_logfile] ' + 
+																CASE WHEN @SQLMajorVersion >= 10 
+																	 THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
+																	 ELSE N', REPLACE(LEFT([' + CASE WHEN @SQLMajorVersion <=8 THEN N'filename' ELSE N'physical_name' END + N'], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
+																END + '
 																, ' + CASE	WHEN @SQLMajorVersion <= 8 
 																			THEN N'CASE WHEN ([maxsize]=-1 AND [groupid]<>0) OR ([maxsize]=-1 AND [groupid]=0) OR ([maxsize]=268435456 AND [groupid]=0) THEN 0 ELSE 1 END ' 
 																			ELSE N'CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END '
 																	 END + N' AS [is_growth_limited]
-														FROM ' + CASE WHEN @SQLMajorVersion <=8 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + N'
+														FROM ' + CASE WHEN @SQLMajorVersion <=8 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + 
+														CASE WHEN @SQLMajorVersion >= 10 
+															 THEN N' CROSS APPLY sys.dm_os_volume_stats(DB_ID(), [file_id])'
+															 ELSE N''
+														END + 
+														N'
 													)sf
-												GROUP BY [drive], [is_logfile]
+												GROUP BY [volume_mount_point], [is_logfile]
 										'''')'')x'
 				ELSE
 					SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
-										SELECT    [drive]
+										SELECT    [volume_mount_point]
 												, CAST([is_logfile]		AS [bit]) AS [is_logfile]
 												, SUM([size_mb])		AS [size_mb]
 												, SUM([space_used_mb])	AS [space_used_mb]
@@ -244,20 +252,27 @@ WHILE @@FETCH_STATUS=0
 												SELECT    [name]
 														, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
 														, CAST(FILEPROPERTY([name], ''SpaceUsed'') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
-														, CAST(FILEPROPERTY([name], ''IsLogFile'') AS [bit])		AS [is_logfile]
-														, REPLACE(LEFT([' + CASE WHEN @SQLMajorVersion <=8 THEN N'filename' ELSE N'physical_name' END + N'], 2), '':'', '''') AS [drive]	
+														, CAST(FILEPROPERTY([name], ''IsLogFile'') AS [bit])		AS [is_logfile] ' + 
+														CASE WHEN @SQLMajorVersion >= 10 
+																THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
+																ELSE N', REPLACE(LEFT([' + CASE WHEN @SQLMajorVersion <=8 THEN N'filename' ELSE N'physical_name' END + N'], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
+														END + '
 														, ' + CASE	WHEN @SQLMajorVersion <= 8 
 																	THEN N'CASE WHEN ([maxsize]=-1 AND [groupid]<>0) OR ([maxsize]=-1 AND [groupid]=0) OR ([maxsize]=268435456 AND [groupid]=0) THEN 0 ELSE 1 END ' 
 																	ELSE N'CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END '
 																END + N' AS [is_growth_limited]
-												FROM ' + CASE WHEN @SQLMajorVersion <=8 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + N'
+												FROM ' + CASE WHEN @SQLMajorVersion <=8 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + 
+												CASE WHEN @SQLMajorVersion >= 10 
+														THEN N' CROSS APPLY sys.dm_os_volume_stats(DB_ID(), [file_id])'
+														ELSE N''
+												END + N'
 											)sf
-										GROUP BY [drive], [is_logfile]'			
+										GROUP BY [volume_mount_point], [is_logfile]'			
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 				
 				TRUNCATE TABLE #databaseSpaceInfo
 				BEGIN TRY
-						INSERT	INTO #databaseSpaceInfo([drive], [is_log_file], [size_mb], [space_used_mb], [is_growth_limited])
+						INSERT	INTO #databaseSpaceInfo([volume_mount_point], [is_log_file], [size_mb], [space_used_mb], [is_growth_limited])
 							EXEC sp_executesql @queryToRun
 				END TRY
 				BEGIN CATCH
@@ -337,13 +352,13 @@ WHILE @@FETCH_STATUS=0
 					end
 
 				/* compute database statistics */
-				INSERT	INTO #statsDatabaseDetails([query_type], [database_id], [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], [physical_drives], [last_dbcc checkdb_time], [is_growth_limited])
+				INSERT	INTO #statsDatabaseDetails([query_type], [database_id], [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], [volume_mount_point], [last_dbcc checkdb_time], [is_growth_limited])
 						SELECT    1, @databaseID
 								, CAST([data_size_mb] AS [numeric](20,3)) AS [data_size_mb]
 								, CAST(CASE WHEN [data_size_mb] <>0 THEN [data_space_used_mb] * 100. / [data_size_mb] ELSE 0 END AS [numeric](6,2)) AS [data_used_percent]
 								, CAST([log_size_mb] AS [numeric](20,3)) AS [log_size_mb]
 								, CAST(CASE WHEN [log_size_mb] <>0 THEN [log_space_used_mb] * 100. / [log_size_mb] ELSE 0 END AS [numeric](6,2)) AS [log_used_percent]
-								, [drives]
+								, [volume_mount_point]
 								, @dbccLastKnownGood
 								, [is_growth_limited]
 						FROM (
@@ -351,20 +366,20 @@ WHILE @@FETCH_STATUS=0
 										, SUM(CASE WHEN [is_log_file] = 0 THEN dsi.[space_used_mb] ELSE 0 END) 	AS [data_space_used_mb]
 										, SUM(CASE WHEN [is_log_file] = 1 THEN dsi.[size_mb] ELSE 0 END) 		AS [log_size_mb]
 										, SUM(CASE WHEN [is_log_file] = 1 THEN dsi.[space_used_mb] ELSE 0 END) 	AS [log_space_used_mb]
-										, MAX(x.[drives]) [drives]
+										, MAX(x.[volume_mount_points]) [volume_mount_point]
 										, MAX(CAST([is_growth_limited] AS [tinyint])) [is_growth_limited]
 								FROM #databaseSpaceInfo dsi
 								CROSS APPLY(
 											SELECT STUFF(
-															(	SELECT ', ' + [drive]
+															(	SELECT ', ' + [volume_mount_point]
 																FROM (	
-																		SELECT DISTINCT UPPER([drive]) [drive]
+																		SELECT DISTINCT [volume_mount_point]
 																		FROM #databaseSpaceInfo
 																	) AS x
-																ORDER BY [drive]
+																ORDER BY [volume_mount_point]
 																FOR XML PATH('')
 															),1,1,''
-														) AS [drives]
+														) AS [volume_mount_points]
 											)x
 							)db
 				FETCH NEXT FROM crsActiveDatabases INTO @catalogDatabaseID, @databaseID, @databaseName
@@ -484,11 +499,11 @@ WHILE @@FETCH_STATUS=0
 		/* save results to stats table */
 		INSERT	INTO [health-check].[statsDatabaseDetails]([catalog_database_id], [instance_id], 
 				 											 [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], 
-															 [is_auto_close], [is_auto_shrink], [physical_drives], 
+															 [is_auto_close], [is_auto_shrink], [volume_mount_point], 
 															 [last_backup_time], [last_dbcc checkdb_time],  [recovery_model], [page_verify_option], [compatibility_level], [is_growth_limited], [event_date_utc])
 				SELECT cdn.[id], @instanceID, 
 				 		qt.[data_size_mb], qt.[data_space_used_percent], qt.[log_size_mb], qt.[log_space_used_percent], 
-						qt.[is_auto_close], qt.[is_auto_shrink], qt.[physical_drives], 
+						qt.[is_auto_close], qt.[is_auto_shrink], qt.[volume_mount_point], 
 						qt.[last_backup_time], qt.[last_dbcc checkdb_time],  qt.[recovery_model], qt.[page_verify_option], qt.[compatibility_level], qt.[is_growth_limited], GETUTCDATE()
 				FROM (
 						SELECT    ISNULL(qt1.[database_id], qt2.[database_id]) [database_id]
@@ -499,7 +514,7 @@ WHILE @@FETCH_STATUS=0
 								, qt1.[data_space_used_percent]
 								, qt1.[log_size_mb]
 								, qt1.[log_space_used_percent]
-								, qt1.[physical_drives]
+								, qt1.[volume_mount_point]
 								, qt2.[is_auto_close]
 								, qt2.[is_auto_shrink]
 								, qt2.[last_backup_time]
@@ -511,7 +526,7 @@ WHILE @@FETCH_STATUS=0
 										, [data_space_used_percent]
 										, [log_size_mb]
 										, [log_space_used_percent]
-										, [physical_drives]
+										, [volume_mount_point]
 										, [last_dbcc checkdb_time]
 										, [is_growth_limited]
 								FROM #statsDatabaseDetails

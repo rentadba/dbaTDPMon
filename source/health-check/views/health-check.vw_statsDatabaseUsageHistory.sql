@@ -30,7 +30,7 @@ SELECT 	  cin.[project_id]		AS [project_id]
 		, shcdd.[data_space_used_percent]
 		, shcdd.[log_size_mb]
 		, shcdd.[log_space_used_percent]
-		, shcdd.[physical_drives]
+		, shcdd.[volume_mount_point]
 		, shcdd.[event_date_utc]
 FROM [dbo].[catalogInstanceNames]	cin	
 INNER JOIN [dbo].[catalogDatabaseNames] cdn ON cin.[id] = cdn.[instance_id] AND cin.[project_id] = cdn.[project_id]

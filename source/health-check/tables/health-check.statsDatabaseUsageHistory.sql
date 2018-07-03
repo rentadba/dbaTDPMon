@@ -23,7 +23,7 @@ CREATE TABLE [health-check].[statsDatabaseUsageHistory]
 	[data_space_used_percent]	[numeric](6,2)	NULL,
 	[log_size_mb]				[numeric](20,3)	NULL,
 	[log_space_used_percent]	[numeric](6,2)	NULL,
-	[physical_drives]			[sysname]		NULL,
+	[volume_mount_point]		[nvarchar](512)	NULL,
 	[event_date_utc]			[datetime]		NOT NULL,
 	CONSTRAINT [PK_statsDatabaseUsageHistory] PRIMARY KEY  CLUSTERED 
 	(
