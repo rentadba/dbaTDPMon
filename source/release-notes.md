@@ -718,3 +718,4 @@
 #### July 2018 new features & fixes
 03.07.2018
 * health-check: save volume/disk mount point for data/log file physical location (SQL Server 2008 onwards)
+* add is_resource_intensive flag for appInternalTasks

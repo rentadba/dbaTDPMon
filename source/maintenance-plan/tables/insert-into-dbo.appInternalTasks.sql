@@ -32,3 +32,15 @@ INSERT	INTO [dbo].[appInternalTasks] ([id], [descriptor], [task_name], [flg_acti
 		LEFT JOIN [dbo].[appInternalTasks] ait ON S.[id] = ait.[id]
 		WHERE ait.[id] IS NULL
 GO
+UPDATE [dbo].[appInternalTasks]
+	SET [is_resource_intensive] = 1
+WHERE [task_name] IN (  'Database Consistency Check'
+					  , 'Tables Consistency Check'
+					  , 'Reference Consistency Check'
+					  , 'Perform Correction to Space Usage'
+					  , 'Rebuild Heap Tables'
+					  , 'User Databases (diff)'
+					  , 'User Databases (full)'
+				     )
+
+GO

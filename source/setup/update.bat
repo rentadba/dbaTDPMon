@@ -123,6 +123,9 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20180628-patch-upgrade-from-v2018_5-to-v2018_6-common.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20180703-patch-upgrade-from-v2018_6-to-v2018_7-common.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 
 echo *-----------------------------------------------------------------------------*
 echo Common: Creating Views ...
@@ -410,7 +413,7 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20180619-patch-upgrade-from-v2018_5-to-v2018_6-hc.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180703-patch-upgrade-from-v2018_5-to-v2018_6-hc.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20180703-patch-upgrade-from-v2018_6-to-v2018_7-hc.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 
