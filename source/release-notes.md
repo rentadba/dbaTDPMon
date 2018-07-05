@@ -712,10 +712,13 @@
 
 28.06.2018
 * send custom alert when the number of concurrent running internal jobs reached the limit set
-* maintenance-plan: fix deadlock on concurrent projects defined their internal queues
+* maintenance-plan: fix deadlock on concurrent projects defining their internal queues
 
 ------------
 #### July 2018 new features & fixes
 03.07.2018
 * health-check: save volume/disk mount point for data/log file physical location (SQL Server 2008 onwards)
 * add is_resource_intensive flag for appInternalTasks
+
+05.07.2018
+* maintenance-plan: fix deadlock on concurrent projects defining their internal queues
