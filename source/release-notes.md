@@ -720,5 +720,5 @@
 * health-check: save volume/disk mount point for data/log file physical location (SQL Server 2008 onwards)
 * add is_resource_intensive flag for appInternalTasks
 
-05.07.2018
+06.07.2018
 * maintenance-plan: fix deadlock on concurrent projects defining their internal queues
