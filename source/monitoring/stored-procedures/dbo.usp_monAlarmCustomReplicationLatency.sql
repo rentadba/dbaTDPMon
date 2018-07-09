@@ -490,6 +490,7 @@ FROM	[dbo].[catalogInstanceNames] cin
 WHERE	cin.[active] = 1
 		AND cin.[name] = @@SERVERNAME
 		--AND cin.[project_id] = @projectID
+ORDER BY [id]
 
 /* save the previous executions statistics */
 EXEC [dbo].[usp_jobExecutionSaveStatistics]	@projectCode		= @projectCode,

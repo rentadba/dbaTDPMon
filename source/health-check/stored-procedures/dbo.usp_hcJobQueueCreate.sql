@@ -90,6 +90,7 @@ SELECT TOP 1 @instanceID = [id]
 FROM [dbo].[catalogInstanceNames]
 WHERE [name] = @@SERVERNAME
 		--AND [project_id] = @projectID
+ORDER BY [id]
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 DECLARE crsCollectorDescriptor CURSOR LOCAL FAST_FORWARD FOR	SELECT x.[descriptor], it.[id] AS [task_id]
