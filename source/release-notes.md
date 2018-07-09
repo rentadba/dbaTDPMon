@@ -722,3 +722,6 @@
 
 06.07.2018
 * maintenance-plan: fix deadlock on concurrent projects defining their internal queues
+
+09.07.2018
+* delete duplicate jobs entries in jobExecutionQueue table
