@@ -499,10 +499,10 @@ BEGIN TRY
 	WHERE cin.[project_id] = @projectID
 
 	UPDATE dest
-		SET	dest.[database_id] = src.[database_id]
-					  , dest.[state] = src.[state]
-					  , dest.[state_desc] = src.[state_desc]
-					  , dest.[active] = 1
+		SET	  dest.[database_id] = src.[database_id]
+			, dest.[state] = src.[state]
+			, dest.[state_desc] = src.[state_desc]
+			, dest.[active] = 1
 	FROM [dbo].[catalogDatabaseNames] AS dest
 	INNER JOIN
 		 (	
@@ -517,14 +517,16 @@ BEGIN TRY
 			INNER JOIN [dbo].[catalogMachineNames] cmn ON cmn.[name] = srcMn.[name] AND cmn.[project_id]=@projectID
 			INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[name] = srcIN.[name] AND cin.[machine_id] = cmn.[id]
 			WHERE cin.[project_id] = @projectID
-		  ) AS src ON dest.[instance_id] = src.[instance_id] AND dest.[name] = src.[name];
+		  ) AS src ON dest.[instance_id] = src.[instance_id] AND dest.[name] = src.[name] AND dest.[project_id] = @projectID;;
 
 	IF @addNewDatabasesToProject = 1
+		/* add only databases not allocated to other projects */
 		INSERT INTO [dbo].[catalogDatabaseNames]([instance_id], [project_id], [database_id], [name], [state], [state_desc], [active])
-				SELECT src.[instance_id], @projectID, src.[database_id], src.[name], src.[state], src.[state_desc], 1
+				SELECT src.[instance_id], @projectID, src.[database_id], src.[database_name], src.[state], src.[state_desc], 1
 				FROM (	
 						SELECT  cin.[id] AS [instance_id]
-							  , src.[name]
+							  , cin.[name] AS [instance_name]
+							  , src.[name] AS [database_name]
 							  , src.[database_id]
 							  , src.[state]
 							  , src.[state_desc]
@@ -536,8 +538,13 @@ BEGIN TRY
 						WHERE src.[name] LIKE @dbFilter
 								AND cin.[project_id] = @projectID
 					  ) AS src
-				LEFT JOIN [dbo].[catalogDatabaseNames] AS dest ON dest.[instance_id] = src.[instance_id] AND dest.[name] = src.[name]
-				WHERE dest.[instance_id] IS NULL;
+				LEFT JOIN 
+						(
+							SELECT cin.[project_id], cin.[name] AS [instance_name], cdn.[name] AS [database_name]
+							FROM [dbo].[catalogDatabaseNames] cdn
+							INNER JOIN [dbo].[catalogInstanceNames] cin ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[id]
+						) AS dest ON dest.[instance_name] = src.[instance_name] AND dest.[database_name] = src.[database_name]
+				WHERE dest.[project_id] IS NULL;
 
 	SELECT TOP 1 @instanceID = cin.[id]
 	FROM  #catalogMachineNames srcMn

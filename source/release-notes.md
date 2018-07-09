@@ -725,4 +725,4 @@
 
 09.07.2018
 * fix defect related to duplicate jobs entries in jobExecutionQueue table
-
+* when refreshing projects data, add only databases not allocated to other projects
