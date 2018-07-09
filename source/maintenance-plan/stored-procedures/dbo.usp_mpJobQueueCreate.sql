@@ -659,15 +659,17 @@ WHILE @@FETCH_STATUS=0
 						INNER JOIN (
 									SELECT	S.[id], 
 											ROW_NUMBER() OVER (ORDER BY jeq.[id]) AS [new_priority]
-									FROM [dbo].[jobExecutionQueue] jeq
-									INNER JOIN @jobExecutionQueue S ON		jeq.[instance_id] = S.[instance_id]
+									FROM [dbo].[jobExecutionQueue] jeq WITH (INDEX([IX_jobExecutionQueue_JobQueue]))
+									INNER JOIN @jobExecutionQueue S ON		jeq.[for_instance_id] = S.[for_instance_id]
 																		AND jeq.[project_id] = S.[project_id]
+																		AND jeq.[task_id] = S.[task_id]
+																		AND jeq.[database_name] = S.[database_name]
+																		AND jeq.[instance_id] = S.[instance_id]
 																		AND jeq.[module] = S.[module]
 																		AND jeq.[descriptor] = S.[descriptor]
-																		AND jeq.[for_instance_id] = S.[for_instance_id]
 																		AND (jeq.[job_name] = S.[job_name] OR jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_'))
 																		AND jeq.[job_step_name] = S.[job_step_name]
-																		AND jeq.[job_database_name] = S.[job_database_name]
+																		AND jeq.[job_database_name] = S.[job_database_name]		
 									WHERE (     @skipDatabasesList IS NULL
 											OR (    @skipDatabasesList IS NOT NULL	
 													AND (
@@ -708,18 +710,18 @@ WHILE @@FETCH_STATUS=0
 											, jeq.[status] = -1
 											, jeq.[priority] = S.[priority]
 											, jeq.[event_date_utc] = GETUTCDATE()
-											, jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_')	/* manage special characters in job names */
-											, jeq.[task_id] = S.[task_id]
-											, jeq.[database_name] = S.[database_name]
 									FROM [dbo].[jobExecutionQueue] jeq WITH (INDEX([IX_jobExecutionQueue_JobQueue]))
-									INNER JOIN @jobExecutionQueue S ON		jeq.[instance_id] = S.[instance_id]
+									INNER JOIN @jobExecutionQueue S ON		jeq.[for_instance_id] = S.[for_instance_id]
 																		AND jeq.[project_id] = S.[project_id]
+																		AND jeq.[task_id] = S.[task_id]
+																		AND jeq.[database_name] = S.[database_name]
+																		AND jeq.[instance_id] = S.[instance_id]
 																		AND jeq.[module] = S.[module]
 																		AND jeq.[descriptor] = S.[descriptor]
-																		AND jeq.[for_instance_id] = S.[for_instance_id]
 																		AND (jeq.[job_name] = S.[job_name] OR jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_'))
 																		AND jeq.[job_step_name] = S.[job_step_name]
-																		AND jeq.[job_database_name] = S.[job_database_name]
+																		AND jeq.[job_database_name] = S.[job_database_name]																		
+
 									WHERE (     @skipDatabasesList IS NULL
 											OR (    @skipDatabasesList IS NOT NULL	
 													AND (
@@ -751,11 +753,13 @@ WHILE @@FETCH_STATUS=0
 								, S.[job_command]
 								, S.[task_id], S.[database_name], S.[priority]
 						FROM @jobExecutionQueue S
-						LEFT JOIN [dbo].[jobExecutionQueue] jeq ON		jeq.[instance_id] = S.[instance_id]
+						LEFT JOIN [dbo].[jobExecutionQueue] jeq ON		jeq.[for_instance_id] = S.[for_instance_id]
 																	AND jeq.[project_id] = S.[project_id]
+																	AND jeq.[task_id] = S.[task_id]
+																	AND jeq.[database_name] = S.[database_name]
+																	AND jeq.[instance_id] = S.[instance_id]
 																	AND jeq.[module] = S.[module]
 																	AND jeq.[descriptor] = S.[descriptor]
-																	AND jeq.[for_instance_id] = S.[for_instance_id]
 																	AND (jeq.[job_name] = S.[job_name] OR jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_'))
 																	AND jeq.[job_step_name] = S.[job_step_name]
 																	AND jeq.[job_database_name] = S.[job_database_name]

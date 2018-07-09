@@ -18,11 +18,23 @@ DELETE jeq
 FROM [dbo].[jobExecutionQueue] jeq
 inner JOIN  
 	(
-		SELECT [job_name], [task_id], [database_name], COUNT(*) AS [job_count], MAX([execution_date]) AS [execution_date]
+		SELECT [project_id], [job_name], [task_id], [database_name], COUNT(*) AS [job_count], MAX([execution_date]) AS [execution_date], MAX([id]) AS [last_id]
 		FROM [dbo].[jobExecutionQueue]
-		GROUP BY [job_name], [task_id], [database_name]
-	)jeqDup ON jeqDup.[job_name] = jeq.[job_name] AND jeqDup.[task_id] = jeq.[task_id] AND ISNULL(jeqDup.[database_name], '') = ISNULL(jeq.[database_name], '')
+		GROUP BY [project_id], [job_name], [task_id], [database_name]
+	)jeqDup ON jeqDup.[project_id] = jeq.[project_id] AND jeqDup.[job_name] = jeq.[job_name] AND jeqDup.[task_id] = jeq.[task_id] AND ISNULL(jeqDup.[database_name], '') = ISNULL(jeq.[database_name], '')
 				AND NOT (   jeqDup.[job_count] = 1 
-						OR (jeqDup.[job_count] <> 1 AND jeqDup.[execution_date] = jeq.[execution_date])
+						OR (jeqDup.[job_count] <> 1 AND jeq.[execution_date] IS NOT NULL AND jeqDup.[execution_date] = jeq.[execution_date])
+						OR (jeqDup.[job_count] <> 1 AND jeq.[execution_date] IS NULL AND jeqDup.[last_id] = jeq.[id])
 						)
+GO
+
+IF EXISTS (SELECT * FROM sys.indexes WHERE [object_id] = OBJECT_ID(N'dbo.jobExecutionQueue') AND [name] = N'IX_jobExecutionQueue_JobQueue') 
+	DROP INDEX [IX_jobExecutionQueue_JobQueue] ON [dbo].[jobExecutionQueue]
+GO
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE [object_id] = OBJECT_ID(N'dbo.jobExecutionQueue') AND [name] = N'IX_jobExecutionQueue_JobQueue') 
+	CREATE INDEX [IX_jobExecutionQueue_JobQueue] ON [dbo].[jobExecutionQueue]
+			([for_instance_id], [project_id], [task_id], [database_name], [instance_id], [job_name], [module], [descriptor], [job_step_name], [job_database_name]) 
+		INCLUDE
+			([status], [event_date_utc], [priority])
+		ON [FG_Statistics_Index]
 GO
