@@ -509,7 +509,7 @@ WHILE @@FETCH_STATUS=0
 												SET @eventData='<alert><detail>' + 
 																	'<severity>warning</severity>' + 
 																	'<instance_name>' + @sqlServerName + '</instance_name>' + 
-																	'<name>' + @strMessage + 
+																	'<name>' + @strMessage + '</name>' +
 																	'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@jobName, 'xml') + '</affected_object>' + 
 																	'<event_date_utc>' + CONVERT([varchar](24), GETDATE(), 121) + '</event_date_utc>' + 
 																'</detail></alert>'

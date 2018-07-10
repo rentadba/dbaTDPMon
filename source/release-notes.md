@@ -726,3 +726,6 @@
 09.07.2018
 * fix defect related to duplicate jobs entries in jobExecutionQueue table
 * when refreshing projects data, add only databases not allocated to other projects
+
+10.07.2018
+* fix XML parsing error when maximum jobs limit alert is triggered
