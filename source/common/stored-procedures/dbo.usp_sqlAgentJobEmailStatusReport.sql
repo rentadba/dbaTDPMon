@@ -262,8 +262,7 @@ SELECT @failedSteps = COUNT(*)
 FROM #jobHistory
 WHERE [run_status] = 'Failed'
 
-EXEC [dbo].[usp_logEventMessageAndSendEmail] @projectCode		= NULL,
-											 @sqlServerName		= @sqlServerName,
+EXEC [dbo].[usp_logEventMessageAndSendEmail] @sqlServerName		= @sqlServerName,
 											 @objectName		= @jobName,
 											 @module			= @module,
 											 @eventName			= 'sql agent job status',

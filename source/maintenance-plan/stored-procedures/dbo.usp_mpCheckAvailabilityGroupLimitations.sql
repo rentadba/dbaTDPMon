@@ -148,8 +148,7 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL
 										'<event_date_utc>' + CONVERT([varchar](24), GETUTCDATE(), 121) + '</event_date_utc>' + 
 										'</detail></alert>'
 
-						EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= DEFAULT,
-																		@sqlServerName			= @sqlServerName,
+						EXEC [dbo].[usp_logEventMessageAndSendEmail]	@sqlServerName			= @sqlServerName,
 																		@dbName					= @dbName,
 																		@objectName				= NULL,
 																		@childObjectName		= NULL,

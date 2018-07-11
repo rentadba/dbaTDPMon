@@ -195,8 +195,7 @@ WHILE @@FETCH_STATUS=0
 		/* check for additional receipients for the alert */		
 		SET @additionalRecipients = [dbo].[ufn_monGetAdditionalAlertRecipients](@projectID, @instanceName, @eventName, @objectName)
 
-		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= @projectCode,
-														@sqlServerName			= @instanceName,
+		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@sqlServerName			= @instanceName,
 														@dbName					= @severity,
 														@objectName				= @objectName,
 														@childObjectName		= NULL,

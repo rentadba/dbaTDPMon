@@ -16,7 +16,7 @@ begin
 
 	/* identify Project Code by InstanceName and Database Name */
 	IF @sqlServerName IS NOT NULL AND @dbName IS NOT NULL
-		SELECT   @projectCode = cp.[code]
+		SELECT TOP 1 @projectCode = cp.[code]
 		FROM dbo.catalogInstanceNames AS cin
 		INNER JOIN dbo.catalogDatabaseNames AS cdn ON cin.[id] = cdn.[instance_id]
 		LEFT JOIN dbo.catalogProjects AS cp ON cp.[id] = cdn.[project_id]

@@ -209,8 +209,7 @@ WHILE @@FETCH_STATUS=0
 		SET @publicationDetails = 'Publication: ' + @publicationName + ' - Subscriber: ' + @subcriptionServer + '.' + @subscriptionDB
 		SET @additionalRecipients = [dbo].[ufn_monGetAdditionalAlertRecipients](@projectID, @publicationServer, @eventName, @publicationDetails)
 
-		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= @projectCode,
-														@sqlServerName			= @publicationServer,
+		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@sqlServerName			= @publicationServer,
 														@dbName					= @publicationName,
 														@objectName				= @subcriptionServer,
 														@childObjectName		= @subscriptionDB,
@@ -269,8 +268,7 @@ WHILE @@FETCH_STATUS=0
 		SET @publicationDetails = 'Publication: ' + @publicationName + ' - Subscriber: ' + @subcriptionServer + '.' + @subscriptionDB
 		SET @additionalRecipients = [dbo].[ufn_monGetAdditionalAlertRecipients](@projectID, @publicationServer, @eventName, @publicationDetails)
 
-		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= @projectCode,
-														@sqlServerName			= @publicationServer,
+		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@sqlServerName			= @publicationServer,
 														@dbName					= @publicationName,
 														@objectName				= @subcriptionServer,
 														@childObjectName		= @subscriptionDB,
@@ -803,8 +801,7 @@ WHILE @@FETCH_STATUS=0
 		SET @publicationDetails = 'Publication: ' + @publicationName + ' - Subscriber: ' + @subcriptionServer + '.' + @subscriptionDB
 		SET @additionalRecipients = [dbo].[ufn_monGetAdditionalAlertRecipients](@projectID, @publicationServer, @eventName, @publicationDetails)
 
-		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= @projectCode,
-														@sqlServerName			= @instanceName,
+		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@sqlServerName			= @instanceName,
 														@dbName					= @severity,
 														@objectName				= @objectName,
 														@childObjectName		= NULL,

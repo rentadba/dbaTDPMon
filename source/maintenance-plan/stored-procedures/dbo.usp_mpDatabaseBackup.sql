@@ -414,8 +414,7 @@ IF NOT (@serverVersionNum >= 14 AND @hostPlatform='linux' )
 									'<event_date_utc>' + CONVERT([varchar](24), GETDATE(), 121) + '</event_date_utc>' + 
 								'</detail></alert>'
 
-				EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= NULL,
-																@sqlServerName			= @sqlServerName,
+				EXEC [dbo].[usp_logEventMessageAndSendEmail]	@sqlServerName			= @sqlServerName,
 																@dbName					= @dbName,
 																@objectName				= 'critical',
 																@childObjectName		= 'dbo.usp_mpDatabaseBackup',
@@ -647,8 +646,7 @@ IF @optionForceChangeBackupType=1
 									'<event_date_utc>' + CONVERT([varchar](24), GETDATE(), 121) + '</event_date_utc>' + 
 								'</detail></alert>'
 
-				EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= NULL,
-																@sqlServerName			= @sqlServerName,
+				EXEC [dbo].[usp_logEventMessageAndSendEmail]	@sqlServerName			= @sqlServerName,
 																@dbName					= @dbName,
 																@objectName				= 'critical',
 																@childObjectName		= 'dbo.usp_mpDatabaseBackup',
@@ -722,8 +720,7 @@ IF LEN(@backupLocation + @backupFileName) > @maxPATHLength
 							'<event_date_utc>' + CONVERT([varchar](24), GETDATE(), 121) + '</event_date_utc>' + 
 						'</detail></alert>'
 
-		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= NULL,
-														@sqlServerName			= @sqlServerName,
+		EXEC [dbo].[usp_logEventMessageAndSendEmail]	@sqlServerName			= @sqlServerName,
 														@dbName					= @dbName,
 														@objectName				= 'critical',
 														@childObjectName		= 'dbo.usp_mpDatabaseBackup',

@@ -514,8 +514,7 @@ WHILE @@FETCH_STATUS=0
 																	'<event_date_utc>' + CONVERT([varchar](24), GETDATE(), 121) + '</event_date_utc>' + 
 																'</detail></alert>'
 
-												EXEC [dbo].[usp_logEventMessageAndSendEmail]	@projectCode			= NULL,
-																								@sqlServerName			= @sqlServerName,
+												EXEC [dbo].[usp_logEventMessageAndSendEmail]	@sqlServerName			= @sqlServerName,
 																								@dbName					= @jobDBName,
 																								@objectName				= 'warning',
 																								@childObjectName		= 'dbo.usp_jobQueueExecute',
