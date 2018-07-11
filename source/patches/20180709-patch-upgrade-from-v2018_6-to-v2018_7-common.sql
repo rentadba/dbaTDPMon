@@ -31,6 +31,7 @@ inner JOIN
 						)
 GO
 
+/* delete duplicate jobs with the same execution date */
 DELETE jeq
 FROM (
 		SELECT    [project_id], [job_name], [task_id], [database_name], [execution_date], [id]
@@ -51,6 +52,15 @@ inner JOIN
 						OR (jeqDup.[job_count] <> 1 AND jeq.[execution_date] IS NULL AND jeqDup.[last_id] = jeq.[id])
 						)
 WHERE jeq.[row_no] > 1
+GO
+
+/* delete maintenance jobs with no database associated */
+DELETE jeq
+FROM [dbo].[jobExecutionQueue] jeq
+INNER JOIN [dbo].[catalogInstanceNames] cin ON jeq.[project_id] = cin.[project_id] AND jeq.[for_instance_id] = cin.[id]
+LEFT JOIN [dbo].[catalogDatabaseNames] cdn ON jeq.[database_name] = cdn.[name] AND cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[id]
+WHERE	jeq.[module] = 'maintenance-plan'
+		AND cdn.[id] IS NULL
 GO
 
 

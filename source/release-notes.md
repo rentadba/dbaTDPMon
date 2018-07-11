@@ -729,3 +729,6 @@
 
 10.07.2018
 * fix XML parsing error when maximum jobs limit alert is triggered
+
+11.07.2018
+* health-check: fix disk space details table formatting in the HTML report

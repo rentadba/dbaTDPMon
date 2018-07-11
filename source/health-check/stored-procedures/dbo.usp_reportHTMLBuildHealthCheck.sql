@@ -3560,9 +3560,10 @@ BEGIN TRY
 
 			SET @volumeCount = 0
 			DECLARE crsDiskSpaceInformationMachineNames CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT
-																								  cin.[machine_name]/*, cin.[instance_name]*/
-																								, cin.[is_clustered], cin.[cluster_node_machine_name]
-																								, COUNT(*) AS [volume_count]
+																								  cin.[machine_name]
+																								, cin.[is_clustered]
+																								, cin.[cluster_node_machine_name]
+																								, COUNT(DISTINCT [volume_mount_point]) AS [volume_count]
 																						FROM [dbo].[vw_catalogInstanceNames]  cin
 																						INNER JOIN 
 																								(
@@ -3584,8 +3585,8 @@ BEGIN TRY
 																						WHERE cin.[instance_active]=1
 																								AND cin.[project_id] = @projectID
 																								AND rsr.[id] IS NULL	
-																						GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name]
-																						ORDER BY cin.[machine_name]/*, cin.[instance_name]*/
+																						GROUP BY cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name]
+																						ORDER BY cin.[machine_name]
 			OPEN crsDiskSpaceInformationMachineNames
 			FETCH NEXT FROM crsDiskSpaceInformationMachineNames INTO  @machineName, /*@instanceName, */@isClustered, @clusterNodeName, @volumeCount
 			WHILE @@FETCH_STATUS=0
