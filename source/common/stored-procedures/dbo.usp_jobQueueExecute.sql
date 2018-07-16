@@ -39,7 +39,6 @@ DECLARE   @projectID					[smallint]
 		, @defaultLogFileLocation		[nvarchar](512)
 		, @logFileLocation				[nvarchar](512)
 		, @jobQueueID					[int]
-
 		, @configParallelJobs			[smallint]
 		, @configMaxNumberOfRetries		[smallint]
 		, @configFailMasterJob			[bit]
@@ -75,6 +74,13 @@ DECLARE	  @serverEdition			[sysname]
 DECLARE	  @queryToRun  			[nvarchar](2048)
 		, @queryParameters		[nvarchar](512)
 		, @eventData			[varchar](8000)
+
+/* for the jobs per volume limit */
+DECLARE	  @moduleHealthCheckExists				[bit]
+		, @forDatabaseName						[sysname]
+		, @forDatabaseMountPoint				[nvarchar](512)
+		, @jobsRunningOnSameVolume				[smallint]
+		, @configMaxSQLJobsRunningOnSameVolume	[smallint]
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default projectCode
@@ -174,6 +180,20 @@ END CATCH
 SET @configMaxSQLJobsRunning = ISNULL(@configMaxSQLJobsRunning, 0)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
+--get the maximum numbers of jobs that can be running on the same physical volume
+BEGIN TRY
+	SELECT	@configMaxSQLJobsRunningOnSameVolume = [value]
+	FROM	[dbo].[appConfigurations]
+	WHERE	[name] = N'Maximum SQL Agent jobs running on the same physical volume (0=unlimited)'
+			AND [module] = 'common'
+END TRY
+BEGIN CATCH
+	SET @configMaxSQLJobsRunningOnSameVolume = 0
+END CATCH
+
+SET @configMaxSQLJobsRunningOnSameVolume = ISNULL(@configMaxSQLJobsRunningOnSameVolume, 0)
+
+------------------------------------------------------------------------------------------------------------------------------------------
 --get the time limit for which the queue can execute (hours)
 BEGIN TRY
 	SELECT	@configMaxQueueExecutionTime = [value]
@@ -225,6 +245,14 @@ IF RIGHT(@defaultLogFileLocation, 1)<>'\' SET @defaultLogFileLocation = @default
 SET @defaultLogFileLocation = [dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, @defaultLogFileLocation)
 
 ------------------------------------------------------------------------------------------------------------------------------------------
+--for limitations that are defined cross-modules, check if module health-check is installed
+SET @moduleHealthCheckExists = 0
+IF EXISTS(SELECT * FROM sys.schemas WHERE [name] = 'health-check')
+	AND EXISTS(SELECT * FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_SCHEMA='health-check' AND TABLE_NAME='vw_statsDatabaseDetails')
+	AND EXISTS(SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='health-check' AND TABLE_NAME='statsDatabaseDetails')
+	SET @moduleHealthCheckExists = 1
+
+------------------------------------------------------------------------------------------------------------------------------------------
 --create folder on disk
 SET @queryToRun = N'EXEC ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[dbo].[usp_createFolderOnDisk]	@sqlServerName	= ''' + @@SERVERNAME + N''',
 																			@folderName		= ''' + @defaultLogFileLocation + N''',
@@ -265,7 +293,7 @@ SET @runningJobs  = 0
 ------------------------------------------------------------------------------------------------------------------------------------------
 DECLARE crsJobQueue CURSOR LOCAL FAST_FORWARD FOR	SELECT    [id], [instance_name]
 															, [job_name], [job_step_name], [job_database_name], REPLACE([job_command], '''', '''''') AS [job_command]
-															, [event_date_utc]
+															, [database_name], [event_date_utc]
 													FROM [dbo].[vw_jobExecutionQueue]
 													WHERE  [project_id] = @projectID 
 															AND [module] LIKE @moduleFilter
@@ -278,7 +306,7 @@ DECLARE crsJobQueue CURSOR LOCAL FAST_FORWARD FOR	SELECT    [id], [instance_name
 																)																
 													ORDER BY [priority], [id]
 OPEN crsJobQueue
-FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @jobCreateTimeUTC
+FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @forDatabaseName, @jobCreateTimeUTC
 SET @executedJobs = 1
 WHILE @@FETCH_STATUS=0
 	begin
@@ -475,31 +503,75 @@ WHILE @@FETCH_STATUS=0
 
 						---------------------------------------------------------------------------------------------------
 						/* check how many jobs are running. if cap is set, waiting for jobs to complete */
-						IF @configMaxSQLJobsRunning > 0 AND @serialExecutionMode = 0 AND @serverVersionNum > 10 
+						IF (@serialExecutionMode = 0 AND @serverVersionNum > 10) AND (@configMaxSQLJobsRunning > 0 OR @configMaxSQLJobsRunningOnSameVolume > 0)
 							begin
-								SET @runningJobs = @configMaxSQLJobsRunning
-								WHILE @runningJobs >= @configMaxSQLJobsRunning
+								/* get current job database mount point */
+								SET @forDatabaseMountPoint = NULL
+								IF @moduleHealthCheckExists = 1 AND @forDatabaseName IS NOT NULL AND @configMaxSQLJobsRunningOnSameVolume > 0
 									begin
 										SET @queryToRun = N''
-										SET @queryToRun = @queryToRun + N'	SELECT	j.[name] 
-																			FROM  [msdb].[dbo].[sysjobactivity] ja WITH (NOLOCK)
-																			LEFT  JOIN [msdb].[dbo].[sysjobhistory] jh WITH (NOLOCK) ON ja.[job_history_id] = jh.[instance_id]
-																			INNER JOIN [msdb].[dbo].[sysjobs] j WITH (NOLOCK) ON ja.[job_id] = j.[job_id]
-																			INNER JOIN [msdb].[dbo].[sysjobsteps] js WITH (NOLOCK) ON ja.[job_id] = js.[job_id] AND ISNULL(ja.[last_executed_step_id], 0)+ 1  = js.[step_id]
-																			WHERE	ja.[session_id] = (
-																										SELECT TOP 1 [session_id] 
-																										FROM [msdb].[dbo].[syssessions] 
-																										ORDER BY [agent_start_date] DESC
-																										)
-																					AND ja.[start_execution_date] IS NOT NULL
-																					AND ja.[stop_execution_date] IS NULL'
-										SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-										SET @queryToRun = N'SELECT @currentRunningJobs = COUNT(*)
-															FROM (' + @queryToRun + N') j
-															INNER JOIN [dbo].[jobExecutionQueue] jeq WITH (NOLOCK) ON j.[name] = jeq.[job_name]'
-										SET @queryParameters = '@currentRunningJobs [int] OUTPUT'
+										SET @queryToRun = @queryToRun + N'SELECT @forDatabaseMountPoint = [volume_mount_point]
+																			FROM [health-check].[vw_statsDatabaseDetails]
+																			WHERE [instance_name] = @sqlServerName
+																					AND [database_name] = @forDatabaseName
+																					AND [project_id] = @projectID' 
+										SET @queryParameters = '@sqlServerName [sysname], @forDatabaseName [sysname], @projectID [smallint], @forDatabaseMountPoint [nvarchar](512) OUTPUT'
 										IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-										EXEC sp_executesql @queryToRun, @queryParameters, @currentRunningJobs = @runningJobs OUT
+										EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName 
+																						, @forDatabaseName = @forDatabaseName
+																						, @projectID = @projectID
+																						, @forDatabaseMountPoint = @forDatabaseMountPoint OUT
+									end
+
+								/* prepare the SQL code */
+								SET @queryToRun = N''
+								SET @queryToRun = @queryToRun + N'	SELECT	j.[name] 
+																	FROM  [msdb].[dbo].[sysjobactivity] ja WITH (NOLOCK)
+																	LEFT  JOIN [msdb].[dbo].[sysjobhistory] jh WITH (NOLOCK) ON ja.[job_history_id] = jh.[instance_id]
+																	INNER JOIN [msdb].[dbo].[sysjobs] j WITH (NOLOCK) ON ja.[job_id] = j.[job_id]
+																	INNER JOIN [msdb].[dbo].[sysjobsteps] js WITH (NOLOCK) ON ja.[job_id] = js.[job_id] AND ISNULL(ja.[last_executed_step_id], 0)+ 1  = js.[step_id]
+																	WHERE	ja.[session_id] = (
+																								SELECT TOP 1 [session_id] 
+																								FROM [msdb].[dbo].[syssessions] 
+																								ORDER BY [agent_start_date] DESC
+																								)
+																			AND ja.[start_execution_date] IS NOT NULL
+																			AND ja.[stop_execution_date] IS NULL'
+								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+								SET @queryToRun = N'SELECT    @currentRunningJobs = COUNT(*)
+															, @jobsRunningOnSameVolume = SUM(CASE WHEN ' + 
+																			CASE WHEN @moduleHealthCheckExists = 1 AND @forDatabaseMountPoint IS NOT NULL
+																				THEN N'sdd.[catalog_database_id]'
+																				ELSE N'NULL'
+																			END + N' IS NOT NULL THEN ait.[is_resource_intensive] ELSE 0 END)
+													FROM (' + @queryToRun + N') j
+													INNER JOIN [dbo].[jobExecutionQueue] jeq WITH (NOLOCK) ON j.[name] = jeq.[job_name]
+													INNER JOIN [dbo].[appInternalTasks] ait ON ait.[id] = jeq.[task_id]'
+										
+								/* get the jobs running on the same physical volume */
+								IF @moduleHealthCheckExists = 1 AND @forDatabaseMountPoint IS NOT NULL
+									SET @queryToRun = @queryToRun + N'
+													LEFT JOIN [health-check].[vw_statsDatabaseDetails] sdd WITH (NOLOCK) ON jeq.[project_id] = sdd.[project_id] 
+																															AND jeq.[database_name] = sdd.[database_name] 
+																															AND sdd.[instance_name] = @sqlServerName
+																															AND (   CHARINDEX(sdd.[volume_mount_point], @forDatabaseMountPoint) > 0
+																																	OR CHARINDEX(@forDatabaseMountPoint, sdd.[volume_mount_point]) > 0
+																																)'
+								SET @queryParameters = '@sqlServerName [sysname], @forDatabaseMountPoint [nvarchar](512), @currentRunningJobs [int] OUTPUT, @jobsRunningOnSameVolume [smallint] OUTPUT'
+
+								/* Maximum SQL Agent jobs running limit reached */
+								SET @runningJobs = @configMaxSQLJobsRunning
+								SET @jobsRunningOnSameVolume = @configMaxSQLJobsRunningOnSameVolume
+								WHILE (@runningJobs >= @configMaxSQLJobsRunning AND @configMaxSQLJobsRunning > 0)
+									begin
+										IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+										EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
+																						, @forDatabaseMountPoint = @forDatabaseMountPoint
+																						, @currentRunningJobs = @runningJobs OUT
+																						, @jobsRunningOnSameVolume = @jobsRunningOnSameVolume OUT
+										
+										SET @runningJobs			 = ISNULL(@runningJobs, 0)
+										SET @jobsRunningOnSameVolume = ISNULL(@jobsRunningOnSameVolume, 0)
 
 										IF @runningJobs >= @configMaxSQLJobsRunning
 											begin
@@ -529,6 +601,44 @@ WHILE @@FETCH_STATUS=0
 
 												WAITFOR DELAY @waitForDelay
 											end
+									end
+
+								/* Maximum SQL Agent jobs running on the same physical volume limit reached */
+								WHILE (@jobsRunningOnSameVolume >= @configMaxSQLJobsRunningOnSameVolume AND @configMaxSQLJobsRunningOnSameVolume > 0)
+									begin
+										SET @strMessage='Maximum SQL Agent jobs running on the same physical volume limit reached. Waiting for some job(s) to complete.'
+										EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+										SET @eventData='<alert><detail>' + 
+															'<severity>warning</severity>' + 
+															'<instance_name>' + @sqlServerName + '</instance_name>' + 
+															'<name>' + @strMessage + '</name>' +
+															'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@jobName, 'xml') + '</affected_object>' + 
+															'<event_date_utc>' + CONVERT([varchar](24), GETDATE(), 121) + '</event_date_utc>' + 
+														'</detail></alert>'
+
+										EXEC [dbo].[usp_logEventMessageAndSendEmail]	@sqlServerName			= @sqlServerName,
+																						@dbName					= @jobDBName,
+																						@objectName				= 'warning',
+																						@childObjectName		= 'dbo.usp_jobQueueExecute',
+																						@module					= 'common',
+																						@eventName				= 'job queue execute',
+																						@parameters				= NULL,	
+																						@eventMessage			= @eventData,
+																						@dbMailProfileName		= NULL,
+																						@recipientsList			= NULL,
+																						@eventType				= 6,	/* 6 - alert-custom */
+																						@additionalOption		= 0
+
+										WAITFOR DELAY @waitForDelay
+
+										IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+										EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
+																						, @forDatabaseMountPoint = @forDatabaseMountPoint
+																						, @currentRunningJobs = @runningJobs OUT
+																						, @jobsRunningOnSameVolume = @jobsRunningOnSameVolume OUT
+										
+										SET @jobsRunningOnSameVolume = ISNULL(@jobsRunningOnSameVolume, 0)
 									end
 							end
 
@@ -571,7 +681,7 @@ WHILE @@FETCH_STATUS=0
 						---------------------------------------------------------------------------------------------------
 						IF @runningJobs < @jobQueueCount
 							begin
-								FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @jobCreateTimeUTC
+								FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @forDatabaseName, @jobCreateTimeUTC
 								SET @executedJobs = @executedJobs + 1
 							end
 					end

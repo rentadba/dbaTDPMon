@@ -733,3 +733,6 @@
 11.07.2018
 * health-check: fix disk space details table formatting in the HTML report
 * monitoring: auto-detect project code when sending alert emails
+
+16.07.2018
+* add new option for job execution: Maximum SQL Agent jobs running on the same physical volume (0=unlimited) 
