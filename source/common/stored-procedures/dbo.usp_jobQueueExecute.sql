@@ -313,7 +313,7 @@ WHILE @@FETCH_STATUS=0
 		/* check if job should be "skipped" */
 		IF NOT (DATEDIFF(minute, @jobCreateTimeUTC, GETUTCDATE()) < (@configMaxQueueExecutionTime * 60) OR @configMaxQueueExecutionTime = 0)
 			begin
-				FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @jobCreateTimeUTC
+				FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @forDatabaseName, @jobCreateTimeUTC				
 			end
 		/* execute the job */
 		ELSE
@@ -362,7 +362,7 @@ WHILE @@FETCH_STATUS=0
 
 							SET @executedJobs = @executedJobs + 1
 
-							FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @jobCreateTimeUTC
+							FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @forDatabaseName, @jobCreateTimeUTC
 						END TRY
 						BEGIN CATCH		
 								SET @ErrorNumber = ERROR_NUMBER();
