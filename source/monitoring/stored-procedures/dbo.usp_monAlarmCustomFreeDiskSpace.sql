@@ -126,7 +126,7 @@ DECLARE crsDiskSpaceAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINCT
 																			(	   dsi.[percent_available] IS NULL 
 																				AND dsi.[available_space_mb] IS NOT NULL 
 																				AND dsi.[available_space_mb] <= @warningFreeDiskMinSpaceMB
-																				AND dsi.[percent_available] > @criticalFreeDiskMinSpaceMB
+																				AND dsi.[available_space_mb] > @criticalFreeDiskMinSpaceMB
 																			)
 																		)
 																	AND (   dsi.[logical_drive] IN ('C') 

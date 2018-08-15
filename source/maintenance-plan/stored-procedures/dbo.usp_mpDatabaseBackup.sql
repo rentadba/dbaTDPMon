@@ -506,33 +506,37 @@ IF @flgOptions & 8 = 8 AND (@clusterName IS NULL OR (@clusterName IS NOT NULL AN
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 					end
 				ELSE	
-					begin
-						SET @queryToRun = N''
-						SET @queryToRun = @queryToRun + 'SELECT COUNT(*) 
-														FROM msdb.dbo.backupset bs
-														INNER JOIN msdb.dbo.backupmediafamily bmf ON bmf.[media_set_id] = bs.[media_set_id]
-														WHERE bs.[server_name] = N''' + @sqlServerName + ''' 
-															AND bs.[database_name]=''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''' 
-															AND bs.[type] IN (''D''' + CASE WHEN @flgActions & 4 = 4 THEN N', ''I''' ELSE N'' END + N')
-															AND ' + CAST(@differentialBaseLSN AS [nvarchar]) + N' BETWEEN bs.[first_lsn] AND bs.[last_lsn]
-															AND bmf.[device_type] <> 7 /* virtual device */'
-						IF @serverVersionNum >= 9
-							SET @queryToRun = @queryToRun + N' AND [is_copy_only]=0'
-						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+					/* only for databases in single instance mode */
+					IF @clusterName IS NULL
+						begin
+							SET @queryToRun = N''
+							SET @queryToRun = @queryToRun + 'SELECT COUNT(*) 
+															FROM msdb.dbo.backupset bs
+															INNER JOIN msdb.dbo.backupmediafamily bmf ON bmf.[media_set_id] = bs.[media_set_id]
+															WHERE bs.[server_name] = N''' + @sqlServerName + ''' 
+																AND bs.[database_name]=''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''' 
+																AND bs.[type] IN (''D''' + CASE WHEN @flgActions & 4 = 4 THEN N', ''I''' ELSE N'' END + N')
+																AND ' + CAST(@differentialBaseLSN AS [nvarchar]) + N' BETWEEN bs.[first_lsn] AND bs.[last_lsn]
+																AND bmf.[device_type] <> 7 /* virtual device */'
+							IF @serverVersionNum >= 9
+								SET @queryToRun = @queryToRun + N' AND [is_copy_only]=0'
+							SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+							IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-						DELETE FROM #serverPropertyConfig
-						INSERT	INTO #serverPropertyConfig([value])
-								EXEC sp_executesql @queryToRun
+							DELETE FROM #serverPropertyConfig
+							INSERT	INTO #serverPropertyConfig([value])
+									EXEC sp_executesql @queryToRun
 
-						IF (SELECT [value] FROM #serverPropertyConfig) = 0
-							begin
-								SET @queryToRun = 'WARNING: Specified backup type cannot be performed since no full database backup exists. A full database backup will be taken before the requested backup type.'
-								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+							IF (SELECT [value] FROM #serverPropertyConfig) = 0
+								begin
+							SELECT * FROM #serverPropertyConfig
 
-								SET @optionForceChangeBackupType=1 
-							end
-					end
+									SET @queryToRun = 'WARNING: Specified backup type cannot be performed since no full database backup exists. A full database backup will be taken before the requested backup type.'
+									EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+									SET @optionForceChangeBackupType=1 
+								end
+						end
 
 				/* check for database header: dbi_dbbackupLSN */
 				IF @differentialBaseLSN IS NOT NULL AND @serverVersionNum >= 9 AND @optionForceChangeBackupType = 0

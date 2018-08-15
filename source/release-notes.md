@@ -736,3 +736,8 @@
 
 16.07.2018
 * add new option for job execution: Maximum SQL Agent jobs running on the same physical volume (0=unlimited) 
+
+------------
+#### August 2018 new features & fixes
+15.08.2018
+* maintenance-plan: fix defect when triggering full database backup after an Availability Group fail-over
