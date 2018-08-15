@@ -78,7 +78,8 @@ DECLARE		@backupStartDate				[datetime],
 			@backupDurationSec				[int],
 			@backupSizeBytes				[bigint],
 			@eventData						[varchar](8000),
-			@maxPATHLength					[smallint]
+			@maxPATHLength					[smallint],
+			@executionDBName				[sysname]
 
 -----------------------------------------------------------------------------------------
 SET NOCOUNT ON
@@ -325,9 +326,10 @@ IF @flgOptions & 512 = 512
 
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
-DECLARE @clusterName		[sysname],
-		@agInstanceRoleDesc	[sysname],
-		@agStopLimit		[int]
+DECLARE @clusterName		 [sysname],
+		@agInstanceRoleDesc	 [sysname],
+		@agReadableSecondary [sysname],
+		@agStopLimit		 [int]
 
 SET @agStopLimit = 0
 IF @serverVersionNum >= 11
@@ -339,11 +341,16 @@ IF @serverVersionNum >= 11
 																		@flgOptions			= @flgOptions OUTPUT,
 																		@clusterName		= @clusterName OUTPUT,
 																		@agInstanceRoleDesc = @agInstanceRoleDesc OUTPUT,
+																		@agReadableSecondary= @agReadableSecondary OUTPUT,
 																		@executionLevel		= @executionLevel,
 																		@debugMode			= @debugMode
 
 IF @agStopLimit <> 0
 	RETURN 0
+
+SET @executionDBName = @dbName
+IF @clusterName IS NOT NULL AND @agInstanceRoleDesc = 'SECONDARY' AND @agReadableSecondary='NO' 
+	SET @executionDBName = 'master'
 
 --------------------------------------------------------------------------------------------------
 --check recovery model for database. transaction log backup is allowed only for FULL
@@ -671,7 +678,7 @@ IF @optionForceChangeBackupType=1
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
-																@dbName			= @dbName,
+																@dbName			= @executionDBName,
 																@module			= 'dbo.usp_mpDatabaseBackup',
 																@eventName		= 'database backup',
 																@queryToRun  	= @queryToRun,
@@ -785,7 +792,7 @@ IF @flgOptions & 16 = 16 AND @errorCode = 0
 
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
-														@dbName			= @dbName,
+														@dbName			= @executionDBName,
 														@module			= 'dbo.usp_mpDatabaseBackup',
 														@eventName		= 'database backup verify',
 														@queryToRun  	= @queryToRun,

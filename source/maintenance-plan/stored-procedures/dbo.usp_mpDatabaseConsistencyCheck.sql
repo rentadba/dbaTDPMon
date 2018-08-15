@@ -80,7 +80,8 @@ DECLARE		@queryToRun  					[nvarchar](2048),
 			@DBCCCheckTableBatchSize 		[int],
 			@errorCode						[int],
 			@databaseStatus					[int],
-			@dbi_dbccFlags					[int]
+			@dbi_dbccFlags					[int],
+			@executionDBName				[sysname]
 
 SET NOCOUNT ON
 
@@ -101,11 +102,12 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
-DECLARE @clusterName		[sysname],
-		@agInstanceRoleDesc	[sysname],
-		@agStopLimit		[int],
-		@actionType			[sysname],
-		@actionName			[sysname]
+DECLARE @clusterName		 [sysname],
+		@agInstanceRoleDesc	 [sysname],
+		@agReadableSecondary [sysname],
+		@agStopLimit		 [int],
+		@actionType			 [sysname],
+		@actionName			 [sysname]
 
 SET @agStopLimit = 0
 SET @actionType = NULL
@@ -130,12 +132,17 @@ IF @serverVersionNum >= 11 AND @flgActions IS NOT NULL
 																			@flgOptions			= @flgOptions OUTPUT,
 																			@clusterName		= @clusterName OUTPUT,
 																			@agInstanceRoleDesc = @agInstanceRoleDesc OUTPUT,
+																			@agReadableSecondary= @agReadableSecondary OUTPUT,
 																			@executionLevel		= @executionLevel,
 																			@debugMode			= @debugMode
 	end
 IF @agStopLimit <> 0
 	RETURN 0
-	
+
+SET @executionDBName = @dbName
+IF @clusterName IS NOT NULL AND @agInstanceRoleDesc = 'SECONDARY' AND @agReadableSecondary='NO' 
+	SET @executionDBName = 'master'
+
 ---------------------------------------------------------------------------------------------
 DECLARE @compatibilityLevel [tinyint]
 IF object_id('tempdb..#databaseCompatibility') IS NOT NULL 
@@ -391,7 +398,7 @@ IF @flgActions & 1 = 1
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 		
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
-														@dbName			= @dbName,
+														@dbName			= @executionDBName,
 														@module			= 'dbo.usp_mpDatabaseConsistencyCheck',
 														@eventName		= 'database consistency check',
 														@queryToRun  	= @queryToRun,
@@ -467,7 +474,7 @@ IF @flgActions & 4 = 4
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
-														@dbName			= @dbName,
+														@dbName			= @executionDBName,
 														@module			= 'dbo.usp_mpDatabaseConsistencyCheck',
 														@eventName		= 'database consistency check - allocation structures',
 														@queryToRun  	= @queryToRun,
@@ -492,7 +499,7 @@ IF @flgActions & 8 = 8
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
-														@dbName			= @dbName,
+														@dbName			= @executionDBName,
 														@module			= 'dbo.usp_mpDatabaseConsistencyCheck',
 														@eventName		= 'database consistency check - catalogs',
 														@queryToRun  	= @queryToRun,
@@ -706,7 +713,7 @@ IF @flgActions & 64 = 64
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
-																@dbName			= @dbName,
+																@dbName			= @executionDBName,
 																@objectName		= NULL,
 																@module			= 'dbo.usp_mpDatabaseConsistencyCheck',
 																@eventName		= 'database maintenance - update space usage',

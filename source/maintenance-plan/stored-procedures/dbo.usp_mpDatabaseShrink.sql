@@ -48,7 +48,8 @@ DECLARE		@queryToRun    			[nvarchar](4000),
 			@databaseName			[sysname],
 			@logName				[sysname],
 			@errorCode				[int],
-			@nestedExecutionLevel	[int]
+			@nestedExecutionLevel	[int],
+			@executionDBName		[sysname]
 
 ---------------------------------------------------------------------------------------------
 --create temporary tables that will be used 
@@ -84,10 +85,11 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
-DECLARE @clusterName		[sysname],
-		@agInstanceRoleDesc	[sysname],
-		@agStopLimit		[int],
-		@actionType			[sysname]
+DECLARE @clusterName		 [sysname],
+		@agInstanceRoleDesc	 [sysname],
+		@agReadableSecondary [sysname],
+		@agStopLimit		 [int],
+		@actionType			 [sysname]
 
 SET @agStopLimit = 0
 SET @actionType = NULL
@@ -104,11 +106,16 @@ IF @serverVersionNum >= 11 AND @flgActions IS NOT NULL
 																		@flgOptions			= @flgOptions OUTPUT,
 																		@clusterName		= @clusterName OUTPUT,
 																		@agInstanceRoleDesc = @agInstanceRoleDesc OUTPUT,
+																		@agReadableSecondary= @agReadableSecondary OUTPUT,
 																		@executionLevel		= @executionLevel,
 																		@debugMode			= @debugMode
 
 IF @agStopLimit <> 0
 	RETURN 0
+
+SET @executionDBName = @dbName
+IF @clusterName IS NOT NULL AND @agInstanceRoleDesc = 'SECONDARY' AND @agReadableSecondary='NO' 
+	SET @executionDBName = 'master'
 
 ---------------------------------------------------------------------------------------------
 SET @errorCode	 = 1

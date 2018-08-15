@@ -309,7 +309,7 @@ IF @serverVersionNum>=9 AND @flgOptions & 256 = 256
 		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
-														@dbName			= @dbName,
+														@dbName			= NULL,
 														@module			= 'dbo.usp_mpDatabaseBackupCleanup',
 														@eventName		= 'database backup cleanup',
 														@queryToRun  	= @queryToRun,

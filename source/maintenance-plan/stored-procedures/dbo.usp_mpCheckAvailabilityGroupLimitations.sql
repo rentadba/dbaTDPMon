@@ -10,16 +10,17 @@ GO
 
 -----------------------------------------------------------------------------------------
 CREATE PROCEDURE [dbo].[usp_mpCheckAvailabilityGroupLimitations]
-		@sqlServerName		[sysname] = @@SERVERNAME,
-		@dbName				[sysname],
-		@actionName			[sysname],
-		@actionType			[sysname],
-		@flgActions			[smallint]	= 0,
-		@flgOptions			[int]	  OUTPUT,
-		@clusterName		[sysname] OUTPUT,
-		@agInstanceRoleDesc	[sysname] OUTPUT,
-		@executionLevel		[tinyint]	= 0,
-		@debugMode			[bit]		= 0
+		@sqlServerName		 [sysname] = @@SERVERNAME,
+		@dbName				 [sysname],
+		@actionName			 [sysname],
+		@actionType			 [sysname],
+		@flgActions			 [smallint]	= 0,
+		@flgOptions			 [int]	   OUTPUT,
+		@clusterName		 [sysname] OUTPUT,
+		@agInstanceRoleDesc	 [sysname] OUTPUT,
+		@agReadableSecondary [sysname] OUTPUT,
+		@executionLevel		 [tinyint]	= 0,
+		@debugMode			 [bit]		= 0
 /* WITH ENCRYPTION */
 AS
 
@@ -38,8 +39,8 @@ SET @nestedExecutionLevel = @executionLevel + 1
 DECLARE @agName						 [sysname],		
 		@agSynchronizationState		 [sysname],
 		@agPreferredBackupReplica	 [bit],
-		@agAutomatedBackupPreference [tinyint],
-		@agReadableSecondary		 [sysname]
+		@agAutomatedBackupPreference [tinyint]
+		
 
 SET @agName = NULL
 SET @clusterName = NULL

@@ -741,3 +741,4 @@
 #### August 2018 new features & fixes
 15.08.2018
 * maintenance-plan: fix defect when triggering full database backup after an Availability Group fail-over
+* maintenance-plan: fix error 976 when performing backups or consistency checks against a non-readable secondary database
