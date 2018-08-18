@@ -313,7 +313,8 @@ INNER JOIN
 								FROM #databaseTableList dtl
 								INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
 																						AND dtl.[table_name] = osl.[object_name]
-								WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]'
+								WHERE	@flgActions & osl.[flg_actions] = osl.[flg_actions]
+										AND osl.[active] = 1'
 				SET @queryParameters = '@flgActions [int]'
 				EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
 			end
@@ -657,7 +658,8 @@ IF @flgActions & 32 = 32
 										FROM #databaseTableListIdent dtl
 										INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
 																								AND dtl.[table_name] = osl.[object_name]
-										WHERE @flgActions & osl.[flg_actions] = osl.[flg_actions]'
+										WHERE	@flgActions & osl.[flg_actions] = osl.[flg_actions]
+												AND osl.[active] = 1'
 						SET @queryParameters = '@flgActions [int]'
 						EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
 					end

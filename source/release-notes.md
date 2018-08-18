@@ -742,3 +742,6 @@
 15.08.2018
 * maintenance-plan: fix defect when triggering full database backup after an Availability Group fail-over
 * maintenance-plan: fix error 976 when performing backups or consistency checks against a non-readable secondary database
+
+18.08.2018
+* maintenance-plan: add active column/flag to the objectSkipList table

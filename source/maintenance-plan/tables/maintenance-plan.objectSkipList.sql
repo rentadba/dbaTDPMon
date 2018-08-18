@@ -23,6 +23,7 @@ CREATE TABLE [maintenance-plan].[objectSkipList]
 	[task_id]				[bigint]		NOT NULL,
 	[schema_name]			[sysname]		NOT NULL,
 	[object_name]			[sysname]		NOT NULL,
+	[active]				[bit]			NOT NULL CONSTRAINT [DF_objectSkipList_Active] DEFAULT (1),
 	CONSTRAINT [PK_objectSkipList] PRIMARY KEY  CLUSTERED 
 	(
 		[id]

@@ -24,6 +24,7 @@ SELECT 	  osl.[id]
 		, osl.[database_name]
 		, osl.[schema_name]
 		, osl.[object_name]
+		, osl.[active]
 		, it.[flg_actions]
 FROM [maintenance-plan].[objectSkipList] osl
 INNER JOIN [dbo].[appInternalTasks] it ON it.[id] = osl.[task_id]

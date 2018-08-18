@@ -487,6 +487,7 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 																				AND dtl.[table_name] = osl.[object_name]
 						WHERE osl.[instance_name] = @sqlServerName
 								AND osl.[database_name] = @dbName
+								AND osl.[active] = 1
 								AND @flgActions & osl.[flg_actions] = osl.[flg_actions]'
 		SET @queryParameters = '@sqlServerName [sysname], @dbName [sysname], @flgActions [int]'
 		EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
@@ -501,6 +502,7 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 																				AND dtl.[index_name] = osl.[object_name]
 						WHERE osl.[instance_name] = @sqlServerName
 								AND osl.[database_name] = @dbName
+								AND osl.[active] = 1
 								AND @flgActions & osl.[flg_actions] = osl.[flg_actions]'
 		SET @queryParameters = '@sqlServerName [sysname], @dbName [sysname], @flgActions [int]'
 		EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
@@ -769,6 +771,7 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 																						AND dtl.[table_name] = osl.[object_name]
 								WHERE osl.[instance_name] = @sqlServerName
 										AND osl.[database_name] = @dbName
+										AND osl.[active] = 1
 										AND @flgActions & osl.[flg_actions] = osl.[flg_actions]'
 				SET @queryParameters = '@sqlServerName [sysname], @dbName [sysname], @flgActions [int]'
 				EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
@@ -783,6 +786,7 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 																						AND dtl.[index_name] = osl.[object_name]
 								WHERE osl.[instance_name] = @sqlServerName
 										AND osl.[database_name] = @dbName
+										AND osl.[active] = 1
 										AND @flgActions & osl.[flg_actions] = osl.[flg_actions]'
 				SET @queryParameters = '@sqlServerName [sysname], @dbName [sysname], @flgActions [int]'
 				EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
@@ -1039,6 +1043,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 																						AND dtl.[table_name] = osl.[object_name]
 								WHERE osl.[instance_name] = @sqlServerName
 										AND osl.[database_name] = @dbName
+										AND osl.[active] = 1
 										AND @flgActions & osl.[flg_actions] = osl.[flg_actions]'
 				SET @queryParameters = '@sqlServerName [sysname], @dbName [sysname], @flgActions [int]'
 				EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
@@ -1053,6 +1058,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 																						AND dtl.[stats_name] = osl.[object_name]
 								WHERE osl.[instance_name] = @sqlServerName
 										AND osl.[database_name] = @dbName
+										AND osl.[active] = 1
 										AND @flgActions & osl.[flg_actions] = osl.[flg_actions]'
 				SET @queryParameters = '@sqlServerName [sysname], @dbName [sysname], @flgActions [int]'
 				EXEC sp_executesql @queryToRun, @queryParameters, @sqlServerName = @sqlServerName
