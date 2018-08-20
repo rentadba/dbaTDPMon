@@ -745,3 +745,6 @@
 
 18.08.2018
 * maintenance-plan: add active column/flag to the objectSkipList table
+
+20.08.2018
+* health-check: enhance the Availability Group databases information collector

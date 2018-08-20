@@ -106,8 +106,7 @@ CREATE TABLE #statsDatabaseAlwaysOnDetails
 	[database_name]					[sysname]		NOT NULL,
 	[role_desc]						[nvarchar](60)	NULL,
 	[synchronization_health_desc]	[nvarchar](60)	NULL,
-	[synchronization_state_desc]	[nvarchar](60)	NULL,
-	[data_loss_sec]					[int]			NULL
+	[synchronization_state_desc]	[nvarchar](60)	NULL
 )
 
 ------------------------------------------------------------------------------------------------------------------------------------------
@@ -448,38 +447,30 @@ WHILE @@FETCH_STATUS=0
 		/* check for AlwaysOn Availability Groups configuration */
 		IF @SQLMajorVersion >= 12
 			begin
-				SET @queryToRun = N'WITH agDatabaseDetails AS
-									(
-										SELECT    hc.[cluster_name]
-												, ag.[name] AS [ag_name]
-												, hinm.[node_name] as [host_name]
-												, arcn.[replica_server_name] AS [instance_name]
-												, adc.[database_name]
-												, ars.[role_desc]
-												, ars.[synchronization_health_desc]
-												, hdrs.[synchronization_state_desc]
-												, hdrs.[last_commit_time]
-										FROM sys.availability_replicas ar
-										INNER JOIN sys.dm_hadr_availability_replica_states ars ON ars.[replica_id]=ar.[replica_id] AND ars.[group_id]=ar.[group_id]
-										INNER JOIN sys.availability_groups ag ON ag.[group_id]=ar.[group_id]
-										INNER JOIN sys.dm_hadr_availability_replica_cluster_nodes arcn ON arcn.[group_name]=ag.[name] AND arcn.[replica_server_name]=ar.[replica_server_name]
-										INNER JOIN sys.dm_hadr_database_replica_states hdrs ON ar.[replica_id]=hdrs.[replica_id]
-										INNER JOIN sys.availability_databases_cluster adc ON adc.[group_id]=hdrs.[group_id] AND adc.[group_database_id]=hdrs.[group_database_id]
-										INNER JOIN sys.dm_hadr_instance_node_map hinm ON hinm.[ag_resource_id] = ag.[resource_id] AND hinm.[instance_name] = arcn.[replica_server_name]
-										INNER JOIN sys.dm_hadr_cluster_members hcm ON hcm.[member_name] = hinm.[node_name]
-										INNER JOIN sys.dm_hadr_cluster hc ON 1=1
-									)
-									SELECT    a.[cluster_name], a.[ag_name], a.[host_name], a.[instance_name], a.[database_name]
-											, a.[role_desc], a.[synchronization_health_desc], a.[synchronization_state_desc]
-											, DATEDIFF(ss, a.[last_commit_time], b.[last_commit_time]) AS [data_loss_sec]
-									FROM agDatabaseDetails a
-									INNER JOIN agDatabaseDetails b ON	a.[cluster_name]=b.[cluster_name] AND a.[ag_name]=b.[ag_name] 
-																		AND a.[database_name]=b.[database_name] AND b.[role_desc]=''PRIMARY'''
+				SET @queryToRun = N'SELECT    hc.[cluster_name]
+											, ag.[name] AS [ag_name]
+											, hinm.[node_name] as [host_name]
+											, arcn.[replica_server_name] AS [instance_name]
+											, adc.[database_name]
+											, ars.[role_desc]
+											, ars.[synchronization_health_desc]
+											, hdrs.[synchronization_state_desc]
+									FROM sys.availability_replicas ar
+									INNER JOIN sys.dm_hadr_availability_replica_states ars ON ars.[replica_id]=ar.[replica_id] AND ars.[group_id]=ar.[group_id]
+									INNER JOIN sys.availability_groups ag ON ag.[group_id]=ar.[group_id]
+									INNER JOIN sys.dm_hadr_availability_replica_cluster_nodes arcn ON arcn.[group_name]=ag.[name] AND arcn.[replica_server_name]=ar.[replica_server_name]
+									INNER JOIN sys.dm_hadr_database_replica_states hdrs ON ar.[replica_id]=hdrs.[replica_id]
+									INNER JOIN sys.availability_databases_cluster adc ON adc.[group_id]=hdrs.[group_id] AND adc.[group_database_id]=hdrs.[group_database_id]
+									INNER JOIN sys.dm_hadr_instance_node_map hinm ON hinm.[ag_resource_id] = ag.[resource_id] AND hinm.[instance_name] = arcn.[replica_server_name]
+									INNER JOIN sys.dm_hadr_cluster_members hcm ON hcm.[member_name] = hinm.[node_name]
+									INNER JOIN sys.dm_hadr_cluster hc ON 1=1
+									WHERE arcn.[replica_server_name] = ''' + @sqlServerName + ''''
+
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		
 				BEGIN TRY
-					INSERT	INTO #statsDatabaseAlwaysOnDetails([cluster_name], [ag_name], [host_name], [instance_name], [database_name], [role_desc], [synchronization_health_desc], [synchronization_state_desc], [data_loss_sec])
+					INSERT	INTO #statsDatabaseAlwaysOnDetails([cluster_name], [ag_name], [host_name], [instance_name], [database_name], [role_desc], [synchronization_health_desc], [synchronization_state_desc])
 							EXEC sp_executesql @queryToRun
 				END TRY
 				BEGIN CATCH
@@ -550,7 +541,7 @@ WHILE @@FETCH_STATUS=0
 															AND cdn.[project_id] = @projectID
 
 		INSERT	INTO [health-check].[statsDatabaseAlwaysOnDetails]([catalog_database_id], [instance_id], [cluster_name], [ag_name]
-																	, [role_desc], [synchronization_health_desc], [synchronization_state_desc], [data_loss_sec], [event_date_utc])
+																	, [role_desc], [synchronization_health_desc], [synchronization_state_desc], [event_date_utc])
 				SELECT    cdn.[id] AS [catalog_database_id]
 						, cin.[id] AS [instance_id]
 						, X.[cluster_name]
@@ -558,7 +549,6 @@ WHILE @@FETCH_STATUS=0
 						, X.[role_desc]
 						, X.[synchronization_health_desc]
 						, X.[synchronization_state_desc]
-						, X.[data_loss_sec]
 						, GETUTCDATE()
 				FROM #statsDatabaseAlwaysOnDetails X
 				INNER JOIN dbo.catalogMachineNames cmn ON cmn.[name] = X.[host_name]
