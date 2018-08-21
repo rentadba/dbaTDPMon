@@ -187,8 +187,8 @@ BEGIN TRY
 													LEFT  JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[foreign_keys]	fk  ON fk.[referenced_object_id] = so.[object_id] AND fk.[key_index_id] = si.[index_id]
 													LEFT  JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[tables]		st  ON st.[object_id] = so.[object_id]
 													WHERE	so.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'sql') + '''
-															AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'sql') + '''
-															AND so.[is_ms_shipped] = 0' + 
+															AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'sql') + '''' + 
+															CASE WHEN @dbName NOT IN ('msdb') THEN N' AND so.[is_ms_shipped] = 0' ELSE N'' END + 
 															CASE	WHEN ISNULL(@partitionNumber, 0) <> 0
 																	THEN N' AND sp.[partition_number] = ' + CAST(@partitionNumber AS [varchar](32)) 
 																	ELSE N''

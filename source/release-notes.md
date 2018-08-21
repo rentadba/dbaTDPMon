@@ -748,3 +748,6 @@
 
 20.08.2018
 * health-check: enhance the Availability Group databases information collector
+
+21.08.2018
+* maintenance-plan: improve performance for [dbo].[usp_mpCheckAvailabilityGroupLimitations] stored procedure; less calls to system dmvs
