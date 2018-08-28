@@ -35,6 +35,7 @@ GO
 UPDATE [dbo].[appInternalTasks]
 	SET [is_resource_intensive] = 1
 WHERE [task_name] IN (  'Database Consistency Check'
+					  , 'Allocation Consistency Check'
 					  , 'Tables Consistency Check'
 					  , 'Reference Consistency Check'
 					  , 'Perform Correction to Space Usage'

@@ -751,3 +751,6 @@
 
 21.08.2018
 * maintenance-plan: improve performance for [dbo].[usp_mpCheckAvailabilityGroupLimitations] stored procedure; less calls to system dmvs
+
+28.08.2018
+* maintenance-plan: mark Allocation Consistency Checks (DBCC CHECKCATALOG / DBCC CHECKALLOC) as heavy operation to lower the pressure when running in parallel
