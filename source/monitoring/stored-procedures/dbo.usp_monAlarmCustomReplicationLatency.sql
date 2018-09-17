@@ -543,7 +543,9 @@ WHILE @@FETCH_STATUS=0
 			begin
 
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'EXEC [' + @publicationServer + '].tempdb.dbo.usp_monGetReplicationLatency @publisherDB = ''' + [dbo].[ufn_getObjectQuoteName](@publisherDB, 'sql') + N''', @publicationName = ''' + [dbo].[ufn_getObjectQuoteName](@publicationName, 'sql') + N''', @replicationDelay = ' + CAST(@alertThresholdCriticalReplicationLatencySec AS [nvarchar]) + N', @operationDelay = ''' + @operationDelay + N''';'
+				SET @queryToRun = @queryToRun + N'
+				IF EXISTS(SELECT * FROM sys.databases WHERE name=''' + [dbo].[ufn_getObjectQuoteName](@publisherDB, 'sql') + N''' AND state_desc=''ONLINE'')
+					EXEC [' + @publicationServer + '].tempdb.dbo.usp_monGetReplicationLatency @publisherDB = ''' + [dbo].[ufn_getObjectQuoteName](@publisherDB, 'sql') + N''', @publicationName = ''' + [dbo].[ufn_getObjectQuoteName](@publicationName, 'sql') + N''', @replicationDelay = ' + CAST(@alertThresholdCriticalReplicationLatencySec AS [nvarchar]) + N', @operationDelay = ''' + @operationDelay + N''';'
 
 				INSERT	INTO [dbo].[jobExecutionQueue](	[instance_id], [project_id], [module], [descriptor], [task_id],
 														[filter], [for_instance_id],

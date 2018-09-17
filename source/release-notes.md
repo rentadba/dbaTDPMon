@@ -754,3 +754,8 @@
 
 28.08.2018
 * maintenance-plan: mark Allocation Consistency Checks (DBCC CHECKCATALOG / DBCC CHECKALLOC) as heavy operation to lower the pressure when running in parallel
+
+------------
+#### September 2018 new features & fixes
+17.09.2018
+* monitoring: fix defect - analyzing replication status for an offline database
