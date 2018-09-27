@@ -114,7 +114,8 @@ DECLARE		@queryToRun    					[nvarchar](4000),
 			@stopTimeLimit					[datetime],
 			@partitionNumber				[int],
 			@isPartitioned					[bit],
-			@executionDBName				[sysname]
+			@executionDBName				[sysname],
+			@databaseStateDesc				[sysname]
 
 SET NOCOUNT ON
 
@@ -283,6 +284,68 @@ IF @defragIndexThreshold > @rebuildIndexThreshold
 		RETURN 1
 	end
 
+
+--------------------------------------------------------------------------------------------------
+--get database status
+IF @serverVersionNum >= 9
+	begin
+		IF object_id('#serverPropertyConfig') IS NOT NULL DROP TABLE #serverPropertyConfig
+		CREATE TABLE #serverPropertyConfig
+			(
+				[value]			[sysname]	NULL
+			)
+
+		SET @queryToRun = N'SELECT CONVERT([sysname], DATABASEPROPERTYEX(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''', ''Status'')) AS [state]' 
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		DELETE FROM #serverPropertyConfig
+		INSERT	INTO #serverPropertyConfig([value])
+				EXEC sp_executesql @queryToRun
+
+		SELECT @databaseStateDesc = [value]
+		FROM #serverPropertyConfig
+
+		SET @databaseStateDesc = ISNULL(@databaseStateDesc, 'NULL')
+
+		/* check for the read-only/updatable property */
+		IF @databaseStateDesc IN ('ONLINE')
+			begin
+				SET @queryToRun = N'SELECT CONVERT([sysname], DATABASEPROPERTYEX(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''', ''Updateability'')) AS [state]' 
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+				DELETE FROM #serverPropertyConfig
+				INSERT	INTO #serverPropertyConfig([value])
+						EXEC sp_executesql @queryToRun
+
+				SELECT @databaseStateDesc = [value] FROM #serverPropertyConfig
+			end
+
+	end
+
+IF @databaseStateDesc NOT IN ('READ_WRITE')
+begin
+	SET @queryToRun='Current database state (' + @databaseStateDesc + ') does not allow writing / maintenance.'
+	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+	SET @eventData='<skipaction><detail>' + 
+						'<name>database maintenance</name>' + 
+						'<type>N/A</type>' + 
+						'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+						'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+						'<reason>' + @queryToRun + '</reason>' + 
+					'</detail></skipaction>'
+
+	EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+										@dbName			= @dbName,
+										@module			= 'dbo.usp_mpDatabaseOptimize',
+										@eventName		= 'database maintenance',
+										@eventMessage	= @eventData,
+										@eventType		= 0 /* info */
+
+	RETURN 0
+end
 
 ---------------------------------------------------------------------------------------------
 --create temporary tables that will be used 
