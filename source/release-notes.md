@@ -766,3 +766,4 @@
 
 27.09.2018
 * health-check: fix small issue on daily HTML report data layout
+* for internal jobs, save database_name in dbo.jobExecutionHistory

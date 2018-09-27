@@ -120,10 +120,10 @@ WHILE @@FETCH_STATUS=0
 		/* save the execution history */
 		INSERT	INTO [dbo].[jobExecutionHistory]([instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id], 
 												 [job_name], [job_step_name], [job_database_name], [job_command], [execution_date], 
-												 [running_time_sec], [log_message], [status], [event_date_utc], [task_id])
+												 [running_time_sec], [log_message], [status], [event_date_utc], [task_id], [database_name])
 				SELECT	[instance_id], [project_id], [module], [descriptor], [filter], [for_instance_id], 
 						[job_name], [job_step_name], [job_database_name], [job_command], [execution_date], 
-						[running_time_sec], [log_message], [status], [event_date_utc], [task_id]
+						[running_time_sec], [log_message], [status], [event_date_utc], [task_id], [database_name]
 				FROM [dbo].[jobExecutionQueue]
 				WHERE [project_id] = @projectID
 						AND [instance_id] = @instanceID
