@@ -759,3 +759,10 @@
 #### September 2018 new features & fixes
 17.09.2018
 * monitoring: fix defect - analyzing replication status for an offline database
+
+22.09.2018
+* maintenance-plan: skip read-only databases from index, statistics or heap maintenance
+* maintenance-plan: skip backups on database snapshots as they are not allowed
+
+27.09.2018
+* health-check: fix small issue on daily HTML report data layout

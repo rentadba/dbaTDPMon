@@ -102,7 +102,7 @@ DECLARE   @databaseName								[sysname]
 		, @reportOptionUserDatabaseBACKUPAgeDays	[int]
 		, @reportOptionSystemDatabaseBACKUPAgeDays	[int]
 		, @reportOptionFreeDiskMinPercent 			[numeric](6,2)
-		, @reportOptionFreeDiskMinSpace				[int]
+		, @reportOptionFreeDiskMinSpaceMB			[int]
 		, @reportOptionErrorlogMessageLastHours		[int]
 		, @reportOptionErrorlogMessageLimit			[int]
 		, @reportOptionMaxJobRunningTimeInHours		[int]
@@ -354,15 +354,15 @@ BEGIN TRY
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
-		SELECT	@reportOptionFreeDiskMinSpace = [value]
+		SELECT	@reportOptionFreeDiskMinSpaceMB = [value]
 		FROM	[report].[htmlOptions]
 		WHERE	[name] = N'Free Disk Space Min Space (mb)'
 				AND [module] = 'health-check'
 	END TRY
 	BEGIN CATCH
-		SET @reportOptionFreeDiskMinSpace = 3000
+		SET @reportOptionFreeDiskMinSpaceMB = 3000
 	END CATCH
-	SET @reportOptionFreeDiskMinSpace = ISNULL(@reportOptionFreeDiskMinSpace, 3000)
+	SET @reportOptionFreeDiskMinSpaceMB = ISNULL(@reportOptionFreeDiskMinSpaceMB, 3000)
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
@@ -1994,7 +1994,7 @@ BEGIN TRY
 							N'<A NAME="DiskSpaceInformationIssuesDetected" class="category-style">Low Free Disk Space - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="8">free disk space (%) &lt; ' + CAST(@reportOptionFreeDiskMinPercent  AS [nvarchar](32)) + N' OR free disk space (MB) &lt; ' + CAST(@reportOptionFreeDiskMinSpace AS [nvarchar](32)) + N'</TD>
+								<TD class="small-size" COLLSPAN="8">free disk space (%) &lt; ' + CAST(@reportOptionFreeDiskMinPercent  AS [nvarchar](32)) + N' OR free disk space (MB) &lt; ' + CAST(@reportOptionFreeDiskMinSpaceMB AS [nvarchar](32)) + N'</TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -2011,11 +2011,13 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsDiskSpaceInformationIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT  DISTINCT
-																									  cin.[machine_name], cin.[instance_name]
+			DECLARE crsDiskSpaceInformationIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																									, cin.[is_clustered], cin.[cluster_node_machine_name]
-																									, dsi.[logical_drive], dsi.[volume_mount_point]
-																									, dsi.[total_size_mb], dsi.[available_space_mb], dsi.[percent_available]
+																									, dsi.[logical_drive]
+																									, dsi.[volume_mount_point]
+																									, MAX(dsi.[total_size_mb]) AS [total_size_mb]
+																									, MIN(dsi.[available_space_mb]) AS [available_space_mb]
+																									, MIN(dsi.[percent_available]) AS [percent_available]
 																							FROM [dbo].[vw_catalogInstanceNames]  cin
 																							INNER JOIN [health-check].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
 																							LEFT  JOIN 
@@ -2035,11 +2037,15 @@ BEGIN TRY
 																											OR 
 																											(	   dsi.[percent_available] IS NULL 
 																												AND dsi.[available_space_mb] IS NOT NULL 
-																												AND dsi.[available_space_mb] < @reportOptionFreeDiskMinSpace
+																												AND dsi.[available_space_mb] < @reportOptionFreeDiskMinSpaceMB
 																											)
 																										)
 																									AND (dsi.[logical_drive] IN ('C') OR CHARINDEX(dsi.[logical_drive], cdd.[volume_mount_point])>0)
 																									AND rsr.[id] IS NULL
+																							GROUP BY  cin.[machine_name], cin.[instance_name]
+																									, cin.[is_clustered], cin.[cluster_node_machine_name]
+																									, dsi.[logical_drive]
+																									, dsi.[volume_mount_point]
 																							ORDER BY cin.[instance_name], cin.[machine_name]
 			OPEN crsDiskSpaceInformationIssuesDetected
 			FETCH NEXT FROM crsDiskSpaceInformationIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @logicalDrive, @volumeMountPoint, @diskTotalSizeMB, @diskAvailableSpaceMB, @diskPercentAvailable
