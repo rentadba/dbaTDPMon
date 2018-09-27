@@ -191,6 +191,20 @@ IF @serverVersionNum >= 9
 					SET @databaseStateDesc = 'STANDBY'
 			end
 
+		/* check if the database is a snapshot */
+		IF  @databaseStateDesc IN ('ONLINE')
+			begin
+				SET @queryToRun = N'SELECT CAST([source_database_id] AS [sysname]) FROM sys.databases WHERE [name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''' 
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+				DELETE FROM #serverPropertyConfig
+				INSERT	INTO #serverPropertyConfig([value])
+						EXEC sp_executesql @queryToRun
+
+				IF (SELECT [value] FROM #serverPropertyConfig) IS NOT NULL
+					SET @databaseStateDesc = 'DATABASE SNAPSHOT'
+			end
 	end
 ELSE
 	begin
@@ -536,8 +550,6 @@ IF @flgOptions & 8 = 8 AND (@clusterName IS NULL OR (@clusterName IS NOT NULL AN
 
 							IF (SELECT [value] FROM #serverPropertyConfig) = 0
 								begin
-							SELECT * FROM #serverPropertyConfig
-
 									SET @queryToRun = 'WARNING: Specified backup type cannot be performed since no full database backup exists. A full database backup will be taken before the requested backup type.'
 									EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
