@@ -46,8 +46,8 @@ DECLARE   @projectID					[smallint]
 		, @configMaxSQLJobsRunning		[smallint]
 		, @configMaxQueueExecutionTime	[smallint]
 		, @runningJobs					[smallint]
-		, @executedJobs					[smallint]
-		, @jobQueueCount				[smallint]
+		, @executedJobs					[int]
+		, @jobQueueCount				[int]
 			
 		, @strMessage					[varchar](8000)	
 		, @currentRunning				[int]

@@ -767,3 +767,8 @@
 27.09.2018
 * health-check: fix small issue on daily HTML report data layout
 * for internal jobs, save database_name in dbo.jobExecutionHistory
+
+------------
+#### October 2018 new features & fixes
+10.10.2018
+* allow definition of more than 32k internal jobs in jobExecutionQueue table (smallint to int change)
