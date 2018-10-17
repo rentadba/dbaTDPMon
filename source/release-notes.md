@@ -772,3 +772,5 @@
 #### October 2018 new features & fixes
 10.10.2018
 * allow definition of more than 32k internal jobs in jobExecutionQueue table (smallint to int change)
+17.10.2018
+* reduce CPU usage for the dbo.usp_sqlAgentJobCheckStatus stored procedure

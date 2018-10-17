@@ -569,7 +569,7 @@ if errorlevel 1 goto install_err
 
 
 :done
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2018.10.10' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2018.10.17' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err  
 
 echo *-----------------------------------------------------------------------------*

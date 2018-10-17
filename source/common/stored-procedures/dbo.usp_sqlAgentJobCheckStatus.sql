@@ -50,7 +50,13 @@ DECLARE 	@Message 			[varchar](8000),
 			@RunDurationLast	[varchar](8),
 			@EventTime			[datetime],		
 			@ReturnValue		[int],
-			@queryToRun			[nvarchar](4000)
+			@queryToRun			[nvarchar](4000),
+			@queryParams		[nvarchar](512)
+
+DECLARE	  @serverEdition			[sysname]
+		, @serverVersionStr			[sysname]
+		, @serverVersionNum			[numeric](9,6)
+		, @nestedExecutionLevel		[tinyint]
 
 SET NOCOUNT ON
 
@@ -93,6 +99,15 @@ IF @sqlServerName != @@SERVERNAME
 			end
 	end
 
+------------------------------------------------------------------------------------------------------------------------------------------
+--get destination server running version/edition
+EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName		= @sqlServerName,
+										@serverEdition		= @serverEdition OUT,
+										@serverVersionStr	= @serverVersionStr OUT,
+										@serverVersionNum	= @serverVersionNum OUT,
+										@executionLevel		= 0,
+										@debugMode			= @debugMode
+
 ---------------------------------------------------------------------------------------------
 SET @ReturnValue	= 5 --Unknown
 
@@ -125,32 +140,60 @@ ELSE
 		
 		--check for active processes started by SQL Agent job
 		SET @currentRunning=0
-		SET @queryToRun=N'SELECT DISTINCT sp.[step_id], sp.[job_id], sp.[spid]
-						FROM (
-							  SELECT  [step_id]
-									, SUBSTRING([job_id], 7, 2) + SUBSTRING([job_id], 5, 2) + SUBSTRING([job_id], 3, 2) + LEFT([job_id], 2) + ''-'' + SUBSTRING([job_id], 11, 2) + SUBSTRING([job_id], 9, 2) + ''-'' + SUBSTRING([job_id], 15, 2) + SUBSTRING([job_id], 13, 2) + ''-'' + SUBSTRING([job_id], 17, 4) + ''-'' + RIGHT([job_id], 12) AS [job_id] 
-									, [spid]
- 							  FROM (
-									SELECT SUBSTRING([program_name], CHARINDEX('': Step'', [program_name]) + 7, LEN([program_name]) - CHARINDEX('': Step'', [program_name]) - 7) [step_id]
-										 , SUBSTRING([program_name], CHARINDEX(''(Job 0x'', [program_name]) + 7, CHARINDEX('' : Step '', [program_name]) - CHARINDEX(''(Job 0x'', [program_name]) - 7) [job_id]
-										 , [spid]
-			 						FROM [master].[dbo].[sysprocesses] WITH (NOLOCK) 
-									WHERE [program_name] LIKE ''SQLAgent - %JobStep%''
-								   ) sp
-							) sp
-						INNER JOIN [msdb].[dbo].[sysjobs] sj WITH (NOLOCK) ON sj.[job_id] = sp.[job_id]
-						WHERE CHARINDEX(sj.[name], ''' + @jobName + N''') <> 0
-						UNION
-						SELECT DISTINCT sjs.[step_id], sj.[job_id], sp.[spid]
-						FROM [master].[dbo].[sysprocesses] sp WITH (NOLOCK) 
-						INNER JOIN [msdb].[dbo].[sysjobs]		sj WITH (NOLOCK) ON sj.[name] = sp.[program_name]
-						INNER JOIN [msdb].[dbo].[sysjobsteps]	sjs WITH (NOLOCK) ON sjs.[job_id] = sj.[job_id]
-						INNER JOIN [msdb].[dbo].[sysjobhistory] sjh WITH (NOLOCK) ON sjh.[job_id] = sj.[job_id] AND sjh.[step_id] = sjs.[step_id] AND sjh.[run_status] = 4
-						WHERE CHARINDEX(sj.[name], ''' + @jobName + N''') <> 0'
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @serverVersionNum >= 10
+			SET @queryToRun=N'SELECT	js.[step_id], ja.[job_id], es.[session_id]
+							FROM  [msdb].[dbo].[sysjobactivity] ja WITH (NOLOCK)
+							INNER JOIN [msdb].[dbo].[sysjobs] j WITH (NOLOCK) ON ja.[job_id] = j.[job_id]
+							INNER JOIN [msdb].[dbo].[sysjobsteps] js WITH (NOLOCK) ON ja.[job_id] = js.[job_id] AND ISNULL(ja.[last_executed_step_id], 0)+ 1 = js.[step_id]
+							INNER JOIN
+								(
+									SELECT  LEFT([intr1], CHARINDEX('':'', [intr1]) - 1) AS [job_id], [session_id]
+									FROM [master].sys.dm_exec_sessions x
+									CROSS APPLY (SELECT REPLACE(x.[program_name], ''SQLAgent - TSQL JobStep (Job '', '''')) cs(intr1)
+									WHERE x.[program_name] LIKE ''SQLAgent - TSQL JobStep (Job %''	
+								)es ON es.[job_id] = CONVERT(varchar(max), CONVERT(binary (16), ja.[job_id]), 1)
+							WHERE	ja.[session_id] = (
+														SELECT TOP 1 [session_id] 
+														FROM [msdb].[dbo].[syssessions] 
+														ORDER BY [agent_start_date] DESC
+														)
+									AND ja.[start_execution_date] IS NOT NULL
+									AND ja.[stop_execution_date] IS NULL
+									AND CHARINDEX(j.[name], @jobName) <> 0'
+		ELSE
+			SET @queryToRun=N'SELECT DISTINCT sp.[step_id], sp.[job_id], sp.[spid]
+							FROM (
+								  SELECT  [step_id]
+										, SUBSTRING([job_id], 7, 2) + SUBSTRING([job_id], 5, 2) + SUBSTRING([job_id], 3, 2) + LEFT([job_id], 2) + ''-'' + SUBSTRING([job_id], 11, 2) + SUBSTRING([job_id], 9, 2) + ''-'' + SUBSTRING([job_id], 15, 2) + SUBSTRING([job_id], 13, 2) + ''-'' + SUBSTRING([job_id], 17, 4) + ''-'' + RIGHT([job_id], 12) AS [job_id] 
+										, [spid]
+ 								  FROM (
+										SELECT SUBSTRING([program_name], CHARINDEX('': Step'', [program_name]) + 7, LEN([program_name]) - CHARINDEX('': Step'', [program_name]) - 7) [step_id]
+											 , SUBSTRING([program_name], CHARINDEX(''(Job 0x'', [program_name]) + 7, CHARINDEX('' : Step '', [program_name]) - CHARINDEX(''(Job 0x'', [program_name]) - 7) [job_id]
+											 , [spid]
+			 							FROM [master].[dbo].[sysprocesses] WITH (NOLOCK) 
+										WHERE [program_name] LIKE ''SQLAgent - %JobStep%''
+									   ) sp
+								) sp
+							INNER JOIN [msdb].[dbo].[sysjobs] sj WITH (NOLOCK) ON sj.[job_id] = sp.[job_id]
+							WHERE CHARINDEX(sj.[name], @jobName) <> 0
+							UNION
+							SELECT DISTINCT sjs.[step_id], sj.[job_id], sp.[spid]
+							FROM [master].[dbo].[sysprocesses] sp WITH (NOLOCK) 
+							INNER JOIN [msdb].[dbo].[sysjobs]		sj WITH (NOLOCK) ON sj.[name] = sp.[program_name]
+							INNER JOIN [msdb].[dbo].[sysjobsteps]	sjs WITH (NOLOCK) ON sjs.[job_id] = sj.[job_id]
+							INNER JOIN [msdb].[dbo].[sysjobhistory] sjh WITH (NOLOCK) ON sjh.[job_id] = sj.[job_id] AND sjh.[step_id] = sjs.[step_id] AND sjh.[run_status] = 4
+							WHERE CHARINDEX(sj.[name], @jobName) <> 0'
+		SET @queryParams = '@jobName [sysname]'
+		
+		IF @sqlServerName <> @@SERVERNAME
+			begin
+				SET @queryToRun = REPLACE(@queryToRun, '@jobName', '''' + @jobName + N'''');
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+			end
 		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
 		INSERT	INTO #runningSQLAgentJobsProcess([step_id], [job_id], [session_id])
-				EXEC sp_executesql  @queryToRun
+				EXEC sp_executesql  @queryToRun, @queryParams, @jobName = @jobName 
 
 		SET @StepID = NULL
 		SET @JobSessionID = NULL
