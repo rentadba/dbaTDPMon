@@ -414,14 +414,17 @@ EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrin
 
 IF @lastExecutionStatus=0
 	begin
-		SET @strMessage = 'Execution failed. Please notify your Database Administrator.'
-		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+		SET @queryToRun = 'Execution failed. Please notify your Database Administrator.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 		SET @returnValue=1
 	end
 IF @watchJob=1
 	begin
-		SET @queryToRun = SUBSTRING(@strMessage, CHARINDEX(N'--Last execution step', @strMessage)+22, LEN(@strMessage))
+		IF CHARINDEX(N'--Last execution step', @strMessage) > 0
+			SET @queryToRun = SUBSTRING(@strMessage, CHARINDEX(N'--Last execution step', @strMessage)+22, LEN(@strMessage))
+		ELSE
+			SET @queryToRun = @strMessage
 		SET @queryToRun = SUBSTRING(@queryToRun, CHARINDEX('[', @queryToRun) + 1, LEN(@queryToRun))
 		SET @queryToRun = SUBSTRING(@queryToRun, 1, CHARINDEX(']', @queryToRun)-1)
 	
