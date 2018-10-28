@@ -322,7 +322,7 @@ BEGIN TRY
 																		, @debugMode	 = @debugMode
 					end
 
-				IF @optionXPValue=1 OR @SQLMajorVersion=8
+				IF @optionXPValue=1
 					begin
 						BEGIN TRY
 							--run wmi to get the domain name
@@ -330,7 +330,11 @@ BEGIN TRY
 							SET @queryToRun = @queryToRun + N'DECLARE @cmdQuery [varchar](102); SET @cmdQuery=''wmic computersystem get Domain''; EXEC xp_cmdshell @cmdQuery;'
 			
 							IF @sqlServerName<>@@SERVERNAME
-								SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+								IF @SQLMajorVersion < 11
+									SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+								ELSE 
+									SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''') WITH RESULT SETS(([Output] [nvarchar](max)))'')x'
+							
 							IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 							INSERT	INTO #xpCMDShellOutput([output])
