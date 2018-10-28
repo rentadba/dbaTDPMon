@@ -34,6 +34,7 @@ SET NOCOUNT ON
 ------------------------------------------------------------------------------------------------------------------------------------------
 DECLARE @projectID				[smallint],
 		@sqlServerName			[sysname],
+		@machineName			[sysname],
 		@instanceID				[smallint],
 		@queryToRun				[nvarchar](4000),
 		@strMessage				[nvarchar](4000),
@@ -117,14 +118,14 @@ WHERE cin.[project_id] = @projectID
 SET @strMessage='Step 2: Get Instance Details Information....'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		
-DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
+DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version], cin.[machine_name]
 															FROM	[dbo].[vw_catalogInstanceNames] cin
 															WHERE 	cin.[project_id] = @projectID
 																	AND cin.[instance_active]=1
 																	AND cin.[instance_name] LIKE @sqlServerNameFilter
 															ORDER BY cin.[instance_name]
 OPEN crsActiveInstances
-FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
+FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion, @machineName
 WHILE @@FETCH_STATUS=0
 	begin
 		SET @strMessage='Analyzing server: ' + @sqlServerName
@@ -146,24 +147,34 @@ WHILE @@FETCH_STATUS=0
 		SET @runxpFixedDrives=1
 		IF @SQLMajorVersion >= 10
 			begin				
-				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'SELECT DISTINCT
-													  UPPER(SUBSTRING([physical_name], 1, 1)) [logical_drive]
-													, CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point]
-													, [total_bytes] / 1024 / 1024 AS [total_size_mb]
-													, [available_bytes] / 1024 / 1024 AS [available_space_mb]
-													, CAST(ISNULL(ROUND([available_bytes] / CAST(NULLIF([total_bytes], 0) AS [numeric](20,3)) * 100, 2), 0) AS [numeric](10,2)) AS [percent_available]
-												FROM sys.master_files AS f
-												CROSS APPLY sys.dm_os_volume_stats(f.[database_id], f.[file_id])'
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+				IF @enableXPCMDSHELL=1
+					begin
+						SET  @optionXPValue	= 0
 
-				TRUNCATE TABLE #diskSpaceInfo
+						/* enable xp_cmdshell configuration option */
+						EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
+																		, @flgAction	 = 1			-- 1=enable | 0=disable
+																		, @optionXPValue = @optionXPValue OUTPUT
+																		, @debugMode	 = @debugMode
+
+						IF @optionXPValue = 0
+							begin
+								RETURN 1
+							end										
+					end
+
+				/* get using powershell */
+				SET @queryToRun = N''
+				SET @queryToRun = @queryToRun + N'DECLARE @cmdQuery [varchar](1024); SET @cmdQuery=''powershell.exe -c "Get-WmiObject -ComputerName ''' + QUOTENAME(REPLACE(@machineName, '.workgroup', ''), '''') + ''' -Class Win32_Volume -Filter ''''DriveType = 3'''' | select name,capacity,freespace | foreach{$_.name+''''|''''+$_.capacity/1048576+''''%''''+$_.freespace/1048576+''''*''''}"''; EXEC xp_cmdshell @cmdQuery;'
+			
+				IF @sqlServerName<>@@SERVERNAME
+					SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+				TRUNCATE TABLE #xpCMDShellOutput
 				BEGIN TRY
-						INSERT	INTO #diskSpaceInfo([logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [percent_available])
+					INSERT	INTO #xpCMDShellOutput([output])
 							EXEC sp_executesql @queryToRun
-						SET @runwmicLogicalDisk=0
-						SET @runxpFixedDrives=0
 				END TRY
 				BEGIN CATCH
 					IF @debugMode=1 
@@ -172,6 +183,57 @@ WHILE @@FETCH_STATUS=0
 							EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 						end
 				END CATCH
+
+				--script to retrieve the values in MB from PS Script output
+				INSERT	INTO #diskSpaceInfo([logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [percent_available])
+				SELECT    UPPER(SUBSTRING([volume_mount_point], 1, 1)) [logical_drive]
+						, [volume_mount_point]
+						, [total_size_mb]
+						, [available_space_mb]
+						, CAST(ISNULL(ROUND([available_space_mb] / CAST(NULLIF([total_size_mb], 0) AS [numeric](20,3)) * 100, 2), 0) AS [numeric](10,2)) AS [percent_available]
+				FROM (
+						SELECT	  RTRIM(LTRIM(SUBSTRING([output], 1, CHARINDEX('|', [output]) - 1))) AS [volume_mount_point]
+								, ROUND(CAST(RTRIM(LTRIM(SUBSTRING([output], CHARINDEX('|', [output]) + 1, (CHARINDEX('%', [output]) - 1) - CHARINDEX('|', [output])) )) AS [float]),0) AS [total_size_mb]
+								, ROUND(CAST(RTRIM(LTRIM(SUBSTRING([output], CHARINDEX('%', [output]) + 1, (CHARINDEX('*', [output]) - 1) - CHARINDEX('%', [output])) )) AS [float]),0) AS [available_space_mb]
+						FROM #xpCMDShellOutput
+						WHERE [output] LIKE '[A-Z][:]%'
+					)x
+
+				IF (SELECT COUNT(*) FROM #diskSpaceInfo) > 0
+					begin
+						SET @runwmicLogicalDisk=0
+						SET @runxpFixedDrives=0
+					end
+				ELSE
+					begin
+						/* get using dmvs (slower for large number of databases) */
+						SET @queryToRun = N''
+						SET @queryToRun = @queryToRun + N'SELECT DISTINCT
+															  UPPER(SUBSTRING([physical_name], 1, 1)) [logical_drive]
+															, CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point]
+															, [total_bytes] / 1024 / 1024 AS [total_size_mb]
+															, [available_bytes] / 1024 / 1024 AS [available_space_mb]
+															, CAST(ISNULL(ROUND([available_bytes] / CAST(NULLIF([total_bytes], 0) AS [numeric](20,3)) * 100, 2), 0) AS [numeric](10,2)) AS [percent_available]
+														FROM sys.master_files AS f
+														CROSS APPLY sys.dm_os_volume_stats(f.[database_id], f.[file_id])'
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+						TRUNCATE TABLE #diskSpaceInfo
+						BEGIN TRY
+								INSERT	INTO #diskSpaceInfo([logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [percent_available])
+									EXEC sp_executesql @queryToRun
+								SET @runwmicLogicalDisk=0
+								SET @runxpFixedDrives=0
+						END TRY
+						BEGIN CATCH
+							IF @debugMode=1 
+								begin 
+									SET @strMessage='An error occured. It will be ignored: ' + ERROR_MESSAGE()					
+									EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+								end
+						END CATCH
+				end
 			end
 
 		IF @runwmicLogicalDisk=1
@@ -316,7 +378,7 @@ WHILE @@FETCH_STATUS=0
 						, [logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [percent_available], [block_size]
 				FROM #diskSpaceInfo
 							
-		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
+		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion, @machineName
 	end
 CLOSE crsActiveInstances
 DEALLOCATE crsActiveInstances

@@ -774,3 +774,7 @@
 * allow definition of more than 32k internal jobs in jobExecutionQueue table (smallint to int change)
 17.10.2018
 * reduce CPU usage for the dbo.usp_sqlAgentJobCheckStatus stored procedure
+24.10.2018
+* fix a small bug while getting the host domain name
+27.10.2018
+* health-check: use powershell to get the volume disk space as 1st option; use volume_stats as 2nd
