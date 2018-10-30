@@ -779,6 +779,7 @@
 27.10.2018
 * health-check: use powershell to get the volume disk space as 1st option; use volume_stats as 2nd
 30.10.2018
-* maintenance-plan: avoid a deadlock scenario when performing system databases maintenance
 * implement caching for getting SQL Server version and edition
 * health-check: add default 367 days retention for historical and log tables
+* maintenance-plan: avoid a deadlock scenario when performing system databases maintenance
+* maintenance-plan: reduce the number of calls to AlwaysOn / cluster related dvms

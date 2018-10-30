@@ -39,7 +39,8 @@ SET @nestedExecutionLevel = @executionLevel + 1
 DECLARE @agName						 [sysname],		
 		@agSynchronizationState		 [sysname],
 		@agPreferredBackupReplica	 [bit],
-		@agAutomatedBackupPreference [tinyint]
+		@agAutomatedBackupPreference [tinyint],
+		@dbIsPartOfAG				 [bit] = 0
 		
 
 SET @agName = NULL
@@ -48,19 +49,23 @@ SET @agSynchronizationState = NULL
 SET @agInstanceRoleDesc = NULL
 
 /* get cluster name */
-SET @queryToRun = N'SELECT [cluster_name] FROM sys.dm_hadr_cluster'
+SET @queryToRun = N' SELECT [cluster_name], CAST([db_is_part_of_ag] AS [bit]) AS [db_is_part_of_ag] 
+					 FROM (SELECT [cluster_name] FROM sys.dm_hadr_cluster) hc,
+						  (SELECT CASE WHEN [group_database_id] IS NOT NULL THEN 1 ELSE 0 END AS [db_is_part_of_ag] FROM sys.databases WHERE [name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') db'
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 
-SET @queryToRun = N'SELECT @clusterName = [cluster_name]
+SET @queryToRun = N'SELECT    @clusterName = [cluster_name]
+							, @dbIsPartOfAG = [db_is_part_of_ag]
 					FROM (' + @queryToRun + N')inq'
 
-SET @queryParameters = N'@clusterName [sysname] OUTPUT'
+SET @queryParameters = N'@clusterName [sysname] OUTPUT, @dbIsPartOfAG [bit] OUTPUT'
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 EXEC sp_executesql @queryToRun, @queryParameters, @clusterName = @clusterName OUTPUT
+												, @dbIsPartOfAG = @dbIsPartOfAG OUTPUT
 IF @clusterName = '' SET @clusterName = NULL
 
-IF @clusterName IS NOT NULL
+IF @clusterName IS NOT NULL AND @dbIsPartOfAG=1
 	begin
 		/* availability group configuration and synchronization status */
 		SET @queryToRun = N'
