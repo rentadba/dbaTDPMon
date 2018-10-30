@@ -781,3 +781,4 @@
 30.10.2018
 * maintenance-plan: avoid a deadlock scenario when performing system databases maintenance
 * implement caching for getting SQL Server version and edition
+* health-check: add default 367 days retention for historical and log tables

@@ -38,12 +38,12 @@ WHERE [name] = 'Log events retention (days)'
 	AND [module] = 'common'
 
 SET @customMessage = 'Cleaning event history - keeping last ' + CAST(@retentionDays AS [varchar](32)) + ' days.'
-EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 
 SET @retentionDays = ISNULL(@retentionDays, 0)
 IF @retentionDays<>0
 	begin
-		SET ROWCOUNT 4096
+		SET ROWCOUNT 2048
 		WHILE 1=1
 			begin
 				DELETE FROM [dbo].[logEventMessages]
@@ -56,7 +56,7 @@ IF @retentionDays<>0
 
 	end
 SET @customMessage = 'Done.'
-EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 
 
 -----------------------------------------------------------------------------------------
@@ -70,7 +70,7 @@ IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[jobExecutionH
 			AND [module] = 'common'
 
 		SET @customMessage = 'Cleaning internal jobs logs - keeping last ' + CAST(@retentionDays AS [varchar](32)) + ' days.'
-		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 
 		SET @retentionDays = ISNULL(@retentionDays, 0)
 		IF @retentionDays<>0
@@ -100,7 +100,7 @@ IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[jobExecutionH
 				SET ROWCOUNT 0
 			end
 		SET @customMessage = 'Done.'
-		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 	end
 
 -----------------------------------------------------------------------------------------
@@ -114,14 +114,17 @@ IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[health-check].[stat
 			AND [module] = 'health-check'
 
 		SET @customMessage = 'Cleaning Health-Check history data - keeping last ' + CAST(@retentionDays AS [varchar](32)) + ' days.'
-		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 
 		SET @retentionDays = ISNULL(@retentionDays, 0)
+
+		SET @customMessage = '[monitoring].[statsSQLAgentJobs]'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0	
 		IF @retentionDays<>0
 			begin
-				SET @queryToRun = 'DELETE FROM [health-check].[statsDatabaseUsageHistory]
+				SET @queryToRun = 'DELETE FROM [monitoring].[statsSQLAgentJobs]
 									WHERE [event_date_utc] < DATEADD(dd, -' + CAST(@retentionDays AS [varchar]) + ', GETUTCDATE())'
-				SET ROWCOUNT 4096
+				SET ROWCOUNT 2048
 				WHILE 1=1
 					begin
 						EXEC sp_executesql  @queryToRun
@@ -131,6 +134,126 @@ IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[health-check].[stat
 					end
 				SET ROWCOUNT 0
 			end
+
+		SET @customMessage = '[health-check].[statsDatabaseUsageHistory]'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0	
+		IF @retentionDays<>0
+			begin
+				SET @queryToRun = 'DELETE FROM [health-check].[statsDatabaseUsageHistory]
+									WHERE [event_date_utc] < DATEADD(dd, -' + CAST(@retentionDays AS [varchar]) + ', GETUTCDATE())'
+				SET ROWCOUNT 2048
+				WHILE 1=1
+					begin
+						EXEC sp_executesql  @queryToRun
+						
+						IF @@ROWCOUNT=0
+							BREAK
+					end
+				SET ROWCOUNT 0
+			end
+
+		SET @customMessage = '[health-check].[statsDatabaseAlwaysOnDetails]'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0	
+		IF @retentionDays<>0
+			begin
+				SET @queryToRun = 'DELETE FROM [health-check].[statsDatabaseAlwaysOnDetails]
+									WHERE [event_date_utc] < DATEADD(dd, -' + CAST(@retentionDays AS [varchar]) + ', GETUTCDATE())'
+				SET ROWCOUNT 2048
+				WHILE 1=1
+					begin
+						EXEC sp_executesql  @queryToRun
+						
+						IF @@ROWCOUNT=0
+							BREAK
+					end
+				SET ROWCOUNT 0
+			end
+
+		SET @customMessage = '[health-check].[statsDatabaseDetails]'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0	
+		IF @retentionDays<>0
+			begin
+				SET @queryToRun = 'DELETE FROM [health-check].[statsDatabaseDetails]
+									WHERE [event_date_utc] < DATEADD(dd, -' + CAST(@retentionDays AS [varchar]) + ', GETUTCDATE())'
+				SET ROWCOUNT 2048
+				WHILE 1=1
+					begin
+						EXEC sp_executesql  @queryToRun
+						
+						IF @@ROWCOUNT=0
+							BREAK
+					end
+				SET ROWCOUNT 0
+			end
+
+		SET @customMessage = '[health-check].[statsSQLAgentJobsHistory]'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0	
+		IF @retentionDays<>0
+			begin
+				SET @queryToRun = 'DELETE FROM [health-check].[statsSQLAgentJobsHistory]
+									WHERE [event_date_utc] < DATEADD(dd, -' + CAST(@retentionDays AS [varchar]) + ', GETUTCDATE())'
+				SET ROWCOUNT 2048
+				WHILE 1=1
+					begin
+						EXEC sp_executesql  @queryToRun
+						
+						IF @@ROWCOUNT=0
+							BREAK
+					end
+				SET ROWCOUNT 0
+			end
+
+		SET @customMessage = '[health-check].[statsOSEventLogs]'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0	
+		IF @retentionDays<>0
+			begin
+				SET @queryToRun = 'DELETE FROM [health-check].[statsOSEventLogs]
+									WHERE [event_date_utc] < DATEADD(dd, -' + CAST(@retentionDays AS [varchar]) + ', GETUTCDATE())'
+				SET ROWCOUNT 2048
+				WHILE 1=1
+					begin
+						EXEC sp_executesql  @queryToRun
+						
+						IF @@ROWCOUNT=0
+							BREAK
+					end
+				SET ROWCOUNT 0
+			end
+
+		SET @customMessage = '[health-check].[statsErrorlogDetails]'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0	
+		IF @retentionDays<>0
+			begin
+				SET @queryToRun = 'DELETE FROM [health-check].[statsErrorlogDetails]
+									WHERE [event_date_utc] < DATEADD(dd, -' + CAST(@retentionDays AS [varchar]) + ', GETUTCDATE())'
+				SET ROWCOUNT 2048
+				WHILE 1=1
+					begin
+						EXEC sp_executesql  @queryToRun
+						
+						IF @@ROWCOUNT=0
+							BREAK
+					end
+				SET ROWCOUNT 0
+			end
+
+		SET @customMessage = '[health-check].[statsDiskSpaceInfo]'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0	
+		IF @retentionDays<>0
+			begin
+				SET @queryToRun = 'DELETE FROM [health-check].[statsDiskSpaceInfo]
+									WHERE [event_date_utc] < DATEADD(dd, -' + CAST(@retentionDays AS [varchar]) + ', GETUTCDATE())'
+				SET ROWCOUNT 2048
+				WHILE 1=1
+					begin
+						EXEC sp_executesql  @queryToRun
+						
+						IF @@ROWCOUNT=0
+							BREAK
+					end
+				SET ROWCOUNT 0
+			end
+
 		SET @customMessage = 'Done.'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @customMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 	end
