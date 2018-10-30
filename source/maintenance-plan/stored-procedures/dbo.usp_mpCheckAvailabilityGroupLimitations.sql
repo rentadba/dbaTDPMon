@@ -40,13 +40,14 @@ DECLARE @agName						 [sysname],
 		@agSynchronizationState		 [sysname],
 		@agPreferredBackupReplica	 [bit],
 		@agAutomatedBackupPreference [tinyint],
-		@dbIsPartOfAG				 [bit] = 0
+		@dbIsPartOfAG				 [bit]
 		
 
 SET @agName = NULL
 SET @clusterName = NULL
 SET @agSynchronizationState = NULL
 SET @agInstanceRoleDesc = NULL
+SET @dbIsPartOfAG = 0
 
 /* get cluster name */
 SET @queryToRun = N' SELECT [cluster_name], CAST([db_is_part_of_ag] AS [bit]) AS [db_is_part_of_ag] 

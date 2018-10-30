@@ -21,8 +21,24 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE [object_id] = OBJECT_ID(N'dbo.job
 		ON [FG_Statistics_Index]
 	GO
 
-IF EXISTS (SELECT * FROM sys.tables WHERE [object_id] = OBJECT_ID('dbo.jobExecutionQueue') AND [lock_escalation_desc]='TABLE')
-	ALTER TABLE [dbo].[jobExecutionQueue] SET (LOCK_ESCALATION = DISABLE)
+DECLARE	  @serverEdition			[sysname]
+		, @serverVersionStr			[sysname]
+		, @serverVersionNum			[numeric](9,6)
+
+-----------------------------------------------------------------------------------------
+--get destination server running version/edition
+EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @@SERVERNAME,
+										@serverEdition			= @serverEdition OUT,
+										@serverVersionStr		= @serverVersionStr OUT,
+										@serverVersionNum		= @serverVersionNum OUT,
+										@executionLevel			= 0,
+										@debugMode				= 0
+
+IF @serverVersionNum >=10
+	begin
+		EXEC ('IF EXISTS (SELECT * FROM sys.tables WHERE [object_id] = OBJECT_ID(''dbo.jobExecutionQueue'') AND [lock_escalation_desc]=''TABLE'')
+				ALTER TABLE [dbo].[jobExecutionQueue] SET (LOCK_ESCALATION = DISABLE)')
+	end
 GO
 
 IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='report' AND TABLE_NAME='htmlContent' AND COLUMN_NAME='project_id' AND IS_NULLABLE='YES')
