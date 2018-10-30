@@ -780,3 +780,4 @@
 * health-check: use powershell to get the volume disk space as 1st option; use volume_stats as 2nd
 30.10.2018
 * maintenance-plan: avoid a deadlock scenario when performing system databases maintenance
+* implement caching for getting SQL Server version and edition

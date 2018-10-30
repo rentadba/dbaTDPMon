@@ -33,37 +33,55 @@ DECLARE @queryToRun [nvarchar](2000)
 IF object_id('#serverProperty') IS NOT NULL DROP TABLE #serverProperty
 CREATE TABLE #serverProperty
 			(
-				[value]			[sysname]	NULL
+				[edition]			[sysname]	NULL,
+				[product_version]	[sysname]	NULL
 			)
 
------------------------------------------------------------------------------------------
-/* get SQL Server Edition */
------------------------------------------------------------------------------------------
-SET @queryToRun = N''
-SET @queryToRun = @queryToRun + 'SELECT CAST(SERVERPROPERTY(''Edition'') AS [sysname])'
-SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-INSERT	INTO #serverProperty([value])
-		EXEC sp_executesql  @queryToRun
-
-SELECT @serverEdition = [value] 
-FROM #serverProperty
+/* cache results for maximum 60 minutes */
+IF OBJECT_ID('tempdb..##tdp_sql_version_requests') IS NULL
+	CREATE TABLE ##tdp_sql_version_requests
+		(
+			  [instance_name]				[sysname]	NOT NULL
+			, [edition]						[sysname]	NULL
+			, [product_version]				[sysname]	NULL
+			, [product_version_num]			[numeric](9,6) NULL
+			, [event_date_utc]				[datetime]	NULL
+		)
 
 -----------------------------------------------------------------------------------------
-/* get SQL Server Version */
+/* get SQL Server Edition and Product Version */
 -----------------------------------------------------------------------------------------
-SET @queryToRun = N''
-SET @queryToRun = @queryToRun + 'SELECT CAST(SERVERPROPERTY(''ProductVersion'') AS [sysname])'
-SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+SELECT    @serverEdition    = [edition]
+		, @serverVersionStr = [product_version]
+		, @serverVersionNum = [product_version_num]
+FROM ##tdp_sql_version_requests
+WHERE [instance_name] = @sqlServerName
 
-DELETE FROM #serverProperty
-INSERT	INTO #serverProperty([value])
-		EXEC sp_executesql  @queryToRun
+--if data was not found in cache
+IF @serverEdition IS NULL
+	begin
 
-SELECT @serverVersionStr = [value] 
-FROM #serverProperty
+		SET @queryToRun = N''
+		SET @queryToRun = @queryToRun + 'SELECT CAST(SERVERPROPERTY(''Edition'') AS [sysname]) AS [edition],
+												CAST(SERVERPROPERTY(''ProductVersion'') AS [sysname]) AS [product_version]'
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-SET @serverVersionNum=SUBSTRING(@serverVersionStr, 1, CHARINDEX('.', @serverVersionStr)-1) + '.' + REPLACE(SUBSTRING(@serverVersionStr, CHARINDEX('.', @serverVersionStr)+1, LEN(@serverVersionStr)), '.', '')
+		INSERT	INTO #serverProperty([edition], [product_version])
+				EXEC sp_executesql  @queryToRun
+
+		SELECT    @serverEdition = [edition] 
+				, @serverVersionStr = [product_version] 
+		FROM #serverProperty
+
+		SET @serverVersionNum=SUBSTRING(@serverVersionStr, 1, CHARINDEX('.', @serverVersionStr)-1) + '.' + REPLACE(SUBSTRING(@serverVersionStr, CHARINDEX('.', @serverVersionStr)+1, LEN(@serverVersionStr)), '.', '')
+
+		INSERT	INTO ##tdp_sql_version_requests([instance_name], [edition], [product_version], [product_version_num], [event_date_utc])
+				SELECT @sqlServerName, @serverEdition, @serverVersionStr, @serverVersionNum, GETUTCDATE()
+	end
+
+--purge old cache values
+DELETE FROM ##tdp_sql_version_requests
+WHERE DATEDIFF(minute, [event_date_utc], GETUTCDATE()) > 60
+-----------------------------------------------------------------------------------------
 GO
