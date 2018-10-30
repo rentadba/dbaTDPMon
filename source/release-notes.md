@@ -778,3 +778,5 @@
 * fix a small bug while getting the host domain name
 27.10.2018
 * health-check: use powershell to get the volume disk space as 1st option; use volume_stats as 2nd
+30.10.2018
+* maintenance-plan: avoid a deadlock scenario when performing system databases maintenance
