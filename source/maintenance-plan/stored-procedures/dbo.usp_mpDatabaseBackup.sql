@@ -85,10 +85,20 @@ DECLARE		@backupStartDate				[datetime],
 SET NOCOUNT ON
 
 -----------------------------------------------------------------------------------------
-IF object_id('#serverPropertyConfig') IS NOT NULL DROP TABLE #serverPropertyConfig
-CREATE TABLE #serverPropertyConfig
+IF OBJECT_ID('#runtimeProperty') IS NOT NULL DROP TABLE #runtimeProperty
+CREATE TABLE #runtimeProperty
 			(
 				[value]			[sysname]	NULL
+			)
+
+IF OBJECT_ID('#databaseProperties') IS NOT NULL DROP TABLE #databaseProperties
+CREATE TABLE #databaseProperties
+			(
+				  [state_desc]			[sysname]	NULL
+				, [is_in_standby]		[bit]		NULL
+				, [is_read_only]		[bit]		NULL
+				, [recovery_model_desc]	[sysname]	NULL
+				, [source_database_id]	[int]		NULL
 			)
 
 -----------------------------------------------------------------------------------------
@@ -161,63 +171,43 @@ SELECT @backupType = CASE WHEN @flgActions & 1 = 1 THEN N'full'
 
 --------------------------------------------------------------------------------------------------
 --get database status
+DELETE FROM #databaseProperties
 IF @serverVersionNum >= 9
 	begin
-		SET @queryToRun = N'SELECT CONVERT([sysname], DATABASEPROPERTYEX(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''', ''Status'')) AS [state]' 
+		SET @queryToRun = N'SELECT [state_desc], [is_in_standby], [is_read_only], [recovery_model_desc], [source_database_id] FROM sys.databases WHERE [name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + '''';
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		DELETE FROM #serverPropertyConfig
-		INSERT	INTO #serverPropertyConfig([value])
+		INSERT INTO #databaseProperties([state_desc], [is_in_standby], [is_read_only], [recovery_model_desc], [source_database_id])
 				EXEC sp_executesql @queryToRun
 
-		SELECT @databaseStateDesc = [value]
-		FROM #serverPropertyConfig
-
+		SELECT @databaseStateDesc = [state_desc] FROM #databaseProperties
 		SET @databaseStateDesc = ISNULL(@databaseStateDesc, 'NULL')
 
 		/* check for the standby property */
-		IF  @databaseStateDesc IN ('ONLINE')
-			begin
-				SET @queryToRun = N'SELECT CONVERT([sysname], DATABASEPROPERTYEX(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''', ''IsInStandBy'')) AS [state]' 
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-				DELETE FROM #serverPropertyConfig
-				INSERT	INTO #serverPropertyConfig([value])
-						EXEC sp_executesql @queryToRun
-
-				IF (SELECT [value] FROM #serverPropertyConfig) = '1'
-					SET @databaseStateDesc = 'STANDBY'
-			end
-
+		IF  @databaseStateDesc IN ('ONLINE') AND (SELECT [is_in_standby] FROM #databaseProperties) = 1
+			SET @databaseStateDesc = 'STANDBY'
+			
 		/* check if the database is a snapshot */
-		IF  @databaseStateDesc IN ('ONLINE')
-			begin
-				SET @queryToRun = N'SELECT CAST([source_database_id] AS [sysname]) FROM sys.databases WHERE [name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''' 
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-				DELETE FROM #serverPropertyConfig
-				INSERT	INTO #serverPropertyConfig([value])
-						EXEC sp_executesql @queryToRun
-
-				IF (SELECT [value] FROM #serverPropertyConfig) IS NOT NULL
-					SET @databaseStateDesc = 'DATABASE SNAPSHOT'
-			end
+		IF  @databaseStateDesc IN ('ONLINE') AND (SELECT [source_database_id] FROM #databaseProperties) IS NOT NULL
+			SET @databaseStateDesc = 'DATABASE SNAPSHOT'			
 	end
 ELSE
 	begin
-		SET @queryToRun = N'SELECT [status] FROM master.dbo.sysdatabases WHERE [name]=''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''' 
+		SET @queryToRun = N'SELECT [status], [recovery_model]
+							FROM (
+									SELECT [status] FROM master.dbo.sysdatabases WHERE [name]=''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
+								)a,
+								(
+									SELECT CAST(DATABASEPROPERTYEX(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''', ''Recovery'') AS [sysname]) AS [recovery_model]
+								)b'							
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		DELETE FROM #serverPropertyConfig
-		INSERT	INTO #serverPropertyConfig([value])
+		INSERT	INTO #databaseProperties([state_desc], [recovery_model_desc])
 				EXEC sp_executesql @queryToRun
 
-		SELECT @databaseStatus = [value]
-		FROM #serverPropertyConfig
+		SELECT @databaseStatus = [state_desc] FROM #databaseProperties
 
 		SET @databaseStateDesc =   CASE	WHEN @databaseStatus & 32 = 32			 THEN 'LOADING'
 										WHEN @databaseStatus & 64 = 64			 THEN 'PRE RECOVERY'
@@ -305,11 +295,11 @@ IF @flgOptions & 512 = 512
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		DELETE FROM #serverPropertyConfig
-		INSERT	INTO #serverPropertyConfig([value])
+		DELETE FROM #runtimeProperty
+		INSERT	INTO #runtimeProperty([value])
 				EXEC sp_executesql @queryToRun
 
-		IF (SELECT COUNT(*) FROM #serverPropertyConfig)>0
+		IF (SELECT COUNT(*) FROM #runtimeProperty)>0
 			begin
 				SET @queryToRun='Log Shipping: '
 				IF @flgActions IN (1, 2)
@@ -372,16 +362,7 @@ IF @clusterName IS NOT NULL AND @agInstanceRoleDesc = 'SECONDARY' AND @agReadabl
 --------------------------------------------------------------------------------------------------
 IF @flgActions & 4 = 4
 	begin
-		SET @queryToRun = N''
-		SET @queryToRun = @queryToRun + 'SELECT CAST(DATABASEPROPERTYEX(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''', ''Recovery'') AS [sysname])'
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-		DELETE FROM #serverPropertyConfig
-		INSERT	INTO #serverPropertyConfig([value])
-				EXEC sp_executesql @queryToRun
-
-		IF (SELECT UPPER([value]) FROM #serverPropertyConfig) = 'SIMPLE'
+		IF (SELECT UPPER([recovery_model_desc]) FROM #databaseProperties) = 'SIMPLE'
 			begin
 				SET @queryToRun = 'Database recovery model is SIMPLE. Transaction log backup cannot be performed.'
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
@@ -512,13 +493,13 @@ IF @flgOptions & 8 = 8 AND (@clusterName IS NULL OR (@clusterName IS NOT NULL AN
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-				DELETE FROM #serverPropertyConfig
-				INSERT	INTO #serverPropertyConfig([value])
+				DELETE FROM #runtimeProperty
+				INSERT	INTO #runtimeProperty([value])
 						EXEC sp_executesql @queryToRun
 
 				DECLARE @differentialBaseLSN	[numeric](25,0)
 
-				SELECT @differentialBaseLSN = [value] FROM #serverPropertyConfig
+				SELECT @differentialBaseLSN = [value] FROM #runtimeProperty
 				
 				IF @differentialBaseLSN IS NULL
 					begin
@@ -544,11 +525,11 @@ IF @flgOptions & 8 = 8 AND (@clusterName IS NULL OR (@clusterName IS NOT NULL AN
 							SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 							IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-							DELETE FROM #serverPropertyConfig
-							INSERT	INTO #serverPropertyConfig([value])
+							DELETE FROM #runtimeProperty
+							INSERT	INTO #runtimeProperty([value])
 									EXEC sp_executesql @queryToRun
 
-							IF (SELECT [value] FROM #serverPropertyConfig) = 0
+							IF (SELECT [value] FROM #runtimeProperty) = 0
 								begin
 									SET @queryToRun = 'WARNING: Specified backup type cannot be performed since no full database backup exists. A full database backup will be taken before the requested backup type.'
 									EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0

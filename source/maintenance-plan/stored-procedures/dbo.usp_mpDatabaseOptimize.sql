@@ -115,7 +115,8 @@ DECLARE		@queryToRun    					[nvarchar](4000),
 			@partitionNumber				[int],
 			@isPartitioned					[bit],
 			@executionDBName				[sysname],
-			@databaseStateDesc				[sysname]
+			@databaseStateDesc				[sysname],
+			@dbIsReadOnly					[bit]
 
 SET NOCOUNT ON
 
@@ -225,28 +226,36 @@ IF @clusterName IS NOT NULL AND @agInstanceRoleDesc = 'SECONDARY' AND @agReadabl
 
 ---------------------------------------------------------------------------------------------
 DECLARE @compatibilityLevel [tinyint]
-IF object_id('tempdb..#databaseCompatibility') IS NOT NULL 
-	DROP TABLE #databaseCompatibility
-
-CREATE TABLE #databaseCompatibility
-	(
-		[compatibility_level]		[tinyint]
-	)
+IF OBJECT_ID('#databaseProperties') IS NOT NULL DROP TABLE #databaseProperties
+CREATE TABLE #databaseProperties
+			(
+				  [state_desc]			[sysname]	NULL
+				, [is_read_only]		[bit]		NULL
+				, [compatibility_level]	[tinyint]	NULL
+			)
 
 
 SET @queryToRun = N''
 IF @serverVersionNum >= 9
-	SET @queryToRun = @queryToRun + N'SELECT [compatibility_level] FROM sys.databases WHERE [name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
+	begin
+		SET @queryToRun = @queryToRun + N'SELECT [state_desc], [is_read_only], [compatibility_level] FROM sys.databases WHERE [name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + '''';
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		INSERT INTO #databaseProperties([state_desc], [is_read_only], [compatibility_level])
+				EXEC sp_executesql @queryToRun
+	end
 ELSE
-	SET @queryToRun = @queryToRun + N'SELECT [cmptlevel] FROM master.dbo.sysdatabases WHERE [name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
+	begin
+		SET @queryToRun = @queryToRun + N'SELECT [cmptlevel] FROM master.dbo.sysdatabases WHERE [name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
-SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+		INSERT	INTO #databaseProperties([compatibility_level])
+				EXEC sp_executesql  @queryToRun
+	end
 
-INSERT	INTO #databaseCompatibility([compatibility_level])
-		EXEC sp_executesql  @queryToRun
-
-SELECT TOP 1 @compatibilityLevel = [compatibility_level] FROM #databaseCompatibility
+SELECT TOP 1 @compatibilityLevel = [compatibility_level] FROM #databaseProperties
 
 IF @serverVersionNum >= 9 AND @compatibilityLevel<=80
 	SET @serverVersionNum = 8
@@ -286,45 +295,17 @@ IF @defragIndexThreshold > @rebuildIndexThreshold
 
 
 --------------------------------------------------------------------------------------------------
---get database status
+--get database status and read/write flag
+SET @dbIsReadOnly = 0
 IF @serverVersionNum >= 9
 	begin
-		IF object_id('#serverPropertyConfig') IS NOT NULL DROP TABLE #serverPropertyConfig
-		CREATE TABLE #serverPropertyConfig
-			(
-				[value]			[sysname]	NULL
-			)
-
-		SET @queryToRun = N'SELECT CONVERT([sysname], DATABASEPROPERTYEX(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''', ''Status'')) AS [state]' 
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-		DELETE FROM #serverPropertyConfig
-		INSERT	INTO #serverPropertyConfig([value])
-				EXEC sp_executesql @queryToRun
-
-		SELECT @databaseStateDesc = [value]
-		FROM #serverPropertyConfig
-
+		SELECT	@databaseStateDesc = [state_desc],
+				@dbIsReadOnly = [is_read_only]
+		FROM #databaseProperties
 		SET @databaseStateDesc = ISNULL(@databaseStateDesc, 'NULL')
-
-		/* check for the read-only/updatable property */
-		IF @databaseStateDesc IN ('ONLINE')
-			begin
-				SET @queryToRun = N'SELECT CONVERT([sysname], DATABASEPROPERTYEX(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''', ''Updateability'')) AS [state]' 
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-				DELETE FROM #serverPropertyConfig
-				INSERT	INTO #serverPropertyConfig([value])
-						EXEC sp_executesql @queryToRun
-
-				SELECT @databaseStateDesc = [value] FROM #serverPropertyConfig
-			end
-
 	end
 
-IF @databaseStateDesc NOT IN ('READ_WRITE')
+IF @dbIsReadOnly = 1
 begin
 	SET @queryToRun='Current database state (' + @databaseStateDesc + ') does not allow writing / maintenance.'
 	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
@@ -343,8 +324,6 @@ begin
 										@eventName		= 'database maintenance',
 										@eventMessage	= @eventData,
 										@eventType		= 0 /* info */
-
-	RETURN 0
 end
 
 ---------------------------------------------------------------------------------------------
@@ -657,7 +636,7 @@ IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopT
 -- implemented an algoritm based on Tibor Karaszi's one: http://sqlblog.com/blogs/tibor_karaszi/archive/2014/03/06/how-often-do-you-rebuild-your-heaps.aspx
 -- rebuilding heaps also rebuild its non-clustered indexes. do heap maintenance before index maintenance
 --------------------------------------------------------------------------------------------------
-IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopTimeLimit)
+IF (@flgActions & 16 = 16) AND (@serverVersionNum >= 9) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 	begin
 		SET @queryToRun='Rebuilding database heap tables...'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
@@ -1233,7 +1212,7 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AN
 -- 1	Defragmenting database tables indexes
 --		All indexes with a fragmentation level between defrag and rebuild threshold will be reorganized
 --------------------------------------------------------------------------------------------------		
-IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTimeLimit)
+IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 	begin
 		SET @queryToRun=N'Defragmenting database tables indexes (fragmentation between ' + CAST(@defragIndexThreshold AS [nvarchar]) + ' and ' + CAST(CAST(@rebuildIndexThreshold AS NUMERIC(6,2)) AS [nvarchar]) + ') and more than ' + CAST(@pageThreshold AS [nvarchar](4000)) + ' pages...'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
@@ -1403,7 +1382,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 --		If a clustered index needs to be rebuild, then all associated non-clustered indexes will be rebuild
 --		http://technet.microsoft.com/en-us/library/ms189858.aspx
 --------------------------------------------------------------------------------------------------
-IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
+IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 	begin
 		SET @queryToRun='Rebuilding database tables indexes (fragmentation between ' + CAST(@rebuildIndexThreshold AS [nvarchar]) + ' and 100) or small tables (no more than ' + CAST(@pageThreshold AS [nvarchar](4000)) + ' pages)...'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
@@ -1599,7 +1578,7 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit)
 --------------------------------------------------------------------------------------------------
 -- 4	- Rebuild all indexes 
 --------------------------------------------------------------------------------------------------
-IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
+IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 	begin
 		SET @queryToRun='Rebuilding database tables indexes  (all)...'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
@@ -1815,7 +1794,7 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit)
 --------------------------------------------------------------------------------------------------
 --1 / 2 / 4	/ 16 
 --------------------------------------------------------------------------------------------------
-IF @serverVersionNum >= 9 AND (GETDATE() <= @stopTimeLimit)
+IF @serverVersionNum >= 9 AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 	begin
 		IF (@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4) OR (@flgActions & 16 = 16)
 		begin
@@ -1833,7 +1812,7 @@ IF @serverVersionNum >= 9 AND (GETDATE() <= @stopTimeLimit)
 --cleanup of ghost records (sp_clean_db_free_space) (starting SQL Server 2005 SP3)
 --exclude indexes which got rebuilt or reorganized, since ghost records were already cleaned
 --------------------------------------------------------------------------------------------------
-IF (@serverVersionNum >= 9.04035 AND @flgOptions & 65536 = 65536) AND (GETDATE() <= @stopTimeLimit)
+IF (@serverVersionNum >= 9.04035 AND @flgOptions & 65536 = 65536) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 	IF (@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4) OR (@flgActions & 16 = 16)
 			IF (
 					SELECT SUM(doil.[ghost_record_count]) 
@@ -1865,7 +1844,7 @@ IF (@serverVersionNum >= 9.04035 AND @flgOptions & 65536 = 65536) AND (GETDATE()
 --------------------------------------------------------------------------------------------------
 --8  - Update statistics for all tables in database
 --------------------------------------------------------------------------------------------------
-IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
+IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 	begin
 		SET @queryToRun=N'Update statistics for all tables (' + 
 					CASE WHEN @statsSamplePercent =   0 THEN 'default sample'

@@ -783,3 +783,6 @@
 * health-check: add default 367 days retention for historical and log tables
 * maintenance-plan: avoid a deadlock scenario when performing system databases maintenance
 * maintenance-plan: reduce the number of calls to AlwaysOn / cluster related dvms
+31.10.2018
+* implement caching for getting database properties information
+* maintenance-plan: allow index fragmentation analysis for read_only databases
