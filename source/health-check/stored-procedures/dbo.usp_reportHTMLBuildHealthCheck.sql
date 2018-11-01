@@ -2003,11 +2003,11 @@ BEGIN TRY
 											<TH WIDTH="120px" class="details-bold" nowrap>Machine Name</TH>
 											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
 											<TH WIDTH="120px" class="details-bold" nowrap>Clustered</TH>
-											<TH WIDTH="100px" class="details-bold" nowrap>Logical Drive</TH>
+											<TH WIDTH="100px" class="details-bold">Logical Drive</TH>
 											<TH WIDTH="230px" class="details-bold" nowrap>Volume Mount Point</TH>
-											<TH WIDTH="120px" class="details-bold" nowrap>Total Size (MB)</TH>
-											<TH WIDTH="120px" class="details-bold" nowrap>Available Space (MB)</TH>
-											<TH WIDTH="120px" class="details-bold" nowrap>Percent Available (%)</TH>'
+											<TH WIDTH="120px" class="details-bold">Total Size (MB)</TH>
+											<TH WIDTH="120px" class="details-bold">Available Space (MB)</TH>
+											<TH WIDTH="120px" class="details-bold">Percent Available (%)</TH>'
 
 			SET @idx=1		
 
