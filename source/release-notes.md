@@ -786,3 +786,9 @@
 31.10.2018
 * implement caching for getting database properties information
 * maintenance-plan: allow index fragmentation analysis for read_only databases
+
+------------
+#### October 2018 new features & fixes
+01.11.2018
+* discontinued support for SQL Server 2000 (latest version supporting SQL Server 2000 is 2017.12)
+* health-check: fixed small bugs when running on SQL Server 2008

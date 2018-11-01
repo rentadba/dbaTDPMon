@@ -41,7 +41,7 @@ DECLARE @projectID				[smallint],
 		@queryToRun				[nvarchar](4000),
 		@strMessage				[nvarchar](4000)
 
-DECLARE @SQLMajorVersion		[int],
+DECLARE @serverVersionNum		[numeric](9,6),
 		@sqlServerVersion		[sysname],
 		@dbccLastKnownGood		[datetime]
 
@@ -188,10 +188,10 @@ WHILE @@FETCH_STATUS=0
 		TRUNCATE TABLE #statsDatabaseDetails
 
 		BEGIN TRY
-			SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(@sqlServerVersion, ''), 2), '.', '') 
+			SET @serverVersionNum=SUBSTRING(@sqlServerVersion, 1, CHARINDEX('.', @sqlServerVersion)-1) + '.' + REPLACE(SUBSTRING(@sqlServerVersion, CHARINDEX('.', @sqlServerVersion)+1, LEN(@sqlServerVersion)), '.', '')
 		END TRY
 		BEGIN CATCH
-			SET @SQLMajorVersion = 8
+			SET @serverVersionNum = 8.0
 		END CATCH
 
 		DECLARE crsActiveDatabases CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cdn.[catalog_database_id], cdn.[database_id], cdn.[database_name]
@@ -223,16 +223,16 @@ WHILE @@FETCH_STATUS=0
 																, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
 																, CAST(FILEPROPERTY([name], ''''''''SpaceUsed'''''''') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
 																, CAST(FILEPROPERTY([name], ''''''''IsLogFile'''''''') AS [bit])		AS [is_logfile] ' + 
-																CASE WHEN @SQLMajorVersion >= 10 
+																CASE WHEN @serverVersionNum >= 10.5
 																	 THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
-																	 ELSE N', REPLACE(LEFT([' + CASE WHEN @SQLMajorVersion <=8 THEN N'filename' ELSE N'physical_name' END + N'], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
+																	 ELSE N', REPLACE(LEFT([' + CASE WHEN @serverVersionNum < 9 THEN N'filename' ELSE N'physical_name' END + N'], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
 																END + '
-																, ' + CASE	WHEN @SQLMajorVersion <= 8 
+																, ' + CASE	WHEN @serverVersionNum < 9
 																			THEN N'CASE WHEN ([maxsize]=-1 AND [groupid]<>0) OR ([maxsize]=-1 AND [groupid]=0) OR ([maxsize]=268435456 AND [groupid]=0) THEN 0 ELSE 1 END ' 
 																			ELSE N'CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END '
 																	 END + N' AS [is_growth_limited]
-														FROM ' + CASE WHEN @SQLMajorVersion <=8 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + 
-														CASE WHEN @SQLMajorVersion >= 10 
+														FROM ' + CASE WHEN @serverVersionNum < 9 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + 
+														CASE WHEN @serverVersionNum >= 10.5
 															 THEN N' CROSS APPLY sys.dm_os_volume_stats(DB_ID(), [file_id])'
 															 ELSE N''
 														END + 
@@ -252,16 +252,16 @@ WHILE @@FETCH_STATUS=0
 														, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
 														, CAST(FILEPROPERTY([name], ''SpaceUsed'') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
 														, CAST(FILEPROPERTY([name], ''IsLogFile'') AS [bit])		AS [is_logfile] ' + 
-														CASE WHEN @SQLMajorVersion >= 10 
+														CASE WHEN @serverVersionNum >= 10.5
 																THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
-																ELSE N', REPLACE(LEFT([' + CASE WHEN @SQLMajorVersion <=8 THEN N'filename' ELSE N'physical_name' END + N'], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
+																ELSE N', REPLACE(LEFT([' + CASE WHEN @serverVersionNum < 9 THEN N'filename' ELSE N'physical_name' END + N'], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
 														END + '
-														, ' + CASE	WHEN @SQLMajorVersion <= 8 
+														, ' + CASE	WHEN @serverVersionNum < 9
 																	THEN N'CASE WHEN ([maxsize]=-1 AND [groupid]<>0) OR ([maxsize]=-1 AND [groupid]=0) OR ([maxsize]=268435456 AND [groupid]=0) THEN 0 ELSE 1 END ' 
 																	ELSE N'CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END '
 																END + N' AS [is_growth_limited]
-												FROM ' + CASE WHEN @SQLMajorVersion <=8 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + 
-												CASE WHEN @SQLMajorVersion >= 10 
+												FROM ' + CASE WHEN @serverVersionNum < 9 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + 
+												CASE WHEN @serverVersionNum >= 10.5
 														THEN N' CROSS APPLY sys.dm_os_volume_stats(DB_ID(), [file_id])'
 														ELSE N''
 												END + N'
@@ -287,11 +287,11 @@ WHILE @@FETCH_STATUS=0
 				END CATCH
 
 				/* get last date for dbcc checkdb, only for 2k5+ */
-				IF @SQLMajorVersion > 8 
+				IF @serverVersionNum >= 9
 					begin
 						IF @sqlServerName <> @@SERVERNAME
 							begin
-								IF @SQLMajorVersion < 11
+								IF @serverVersionNum < 11
 									SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
 														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''')'')x
 														WHERE [Field]=''dbi_dbccLastKnownGood'''
@@ -397,7 +397,7 @@ WHILE @@FETCH_STATUS=0
 									, bkp.[compatibility_level]
 							FROM 	
 								(' + 
-							CASE	WHEN @SQLMajorVersion <= 8 
+							CASE	WHEN @serverVersionNum < 9
 									THEN N'	SELECT	  sdb.[dbid]	AS [database_id]
 													, sdb.[name]	AS [database_name]
 													, CASE CAST(DATABASEPROPERTYEX(sdb.[name], ''Recovery'') AS [sysname]) 
@@ -445,7 +445,7 @@ WHILE @@FETCH_STATUS=0
 		END CATCH
 
 		/* check for AlwaysOn Availability Groups configuration */
-		IF @SQLMajorVersion >= 12
+		IF @serverVersionNum >= 12
 			begin
 				SET @queryToRun = N'SELECT    hc.[cluster_name]
 											, ag.[name] AS [ag_name]
