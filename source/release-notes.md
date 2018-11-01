@@ -792,3 +792,4 @@
 01.11.2018
 * discontinued support for SQL Server 2000 (latest version supporting SQL Server 2000 is 2017.12)
 * health-check: fixed small bugs when running on SQL Server 2008
+* release of dbaTDPMon - v2018.11
