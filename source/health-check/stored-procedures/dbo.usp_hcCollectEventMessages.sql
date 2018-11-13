@@ -33,7 +33,6 @@ SET NOCOUNT ON
 ------------------------------------------------------------------------------------------------------------------------------------------
 DECLARE @projectID				[smallint],
 		@sqlServerName			[sysname],
-		@sqlServerVersion		[varchar](32),
 		@instanceID				[smallint],
 		@queryToRun				[nvarchar](4000),
 		@strMessage				[nvarchar](4000),
@@ -82,7 +81,7 @@ WHERE cin.[project_id] = @projectID
 SET @strMessage='Step 2: Copy Event Messages Information....'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
+DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name]
 															FROM	[dbo].[vw_catalogInstanceNames] cin
 															WHERE 	cin.[project_id] = @projectID
 																	AND cin.[instance_active]=1
@@ -90,7 +89,7 @@ DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_i
 																	AND cin.[instance_name] <> @@SERVERNAME
 															ORDER BY cin.[instance_name]
 OPEN crsActiveInstances
-FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
+FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName
 WHILE @@FETCH_STATUS=0
 	begin
 		SET @strMessage='Analyzing server: ' + @sqlServerName
@@ -160,7 +159,7 @@ WHILE @@FETCH_STATUS=0
 				END CATCH
 			end
 
-		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
+		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName
 	end
 CLOSE crsActiveInstances
 DEALLOCATE crsActiveInstances

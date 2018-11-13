@@ -117,28 +117,25 @@ ELSE
 				SET @runWithxpCreateSubdir = 0
 				SET @optionXPValue = 0
 
-				IF @serverVersionNum>=9
-					begin
-						/*-------------------------------------------------------------------------------------------------------------------------------*/
-						SET @queryToRun = N'[' + @sqlServerName + '].master.sys.xp_create_subdir N''' + @folderName + ''''
-						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-						EXEC sp_executesql @queryToRun
+				/*-------------------------------------------------------------------------------------------------------------------------------*/
+				SET @queryToRun = N'[' + @sqlServerName + '].master.sys.xp_create_subdir N''' + @folderName + ''''
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+				EXEC sp_executesql @queryToRun
 				
-						IF @@ERROR=0
-							SET @runWithxpCreateSubdir=1
-						ELSE
-							begin
-								/* enable xp_cmdshell configuration option */
-								EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
-																				, @flgAction	 = 1			-- 1=enable | 0=disable
-																				, @optionXPValue = @optionXPValue OUTPUT
-																				, @debugMode	 = @debugMode
+				IF @@ERROR=0
+					SET @runWithxpCreateSubdir=1
+				ELSE
+					begin
+						/* enable xp_cmdshell configuration option */
+						EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
+																		, @flgAction	 = 1			-- 1=enable | 0=disable
+																		, @optionXPValue = @optionXPValue OUTPUT
+																		, @debugMode	 = @debugMode
 
-								IF @optionXPValue = 0
-									begin
-										RETURN 1
-									end		
-							end
+						IF @optionXPValue = 0
+							begin
+								RETURN 1
+							end		
 					end
 
 				/*-------------------------------------------------------------------------------------------------------------------------------*/
@@ -152,7 +149,7 @@ ELSE
 					end
 
 				/*-------------------------------------------------------------------------------------------------------------------------------*/
-				IF @serverVersionNum>=9 AND @runWithxpCreateSubdir=0
+				IF @runWithxpCreateSubdir=0
 					begin
 						/* disable xp_cmdshell configuration option */
 						EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName

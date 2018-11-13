@@ -102,60 +102,23 @@ WHILE @@FETCH_STATUS=0
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 
 				---------------------------------------------------------------------------------------------
-				--get destination server running version/edition
-				DECLARE		@serverEdition					[sysname],
-							@serverVersionStr				[sysname],
-							@serverVersionNum				[numeric](9,6),
-							@nestedExecutionLevel			[tinyint]
-
-				SET @nestedExecutionLevel = @executionLevel + 1
-				EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @instanceName,
-														@serverEdition			= @serverEdition OUT,
-														@serverVersionStr		= @serverVersionStr OUT,
-														@serverVersionNum		= @serverVersionNum OUT,
-														@executionLevel			= @nestedExecutionLevel,
-														@debugMode				= @debugMode
-
 				SET @nestExecutionLevel = @executionLevel + 3
 
 				---------------------------------------------------------------------------------------------
-				IF @serverVersionNum>=9
-					begin
-						EXEC [dbo].[usp_mpAlterTableIndexes]	@sqlServerName				= @instanceName,
-																@dbName						= @databaseName,
-																@tableSchema				= @tableSchema,
-																@tableName					= @tableName,
-																@indexName					= @indexName,
-																@indexID					= NULL,
-																@partitionNumber			= 1,
-																@flgAction					= 1,
-																@flgOptions					= DEFAULT,
-																@maxDOP						= DEFAULT,
-																@fillFactor					= @newFillFactor,
-																@executionLevel				= 0,
-																@affectedDependentObjects	= @affectedDependentObjects OUTPUT,
-																@debugMode					= @debugMode
-					end
-				ELSE
-					begin
-						SET @queryToRun = N'SET ARITHABORT ON; SET QUOTED_IDENTIFIER ON; '
-						SET @queryToRun = @queryToRun +	N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@tableName, 'quoted') + ''') IS NOT NULL DBCC DBREINDEX (''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@tableName, 'quoted') + ''', ''' + RTRIM(@indexName) + ''', ' + CAST(@newFillFactor AS [nvarchar]) + N') WITH NO_INFOMSGS'
-						IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-						SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@indexName, 'quoted')
-
-						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @instanceName,
-																		@dbName			= @databaseName,
-																		@objectName		= @objectName,
-																		@childObjectName= @childObjectName,
-																		@module			= 'dbo.usp_hcChangeFillFactorForIndexesFrequentlyFragmented',
-																		@eventName		= 'database maintenance - rebuilding index',
-																		@queryToRun  	= @queryToRun,
-																		@flgOptions		= 0,
-																		@executionLevel	= @nestedExecutionLevel,
-																		@debugMode		= @debugMode						
-					end
-					
+				EXEC [dbo].[usp_mpAlterTableIndexes]	@sqlServerName				= @instanceName,
+														@dbName						= @databaseName,
+														@tableSchema				= @tableSchema,
+														@tableName					= @tableName,
+														@indexName					= @indexName,
+														@indexID					= NULL,
+														@partitionNumber			= 1,
+														@flgAction					= 1,
+														@flgOptions					= DEFAULT,
+														@maxDOP						= DEFAULT,
+														@fillFactor					= @newFillFactor,
+														@executionLevel				= 0,
+														@affectedDependentObjects	= @affectedDependentObjects OUTPUT,
+														@debugMode					= @debugMode
 			end
 		ELSE
 			begin

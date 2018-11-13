@@ -82,19 +82,16 @@ IF (SELECT [file_exists] FROM #fileExists)=1
 
 		SET @optionXPValue = 0
 
-		IF @serverVersionNum>=9
-			begin
-				/* enable xp_cmdshell configuration option */
-				EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
-																, @flgAction	 = 1			-- 1=enable | 0=disable
-																, @optionXPValue = @optionXPValue OUTPUT
-																, @debugMode	 = @debugMode
+		/* enable xp_cmdshell configuration option */
+		EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
+														, @flgAction	 = 1			-- 1=enable | 0=disable
+														, @optionXPValue = @optionXPValue OUTPUT
+														, @debugMode	 = @debugMode
 
-				IF @optionXPValue = 0
-					begin
-						RETURN 1
-					end		
-			end
+		IF @optionXPValue = 0
+			begin
+				RETURN 1
+			end		
 
 		/*-------------------------------------------------------------------------------------------------------------------------------*/
 		/* deleting file     																											 */
@@ -105,15 +102,11 @@ IF (SELECT [file_exists] FROM #fileExists)=1
 
 
 		/*-------------------------------------------------------------------------------------------------------------------------------*/
-		IF @serverVersionNum>=9
-			begin
-				/* disable xp_cmdshell configuration option */
-				EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
-																, @flgAction	 = 0			-- 1=enable | 0=disable
-																, @optionXPValue = @optionXPValue OUTPUT
-																, @debugMode	 = @debugMode
-
-			end
+		/* disable xp_cmdshell configuration option */
+		EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
+														, @flgAction	 = 0			-- 1=enable | 0=disable
+														, @optionXPValue = @optionXPValue OUTPUT
+														, @debugMode	 = @debugMode
 
 		/*-------------------------------------------------------------------------------------------------------------------------------*/
 		/* check if file still exists																									 */

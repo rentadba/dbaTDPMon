@@ -142,7 +142,7 @@ WHILE @@FETCH_STATUS=0
 			SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(@sqlServerVersion, ''), 2), '.', '') 
 		END TRY
 		BEGIN CATCH
-			SET @SQLMajorVersion = 8
+			SET @SQLMajorVersion = 9
 		END CATCH
 
 		TRUNCATE TABLE #xpReadErrorLog
@@ -154,10 +154,7 @@ WHILE @@FETCH_STATUS=0
 				IF @sqlServerName <> @@SERVERNAME
 					begin
 						IF @SQLMajorVersion < 11
-							IF @SQLMajorVersion > 8
-								SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar]) + ''')x'
-							ELSE 
-								SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog'')x'
+							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar]) + ''')x'
 						ELSE
 							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar]) + ' WITH RESULT SETS(([log_date] [datetime] NULL, [process_info] [sysname] NULL, [text] [varchar](max) NULL))'')x'
 					end
@@ -166,12 +163,8 @@ WHILE @@FETCH_STATUS=0
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				BEGIN TRY
-					IF @SQLMajorVersion > 8 
-						INSERT	INTO #xpReadErrorLog([log_date], [process_info], [text])
-								EXEC sp_executesql  @queryToRun
-					ELSE
-						INSERT	INTO #xpReadErrorLog([text], [continuation_row])
-								EXEC sp_executesql  @queryToRun
+					INSERT	INTO #xpReadErrorLog([log_date], [process_info], [text])
+							EXEC sp_executesql  @queryToRun
 				END TRY
 				BEGIN CATCH
 					SET @strMessage = ERROR_MESSAGE()
@@ -186,47 +179,6 @@ WHILE @@FETCH_STATUS=0
 				END CATCH
 
 				SET @errorlogFileNo = @errorlogFileNo - 1
-			end
-
-		/* re-parse messages for 2k version */
-		IF @SQLMajorVersion = 8 
-			begin
-				SET @strMessage= 'rebuild messages for ContinuationRows'
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
-
-				UPDATE S
-					SET S.[text] = S.[text] + D.[text]
-				FROM #xpReadErrorLog S
-				INNER JOIN 
-					(
-						SELECT [id], [text]
-						FROM #xpReadErrorLog
-						WHERE [continuation_row]=1
-					) D ON S.[id] = D.[id]-1
-
-
-				DELETE 
-				FROM #xpReadErrorLog
-				WHERE [continuation_row]=1
-
-				SET @strMessage= 'split messages / SQL Server 2000'
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
-
-				UPDATE eld
-					SET   eld.[log_date] = X.[log_date]
-						, eld.[process_info] = X.[process_info]
-						, eld.[text] = X.[text]
-				FROM #xpReadErrorLog eld
-				INNER JOIN 
-					(
-						SELECT    [id]
-								, SUBSTRING([text], 1, 22) AS [log_date]
-								, LTRIM(RTRIM(SUBSTRING([text], 24, CHARINDEX(' ', [text], 24) -23))) AS [process_info]
-								, LTRIM(RTRIM(SUBSTRING([text], CHARINDEX(' ', [text], 24), LEN([text])))) AS [text]
-						FROM #xpReadErrorLog
-						WHERE LEFT([text], 4) = CAST(YEAR(GETDATE()) AS [varchar])
-							OR LEFT([text], 4) =CAST(YEAR(GETDATE())-1 AS [varchar])
-					)X ON X.[id] = eld.[id]
 			end
 
 		/* save results to stats table */

@@ -303,7 +303,7 @@ ELSE
 -----------------------------------------------------------------------------------------
 --for +2k5 versions, will use xp_delete_file
 SET @errorCode=0
-IF @serverVersionNum>=9 AND @flgOptions & 256 = 256
+IF @flgOptions & 256 = 256
 	begin
 		SET @queryToRun = N'EXEC master.dbo.xp_delete_file 0, N''' + @backupLocation + ''', N''' + @backupFileExtension + ''', N''' + CONVERT([varchar](20), @maxAllowedDate, 120) + ''', 0'
 		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
@@ -330,23 +330,20 @@ IF @debugMode=1
 
 -----------------------------------------------------------------------------------------
 --in case of previous errors or 2k version, will use "standard" delete file
-IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@serverVersionNum < 9) OR (@flgOptions & 128 = 128 AND @lastFullRemainingBackupSetID IS NOT NULL)
+IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@flgOptions & 128 = 128 AND @lastFullRemainingBackupSetID IS NOT NULL)
 	begin
 		SET @optionXPValue = 0
 
-		IF @serverVersionNum>=9
-			begin
-				/* enable xp_cmdshell configuration option */
-				EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
-																, @flgAction	 = 1			-- 1=enable | 0=disable
-																, @optionXPValue = @optionXPValue OUTPUT
-																, @debugMode	 = @debugMode
+		/* enable xp_cmdshell configuration option */
+		EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
+														, @flgAction	 = 1			-- 1=enable | 0=disable
+														, @optionXPValue = @optionXPValue OUTPUT
+														, @debugMode	 = @debugMode
 
-				IF @optionXPValue = 0
-					begin
-						RETURN 1
-					end		
-			end											
+		IF @optionXPValue = 0
+			begin
+				RETURN 1
+			end		
 		
 		/* identify backup files to be deleted, based on msdb information */
 		SET @queryToRun=N''
@@ -358,7 +355,6 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 														AND bmf.[physical_device_name] LIKE (''%.' + @backupFileExtension + N''')
 														AND (	 (' + CAST(@flgOptions AS [nvarchar]) + N' & 256 = 0) 
 															OR (' + CAST(@errorCode AS [nvarchar]) + N'<>0 AND ' + CAST(@flgOptions AS [nvarchar]) + N' & 256 = 256) 
-															OR (' + CAST(@serverVersionNum AS [nvarchar]) + N'< 9)
 															)
 													)
 													OR (
@@ -397,7 +393,7 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 
 		/* identify backup files to be deleted, based on file existence on disk */
 		/* use xp_dirtree to identify orphan backup files to be deleted, when using option 128 (default) */
-		IF @flgOptions & 128 = 128 AND @flgOptions & 4096 = 4096 AND @serverVersionNum>=9
+		IF @flgOptions & 128 = 128 AND @flgOptions & 4096 = 4096
 			begin
 				IF OBJECT_ID('tempdb..#backupFilesOnDisk') IS NOT NULL DROP TABLE #backupFilesOnDisk
 				CREATE TABLE #backupFilesOnDisk
@@ -460,14 +456,11 @@ IF (@flgOptions & 256 = 0) OR (@errorCode<>0 AND @flgOptions & 256 = 256) OR (@s
 		CLOSE crsCleanupBackupFiles
 		DEALLOCATE crsCleanupBackupFiles
 
-		IF @serverVersionNum>=9
-			begin
-				/* disable xp_cmdshell configuration option */
-				EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
-																, @flgAction	 = 0			-- 1=enable | 0=disable
-																, @optionXPValue = @optionXPValue OUTPUT
-																, @debugMode	 = @debugMode
-			end
+		/* disable xp_cmdshell configuration option */
+		EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
+														, @flgAction	 = 0			-- 1=enable | 0=disable
+														, @optionXPValue = @optionXPValue OUTPUT
+														, @debugMode	 = @debugMode
 	end
 
 RETURN @errorCode

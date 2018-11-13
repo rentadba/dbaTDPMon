@@ -18,10 +18,6 @@ DECLARE   @job_name			[sysname]
 		, @queryToRun		[nvarchar](4000)
 		, @databaseName		[sysname]
 
-DECLARE @SQLMajorVersion [int]
-
-SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(CAST(SERVERPROPERTY('ProductVersion') AS [varchar](32)), ''), 2), '.', '') 
-
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default folder for SQL Agent jobs
 BEGIN TRY
@@ -55,11 +51,7 @@ SET @logFileLocation = [$(dbName)].[dbo].[ufn_formatPlatformSpecificPath](@@SERV
 /* dropping job if exists */
 ---------------------------------------------------------------------------------------------------
 IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = @job_name)
-	IF @SQLMajorVersion > 8
-		EXEC msdb.dbo.sp_delete_job @job_name=@job_name, @delete_unused_schedule=1		
-	ELSE
-		EXEC msdb.dbo.sp_delete_job @job_name=@job_name
-
+	EXEC msdb.dbo.sp_delete_job @job_name=@job_name, @delete_unused_schedule=1		
 
 ---------------------------------------------------------------------------------------------------
 /* creating the job */

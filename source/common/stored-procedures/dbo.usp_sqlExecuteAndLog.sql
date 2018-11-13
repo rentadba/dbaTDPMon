@@ -71,112 +71,53 @@ FROM	[dbo].[appConfigurations]
 WHERE	[name]='Log action events'
 		AND [module] = 'common'
 
-
----------------------------------------------------------------------------------------------
---get destination server running version/edition
-DECLARE		@serverEdition					[sysname],
-			@serverVersionStr				[sysname],
-			@serverVersionNum				[numeric](9,6),
-			@nestedExecutionLevel			[tinyint]
-
-SET @nestedExecutionLevel = @executionLevel + 1
-
-EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
-										@serverEdition			= @serverEdition OUT,
-										@serverVersionStr		= @serverVersionStr OUT,
-										@serverVersionNum		= @serverVersionNum OUT,
-										@executionLevel			= @nestedExecutionLevel,
-										@debugMode				= @debugMode
-
 --------------------------------------------------------------------------------------------------
 SET @tmpServer= '[' + @sqlServerName + '].' + [dbo].[ufn_getObjectQuoteName](ISNULL(@dbName, 'master'), 'quoted') + '.[dbo].[sp_executesql]'
 
-IF @serverVersionNum >= 9
-	SET @tmpSQL = N'DECLARE @startTime [datetime]
+SET @tmpSQL = N'DECLARE @startTime [datetime]
 
-					BEGIN TRY
-						SET @startTime = GETDATE()
-						
-						EXEC @tmpServer @queryToRun
-
-						SET @errorCode = 0
-						SET @durationSeconds=DATEDIFF(ss, @startTime, GETDATE())
-					END TRY
-
-					BEGIN CATCH
-						DECLARE   @flgRaiseErrorAndStop [bit]
-								, @errorString			[nvarchar](max)
-								, @eventMessageData		[varchar](8000)
-
-						SET @errorString = ERROR_MESSAGE()
-						SET @errorCode = ERROR_NUMBER()
-						SET @durationSeconds=DATEDIFF(ss, @startTime, GETDATE())
-
-						IF LEFT(@errorString, 2)=''--'' 
-							SET @errorString = LTRIM(SUBSTRING(@errorString, 3, LEN(@errorString)))
-
-						SET @flgRaiseErrorAndStop = CASE WHEN @flgOptions & 32 = 32 THEN 1 ELSE 0 END
-						
-						SET @eventMessageData = ''<alert><detail>'' + 
-												''<error_code>'' + CAST(@errorCode AS [varchar](32)) + ''</error_code>'' + 
-												''<error_string>'' + [dbo].[ufn_getObjectQuoteName](@errorString, ''xml'') + ''</error_string>'' + 
-												''<query_executed>'' + [dbo].[ufn_getObjectQuoteName](@queryToRun, ''xml'') + ''</query_executed>'' + 
-												''<duration_seconds>'' + CAST(@durationSeconds AS [varchar](32)) + ''</duration_seconds>'' + 
-												''<event_date_utc>'' + CONVERT([varchar](20), GETUTCDATE(), 120) + ''</event_date_utc>'' + 
-												''</detail></alert>''
-
-						EXEC [dbo].[usp_logEventMessageAndSendEmail]	@sqlServerName			= @sqlServerName,
-																		@dbName					= @dbName,
-																		@objectName				= @objectName,
-																		@childObjectName		= @childObjectName,
-																		@module					= @module,
-																		@eventName				= @eventName,
-																		@eventMessage			= @eventMessageData,
-																		@eventType				= 1
-
-						EXEC [dbo].[usp_logPrintMessage] @customMessage = @errorString, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=@flgRaiseErrorAndStop
-					END CATCH'
-ELSE
-	SET @tmpSQL = N'DECLARE   @startTime			[datetime]
-					
+				BEGIN TRY
 					SET @startTime = GETDATE()
-					
+						
 					EXEC @tmpServer @queryToRun
-					
-					SET @errorCode=@@ERROR
+
+					SET @errorCode = 0
+					SET @durationSeconds=DATEDIFF(ss, @startTime, GETDATE())
+				END TRY
+
+				BEGIN CATCH
+					DECLARE   @flgRaiseErrorAndStop [bit]
+							, @errorString			[nvarchar](max)
+							, @eventMessageData		[varchar](8000)
+
+					SET @errorString = ERROR_MESSAGE()
+					SET @errorCode = ERROR_NUMBER()
 					SET @durationSeconds=DATEDIFF(ss, @startTime, GETDATE())
 
-					IF @errorCode<>0
-						begin
-							DECLARE   @flgRaiseErrorAndStop [bit]
-									, @errorString			[nvarchar](255)
-									, @eventData			[varchar](8000)
+					IF LEFT(@errorString, 2)=''--'' 
+						SET @errorString = LTRIM(SUBSTRING(@errorString, 3, LEN(@errorString)))
 
-							SELECT @errorString = [description]
-							FROM master.dbo.sysmessages 
-							WHERE [error] = @errorCode
-
-							SET @flgRaiseErrorAndStop = CASE WHEN @flgOptions & 32 = 32 THEN 1 ELSE 0 END
-							
-							SET @eventData = ''<alert><detail>'' + 
-												''<error_code>'' + CAST(@errorCode AS [varchar](32)) + ''</error_code>'' + 
-												''<error_string>'' + [dbo].[ufn_getObjectQuoteName](ISNULL(@errorString, ''''), ''xml'') + ''</error_string>'' + 
-												''<query_executed>'' + [dbo].[ufn_getObjectQuoteName](@queryToRun, ''xml'') + ''</query_executed>'' + 
-												''<duration_seconds>'' + CAST(@durationSeconds AS [varchar](32)) + ''</duration_seconds>'' + 
+					SET @flgRaiseErrorAndStop = CASE WHEN @flgOptions & 32 = 32 THEN 1 ELSE 0 END
+						
+					SET @eventMessageData = ''<alert><detail>'' + 
+											''<error_code>'' + CAST(@errorCode AS [varchar](32)) + ''</error_code>'' + 
+											''<error_string>'' + [dbo].[ufn_getObjectQuoteName](@errorString, ''xml'') + ''</error_string>'' + 
+											''<query_executed>'' + [dbo].[ufn_getObjectQuoteName](@queryToRun, ''xml'') + ''</query_executed>'' + 
+											''<duration_seconds>'' + CAST(@durationSeconds AS [varchar](32)) + ''</duration_seconds>'' + 
+											''<event_date_utc>'' + CONVERT([varchar](20), GETUTCDATE(), 120) + ''</event_date_utc>'' + 
 											''</detail></alert>''
 
-							EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
-																@dbName			= @dbName,
-																@objectName		= @objectName,
-																@childObjectName= @childObjectName,
-																@module			= @module,
-																@eventName		= @eventName,
-																@eventMessage	= @eventData,
-																@eventType		= 1
+					EXEC [dbo].[usp_logEventMessageAndSendEmail]	@sqlServerName			= @sqlServerName,
+																	@dbName					= @dbName,
+																	@objectName				= @objectName,
+																	@childObjectName		= @childObjectName,
+																	@module					= @module,
+																	@eventName				= @eventName,
+																	@eventMessage			= @eventMessageData,
+																	@eventType				= 1
 
-							EXEC [dbo].[usp_logPrintMessage] @customMessage = @errorString, @stopExecution=0
-							EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @stopExecution=@flgRaiseErrorAndStop
-						end'
+					EXEC [dbo].[usp_logPrintMessage] @customMessage = @errorString, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=@flgRaiseErrorAndStop
+				END CATCH'
 
 SET @queryParameters=N'@tmpServer [nvarchar](512), @queryToRun [nvarchar](2048), @flgOptions [int], @module [sysname], @eventName [nvarchar](512), @sqlServerName [sysname], @dbName [sysname], @objectName [nvarchar](512), @childObjectName [sysname], @errorCode [int] OUTPUT, @durationSeconds [bigint] OUTPUT'
 

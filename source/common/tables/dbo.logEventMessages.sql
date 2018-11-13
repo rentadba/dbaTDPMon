@@ -13,10 +13,6 @@ IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[logEventMessa
 DROP TABLE [dbo].[logEventMessages]
 GO
 
-DECLARE @SQLMajorVersion [int]
-SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(CAST(SERVERPROPERTY('ProductVersion') AS [varchar](32)), ''), 2), '.', '') 
-
-
 DECLARE @queryToRun [nvarchar](4000)
 
 SET @queryToRun = '
@@ -33,7 +29,7 @@ CREATE TABLE [dbo].[logEventMessages]
 	[database_name]								[sysname]				NULL,
 	[object_name]								[nvarchar](261)			NULL,
 	[child_object_name]							[sysname]				NULL,
-	[message]									[varchar](' + CASE WHEN @SQLMajorVersion>8 THEN 'max' ELSE '4000' END + ')			NULL,
+	[message]									[varchar](max)			NULL,
 	[send_email_to]								[varchar](1024)			NULL,
 	[event_type]								[smallint]				NULL,
 	[is_email_sent]								[bit]				NOT NULL CONSTRAINT [DF_logEventMessages_is_email_sent] DEFAULT (0),
@@ -65,7 +61,7 @@ CREATE TABLE [dbo].[logEventMessages]
 
 EXEC sp_executesql  @queryToRun
 
-SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_InstanceID] ON [dbo].[logEventMessages]([instance_id], [project_id])' + CASE WHEN @SQLMajorVersion>8 THEN ' INCLUDE ([remote_event_id])' ELSE '' END + ' ON [FG_Statistics_Index]'
+SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_InstanceID] ON [dbo].[logEventMessages]([instance_id], [project_id]) INCLUDE ([remote_event_id]) ON [FG_Statistics_Index]'
 EXEC sp_executesql  @queryToRun
 
 SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_EventName_EventDate] ON [dbo].[logEventMessages]([event_name], [event_date_utc]) ON [FG_Statistics_Index]'
@@ -77,6 +73,6 @@ EXEC sp_executesql  @queryToRun
 SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_EventType_EventDateUTC_Instance_ID] ON [dbo].[logEventMessages] ([event_type], [event_date_utc], [instance_id]) ON [FG_Statistics_Index]'
 EXEC sp_executesql  @queryToRun
 
-SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_Module_EventName] ON [dbo].[logEventMessages] ([project_id], [instance_id], [module], [event_name])' + CASE WHEN @SQLMajorVersion>8 THEN ' INCLUDE ([parameters], [database_name], [object_name], [child_object_name], [event_date_utc])' ELSE '' END + ' ON [FG_Statistics_Index]'
+SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_Module_EventName] ON [dbo].[logEventMessages] ([project_id], [instance_id], [module], [event_name]) INCLUDE ([parameters], [database_name], [object_name], [child_object_name], [event_date_utc]) ON [FG_Statistics_Index]'
 EXEC sp_executesql  @queryToRun
 GO

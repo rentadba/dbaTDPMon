@@ -197,7 +197,7 @@ BEGIN TRY
 				FROM #catalogInstanceNames
 			END TRY
 			BEGIN CATCH
-				SET @SQLMajorVersion = 8
+				SET @SQLMajorVersion = 9
 			END CATCH
 
 			-----------------------------------------------------------------------------------------------------
@@ -205,10 +205,7 @@ BEGIN TRY
 			-----------------------------------------------------------------------------------------------------
 			SET @isClustered=0
 
-			IF @SQLMajorVersion<=8
-				SET @queryToRun = N'SELECT [NodeName] FROM ::fn_virtualservernodes()'
-			ELSE
-				SET @queryToRun = N'SELECT [NodeName] FROM sys.dm_os_cluster_nodes'
+			SET @queryToRun = N'SELECT [NodeName] FROM sys.dm_os_cluster_nodes'
 			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 			IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
@@ -259,41 +256,22 @@ BEGIN TRY
 			-----------------------------------------------------------------------------------------------------
 			--discover database names
 			-----------------------------------------------------------------------------------------------------
-			IF @SQLMajorVersion<=8
-				SET @queryToRun = N'SELECT sdb.[dbid], sdb.[name], sdb.[status] AS [state]
-											, CASE  WHEN sdb.[status] & 4194584 = 4194584 THEN ''SUSPECT''
-													WHEN sdb.[status] & 2097152 = 2097152 THEN ''STANDBY''
-													WHEN sdb.[status] & 32768 = 32768 THEN ''EMERGENCY MODE''
-													WHEN sdb.[status] & 4096 = 4096 THEN ''SINGLE USER''
-													WHEN sdb.[status] & 2048 = 2048 THEN ''DBO USE ONLY''
-													WHEN sdb.[status] & 1024 = 1024 THEN ''READ ONLY''
-													WHEN sdb.[status] & 512 = 512 THEN ''OFFLINE''
-													WHEN sdb.[status] & 256 = 256 THEN ''NOT RECOVERED''
-													WHEN sdb.[status] & 128 = 128 THEN ''RECOVERING''
-													WHEN sdb.[status] & 64 = 64 THEN ''PRE RECOVERY''
-													WHEN sdb.[status] & 32 = 32 THEN ''LOADING''
-													WHEN sdb.[status] = 0 THEN ''UNKNOWN''
-													ELSE ''ONLINE''
-												END AS [state_desc]
-									FROM master.dbo.sysdatabases sdb
-									/* WHERE sdb.[name] LIKE ''' + @dbFilter + ''' */'
-			ELSE
-				SET @queryToRun = N'SELECT sdb.[database_id], sdb.[name], sdb.[state], sdb.[state_desc]
-									FROM sys.databases sdb
-									WHERE	[is_read_only] = 0 
-											AND [is_in_standby] = 0
-											/* AND sdb.[name] LIKE ''' + @dbFilter + ''' */
-									UNION ALL
-									SELECT sdb.[database_id], sdb.[name], sdb.[state], ''READ ONLY''
-									FROM sys.databases sdb
-									WHERE	[is_read_only] = 1
-											AND [is_in_standby] = 0
-											/* AND sdb.[name] LIKE ''' + @dbFilter + ''' */
-									UNION ALL
-									SELECT sdb.[database_id], sdb.[name], sdb.[state], ''STANDBY''
-									FROM sys.databases sdb
-									WHERE	[is_in_standby] = 1
-											/* AND sdb.[name] LIKE ''' + @dbFilter + ''' */'
+			SET @queryToRun = N'SELECT sdb.[database_id], sdb.[name], sdb.[state], sdb.[state_desc]
+								FROM sys.databases sdb
+								WHERE	[is_read_only] = 0 
+										AND [is_in_standby] = 0
+										/* AND sdb.[name] LIKE ''' + @dbFilter + ''' */
+								UNION ALL
+								SELECT sdb.[database_id], sdb.[name], sdb.[state], ''READ ONLY''
+								FROM sys.databases sdb
+								WHERE	[is_read_only] = 1
+										AND [is_in_standby] = 0
+										/* AND sdb.[name] LIKE ''' + @dbFilter + ''' */
+								UNION ALL
+								SELECT sdb.[database_id], sdb.[name], sdb.[state], ''STANDBY''
+								FROM sys.databases sdb
+								WHERE	[is_in_standby] = 1
+										/* AND sdb.[name] LIKE ''' + @dbFilter + ''' */'
 			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 			IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
@@ -311,16 +289,13 @@ BEGIN TRY
 			/*-------------------------------------------------------------------------------------------------------------------------------*/
 			/* check if xp_cmdshell is enabled or should be enabled																			 */
 			BEGIN TRY
-				IF @SQLMajorVersion>8
-					begin
-						SET @optionXPValue = 0
+				SET @optionXPValue = 0
 
-						/* enable xp_cmdshell configuration option */
-						EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
-																		, @flgAction	 = 1			-- 1=enable | 0=disable
-																		, @optionXPValue = @optionXPValue OUTPUT
-																		, @debugMode	 = @debugMode
-					end
+				/* enable xp_cmdshell configuration option */
+				EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
+																, @flgAction	 = 1			-- 1=enable | 0=disable
+																, @optionXPValue = @optionXPValue OUTPUT
+																, @debugMode	 = @debugMode
 
 				IF @optionXPValue=1
 					begin
@@ -366,14 +341,11 @@ BEGIN TRY
 						UPDATE #catalogMachineNames SET [domain] = @domainName
 					end
 
-				IF @SQLMajorVersion>8 
-					begin
-						/* disable xp_cmdshell configuration option */
-						EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
-																		, @flgAction	 = 0			-- 1=enable | 0=disable
-																		, @optionXPValue = @optionXPValue OUTPUT
-																		, @debugMode	 = @debugMode
-					end
+					/* disable xp_cmdshell configuration option */
+					EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
+																	, @flgAction	 = 0			-- 1=enable | 0=disable
+																	, @optionXPValue = @optionXPValue OUTPUT
+																	, @debugMode	 = @debugMode
 			END TRY
 			BEGIN CATCH
 				SET @errMessage = ERROR_MESSAGE()

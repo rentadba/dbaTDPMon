@@ -788,8 +788,12 @@
 * maintenance-plan: allow index fragmentation analysis for read_only databases
 
 ------------
-#### October 2018 new features & fixes
+#### November 2018 new features & fixes
 01.11.2018
 * discontinued support for SQL Server 2000 (latest version supporting SQL Server 2000 is 2017.12)
 * health-check: fixed small bugs when running on SQL Server 2008
 * release of dbaTDPMon - v2018.11
+
+13.11.2018
+* maintenance-plan: fix a bug when updating statistics with fullscan on SQL Server 2016 onwards
+* remove all SQL Server 2000 related code

@@ -61,10 +61,6 @@ DECLARE   @codeDescriptor		[varchar](260)
 		, @maxPriorityValue		[int]
 		, @retryAttempts		[tinyint]
 
-DECLARE		@serverEdition					[sysname],
-			@serverVersionStr				[sysname],
-			@serverVersionNum				[numeric](9,6)
-
 DECLARE @jobExecutionQueue TABLE
 		(
 			[id]					[int]			NOT NULL IDENTITY(1,1),
@@ -122,13 +118,6 @@ WHILE @@FETCH_STATUS=0
 												@sqlServerName	= @forSQLServerName,
 												@addNewDatabasesToProject = 0,
 												@debugMode		= @debugMode
-
-
-		--get destination server running version/edition
-		SELECT @serverVersionNum = SUBSTRING([version], 1, CHARINDEX('.', [version])-1) + '.' + REPLACE(SUBSTRING([version], CHARINDEX('.', [version])+1, LEN([version])), '.', '')
-		FROM	[dbo].[catalogInstanceNames]
-		WHERE	[project_id] = @projectID
-				AND [id] = @instanceID				
 
 		DECLARE crsCollectorDescriptor CURSOR LOCAL FAST_FORWARD FOR	SELECT [descriptor]
 																		FROM
@@ -366,7 +355,7 @@ WHILE @@FETCH_STATUS=0
 					begin
 						/*-------------------------------------------------------------------*/
 						/* Daily: Rebuild Heap Tables - only for SQL versions +2K5*/
-						IF @flgActions & 32 = 32 AND @serverVersionNum > 9 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, @codeDescriptor, 'Rebuild Heap Tables', GETDATE()) = 1
+						IF @flgActions & 32 = 32 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, @codeDescriptor, 'Rebuild Heap Tables', GETDATE()) = 1
 							begin
 								SET @taskID = NULL
 								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = @codeDescriptor AND [task_name] = 'Rebuild Heap Tables'

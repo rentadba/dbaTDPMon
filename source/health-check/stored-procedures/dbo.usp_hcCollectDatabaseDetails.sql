@@ -191,7 +191,7 @@ WHILE @@FETCH_STATUS=0
 			SET @serverVersionNum=SUBSTRING(@sqlServerVersion, 1, CHARINDEX('.', @sqlServerVersion)-1) + '.' + REPLACE(SUBSTRING(@sqlServerVersion, CHARINDEX('.', @sqlServerVersion)+1, LEN(@sqlServerVersion)), '.', '')
 		END TRY
 		BEGIN CATCH
-			SET @serverVersionNum = 8.0
+			SET @serverVersionNum = 9.0
 		END CATCH
 
 		DECLARE crsActiveDatabases CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cdn.[catalog_database_id], cdn.[database_id], cdn.[database_name]
@@ -225,13 +225,10 @@ WHILE @@FETCH_STATUS=0
 																, CAST(FILEPROPERTY([name], ''''''''IsLogFile'''''''') AS [bit])		AS [is_logfile] ' + 
 																CASE WHEN @serverVersionNum >= 10.5
 																	 THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
-																	 ELSE N', REPLACE(LEFT([' + CASE WHEN @serverVersionNum < 9 THEN N'filename' ELSE N'physical_name' END + N'], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
+																	 ELSE N', REPLACE(LEFT([physical_name], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
 																END + '
-																, ' + CASE	WHEN @serverVersionNum < 9
-																			THEN N'CASE WHEN ([maxsize]=-1 AND [groupid]<>0) OR ([maxsize]=-1 AND [groupid]=0) OR ([maxsize]=268435456 AND [groupid]=0) THEN 0 ELSE 1 END ' 
-																			ELSE N'CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END '
-																	 END + N' AS [is_growth_limited]
-														FROM ' + CASE WHEN @serverVersionNum < 9 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + 
+																, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
+														FROM sys.database_files' + 
 														CASE WHEN @serverVersionNum >= 10.5
 															 THEN N' CROSS APPLY sys.dm_os_volume_stats(DB_ID(), [file_id])'
 															 ELSE N''
@@ -254,13 +251,10 @@ WHILE @@FETCH_STATUS=0
 														, CAST(FILEPROPERTY([name], ''IsLogFile'') AS [bit])		AS [is_logfile] ' + 
 														CASE WHEN @serverVersionNum >= 10.5
 																THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
-																ELSE N', REPLACE(LEFT([' + CASE WHEN @serverVersionNum < 9 THEN N'filename' ELSE N'physical_name' END + N'], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
+																ELSE N', REPLACE(LEFT([physical_name], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
 														END + '
-														, ' + CASE	WHEN @serverVersionNum < 9
-																	THEN N'CASE WHEN ([maxsize]=-1 AND [groupid]<>0) OR ([maxsize]=-1 AND [groupid]=0) OR ([maxsize]=268435456 AND [groupid]=0) THEN 0 ELSE 1 END ' 
-																	ELSE N'CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END '
-																END + N' AS [is_growth_limited]
-												FROM ' + CASE WHEN @serverVersionNum < 9 THEN N'dbo.sysfiles' ELSE N'sys.database_files' END + 
+														, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
+												FROM sys.database_files' + 
 												CASE WHEN @serverVersionNum >= 10.5
 														THEN N' CROSS APPLY sys.dm_os_volume_stats(DB_ID(), [file_id])'
 														ELSE N''
@@ -287,46 +281,22 @@ WHILE @@FETCH_STATUS=0
 				END CATCH
 
 				/* get last date for dbcc checkdb, only for 2k5+ */
-				IF @serverVersionNum >= 9
+				IF @sqlServerName <> @@SERVERNAME
 					begin
-						IF @sqlServerName <> @@SERVERNAME
-							begin
-								IF @serverVersionNum < 11
-									SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
-														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''')'')x
-														WHERE [Field]=''dbi_dbccLastKnownGood'''
-								ELSE
-									SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
-														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
-														WHERE [Field]=''dbi_dbccLastKnownGood'''
-							end
+						IF @serverVersionNum < 11
+							SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
+												FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''')'')x
+												WHERE [Field]=''dbi_dbccLastKnownGood'''
 						ELSE
-							begin							
-								BEGIN TRY
-									SET @queryToRun = N'DBCC DBINFO (''' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'sql') + N''') WITH TABLERESULTS, NO_INFOMSGS'
-									INSERT INTO #dbccDBINFO
-											EXEC sp_executesql @queryToRun
-								END TRY
-								BEGIN CATCH
-									SET @strMessage = ERROR_MESSAGE()
-									EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
-									INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
-											SELECT  @instanceID
-												  , @projectID
-												  , GETUTCDATE()
-												  , 'dbo.usp_hcCollectDatabaseDetails'
-												  , [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ':' + @strMessage
-								END CATCH
-
-								SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_dbccLastKnownGood'''											
-							end
-
-						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-				
-						TRUNCATE TABLE #dbccLastKnownGood
+							SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
+												FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
+												WHERE [Field]=''dbi_dbccLastKnownGood'''
+					end
+				ELSE
+					begin							
 						BEGIN TRY
-							INSERT	INTO #dbccLastKnownGood([Value])
+							SET @queryToRun = N'DBCC DBINFO (''' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'sql') + N''') WITH TABLERESULTS, NO_INFOMSGS'
+							INSERT INTO #dbccDBINFO
 									EXEC sp_executesql @queryToRun
 						END TRY
 						BEGIN CATCH
@@ -335,20 +305,41 @@ WHILE @@FETCH_STATUS=0
 
 							INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
 									SELECT  @instanceID
-										  , @projectID
-										  , GETUTCDATE()
-										  , 'dbo.usp_hcCollectDatabaseDetails'
-										  , [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ':' + @strMessage
+											, @projectID
+											, GETUTCDATE()
+											, 'dbo.usp_hcCollectDatabaseDetails'
+											, [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ':' + @strMessage
 						END CATCH
 
-						BEGIN TRY
-							SELECT @dbccLastKnownGood = CASE WHEN [Value] = '1900-01-01 00:00:00.000' THEN NULL ELSE [Value] END 
-							FROM #dbccLastKnownGood
-						END TRY
-						BEGIN CATCH
-							SET @dbccLastKnownGood=NULL
-						END CATCH
+						SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_dbccLastKnownGood'''											
 					end
+
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+				
+				TRUNCATE TABLE #dbccLastKnownGood
+				BEGIN TRY
+					INSERT	INTO #dbccLastKnownGood([Value])
+							EXEC sp_executesql @queryToRun
+				END TRY
+				BEGIN CATCH
+					SET @strMessage = ERROR_MESSAGE()
+					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+							SELECT  @instanceID
+									, @projectID
+									, GETUTCDATE()
+									, 'dbo.usp_hcCollectDatabaseDetails'
+									, [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ':' + @strMessage
+				END CATCH
+
+				BEGIN TRY
+					SELECT @dbccLastKnownGood = CASE WHEN [Value] = '1900-01-01 00:00:00.000' THEN NULL ELSE [Value] END 
+					FROM #dbccLastKnownGood
+				END TRY
+				BEGIN CATCH
+					SET @dbccLastKnownGood=NULL
+				END CATCH
 
 				/* compute database statistics */
 				INSERT	INTO #statsDatabaseDetails([query_type], [database_id], [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], [volume_mount_point], [last_dbcc checkdb_time], [is_growth_limited])
@@ -395,36 +386,18 @@ WHILE @@FETCH_STATUS=0
 									, bkp.[recovery_model]
 									, bkp.[page_verify_option]
 									, bkp.[compatibility_level]
-							FROM 	
-								(' + 
-							CASE	WHEN @serverVersionNum < 9
-									THEN N'	SELECT	  sdb.[dbid]	AS [database_id]
-													, sdb.[name]	AS [database_name]
-													, CASE CAST(DATABASEPROPERTYEX(sdb.[name], ''Recovery'') AS [sysname]) 
-															WHEN ''FULL'' THEN 1 
-															WHEN ''BULK_LOGGED'' THEN 2
-															WHEN ''SIMPLE'' THEN 3
-															ELSE NULL
-													  END AS [recovery_model]
-													, CASE WHEN sdb.[status] & 16 = 16 THEN 1 ELSE 0 END AS [page_verify_option]
-													, sdb.[cmptlevel] AS [compatibility_level]
-													, MAX(bs.[backup_finish_date]) AS [last_backup_time]
-											FROM dbo.sysdatabases sdb
-											LEFT OUTER JOIN msdb.dbo.backupset bs ON bs.[database_name] = sdb.[name] AND bs.type IN (''D'', ''I'')
-											WHERE sdb.[name] LIKE ''' + @databaseNameFilter + N'''
-											GROUP BY sdb.[name], sdb.[dbid], sdb.[status], sdb.[cmptlevel]'
-									ELSE N'SELECT	  sdb.[name]	AS [database_name]
-													, sdb.[database_id]
-													, sdb.[recovery_model]
-													, sdb.[page_verify_option]
-													, sdb.[compatibility_level]
-													, MAX(bs.[backup_finish_date]) AS [last_backup_time]
-											FROM sys.databases sdb
-											LEFT OUTER JOIN msdb.dbo.backupset bs ON bs.[database_name] = sdb.[name] AND bs.type IN (''D'', ''I'')
-											WHERE sdb.[name] LIKE ''' + @databaseNameFilter + N'''
-											GROUP BY sdb.[name], sdb.[database_id], sdb.[recovery_model], sdb.[page_verify_option], sdb.[compatibility_level]'
-							END + N'
-								)bkp'
+							FROM (
+								  SELECT	  sdb.[name]	AS [database_name]
+											, sdb.[database_id]
+											, sdb.[recovery_model]
+											, sdb.[page_verify_option]
+											, sdb.[compatibility_level]
+											, MAX(bs.[backup_finish_date]) AS [last_backup_time]
+								  FROM sys.databases sdb
+								  LEFT OUTER JOIN msdb.dbo.backupset bs ON bs.[database_name] = sdb.[name] AND bs.type IN (''D'', ''I'')
+								  WHERE sdb.[name] LIKE ''' + @databaseNameFilter + N'''
+								  GROUP BY sdb.[name], sdb.[database_id], sdb.[recovery_model], sdb.[page_verify_option], sdb.[compatibility_level]
+							    )bkp'
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		

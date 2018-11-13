@@ -172,57 +172,24 @@ SELECT @backupType = CASE WHEN @flgActions & 1 = 1 THEN N'full'
 --------------------------------------------------------------------------------------------------
 --get database status
 DELETE FROM #databaseProperties
-IF @serverVersionNum >= 9
-	begin
-		SET @queryToRun = N'SELECT [state_desc], [is_in_standby], [is_read_only], [recovery_model_desc], [source_database_id] FROM sys.databases WHERE [name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + '''';
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		INSERT INTO #databaseProperties([state_desc], [is_in_standby], [is_read_only], [recovery_model_desc], [source_database_id])
-				EXEC sp_executesql @queryToRun
+SET @queryToRun = N'SELECT [state_desc], [is_in_standby], [is_read_only], [recovery_model_desc], [source_database_id] FROM sys.databases WHERE [name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + '''';
+SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		SELECT @databaseStateDesc = [state_desc] FROM #databaseProperties
-		SET @databaseStateDesc = ISNULL(@databaseStateDesc, 'NULL')
+INSERT INTO #databaseProperties([state_desc], [is_in_standby], [is_read_only], [recovery_model_desc], [source_database_id])
+		EXEC sp_executesql @queryToRun
 
-		/* check for the standby property */
-		IF  @databaseStateDesc IN ('ONLINE') AND (SELECT [is_in_standby] FROM #databaseProperties) = 1
-			SET @databaseStateDesc = 'STANDBY'
+SELECT @databaseStateDesc = [state_desc] FROM #databaseProperties
+SET @databaseStateDesc = ISNULL(@databaseStateDesc, 'NULL')
+
+/* check for the standby property */
+IF  @databaseStateDesc IN ('ONLINE') AND (SELECT [is_in_standby] FROM #databaseProperties) = 1
+	SET @databaseStateDesc = 'STANDBY'
 			
-		/* check if the database is a snapshot */
-		IF  @databaseStateDesc IN ('ONLINE') AND (SELECT [source_database_id] FROM #databaseProperties) IS NOT NULL
-			SET @databaseStateDesc = 'DATABASE SNAPSHOT'			
-	end
-ELSE
-	begin
-		SET @queryToRun = N'SELECT [status], [recovery_model]
-							FROM (
-									SELECT [status] FROM master.dbo.sysdatabases WHERE [name]=''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
-								)a,
-								(
-									SELECT CAST(DATABASEPROPERTYEX(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''', ''Recovery'') AS [sysname]) AS [recovery_model]
-								)b'							
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-		INSERT	INTO #databaseProperties([state_desc], [recovery_model_desc])
-				EXEC sp_executesql @queryToRun
-
-		SELECT @databaseStatus = [state_desc] FROM #databaseProperties
-
-		SET @databaseStateDesc =   CASE	WHEN @databaseStatus & 32 = 32			 THEN 'LOADING'
-										WHEN @databaseStatus & 64 = 64			 THEN 'PRE RECOVERY'
-										WHEN @databaseStatus & 128 = 128		 THEN 'RECOVERING'
-										WHEN @databaseStatus & 256 = 256		 THEN 'NOT RECOVERED'
-										WHEN @databaseStatus & 512 = 512		 THEN 'OFFLINE'
-										WHEN @databaseStatus & 2048 = 2048		 THEN 'DBO USE ONLY'
-										WHEN @databaseStatus & 4096 = 4096		 THEN 'SINGLE USER'
-										WHEN @databaseStatus & 32768 = 32768	 THEN 'EMERGENCY MODE'
-										WHEN @databaseStatus & 2097152 = 2097152 THEN 'STANDBY'
-										WHEN @databaseStatus & 4194584 = 4194584 THEN 'SUSPECT'
-										WHEN @databaseStatus = 0				 THEN 'UNKNOWN'
-										ELSE 'ONLINE'
-									END
-	end
+/* check if the database is a snapshot */
+IF  @databaseStateDesc IN ('ONLINE') AND (SELECT [source_database_id] FROM #databaseProperties) IS NOT NULL
+	SET @databaseStateDesc = 'DATABASE SNAPSHOT'			
 
 IF  @databaseStateDesc NOT IN ('ONLINE')
 begin
@@ -254,43 +221,22 @@ IF @flgOptions & 512 = 512
 	begin
 		--for full and diff backups
 		IF @flgActions IN (1, 2)
-			begin
-				IF @serverVersionNum >= 9			
-					SET @queryToRun = N'SELECT	[secondary_database]
-										FROM	msdb.dbo.log_shipping_monitor_secondary
-										WHERE	[secondary_server]=@@SERVERNAME
-												AND [secondary_database] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
-				ELSE 
-					SET @queryToRun = N'SELECT	[secondary_database_name]
-										FROM	msdb.dbo.log_shipping_secondaries
-										WHERE	[secondary_server_name]=@@SERVERNAME
-												AND [secondary_database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
-			end
+			SET @queryToRun = N'SELECT	[secondary_database]
+								FROM	msdb.dbo.log_shipping_monitor_secondary
+								WHERE	[secondary_server]=@@SERVERNAME
+										AND [secondary_database] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
 
 		--for log backups
 		IF @flgActions=4
-			begin
-				IF @serverVersionNum >= 9			
-					SET @queryToRun = N'SELECT	[primary_database]
-										FROM	msdb.dbo.log_shipping_monitor_primary
-										WHERE	[primary_server]=@@SERVERNAME
-												AND [primary_database] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
-										UNION ALL
-										SELECT	[secondary_database]
-										FROM	msdb.dbo.log_shipping_monitor_secondary
-										WHERE	[secondary_server]=@@SERVERNAME
-												AND [secondary_database] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
-				ELSE 
-					SET @queryToRun = N'SELECT	[primary_database_name]
-										FROM	msdb.dbo.log_shipping_primaries
-										WHERE	[primary_server_name]=@@SERVERNAME
-												AND [primary_database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
-										UNION ALL
-										SELECT	[secondary_database_name]
-										FROM	msdb.dbo.log_shipping_secondaries
-										WHERE	[secondary_server_name]=@@SERVERNAME
-												AND [secondary_database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
-			end
+			SET @queryToRun = N'SELECT	[primary_database]
+								FROM	msdb.dbo.log_shipping_monitor_primary
+								WHERE	[primary_server]=@@SERVERNAME
+										AND [primary_database] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
+								UNION ALL
+								SELECT	[secondary_database]
+								FROM	msdb.dbo.log_shipping_monitor_secondary
+								WHERE	[secondary_server]=@@SERVERNAME
+										AND [secondary_database] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
 
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
@@ -457,7 +403,7 @@ IF NOT (@serverVersionNum >= 14 AND @hostPlatform='linux' )
 --------------------------------------------------------------------------------------------------
 --check if CHECKSUM backup option may apply
 SET @optionBackupWithChecksum=0
-IF @flgOptions & 1 = 1 AND @serverVersionNum >= 9
+IF @flgOptions & 1 = 1
 	SET @optionBackupWithChecksum=1
 
 --check COMPRESSION backup option may apply
@@ -473,7 +419,7 @@ IF @flgOptions & 2 = 2 AND @serverVersionNum >= 10
 
 --check COPY_ONLY backup option may apply
 SET @optionBackupWithCopyOnly=0
-IF @flgOptions & 4 = 4 AND @serverVersionNum >= 9
+IF @flgOptions & 4 = 4
 	SET @optionBackupWithCopyOnly=1
 
 -- check TAIL_LOG_BACKUP option
@@ -483,7 +429,7 @@ IF @flgActions & 4 = 4 AND @flgOptions & 8192 = 8192
 
 --check if another backup is needed (full) / partially applicable to AlwaysOn Availability Groups
 SET @optionForceChangeBackupType=0
-IF @flgOptions & 8 = 8 AND (@clusterName IS NULL OR (@clusterName IS NOT NULL AND @agInstanceRoleDesc = 'PRIMARY')) AND @serverVersionNum >= 9
+IF @flgOptions & 8 = 8 AND (@clusterName IS NULL OR (@clusterName IS NOT NULL AND @agInstanceRoleDesc = 'PRIMARY'))
 	begin
 		--check for any full database backup (when differential should be made) or any full/incremental database backup (when transaction log should be made)
 		IF @flgActions & 2 = 2 OR @flgActions & 4 = 4
@@ -519,9 +465,8 @@ IF @flgOptions & 8 = 8 AND (@clusterName IS NULL OR (@clusterName IS NOT NULL AN
 																AND bs.[database_name]=''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''' 
 																AND bs.[type] IN (''D''' + CASE WHEN @flgActions & 4 = 4 THEN N', ''I''' ELSE N'' END + N')
 																AND ' + CAST(@differentialBaseLSN AS [nvarchar]) + N' BETWEEN bs.[first_lsn] AND bs.[last_lsn]
-																AND bmf.[device_type] <> 7 /* virtual device */'
-							IF @serverVersionNum >= 9
-								SET @queryToRun = @queryToRun + N' AND [is_copy_only]=0'
+																AND bmf.[device_type] <> 7 /* virtual device */
+																AND [is_copy_only]=0'
 							SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 							IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -539,7 +484,7 @@ IF @flgOptions & 8 = 8 AND (@clusterName IS NULL OR (@clusterName IS NOT NULL AN
 						end
 
 				/* check for database header: dbi_dbbackupLSN */
-				IF @differentialBaseLSN IS NOT NULL AND @serverVersionNum >= 9 AND @optionForceChangeBackupType = 0
+				IF @differentialBaseLSN IS NOT NULL AND @optionForceChangeBackupType = 0
 					begin
 						DECLARE @dbi_dbbackupLSN [sysname]
 

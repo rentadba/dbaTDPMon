@@ -22,10 +22,6 @@ DECLARE   @job_name			[sysname]
 		, @databaseName		[sysname]
 		, @jobEnabled		[tinyint]
 
-DECLARE @SQLMajorVersion [int]
-
-SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(CAST(SERVERPROPERTY('ProductVersion') AS [varchar](32)), ''), 2), '.', '') 
-
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default folder for SQL Agent jobs
 SELECT	@logFileLocation = [value]
@@ -54,10 +50,7 @@ SET @logFileLocation = [$(dbName)].[dbo].[ufn_formatPlatformSpecificPath](@@SERV
 /* dropping job if exists */
 ---------------------------------------------------------------------------------------------------
 IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = @job_name)
-	IF @SQLMajorVersion > 8
-		EXEC msdb.dbo.sp_delete_job @job_name=@job_name, @delete_unused_schedule=1		
-	ELSE
-		EXEC msdb.dbo.sp_delete_job @job_name=@job_name
+	EXEC msdb.dbo.sp_delete_job @job_name=@job_name, @delete_unused_schedule=1		
 
 ---------------------------------------------------------------------------------------------------
 /* creating the job */
@@ -75,10 +68,7 @@ BEGIN TRANSACTION
 	END
 
 	---------------------------------------------------------------------------------------------------
-	IF @SQLMajorVersion > 8
-		SET @jobEnabled = 0
-	ELSE
-		SET @jobEnabled = 1
+	SET @jobEnabled = 0
 
 	DECLARE @jobId BINARY(16)
 	EXEC @ReturnCode =  msdb.dbo.sp_add_job @job_name=@job_name, 
@@ -97,11 +87,10 @@ http://dbaTDPMon.codeplex.com',
 
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'/* only for SQL versions +2K5 */'	 
-	IF @SQLMajorVersion > 8
-		SET @queryToRun=N'EXEC [dbo].[usp_mpDatabaseKillConnections]	@sqlServerName		= @@SERVERNAME,
-						@dbName		= DEFAULT,
-						@flgOptions		= DEFAULT,
-						@debugMode		= DEFAULT'
+	SET @queryToRun=N'EXEC [dbo].[usp_mpDatabaseKillConnections]	@sqlServerName		= @@SERVERNAME,
+					@dbName		= DEFAULT,
+					@flgOptions		= DEFAULT,
+					@debugMode		= DEFAULT'
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Daily: Kill Orphan Connections', 
@@ -420,8 +409,7 @@ IF DATENAME(weekday, GETDATE()) = ''Monday''
 
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun=N'/* only for SQL versions +2K5 */'	 
-	IF @SQLMajorVersion > 8
-		SET @queryToRun=N'DECLARE @databaseName [sysname]
+	SET @queryToRun=N'DECLARE @databaseName [sysname]
 	begin
 		DECLARE crsDatabases CURSOR LOCAL FAST_FORWARD FOR	SELECT [name] 
 									FROM master.dbo.sysdatabases
@@ -695,10 +683,7 @@ IF DATENAME(weekday, GETDATE()) = ''Saturday'' AND DATEPART(dd, GETDATE())<=7
 
 	DECLARE @successJobAction [tinyint]
 
-	IF @SQLMajorVersion > 8
-		SET @successJobAction = 3
-	ELSE
-		SET @successJobAction = 1
+	SET @successJobAction = 3
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Monthly: Shrink Log File', 
@@ -719,91 +704,85 @@ IF DATENAME(weekday, GETDATE()) = ''Saturday'' AND DATEPART(dd, GETDATE())<=7
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
-	IF @SQLMajorVersion > 8
-		begin
-			SET @queryToRun=N'
+	SET @queryToRun=N'
 EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
 												@logFileLocation=''' + @logFileLocation + ''',
 												@module			=''maintenance-plan'',
 												@sendLogAsAttachment = 1,
 												@eventType		= 2'
 
-			EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
-														@step_name=N'Send email', 
-														@step_id=12, 
-														@cmdexec_success_code=0, 
-														@on_success_action=1, 
-														@on_success_step_id=0, 
-														@on_fail_action=2, 
-														@on_fail_step_id=0, 
-														@retry_attempts=0, 
-														@retry_interval=0, 
-														@os_run_priority=0, 
-														@subsystem=N'TSQL', 
-														@command=@queryToRun, 
-														@database_name=@databaseName, 
-														@flags=0
-			IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
-		end
+	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
+												@step_name=N'Send email', 
+												@step_id=12, 
+												@cmdexec_success_code=0, 
+												@on_success_action=1, 
+												@on_success_step_id=0, 
+												@on_fail_action=2, 
+												@on_fail_step_id=0, 
+												@retry_attempts=0, 
+												@retry_interval=0, 
+												@os_run_priority=0, 
+												@subsystem=N'TSQL', 
+												@command=@queryToRun, 
+												@database_name=@databaseName, 
+												@flags=0
+	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
-	IF @SQLMajorVersion > 8
-		begin
-			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-											@step_id=1, 
-											@on_fail_action=4, 
-											@on_fail_step_id=2
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=1, 
+									@on_fail_action=4, 
+									@on_fail_step_id=2
 
-			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-											@step_id=2, 
-											@on_fail_action=4, 
-											@on_fail_step_id=12
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=2, 
+									@on_fail_action=4, 
+									@on_fail_step_id=12
 
-			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-											@step_id=3, 
-											@on_fail_action=4, 
-											@on_fail_step_id=12
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=3, 
+									@on_fail_action=4, 
+									@on_fail_step_id=12
 
-			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-											@step_id=4, 
-											@on_fail_action=4, 
-											@on_fail_step_id=12
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=4, 
+									@on_fail_action=4, 
+									@on_fail_step_id=12
 
-			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-											@step_id=5, 
-											@on_fail_action=4, 
-											@on_fail_step_id=12
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=5, 
+									@on_fail_action=4, 
+									@on_fail_step_id=12
 
-			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-											@step_id=6, 
-											@on_fail_action=4, 
-											@on_fail_step_id=7
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=6, 
+									@on_fail_action=4, 
+									@on_fail_step_id=7
 
-			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-											@step_id=7, 
-											@on_fail_action=4, 
-											@on_fail_step_id=8
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=7, 
+									@on_fail_action=4, 
+									@on_fail_step_id=8
 
-			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-											@step_id=8, 
-											@on_fail_action=4, 
-											@on_fail_step_id=9
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=8, 
+									@on_fail_action=4, 
+									@on_fail_step_id=9
 
-			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-											@step_id=9, 
-											@on_fail_action=4, 
-											@on_fail_step_id=10
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=9, 
+									@on_fail_action=4, 
+									@on_fail_step_id=10
 
-			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-											@step_id=10, 
-											@on_fail_action=4, 
-											@on_fail_step_id=11
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=10, 
+									@on_fail_action=4, 
+									@on_fail_step_id=11
 
-			EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId,
-											@step_id=11, 
-											@on_fail_action=4, 
-											@on_fail_step_id=12
-		end
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId,
+									@step_id=11, 
+									@on_fail_action=4, 
+									@on_fail_step_id=12
 
 	---------------------------------------------------------------------------------------------------
 	EXEC @ReturnCode = msdb.dbo.sp_update_job @job_id = @jobId, @start_step_id = 1

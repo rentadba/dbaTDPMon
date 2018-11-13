@@ -155,10 +155,7 @@ CREATE TABLE #databaseCompatibility
 
 
 SET @queryToRun = N''
-IF @serverVersionNum >= 9
-	SET @queryToRun = @queryToRun + N'SELECT [compatibility_level] FROM sys.databases WHERE [name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
-ELSE
-	SET @queryToRun = @queryToRun + N'SELECT [cmptlevel] FROM master.dbo.sysdatabases WHERE [name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
+SET @queryToRun = @queryToRun + N'SELECT [compatibility_level] FROM sys.databases WHERE [name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''''
 
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@compatibilityLevel, @queryToRun)
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
@@ -214,8 +211,7 @@ IF @flgActions & 2 = 2 OR @flgActions & 16 = 16 OR @flgActions & 64 = 64 OR @flg
 	begin
 		--get table list that will be analyzed including materialized views; will pick only tables with reserved pages
 		SET @queryToRun = N''
-		IF @serverVersionNum >= 9
-			SET @queryToRun = @queryToRun + N'SELECT DISTINCT ob.[table_schema], ob.[table_name], ob.[type]
+		SET @queryToRun = @queryToRun + N'SELECT DISTINCT ob.[table_schema], ob.[table_name], ob.[type]
 FROM (
 		SELECT obj.[object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name], obj.[type]
 		FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'.sys.objects obj WITH (READPAST)
@@ -257,42 +253,9 @@ INNER JOIN
 		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'.sys.schemas sch WITH (READPAST) ON sch.[schema_id] = so.[schema_id]
 		WHERE	so.[type] in (''S'', ''U'', ''V'')
 			AND ps.[reserved_page_count] > 0
-	)ps ON ob.[object_id] = ps.[object_id]'
-		ELSE
-			SET @queryToRun = @queryToRun + N'SELECT ob.[table_schema], ob.[table_name], ob.[type]
-FROM (
-		SELECT DISTINCT obj.[id] AS [object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name], obj.[type]
-		FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sysobjects obj
-		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sysusers sch ON sch.[uid] = obj.[uid]
-		WHERE obj.[type] IN (''S'', ''U'')
-				AND obj.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + N'''
-				AND sch.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + N'''' + 
+	)ps ON ob.[object_id] = ps.[object_id]'	
 
-		CASE WHEN @flgActions & 16 = 16 
-				THEN N'' 
-				ELSE		
-		N'
-		UNION ALL			
-
-		SELECT DISTINCT obj.[id] AS [object_id], sch.[name] AS [table_schema], obj.[name] AS [table_name], obj.[type]
-		FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sysindexes idx
-		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sysobjects obj ON obj.[id] = idx.[id]
-		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sysusers sch ON sch.[uid] = obj.[uid]
-		WHERE obj.[type]= ''V''
-				AND obj.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + N'''
-				AND sch.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + N''''
-		END + N'
-	)ob
-INNER JOIN
-	(
-		SELECT si.[id] AS [object_id], sch.[name] AS [table_schema], so.[name] AS [table_name]
-		FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sysobjects so
-		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sysindexes si on so.[id] = si.[id]
-		INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'..sysusers sch ON sch.[uid] = so.[uid]
-		WHERE si.[reserved]<>0
-	)ps ON ob.[object_id] = ps.[object_id]'
-
-		SET @queryToRun = @queryToRun + CASE WHEN @skipObjectsList IS NOT NULL AND @serverVersionNum >= 9
+		SET @queryToRun = @queryToRun + CASE WHEN @skipObjectsList IS NOT NULL
 											 THEN N'	WHERE ob.[table_name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
 											 ELSE N'' 
 										END
@@ -305,25 +268,22 @@ INNER JOIN
 				EXEC sp_executesql @queryToRun
 
 		--delete entries which should be excluded from current maintenance actions, as they are part of [maintenance-plan].[vw_objectSkipList]
-		IF @serverVersionNum >= 9
-			begin
-				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'
-								DELETE dtl
-								FROM #databaseTableList dtl
-								INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																						AND dtl.[table_name] = osl.[object_name]
-								WHERE	@flgActions & osl.[flg_actions] = osl.[flg_actions]
-										AND osl.[active] = 1'
-				SET @queryParameters = '@flgActions [int]'
-				EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
-			end
+		SET @queryToRun = N''
+		SET @queryToRun = @queryToRun + N'
+						DELETE dtl
+						FROM #databaseTableList dtl
+						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
+																				AND dtl.[table_name] = osl.[object_name]
+						WHERE	@flgActions & osl.[flg_actions] = osl.[flg_actions]
+								AND osl.[active] = 1'
+		SET @queryParameters = '@flgActions [int]'
+		EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
 	end
 
 --------------------------------------------------------------------------------------------------
 --when running DBCC CHECKDB, check if DATA_PURITY option should be used or not (run only when dbi_dbccFlags=0)
 --------------------------------------------------------------------------------------------------
-IF @flgActions & 1 = 1 AND @serverVersionNum >= 9 AND @flgOptions & 1 = 0
+IF @flgActions & 1 = 1 AND @flgOptions & 1 = 0
 	begin
 		IF object_id('tempdb..#dbi_dbccFlags') IS NOT NULL DROP TABLE #dbccLastKnownGood
 		CREATE TABLE #dbi_dbccFlags
@@ -387,7 +347,7 @@ IF @flgActions & 1 = 1
 		SET @queryToRun = N''
 		SET @queryToRun = @queryToRun + N'DBCC CHECKDB(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') WITH ALL_ERRORMSGS, NO_INFOMSGS' + CASE WHEN @flgOptions & 1 = 1 THEN ', PHYSICAL_ONLY' ELSE '' END
 
-		IF @serverVersionNum >= 9 AND @flgOptions & 1 = 0 AND @dbi_dbccFlags <> 2
+		IF @flgOptions & 1 = 0 AND @dbi_dbccFlags <> 2
 			SET @queryToRun = @queryToRun + ', DATA_PURITY'
 
 		IF @compatibilityLevel >= 100 AND @flgOptions & 1 = 0
@@ -432,7 +392,7 @@ IF @flgActions & 2 = 2
 				SET @queryToRun = N''
 				SET @queryToRun = @queryToRun + N'DBCC CHECKTABLE(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'sql') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql') + '''' + CASE WHEN @flgOptions & 2 = 2 THEN ', NOINDEX' ELSE '' END + ') WITH ALL_ERRORMSGS, NO_INFOMSGS'
 				
-				IF @serverVersionNum >= 9 AND @dbi_dbccFlags <> 2
+				IF @dbi_dbccFlags <> 2
 					SET @queryToRun = @queryToRun + ', DATA_PURITY'
 				
 				IF @compatibilityLevel >= 100 AND @flgOptions & 2 = 0
@@ -594,50 +554,35 @@ IF @flgActions & 32 = 32
 
 				--get table list that will be analyzed. only tables with identity columns
 				SET @queryToRun = N''
-				IF @serverVersionNum >= 9
-					begin
-						IF @serverVersionNum >= 13
-							/* excluding memory optimized tables for SQL 2014 onwardss*/
-							SET @queryToRun = @queryToRun + N'	SELECT DISTINCT sch.[name] AS [table_schema], obj.[name] AS [table_name]
-														FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.objects obj
-														INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.schemas sch ON sch.[schema_id] = obj.[schema_id]
-														INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.tables tbl ON tbl.[object_id] = obj.[object_id]
-														WHERE obj.[type] IN (''U'')
-																AND tbl.[is_memory_optimized] = 0
-																AND obj.[object_id] IN (
-																					SELECT [object_id]
-																					FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.columns
-																					WHERE [is_identity] = 1
-																					)
-																AND obj.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
-																AND sch.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + ''''
-						ELSE
-							SET @queryToRun = @queryToRun + N'	SELECT DISTINCT sch.[name] AS [table_schema], obj.[name] AS [table_name]
-														FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.objects obj
-														INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.schemas sch ON sch.[schema_id] = obj.[schema_id]
-														WHERE obj.[type] IN (''U'')
-																AND obj.[object_id] IN (
-																					SELECT [object_id]
-																					FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.columns
-																					WHERE [is_identity] = 1
-																					)
-																AND obj.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
-																AND sch.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + ''''
-					end
-				ELSE
-					SET @queryToRun = @queryToRun + N'SELECT DISTINCT sch.[name] AS [table_schema], obj.[name] AS [table_name]
-												FROM  ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '..sysobjects obj
-												INNER JOIN  ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '..sysusers sch ON sch.[uid] = obj.[uid]
+				IF @serverVersionNum >= 13
+					/* excluding memory optimized tables for SQL 2014 onwardss*/
+					SET @queryToRun = @queryToRun + N'	SELECT DISTINCT sch.[name] AS [table_schema], obj.[name] AS [table_name]
+												FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.objects obj
+												INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.schemas sch ON sch.[schema_id] = obj.[schema_id]
+												INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.tables tbl ON tbl.[object_id] = obj.[object_id]
 												WHERE obj.[type] IN (''U'')
-														AND obj.[id] IN (
-																		SELECT [id]
-																		FROM  ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '..syscolumns
-																		WHERE [autoval] is not null
-																		)
+														AND tbl.[is_memory_optimized] = 0
+														AND obj.[object_id] IN (
+																			SELECT [object_id]
+																			FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.columns
+																			WHERE [is_identity] = 1
+																			)
 														AND obj.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
-														AND sch.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + ''''			
+														AND sch.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + ''''
+				ELSE
+					SET @queryToRun = @queryToRun + N'	SELECT DISTINCT sch.[name] AS [table_schema], obj.[name] AS [table_name]
+												FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.objects obj
+												INNER JOIN ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.schemas sch ON sch.[schema_id] = obj.[schema_id]
+												WHERE obj.[type] IN (''U'')
+														AND obj.[object_id] IN (
+																			SELECT [object_id]
+																			FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + '.sys.columns
+																			WHERE [is_identity] = 1
+																			)
+														AND obj.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + '''
+														AND sch.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + ''''
 
-				SET @queryToRun = @queryToRun + CASE WHEN @skipObjectsList IS NOT NULL AND @serverVersionNum >= 9
+				SET @queryToRun = @queryToRun + CASE WHEN @skipObjectsList IS NOT NULL
 													 THEN N'	AND obj.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'
 													 ELSE N'' 
 												END
@@ -650,19 +595,16 @@ IF @flgActions & 32 = 32
 						EXEC sp_executesql @queryToRun
 
 				--delete entries which should be excluded from current maintenance actions, as they are part of [maintenance-plan].[vw_objectSkipList]
-				IF @serverVersionNum >= 9
-					begin
-						SET @queryToRun = N''
-						SET @queryToRun = @queryToRun + N'
-										DELETE dtl
-										FROM #databaseTableListIdent dtl
-										INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																								AND dtl.[table_name] = osl.[object_name]
-										WHERE	@flgActions & osl.[flg_actions] = osl.[flg_actions]
-												AND osl.[active] = 1'
-						SET @queryParameters = '@flgActions [int]'
-						EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
-					end
+				SET @queryToRun = N''
+				SET @queryToRun = @queryToRun + N'
+								DELETE dtl
+								FROM #databaseTableListIdent dtl
+								INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
+																						AND dtl.[table_name] = osl.[object_name]
+								WHERE	@flgActions & osl.[flg_actions] = osl.[flg_actions]
+										AND osl.[active] = 1'
+				SET @queryParameters = '@flgActions [int]'
+				EXEC sp_executesql @queryToRun, @queryParameters, @flgActions = @flgActions
 
 				DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [table_schema], [table_name] 
 																	FROM #databaseTableListIdent	
@@ -781,8 +723,6 @@ IF @flgActions & 128 = 128
 
 		DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [table_schema], [table_name] 
 															FROM #databaseTableList	
-															WHERE	(@serverVersionNum >= 9)
-																 OR (@serverVersionNum < 9 AND [type] NOT IN ('S'))
 															ORDER BY [table_name]
 		OPEN crsTableList
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName

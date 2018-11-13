@@ -20,10 +20,6 @@ DECLARE   @job_name			[sysname]
 		, @queryParameters	[nvarchar](512)
 		, @databaseName		[sysname]
 
-DECLARE @SQLMajorVersion [int]
-
-SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(CAST(SERVERPROPERTY('ProductVersion') AS [varchar](32)), ''), 2), '.', '') 
-
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default folder for SQL Agent jobs
 SELECT	@logFileLocation = [value]
@@ -53,10 +49,7 @@ SET @logFileLocation = [$(dbName)].[dbo].[ufn_formatPlatformSpecificPath](@@SERV
 /* dropping job if exists */
 ---------------------------------------------------------------------------------------------------
 IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = @job_name)
-	IF @SQLMajorVersion > 8
-		EXEC msdb.dbo.sp_delete_job @job_name=@job_name, @delete_unused_schedule=1		
-	ELSE
-		EXEC msdb.dbo.sp_delete_job @job_name=@job_name
+	EXEC msdb.dbo.sp_delete_job @job_name=@job_name, @delete_unused_schedule=1		
 
 ---------------------------------------------------------------------------------------------------
 /* creating the job */
@@ -302,22 +295,12 @@ WHILE @oldestDate <= DATEADD(month, -6, GETDATE())
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
-	IF @SQLMajorVersion > 8
-		SET @queryToRun = N'
+	SET @queryToRun = N'
 /* keep only last 12 months of job execution history */
 DECLARE   @oldestDate	[datetime]
 
 SET @oldestDate=DATEADD(month, -12, GETDATE())
 EXEC msdb.dbo.sp_purge_jobhistory @oldest_date = @oldestDate'
-	ELSE
-		SET @queryToRun = N'
-/* keep only last 12 months of job execution history */
-DECLARE   @oldestDate	[datetime]
-		, @oldRunDate	[int]
-
-SET @oldestDate=DATEADD(month, -12, GETDATE())
-SET @oldRunDate = CONVERT([int], CONVERT([varchar], @oldestDate, 112))  
-DELETE FROM msdb.dbo.sysjobhistory WHERE (run_date < @oldRunDate)  '
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'msdb - Job History Retention (12 months)', 
@@ -338,8 +321,7 @@ DELETE FROM msdb.dbo.sysjobhistory WHERE (run_date < @oldRunDate)  '
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
-	IF @SQLMajorVersion > 8
-		SET @queryToRun = N'
+	SET @queryToRun = N'
 /* keep only last 6 months of maintenance plan history */
 DECLARE   @oldestDate	[datetime]
 
@@ -347,13 +329,6 @@ SET @oldestDate=DATEADD(month, -6, GETDATE())
 EXECUTE msdb.dbo.sp_maintplan_delete_log null, null, @oldestDate
 DELETE FROM msdb.dbo.sysdbmaintplan_history WHERE end_time < @oldestDate  
 DELETE FROM msdb.dbo.sysmaintplan_logdetail WHERE end_time < @oldestDate'
-	ELSE
-		SET @queryToRun = N'
-/* keep only last 6 months of maintenance plan history */
-DECLARE   @oldestDate	[datetime]
-
-SET @oldestDate=DATEADD(month, -6, GETDATE())
-DELETE FROM msdb.dbo.sysdbmaintplan_history WHERE end_time < @oldestDate'
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'msdb - Maintenance Plan History Retention (6 months)', 
@@ -374,16 +349,13 @@ DELETE FROM msdb.dbo.sysdbmaintplan_history WHERE end_time < @oldestDate'
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
-	IF @SQLMajorVersion > 8
-		SET @queryToRun = N'
+	SET @queryToRun = N'
 /* delete old mail items; especially, if you are sending attachements */
 /* keep only last 6 months of history */
 DECLARE   @oldestDate	[datetime]
 
 SET @oldestDate=DATEADD(month, -6, GETDATE())
 EXEC msdb.dbo.sysmail_delete_mailitems_sp @sent_before = @oldestDate'
-	ELSE
-		SET @queryToRun = N'/* only for SQL versions +2K5*/'
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'msdb - Purge Old Mail Items (6 months)', 
@@ -404,8 +376,7 @@ EXEC msdb.dbo.sysmail_delete_mailitems_sp @sent_before = @oldestDate'
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
-	IF @SQLMajorVersion > 8
-		SET @queryToRun = N'
+	SET @queryToRun = N'
 /* delete the log of the sent items */
 /* keep only last 6 months of history */
 
@@ -413,8 +384,6 @@ DECLARE   @oldestDate	[datetime]
 
 SET @oldestDate=DATEADD(month, -6, GETDATE())
 EXEC msdb.dbo.sysmail_delete_log_sp @logged_before = @oldestDate'
-	ELSE
-		SET @queryToRun = N'/* only for SQL versions +2K5 */'
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'msdb - Purge Old Mail Logs (6 months)', 
@@ -435,8 +404,7 @@ EXEC msdb.dbo.sysmail_delete_log_sp @logged_before = @oldestDate'
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
-	IF @SQLMajorVersion > 8
-		SET @queryToRun = N'
+	SET @queryToRun = N'
 /* keep only last 6 months of replication alerts history */
 BEGIN TRY
 	EXEC sp_executesql N''DELETE FROM msdb.dbo.sysreplicationalerts WHERE time <= DATEADD(month, -6, GETDATE())''
@@ -444,8 +412,6 @@ END TRY
 BEGIN CATCH
 	PRINT ERROR_MESSAGE()
 END CATCH'
-	ELSE
-		SET @queryToRun = N'/* only for SQL versions +2K5 */'
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'msdb - Replication Alerts Retention (6 months)', 
@@ -655,10 +621,7 @@ IF DATENAME(weekday, GETDATE()) = ''Saturday'' AND DATEPART(dd, GETDATE())<=7
 	---------------------------------------------------------------------------------------------------
 	DECLARE @successJobAction	[tinyint]
 
-	IF @SQLMajorVersion > 8
-		SET @successJobAction= 3
-	ELSE
-		SET @successJobAction = 1
+	SET @successJobAction= 3
 
 	SET @queryToRun = 'EXEC dbo.usp_purgeHistoryData'
 
@@ -683,120 +646,114 @@ IF DATENAME(weekday, GETDATE()) = ''Saturday'' AND DATEPART(dd, GETDATE())<=7
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 	
 	---------------------------------------------------------------------------------------------------
-	IF @SQLMajorVersion > 8
-		begin
-			SET @queryToRun=N'
+	SET @queryToRun=N'
 EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
-												@logFileLocation=''' + @logFileLocation + ''',
-												@module			=''maintenance-plan'',
-												@sendLogAsAttachment = 1,
-												@eventType		= 2'
-			EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
-														@step_name=N'Send email', 
-														@step_id=18, 
-														@cmdexec_success_code=0, 
-														@on_success_action=1, 
-														@on_success_step_id=0, 
-														@on_fail_action=2, 
-														@on_fail_step_id=0, 
-														@retry_attempts=0, 
-														@retry_interval=0, 
-														@os_run_priority=0, 
-														@subsystem=N'TSQL', 
-														@command=@queryToRun, 
-														@database_name=@databaseName, 
-														@flags=0
-			IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
-		end
+										@logFileLocation=''' + @logFileLocation + ''',
+										@module			=''maintenance-plan'',
+										@sendLogAsAttachment = 1,
+										@eventType		= 2'
+	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
+												@step_name=N'Send email', 
+												@step_id=18, 
+												@cmdexec_success_code=0, 
+												@on_success_action=1, 
+												@on_success_step_id=0, 
+												@on_fail_action=2, 
+												@on_fail_step_id=0, 
+												@retry_attempts=0, 
+												@retry_interval=0, 
+												@os_run_priority=0, 
+												@subsystem=N'TSQL', 
+												@command=@queryToRun, 
+												@database_name=@databaseName, 
+												@flags=0
+	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
-	IF @SQLMajorVersion > 8
-	begin
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-										@step_id=1, 
-										@on_fail_action=4, 
-										@on_fail_step_id=2
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=1, 
+									@on_fail_action=4, 
+									@on_fail_step_id=2
 
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-										@step_id=2, 
-										@on_fail_action=4, 
-										@on_fail_step_id=18
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=2, 
+									@on_fail_action=4, 
+									@on_fail_step_id=18
 
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-										@step_id=3, 
-										@on_fail_action=4,
-										@on_fail_step_id=18
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=3, 
+									@on_fail_action=4,
+									@on_fail_step_id=18
 
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-										@step_id=4, 
-										@on_fail_action=4, 
-										@on_fail_step_id=18
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=4, 
+									@on_fail_action=4, 
+									@on_fail_step_id=18
 
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-										@step_id=5, 
-										@on_fail_action=4, 
-										@on_fail_step_id=18
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=5, 
+									@on_fail_action=4, 
+									@on_fail_step_id=18
 
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-										@step_id=6, 
-										@on_fail_action=4, 
-										@on_fail_step_id=18
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=6, 
+									@on_fail_action=4, 
+									@on_fail_step_id=18
 
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-										@step_id=7, 
-										@on_fail_action=4, 
-										@on_fail_step_id=8
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=7, 
+									@on_fail_action=4, 
+									@on_fail_step_id=8
 
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-										@step_id=8, 
-										@on_fail_action=4, 
-										@on_fail_step_id=9
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=8, 
+									@on_fail_action=4, 
+									@on_fail_step_id=9
 
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-										@step_id=9, 
-										@on_fail_action=4, 
-										@on_fail_step_id=10
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=9, 
+									@on_fail_action=4, 
+									@on_fail_step_id=10
 
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-										@step_id=10, 
-										@on_fail_action=4, 
-										@on_fail_step_id=11
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=10, 
+									@on_fail_action=4, 
+									@on_fail_step_id=11
 
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-										@step_id=11, 
-										@on_fail_action=4, 
-										@on_fail_step_id=12
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=11, 
+									@on_fail_action=4, 
+									@on_fail_step_id=12
 
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-										@step_id=12, 
-										@on_fail_action=4, 
-										@on_fail_step_id=13
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=12, 
+									@on_fail_action=4, 
+									@on_fail_step_id=13
 
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId,
-										@step_id=13, 
-										@on_fail_action=4, 
-										@on_fail_step_id=14
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId,
+									@step_id=13, 
+									@on_fail_action=4, 
+									@on_fail_step_id=14
 
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId,
-										@step_id=14, 
-										@on_fail_action=4, 
-										@on_fail_step_id=15
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId,
+									@step_id=14, 
+									@on_fail_action=4, 
+									@on_fail_step_id=15
 
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-										@step_id=15, 
-										@on_fail_action=4, 
-										@on_fail_step_id=16
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=15, 
+									@on_fail_action=4, 
+									@on_fail_step_id=16
 
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
-										@step_id=16, 
-										@on_fail_action=4, 
-										@on_fail_step_id=17
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId, 
+									@step_id=16, 
+									@on_fail_action=4, 
+									@on_fail_step_id=17
 	
-		EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId,
-										@step_id=17, 
-										@on_fail_action=4, 
-										@on_fail_step_id=18
-	end
+	EXEC msdb.dbo.sp_update_jobstep	@job_id=@jobId,
+									@step_id=17, 
+									@on_fail_action=4, 
+									@on_fail_step_id=18
 	
 	---------------------------------------------------------------------------------------------------
 	EXEC @ReturnCode = msdb.dbo.sp_update_job	@job_id = @jobId, 

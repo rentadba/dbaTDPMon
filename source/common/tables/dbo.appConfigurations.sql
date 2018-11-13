@@ -84,18 +84,10 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 GO
 
 ---------------------------------------------------------------------------------------------
---get SQL Server running major version
----------------------------------------------------------------------------------------------
-DECLARE @SQLMajorVersion [int]
-SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(CAST(SERVERPROPERTY('ProductVersion') AS [varchar](32)), ''), 2), '.', '') 
-
 DECLARE @queryToRun [nvarchar](1024)
 
-IF @SQLMajorVersion>8
-	begin
-		SET @queryToRun=N'UPDATE [dbo].[appConfigurations] SET [value]=(select top 1 [name] from msdb.dbo.sysmail_profile) WHERE [name]=''Database Mail profile name to use for sending emails'''
-		EXEC sp_executesql  @queryToRun
-	end
+SET @queryToRun=N'UPDATE [dbo].[appConfigurations] SET [value]=(select top 1 [name] from msdb.dbo.sysmail_profile) WHERE [name]=''Database Mail profile name to use for sending emails'''
+EXEC sp_executesql  @queryToRun
 GO
 
 
@@ -122,10 +114,6 @@ GO
 --enable Parallel Execution Jobs
 ---------------------------------------------------------------------------------------------
 DECLARE   @queryToRun 		[nvarchar](4000)
-		, @SQLMajorVersion 	[int]
-
-SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(CAST(SERVERPROPERTY('ProductVersion') AS [varchar](32)), ''), 2), '.', '') 
-
 
 SET @queryToRun=N''
 SET @queryToRun = @queryToRun + N'
@@ -136,6 +124,5 @@ UPDATE [dbo].[appConfigurations]
 				END
 WHERE [module] = ''common'' AND [name] = ''Parallel Execution Jobs'''
 
-IF @SQLMajorVersion > 8
-	EXEC sp_executesql @queryToRun
+EXEC sp_executesql @queryToRun
 GO

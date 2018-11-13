@@ -139,7 +139,7 @@ WHILE @@FETCH_STATUS=0
 			SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(@sqlServerVersion, ''), 2), '.', '') 
 		END TRY
 		BEGIN CATCH
-			SET @SQLMajorVersion = 8
+			SET @SQLMajorVersion = 9
 		END CATCH
 
 		/* get volume space / free disk space details */

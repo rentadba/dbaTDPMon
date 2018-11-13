@@ -34,8 +34,6 @@ SET NOCOUNT ON
 DECLARE @projectID				[smallint],
 		@sqlServerName			[sysname],
 		@instanceID				[smallint],
-		@sqlServerVersion		[sysname],
-		@SQLMajorVersion		[tinyint],
 		@executionLevel			[tinyint],
 		@queryToRun				[nvarchar](4000),
 		@strMessage				[nvarchar](4000)
@@ -154,199 +152,189 @@ WHERE cin.[project_id] = @projectID
 SET @strMessage='Step 2: Get Instance Details Information...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 		
-DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
+DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name]
 															FROM	[dbo].[vw_catalogInstanceNames] cin
 															WHERE 	cin.[project_id] = @projectID
 																	AND cin.[instance_active]=1
 																	AND cin.[instance_name] LIKE @sqlServerNameFilter
 															ORDER BY cin.[instance_name]
 OPEN crsActiveInstances
-FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
+FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName
 WHILE @@FETCH_STATUS=0
 	begin
 		SET @strMessage='Analyzing server: ' + @sqlServerName
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		BEGIN TRY
-			SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(@sqlServerVersion, ''), 2), '.', '') 
-		END TRY
-		BEGIN CATCH
-			SET @SQLMajorVersion = 8
-		END CATCH
-
 		TRUNCATE TABLE #blockedSessionInfo
 		TRUNCATE TABLE #transactionInfo
 		TRUNCATE TABLE #monTransactionsStatus
 
-		IF @SQLMajorVersion > 8
-			begin
-				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'SELECT  owt.[session_id]
-														, owt.[blocking_session_id]
-														, owt.[wait_duration_ms] / 1000
-														, owt.[wait_type]
-												FROM sys.dm_os_waiting_tasks owt WITH (READPAST)
-												INNER JOIN sys.dm_exec_sessions es WITH (READPAST) ON es.[session_id] = owt.[session_id]
-												WHERE ISNULL(owt.[session_id], 0) <> ISNULL(owt.[blocking_session_id], 0)'
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+		SET @queryToRun = N''
+		SET @queryToRun = @queryToRun + N'SELECT  owt.[session_id]
+												, owt.[blocking_session_id]
+												, owt.[wait_duration_ms] / 1000
+												, owt.[wait_type]
+										FROM sys.dm_os_waiting_tasks owt WITH (READPAST)
+										INNER JOIN sys.dm_exec_sessions es WITH (READPAST) ON es.[session_id] = owt.[session_id]
+										WHERE ISNULL(owt.[session_id], 0) <> ISNULL(owt.[blocking_session_id], 0)'
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 				
-				BEGIN TRY
-						INSERT	INTO #blockedSessionInfo([session_id], [blocking_session_id], [wait_duration_sec], [wait_type])
-								EXEC sp_executesql @queryToRun
-				END TRY
-				BEGIN CATCH
-					SET @strMessage = ERROR_MESSAGE()
-					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+		BEGIN TRY
+				INSERT	INTO #blockedSessionInfo([session_id], [blocking_session_id], [wait_duration_sec], [wait_type])
+						EXEC sp_executesql @queryToRun
+		END TRY
+		BEGIN CATCH
+			SET @strMessage = ERROR_MESSAGE()
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
-							SELECT  @instanceID
-									, @projectID
-									, GETUTCDATE()
-									, 'dbo.usp_monGetTransactionsStatus'
-									, '[blocking-session-info]:' + @strMessage
-				END CATCH
+			INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+					SELECT  @instanceID
+							, @projectID
+							, GETUTCDATE()
+							, 'dbo.usp_monGetTransactionsStatus'
+							, '[blocking-session-info]:' + @strMessage
+		END CATCH
 
 
-				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'SELECT  tat.[transaction_begin_time]
-														, ISNULL(tasdt.[elapsed_time_seconds], ABS(DATEDIFF(ss, tat.[transaction_begin_time], GETDATE()))) [elapsed_time_seconds]
-														, ISNULL(tst.[session_id], tasdt.[session_id]) AS [session_id]
-														, DB_NAME(tdt.[database_id]) AS [database_name]
-												FROM sys.dm_tran_active_transactions						tat WITH (READPAST)
-												LEFT JOIN sys.dm_tran_session_transactions					tst WITH (READPAST)		ON	tst.[transaction_id] = tat.[transaction_id]
-												LEFT JOIN sys.dm_tran_database_transactions					tdt WITH (READPAST)		ON	tdt.[transaction_id] = tat.[transaction_id]
-												LEFT JOIN sys.dm_tran_active_snapshot_database_transactions tasdt WITH (READPAST)	ON	tasdt.[transaction_id] = tat.[transaction_id] 
-												WHERE ISNULL(tasdt.[elapsed_time_seconds], 0) >= ' + CAST(@alertThresholdWarning AS [nvarchar])
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+		SET @queryToRun = N''
+		SET @queryToRun = @queryToRun + N'SELECT  tat.[transaction_begin_time]
+												, ISNULL(tasdt.[elapsed_time_seconds], ABS(DATEDIFF(ss, tat.[transaction_begin_time], GETDATE()))) [elapsed_time_seconds]
+												, ISNULL(tst.[session_id], tasdt.[session_id]) AS [session_id]
+												, DB_NAME(tdt.[database_id]) AS [database_name]
+										FROM sys.dm_tran_active_transactions						tat WITH (READPAST)
+										LEFT JOIN sys.dm_tran_session_transactions					tst WITH (READPAST)		ON	tst.[transaction_id] = tat.[transaction_id]
+										LEFT JOIN sys.dm_tran_database_transactions					tdt WITH (READPAST)		ON	tdt.[transaction_id] = tat.[transaction_id]
+										LEFT JOIN sys.dm_tran_active_snapshot_database_transactions tasdt WITH (READPAST)	ON	tasdt.[transaction_id] = tat.[transaction_id] 
+										WHERE ISNULL(tasdt.[elapsed_time_seconds], 0) >= ' + CAST(@alertThresholdWarning AS [nvarchar])
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 				
-				BEGIN TRY
-						INSERT	INTO #transactionInfo([transaction_begin_time], [elapsed_time_seconds], [session_id], [database_name])
-								EXEC sp_executesql @queryToRun
-				END TRY
-				BEGIN CATCH
-					SET @strMessage = ERROR_MESSAGE()
-					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+		BEGIN TRY
+				INSERT	INTO #transactionInfo([transaction_begin_time], [elapsed_time_seconds], [session_id], [database_name])
+						EXEC sp_executesql @queryToRun
+		END TRY
+		BEGIN CATCH
+			SET @strMessage = ERROR_MESSAGE()
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
-							SELECT  @instanceID
-									, @projectID
-									, GETUTCDATE()
-									, 'dbo.usp_monGetTransactionsStatus'
-									, '[active-transaction-info]:' + @strMessage
-				END CATCH
+			INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+					SELECT  @instanceID
+							, @projectID
+							, GETUTCDATE()
+							, 'dbo.usp_monGetTransactionsStatus'
+							, '[active-transaction-info]:' + @strMessage
+		END CATCH
 
 
-				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'SELECT [session_id], [request_id], SUM([space_used_mb]) AS [space_used_mb]
-												FROM (
-														SELECT	[session_id], [request_id],
-																SUM(([internal_objects_alloc_page_count] - [internal_objects_dealloc_page_count])*8)/1024 AS [space_used_mb]
-														FROM sys.dm_db_task_space_usage
-														GROUP BY [session_id], [request_id]
-														)x
-												WHERE x.[space_used_mb] > 0
-												GROUP BY [session_id], [request_id]'
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+		SET @queryToRun = N''
+		SET @queryToRun = @queryToRun + N'SELECT [session_id], [request_id], SUM([space_used_mb]) AS [space_used_mb]
+										FROM (
+												SELECT	[session_id], [request_id],
+														SUM(([internal_objects_alloc_page_count] - [internal_objects_dealloc_page_count])*8)/1024 AS [space_used_mb]
+												FROM sys.dm_db_task_space_usage
+												GROUP BY [session_id], [request_id]
+												)x
+										WHERE x.[space_used_mb] > 0
+										GROUP BY [session_id], [request_id]'
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 				
-				BEGIN TRY
-						INSERT	INTO #sessionTempdbUsage([session_id], [request_id], [space_used_mb])
-								EXEC sp_executesql @queryToRun
-				END TRY
-				BEGIN CATCH
-					SET @strMessage = ERROR_MESSAGE()
-					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+		BEGIN TRY
+				INSERT	INTO #sessionTempdbUsage([session_id], [request_id], [space_used_mb])
+						EXEC sp_executesql @queryToRun
+		END TRY
+		BEGIN CATCH
+			SET @strMessage = ERROR_MESSAGE()
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
-							SELECT  @instanceID
-									, @projectID
-									, GETUTCDATE()
-									, 'dbo.usp_monGetTransactionsStatus'
-									, '[tempdb-usage-info]:' + @strMessage
-				END CATCH
+			INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+					SELECT  @instanceID
+							, @projectID
+							, GETUTCDATE()
+							, 'dbo.usp_monGetTransactionsStatus'
+							, '[tempdb-usage-info]:' + @strMessage
+		END CATCH
 
 			
-				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'SELECT  @@SERVERNAME AS [server_name]
-														, es.[session_id]
-														, er.[request_id]
-														, es.[host_name]
-														, es.[program_name]
-														, CASE WHEN ISNULL(es.[login_name], '''') <> '''' THEN es.[login_name] ELSE sp.[loginame] END [login_name]
-														, DATEDIFF(ss, es.[last_request_start_time], GETDATE()) AS [last_request_elapsed_time_seconds]
-														, sp.[sql_handle]
-														, CASE WHEN er.[session_id] IS NULL THEN 1 ELSE 0 END AS [request_completed]
-														, DB_NAME(ISNULL(er.[database_id], es.[database_id])) AS [database_name]
-												FROM sys.dm_exec_sessions es WITH (READPAST)
-												INNER JOIN master.dbo.sysprocesses sp WITH (READPAST) ON sp.[spid] = es.[session_id]
-												LEFT  JOIN sys.dm_exec_requests er WITH (READPAST) ON er.[session_id] = es.[session_id]
-												WHERE es.[is_user_process] = 1
-														AND sp.[ecid] = 0'
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		SET @queryToRun = N''
+		SET @queryToRun = @queryToRun + N'SELECT  @@SERVERNAME AS [server_name]
+												, es.[session_id]
+												, er.[request_id]
+												, es.[host_name]
+												, es.[program_name]
+												, CASE WHEN ISNULL(es.[login_name], '''') <> '''' THEN es.[login_name] ELSE sp.[loginame] END [login_name]
+												, DATEDIFF(ss, es.[last_request_start_time], GETDATE()) AS [last_request_elapsed_time_seconds]
+												, sp.[sql_handle]
+												, CASE WHEN er.[session_id] IS NULL THEN 1 ELSE 0 END AS [request_completed]
+												, DB_NAME(ISNULL(er.[database_id], es.[database_id])) AS [database_name]
+										FROM sys.dm_exec_sessions es WITH (READPAST)
+										INNER JOIN master.dbo.sysprocesses sp WITH (READPAST) ON sp.[spid] = es.[session_id]
+										LEFT  JOIN sys.dm_exec_requests er WITH (READPAST) ON er.[session_id] = es.[session_id]
+										WHERE es.[is_user_process] = 1
+												AND sp.[ecid] = 0'
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 
-				SET @queryToRun = N'SELECT DISTINCT
-										   x. [server_name]
-										 , x.[session_id]
-										 , ISNULL(x.[database_name], ti.[database_name]) AS [database_name]
-										 , x.[host_name]
-										 , x.[program_name]
-										 , x.[login_name]
-										 , ti.[transaction_begin_time]
-										 , CASE WHEN x.[last_request_elapsed_time_seconds] < 0 THEN 0 ELSE x.[last_request_elapsed_time_seconds] END AS [last_request_elapsed_time_seconds]
-										 , ti.[elapsed_time_seconds] AS [transaction_elapsed_time_seconds]
-										 , bk.[sessions_blocked]
-										 , x.[sql_handle]
-										 , x.[request_completed]
-										 , CASE WHEN si.[blocking_session_id] IS NOT NULL THEN 1 ELSE 0 END AS [is_session_blocked]
-										 , si.[wait_duration_sec]
-										 , si.[wait_type]
-										 , stu.[space_used_mb] AS [tempdb_space_used_mb]
-									FROM (' + @queryToRun + N') x
-									LEFT JOIN #transactionInfo ti ON ti.[session_id] = x.[session_id]
-									LEFT JOIN #sessionTempdbUsage stu ON stu.[session_id] = x.[session_id] AND stu.[request_id] = x.[request_id]
-									LEFT JOIN 
-										(
-											SELECT si.[session_id], ISNULL(bk.[sessions_blocked], 0) AS [sessions_blocked]
-											FROM #blockedSessionInfo si
-											LEFT JOIN
-													(
-														SELECT [blocking_session_id], COUNT(*) AS [sessions_blocked]
-														FROM #blockedSessionInfo 
-														GROUP BY [blocking_session_id]
-													)bk ON bk.[blocking_session_id] = si.[session_id]
-											UNION
-											SELECT [blocking_session_id] AS [session_id], COUNT(*) AS [sessions_blocked]
-											FROM #blockedSessionInfo 
-											WHERE [blocking_session_id] IS NOT NULL
-											GROUP BY [blocking_session_id]
-										)bk ON bk.[session_id] = x.[session_id]
-									LEFT JOIN #blockedSessionInfo si ON si.[session_id] = x.[session_id]
-									WHERE	   (    ISNULL(x.[last_request_elapsed_time_seconds], 0) >= ' + CAST(@alertThresholdWarning AS [nvarchar]) + N'
-											    AND x.[request_completed] = 0
-											   )
-											OR ISNULL(ti.[elapsed_time_seconds], 0) >= ' + CAST(@alertThresholdWarning AS [nvarchar]) + N'
-									'
+		SET @queryToRun = N'SELECT DISTINCT
+									x. [server_name]
+									, x.[session_id]
+									, ISNULL(x.[database_name], ti.[database_name]) AS [database_name]
+									, x.[host_name]
+									, x.[program_name]
+									, x.[login_name]
+									, ti.[transaction_begin_time]
+									, CASE WHEN x.[last_request_elapsed_time_seconds] < 0 THEN 0 ELSE x.[last_request_elapsed_time_seconds] END AS [last_request_elapsed_time_seconds]
+									, ti.[elapsed_time_seconds] AS [transaction_elapsed_time_seconds]
+									, bk.[sessions_blocked]
+									, x.[sql_handle]
+									, x.[request_completed]
+									, CASE WHEN si.[blocking_session_id] IS NOT NULL THEN 1 ELSE 0 END AS [is_session_blocked]
+									, si.[wait_duration_sec]
+									, si.[wait_type]
+									, stu.[space_used_mb] AS [tempdb_space_used_mb]
+							FROM (' + @queryToRun + N') x
+							LEFT JOIN #transactionInfo ti ON ti.[session_id] = x.[session_id]
+							LEFT JOIN #sessionTempdbUsage stu ON stu.[session_id] = x.[session_id] AND stu.[request_id] = x.[request_id]
+							LEFT JOIN 
+								(
+									SELECT si.[session_id], ISNULL(bk.[sessions_blocked], 0) AS [sessions_blocked]
+									FROM #blockedSessionInfo si
+									LEFT JOIN
+											(
+												SELECT [blocking_session_id], COUNT(*) AS [sessions_blocked]
+												FROM #blockedSessionInfo 
+												GROUP BY [blocking_session_id]
+											)bk ON bk.[blocking_session_id] = si.[session_id]
+									UNION
+									SELECT [blocking_session_id] AS [session_id], COUNT(*) AS [sessions_blocked]
+									FROM #blockedSessionInfo 
+									WHERE [blocking_session_id] IS NOT NULL
+									GROUP BY [blocking_session_id]
+								)bk ON bk.[session_id] = x.[session_id]
+							LEFT JOIN #blockedSessionInfo si ON si.[session_id] = x.[session_id]
+							WHERE	   (    ISNULL(x.[last_request_elapsed_time_seconds], 0) >= ' + CAST(@alertThresholdWarning AS [nvarchar]) + N'
+										AND x.[request_completed] = 0
+										)
+									OR ISNULL(ti.[elapsed_time_seconds], 0) >= ' + CAST(@alertThresholdWarning AS [nvarchar]) + N'
+							'
 
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-				BEGIN TRY
-						INSERT	INTO #monTransactionsStatus([server_name], [session_id], [database_name], [host_name], [program_name], [login_name], [transaction_begin_time], [last_request_elapsed_time_seconds], [transaction_elapsed_time_seconds], [sessions_blocked], [sql_handle], [request_completed], [is_session_blocked], [wait_duration_sec], [wait_type], [tempdb_space_used_mb])
-								EXEC sp_executesql @queryToRun
-				END TRY
-				BEGIN CATCH
-					SET @strMessage = ERROR_MESSAGE()
-					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+		BEGIN TRY
+				INSERT	INTO #monTransactionsStatus([server_name], [session_id], [database_name], [host_name], [program_name], [login_name], [transaction_begin_time], [last_request_elapsed_time_seconds], [transaction_elapsed_time_seconds], [sessions_blocked], [sql_handle], [request_completed], [is_session_blocked], [wait_duration_sec], [wait_type], [tempdb_space_used_mb])
+						EXEC sp_executesql @queryToRun
+		END TRY
+		BEGIN CATCH
+			SET @strMessage = ERROR_MESSAGE()
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
-							SELECT  @instanceID
-									, @projectID
-									, GETUTCDATE()
-									, 'dbo.usp_monGetTransactionsStatus'
-									, '[session-info]:' + @strMessage
-				END CATCH
-			end								
+			INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+					SELECT  @instanceID
+							, @projectID
+							, GETUTCDATE()
+							, 'dbo.usp_monGetTransactionsStatus'
+							, '[session-info]:' + @strMessage
+		END CATCH
 				
 		/* save results to stats table */
 		INSERT INTO [monitoring].[statsTransactionsStatus]([instance_id], [project_id], [event_date_utc]
@@ -359,7 +347,7 @@ WHILE @@FETCH_STATUS=0
 						, [request_completed], [is_session_blocked], [wait_duration_sec], [wait_type], [tempdb_space_used_mb]
 				FROM #monTransactionsStatus
 								
-		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
+		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName
 	end
 CLOSE crsActiveInstances
 DEALLOCATE crsActiveInstances

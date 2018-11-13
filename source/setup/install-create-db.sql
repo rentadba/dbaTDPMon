@@ -99,42 +99,34 @@ GO
 
 
 ---------------------------------------------------------------------------------------------
---get SQL Server running major version
----------------------------------------------------------------------------------------------
-DECLARE @SQLMajorVersion [int]
-SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(CAST(SERVERPROPERTY('ProductVersion') AS [varchar](32)), ''), 2), '.', '') 
-
 DECLARE @queryToRun [nvarchar](1024)
 
-IF @SQLMajorVersion > 8
-	begin
-		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET DISABLE_BROKER'
-		EXEC sp_executesql  @queryToRun
+SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET DISABLE_BROKER'
+EXEC sp_executesql  @queryToRun
 
-		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET AUTO_UPDATE_STATISTICS_ASYNC OFF'
-		EXEC sp_executesql  @queryToRun
+SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET AUTO_UPDATE_STATISTICS_ASYNC OFF'
+EXEC sp_executesql  @queryToRun
 
-		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET DATE_CORRELATION_OPTIMIZATION OFF'
-		EXEC sp_executesql  @queryToRun
+SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET DATE_CORRELATION_OPTIMIZATION OFF'
+EXEC sp_executesql  @queryToRun
 
-		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET TRUSTWORTHY OFF'
-		EXEC sp_executesql  @queryToRun
+SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET TRUSTWORTHY OFF'
+EXEC sp_executesql  @queryToRun
 
-		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET ALLOW_SNAPSHOT_ISOLATION ON'
-		EXEC sp_executesql  @queryToRun
+SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET ALLOW_SNAPSHOT_ISOLATION ON'
+EXEC sp_executesql  @queryToRun
 
-		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET PARAMETERIZATION SIMPLE'
-		EXEC sp_executesql  @queryToRun
+SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET PARAMETERIZATION SIMPLE'
+EXEC sp_executesql  @queryToRun
 
-		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET READ_COMMITTED_SNAPSHOT ON'
-		EXEC sp_executesql  @queryToRun
+SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET READ_COMMITTED_SNAPSHOT ON'
+EXEC sp_executesql  @queryToRun
 
-		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET PAGE_VERIFY CHECKSUM'
-		EXEC sp_executesql  @queryToRun
+SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET PAGE_VERIFY CHECKSUM'
+EXEC sp_executesql  @queryToRun
 
-		SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET DB_CHAINING OFF'
-		EXEC sp_executesql  @queryToRun
-	end
+SET @queryToRun=N'ALTER DATABASE [$(dbName)] SET DB_CHAINING OFF'
+EXEC sp_executesql  @queryToRun
 
 PRINT '"$(dbName)" database created.'
 GO
