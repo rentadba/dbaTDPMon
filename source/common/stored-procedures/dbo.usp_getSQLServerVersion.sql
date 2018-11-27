@@ -39,14 +39,21 @@ CREATE TABLE #serverProperty
 
 /* cache results for maximum 60 minutes */
 IF OBJECT_ID('tempdb..##tdp_sql_version_requests') IS NULL
-	CREATE TABLE ##tdp_sql_version_requests
-		(
-			  [instance_name]				[sysname]	NOT NULL
-			, [edition]						[sysname]	NULL
-			, [product_version]				[sysname]	NULL
-			, [product_version_num]			[numeric](9,6) NULL
-			, [event_date_utc]				[datetime]	NULL
-		)
+	BEGIN TRY
+		CREATE TABLE ##tdp_sql_version_requests
+			(
+				  [instance_name]				[sysname]	NOT NULL
+				, [edition]						[sysname]	NULL
+				, [product_version]				[sysname]	NULL
+				, [product_version_num]			[numeric](9,6) NULL
+				, [event_date_utc]				[datetime]	NULL
+			)
+	END TRY
+	BEGIN CATCH
+		/* in a high concurency environment, the above table creation may fail. ignore the error */
+		SET @queryToRun = ERROR_MESSAGE()
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+	END CATCH
 
 -----------------------------------------------------------------------------------------
 /* get SQL Server Edition and Product Version */
