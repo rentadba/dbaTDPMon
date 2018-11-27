@@ -797,3 +797,6 @@
 13.11.2018
 * maintenance-plan: fix a bug when updating statistics with fullscan on SQL Server 2016 onwards
 * remove all SQL Server 2000 related code
+
+27.11.2018
+* add option to ignore job execution limit warning alerts

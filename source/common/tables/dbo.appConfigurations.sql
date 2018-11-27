@@ -63,6 +63,7 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 		  SELECT 'common'			AS [module], 'Maximum SQL Agent jobs running (0=unlimited)'									AS [name], '0'			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Maximum job queue execution time (hours) (0=unlimited)'						AS [name], '0'			AS [value]		UNION ALL
 		  SELECT 'common'			AS [module], 'Maximum SQL Agent jobs running on the same physical volume (0=unlimited)'		AS [name], '0'			AS [value]		UNION ALL
+		  SELECT 'common'			AS [module], 'Ignore alerts for: Maximum SQL Agent jobs running limit reached'				AS [name], 'true'		AS [value]		UNION ALL
 
 		  SELECT 'maintenance-plan' AS [module], 'Default backup location'														AS [name], NULL			AS [value]		UNION ALL
 		  SELECT 'maintenance-plan' AS [module], 'Default backup retention (days)'												AS [name], '7'			AS [value]		UNION ALL
