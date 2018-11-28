@@ -15,5 +15,5 @@ RAISERROR('* Patch: 20181127-patch-upgrade-from-v2018_10-to-v2018_11-common.sql'
 
 IF NOT EXISTS(SELECT * FROM [dbo].[appConfigurations] WHERE [name] = 'Ignore alerts for: Maximum SQL Agent jobs running limit reached' and [module] = 'common')
 	INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
-			SELECT 'common' AS [module], 'Ignore alerts for: Maximum SQL Agent jobs running limit reached'	AS [name], '0' AS [value]
+			SELECT 'common' AS [module], 'Ignore alerts for: Maximum SQL Agent jobs running limit reached'	AS [name], 'true' AS [value]
 GO
