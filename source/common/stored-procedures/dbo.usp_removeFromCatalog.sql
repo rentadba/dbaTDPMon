@@ -166,6 +166,19 @@ BEGIN TRY
 				AND cin.[name] = @sqlServerName
 
 		-----------------------------------------------------------------------------------------------------
+		DELETE aar
+		FROM [monitoring].[alertAdditionalRecipients] aar
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = aar.[project_id] AND cin.[id] = aar.[instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[name] = @sqlServerName				
+
+		DELETE srl
+		FROM [monitoring].[statsReplicationLatency] srl
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = srl.[project_id] AND cin.[name] = srl.[publisher_server]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[name] = @sqlServerName				
+
+		-----------------------------------------------------------------------------------------------------
 		DELETE ssaj
 		FROM [monitoring].statsSQLAgentJobs ssaj
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = ssaj.[project_id] AND cin.[id] = ssaj.[instance_id]
