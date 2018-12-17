@@ -806,3 +806,6 @@
 #### December 2018 new features & fixes
 10.12.2018
 * monitoring: add support for replication monitoring when distributor is on a remote instance
+
+17.12.2018
+* enhance caching for getting SQL Server version and edition

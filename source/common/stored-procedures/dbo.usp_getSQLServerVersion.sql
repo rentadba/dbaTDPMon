@@ -30,41 +30,22 @@ SET NOCOUNT ON
 -----------------------------------------------------------------------------------------
 DECLARE @queryToRun [nvarchar](2000)
 
-IF object_id('#serverProperty') IS NOT NULL DROP TABLE #serverProperty
-CREATE TABLE #serverProperty
-			(
-				[edition]			[sysname]	NULL,
-				[product_version]	[sysname]	NULL
-			)
-
-/* cache results for maximum 60 minutes */
-IF OBJECT_ID('tempdb..##tdp_sql_version_requests') IS NULL
-	BEGIN TRY
-		CREATE TABLE ##tdp_sql_version_requests
-			(
-				  [instance_name]				[sysname]	NOT NULL
-				, [edition]						[sysname]	NULL
-				, [product_version]				[sysname]	NULL
-				, [product_version_num]			[numeric](9,6) NULL
-				, [event_date_utc]				[datetime]	NULL
-			)
-	END TRY
-	BEGIN CATCH
-		/* in a high concurency environment, the above table creation may fail. ignore the error */
-		SET @queryToRun = ERROR_MESSAGE()
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-	END CATCH
-
 -----------------------------------------------------------------------------------------
 /* get SQL Server Edition and Product Version */
 -----------------------------------------------------------------------------------------
-SELECT    @serverEdition    = [edition]
-		, @serverVersionStr = [product_version]
-		, @serverVersionNum = [product_version_num]
-FROM ##tdp_sql_version_requests
-WHERE [instance_name] = @sqlServerName
+BEGIN TRY
+	SELECT    @serverEdition    = [edition]
+			, @serverVersionStr = [version]
+			, @serverVersionNum = SUBSTRING([version], 1, CHARINDEX('.', [version])-1) + '.' + REPLACE(SUBSTRING([version], CHARINDEX('.', [version])+1, LEN([version])), '.', '')
+	FROM [dbo].[vw_catalogInstanceNames]
+	WHERE [instance_name] = @sqlServerName
+END TRY
+BEGIN CATCH
+	SELECT    @serverEdition    = NULL
+			, @serverVersionStr = NULL
+			, @serverVersionNum = NULL
+END CATCH
 
---if data was not found in cache
 IF @serverEdition IS NULL
 	begin
 
@@ -86,9 +67,5 @@ IF @serverEdition IS NULL
 		INSERT	INTO ##tdp_sql_version_requests([instance_name], [edition], [product_version], [product_version_num], [event_date_utc])
 				SELECT @sqlServerName, @serverEdition, @serverVersionStr, @serverVersionNum, GETUTCDATE()
 	end
-
---purge old cache values
-DELETE FROM ##tdp_sql_version_requests
-WHERE DATEDIFF(minute, [event_date_utc], GETUTCDATE()) > 60
 -----------------------------------------------------------------------------------------
 GO
