@@ -15,7 +15,7 @@ CREATE PROCEDURE [dbo].[usp_mpAlterTableIndexes]
 		@tableSchema				[sysname] = '%',
 		@tableName					[sysname] = '%',
 		@indexName					[sysname] = '%',
-		@indexID					[int],
+		@indexID					[int] = NULL,
 		@partitionNumber			[int] = 0,
 		@flgAction					[tinyint] = 1,
 		@flgOptions					[int] = 6145, --4096 + 2048 + 1	/* 6177 for space optimized index rebuild */
@@ -82,7 +82,9 @@ DECLARE		@queryToRun   			[nvarchar](max),
 			@flgInheritOptions		[int],
 			@tmpIndexName			[sysname],
 			@tmpIndexIsPrimaryXML	[bit],
-			@nestedExecutionLevel	[tinyint]
+			@nestedExecutionLevel	[tinyint],
+			@eventName				[sysname],
+			@eventData				[varchar](8000)
 
 DECLARE   @flgRaiseErrorAndStop [bit]
 		, @errorCode			[int]
@@ -109,7 +111,59 @@ DECLARE @tmpTableToAlterIndexes TABLE
 			)
 
 
--- { sql_statement | statement_block }
+--------------------------------------------------------------------------------------------------
+/*	Could not proceed with index DDL operation on table '...' because it conflicts with another concurrent operation that is already in progress on the object. 
+	The concurrent operation could be an online index operation on the same object or another concurrent operation that moves index pages like DBCC SHRINKFILE.
+*/
+-----------------------------------------------------------------------------------------
+IF OBJECT_ID('#runtimeProperty') IS NOT NULL DROP TABLE #runtimeProperty
+CREATE TABLE #runtimeProperty
+			(
+				[value]			[sysname]	NULL
+			)
+			
+SET @queryToRun = N'SELECT CAST(COUNT(*) AS [sysname]) AS [session_count] FROM sys.dm_exec_requests
+					WHERE	DB_NAME([database_id]) = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
+							AND [command] LIKE ''Dbcc%'''
+		
+SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+DELETE FROM #runtimeProperty
+INSERT	INTO #runtimeProperty([value])
+		EXEC sp_executesql @queryToRun
+
+IF (SELECT CAST([value] AS [int]) FROM #runtimeProperty) > 0
+	begin
+		SET @queryToRun='A shrink operation is in progress for the current database. Index operations cannot run.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		SET @eventName = CASE @flgAction  WHEN 1 THEN 'database maintenance - rebuilding index'
+										  WHEN 2 THEN 'database maintenance - reorganize index'
+										  WHEN 4 THEN 'database maintenance - disable index'
+						 END
+						 
+		SET @eventData='<skipaction><detail>' + 
+							'<name>database maintenance</name>' + 
+							'<type>' + CASE @flgAction  WHEN 1 THEN 'rebuilding index'
+														WHEN 2 THEN 'reorganize index'
+														WHEN 4 THEN 'disable index'
+										END + '</type>' + 
+							'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+							'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+							'<reason>' + @queryToRun + '</reason>' + 
+						'</detail></skipaction>'
+						
+		EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+											@dbName			= @dbName,
+											@module			= 'dbo.usp_mpAlterTableIndexes',
+											@eventName		= @eventName,
+											@eventMessage	= @eventData,
+											@eventType		= 0 /* info */
+		RETURN 0
+	end
+
+--------------------------------------------------------------------------------------------------
 BEGIN TRY
 		SET @errorCode	 = 0
 
