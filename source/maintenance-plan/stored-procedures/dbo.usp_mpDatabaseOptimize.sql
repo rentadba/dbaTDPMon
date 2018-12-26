@@ -71,6 +71,7 @@ AS
 --					 32768  - analyze only tables with at least @pageThreshold pages reserved (+2k5 only)
 --					 65536  - cleanup of ghost records (sp_clean_db_free_space)
 --							- this may be forced by setting to true property 'Force cleanup of ghost records'
+--				    131072  - Create statistics on all eligible columns
 
 --		@defragIndexThreshold		- min value for fragmentation level when to start reorganize it
 --		@@rebuildIndexThreshold		- min value for fragmentation level when to start rebuild it
@@ -1831,109 +1832,115 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 			end
 		CLOSE crsTableList2
 		DEALLOCATE crsTableList2
+	end
 
-		--128  - Create statistics on index columns only (default). Default behaviour is to not create statistics on all eligible columns
-		IF @flgOptions & 128 = 128
+--------------------------------------------------------------------------------------------------
+--8  - create statistics for all tables in database
+--------------------------------------------------------------------------------------------------
+IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0 AND (@flgOptions & 128 = 128 OR @flgOptions & 131072 = 131072)
+	begin
+		SET @queryToRun=N'Creating statistics for all tables / ' + CASE WHEN @flgOptions & 128 = 128 THEN 'index' ELSE 'all' END + ' columns ...'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		DECLARE @missingColumnStatsCounter [int]
+
+		/* detect if sp_createstats should be executed: check for columns without histograms */
+		IF object_id('tempdb..#checkMissingColumnStatistics') IS NOT NULL 
+		DROP TABLE #checkMissingColumnStatistics
+
+		CREATE TABLE #checkMissingColumnStatistics
+			(
+				[counter]		[int]
+			)
+
+		SET @queryToRun = N''				
+		SET @queryToRun = @queryToRun + 
+							CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
+							SELECT COUNT(*) AS MissingColumnStats
+							FROM (
+									SELECT DISTINCT so.[name] AS [table_name], sc.[name] AS [schema_name]
+									FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.objects so WITH (READPAST)
+									INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.columns sc WITH (READPAST) ON sc.[object_id] = so.[object_id] 
+									' + CASE WHEN @flgOptions & 128 = 128 THEN 'INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.indexes si WITH (READPAST) ON si.[object_id] = so.[object_id] ' ELSE N'' END + N'
+									' + CASE WHEN @flgOptions & 128 = 128 THEN 'INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.index_columns sic WITH (READPAST) ON sic.[object_id] = so.[object_id] AND sc.[column_id] = sic.[column_id] AND sic.[index_id] = si.[index_id]' ELSE N'' END + N'
+									LEFT JOIN 
+										(
+											SELECT [object_id], [column_id]
+											FROM	' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.stats_columns WITH (READPAST)
+											WHERE	[stats_column_id] = 1
+										)ssc ON ssc.[object_id] = so.[object_id] AND sc.[column_id] = ssc.[column_id]
+									WHERE  so.[type] IN (''U'', ''IT'')
+										' + CASE WHEN @flgOptions & 128 = 128 THEN 'AND not (si.[is_disabled] = 1 OR si.[type] IN (5,6)) AND sic.[key_ordinal] <> 1 AND sic.[is_included_column] = 0' ELSE '' END + N'
+										AND (TYPE_NAME(sc.[system_type_id]) NOT IN (''xml'')) ' + 
+									CASE WHEN @serverVersionNum >= 10 
+										THEN '
+										AND (OBJECTPROPERTY(so.[object_id], ''tablehascolumnset'') = 0 or sc.[is_sparse]=0)  
+										AND (sc.[is_filestream] = 0)  
+										AND (	sc.[is_computed] = 0  
+												OR (	 sc.[is_computed] = 1   
+													AND COLUMNPROPERTY(so.[object_id], sc.[name], ''isdeterministic'') = 1 
+													AND COLUMNPROPERTY(so.[object_id], sc.[name], ''isprecise'') = 1
+												)
+											) '
+										ELSE ''
+									END + N'
+										AND ssc.[object_id] IS NULL
+										AND so.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + N'''
+										AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + N'''' + 
+										CASE WHEN @skipObjectsList IS NOT NULL
+												THEN N'	AND so.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'  
+												ELSE N'' 
+										END + N'
+									)X'
+
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+				
+		INSERT	INTO #checkMissingColumnStatistics([counter])
+				EXEC sp_executesql  @queryToRun
+				
+		SELECT @missingColumnStatsCounter = [counter] 
+		FROM #checkMissingColumnStatistics
+
+
+		/* detect if sp_createstats should be executed: check for objects in "offline" filegroups */
+		IF EXISTS(SELECT * FROM #objectsInOfflineFileGroups)
+				SET @missingColumnStatsCounter = 0
+				
+		SET @queryToRun = N''
+		IF @missingColumnStatsCounter > 0
 			begin
-				SET @queryToRun=N'Creating statistics for all tables / index columns only ...'
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+				--128 - Create statistics on index columns only (default). Default behaviour is to not create statistics on all eligible columns
+				IF @flgOptions & 128 = 128 
+					SET @queryToRun = @queryToRun + N'sp_createstats @indexonly = ''indexonly'''
+				ELSE
+					--131072  - Create statistics on all eligible column
+					IF @flgOptions & 131072 = 131072 
+						SET @queryToRun = @queryToRun + N'sp_createstats @indexonly = ''NO'''
 
-				DECLARE @missingColumnStatsCounter [int]
+				--256  - Create statistics using default sample scan. Default behaviour is to create statistics using fullscan mode
+				IF @flgOptions & 256 = 256
+					SET @queryToRun = @queryToRun + N', @fullscan = ''NO'''
+				ELSE
+					SET @queryToRun = @queryToRun + N', @fullscan = ''fullscan'''
 
-				/* detect if sp_createstats should be executed: check for columns without histograms */
-				IF object_id('tempdb..#checkMissingColumnStatistics') IS NOT NULL 
-				DROP TABLE #checkMissingColumnStatistics
-
-				CREATE TABLE #checkMissingColumnStatistics
-					(
-						[counter]		[int]
-					)
-
-				SET @queryToRun = N''				
-				SET @queryToRun = @queryToRun + 
-									CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
-									SELECT COUNT(*) AS MissingColumnStats
-									FROM (
-											SELECT DISTINCT so.[name] AS [table_name], sc.[name] AS [schema_name]
-											FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.objects so WITH (READPAST)
-											INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.columns sc WITH (READPAST) ON sc.[object_id] = so.[object_id] 
-											INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.indexes si WITH (READPAST) ON si.[object_id] = so.[object_id] 
-											INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.index_columns sic WITH (READPAST) ON sic.[object_id] = so.[object_id] AND sc.[column_id] = sic.[column_id] AND sic.[index_id] = si.[index_id]
-											LEFT JOIN 
-												(
-													SELECT [object_id], [column_id]
-													FROM	' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.stats_columns WITH (READPAST)
-													WHERE	[stats_column_id] = 1
-												)ssc ON ssc.[object_id] = so.[object_id] AND sc.[column_id] = ssc.[column_id]
-											WHERE  so.[type] IN (''U'', ''IT'')
-												AND not (si.[is_disabled] = 1 OR si.[type] IN (5,6))
-												AND sic.[key_ordinal] <> 1
-												AND sic.[is_included_column] = 0
-												AND (TYPE_NAME(sc.[system_type_id]) NOT IN (''xml'')) ' + 
-											CASE WHEN @serverVersionNum >= 10 
-												THEN '
-												AND (OBJECTPROPERTY(so.[object_id], ''tablehascolumnset'') = 0 or sc.[is_sparse]=0)  
-												AND (sc.[is_filestream] = 0)  
-												AND (	sc.[is_computed] = 0  
-														OR (	 sc.[is_computed] = 1   
-															AND COLUMNPROPERTY(so.[object_id], sc.[name], ''isdeterministic'') = 1 
-															AND COLUMNPROPERTY(so.[object_id], sc.[name], ''isprecise'') = 1
-														)
-													) '
-												ELSE ''
-											END + N'
-												AND ssc.[object_id] IS NULL
-												AND so.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + N'''
-												AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + N'''' + 
-												CASE WHEN @skipObjectsList IS NOT NULL
-														THEN N'	AND so.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '',''))'  
-														ELSE N'' 
-												END + N'
-											)X'
-
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-				
-				INSERT	INTO #checkMissingColumnStatistics([counter])
-						EXEC sp_executesql  @queryToRun
-				
-				SELECT @missingColumnStatsCounter = [counter] 
-				FROM #checkMissingColumnStatistics
 
-				/* detect if sp_createstats should be executed: check for objects in "offline" filegroups */
-				IF EXISTS(SELECT * FROM #objectsInOfflineFileGroups)
-						SET @missingColumnStatsCounter = 0
+				SET @nestedExecutionLevel = @executionLevel + 1
 
-				IF @missingColumnStatsCounter > 0
-					begin
-						SET @queryToRun = N''
-						SET @queryToRun = @queryToRun + N'sp_createstats @indexonly = ''indexonly'''
-
-						--256  - Create statistics using default sample scan. Default behaviour is to create statistics using fullscan mode
-						IF @flgOptions & 256 = 256
-							SET @queryToRun = @queryToRun + N', @fullscan = ''NO'''
-						ELSE
-							SET @queryToRun = @queryToRun + N', @fullscan = ''fullscan'''
-
-						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-
-						SET @nestedExecutionLevel = @executionLevel + 1
-
-						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
-																		@dbName			= @dbName,
-																		@objectName		= @objectName,
-																		@childObjectName= @childObjectName,
-																		@module			= 'dbo.usp_mpDatabaseOptimize',
-																		@eventName		= 'database maintenance - create statistics',
-																		@queryToRun  	= @queryToRun,
-																		@flgOptions		= @flgOptions,
-																		@executionLevel	= @nestedExecutionLevel,
-																		@debugMode		= @debugMode
-					end
+				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+																@dbName			= @dbName,
+																@objectName		= @objectName,
+																@childObjectName= @childObjectName,
+																@module			= 'dbo.usp_mpDatabaseOptimize',
+																@eventName		= 'database maintenance - create statistics',
+																@queryToRun  	= @queryToRun,
+																@flgOptions		= @flgOptions,
+																@executionLevel	= @nestedExecutionLevel,
+																@debugMode		= @debugMode
 			end
 	end
 	
-
 ---------------------------------------------------------------------------------------------
 IF object_id('tempdb..#CurrentIndexFragmentationStats') IS NOT NULL DROP TABLE #CurrentIndexFragmentationStats
 IF object_id('tempdb..#databaseObjectsWithIndexList') IS NOT NULL 	DROP TABLE #databaseObjectsWithIndexList

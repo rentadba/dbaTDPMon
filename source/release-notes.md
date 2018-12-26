@@ -813,3 +813,4 @@
 26.12.2016
 * maintenance-plan: do not allow database backup while shrink is in progress
 * maintenance-plan: do not allow index maintenance operations while shrink is in progress
+* maintenance-plan: add option to create statistics on all table columns, not only on the indexed ones
