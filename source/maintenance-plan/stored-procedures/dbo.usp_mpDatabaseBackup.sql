@@ -214,6 +214,42 @@ begin
 	RETURN 0
 end
 
+--------------------------------------------------------------------------------------------------
+/*	Operations that cannot run during a database backup or transaction log backup include the following:
+		Shrink database or shrink file operations. This includes auto-shrink operations.
+*/
+SET @queryToRun = N'SELECT CAST(COUNT(*) AS [sysname]) AS [session_count] FROM sys.dm_exec_requests
+					WHERE	DB_NAME([database_id]) = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
+							AND [command] LIKE ''Dbcc%'''
+		
+SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+DELETE FROM #runtimeProperty
+INSERT	INTO #runtimeProperty([value])
+		EXEC sp_executesql @queryToRun
+
+IF (SELECT CAST([value] AS [int]) FROM #runtimeProperty) > 0
+	begin
+		SET @queryToRun='A shrink operation is in progress for the current database. Backup cannot run.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		SET @eventData='<skipaction><detail>' + 
+							'<name>database backup</name>' + 
+							'<type>' + @backupType + '</type>' + 
+							'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+							'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+							'<reason>' + @queryToRun + '</reason>' + 
+						'</detail></skipaction>'
+
+		EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+											@dbName			= @dbName,
+											@module			= 'dbo.usp_mpDatabaseBackup',
+											@eventName		= 'database backup',
+											@eventMessage	= @eventData,
+											@eventType		= 0 /* info */
+		RETURN 0
+	end
 
 --------------------------------------------------------------------------------------------------
 --skip databases involved in log shipping (primary or secondary or logs, secondary for full/diff backups)

@@ -809,3 +809,6 @@
 
 17.12.2018
 * enhance caching for getting SQL Server version and edition
+
+26.12.2016
+* maintenance-plan: do not allow database backup while shrink is in progress
