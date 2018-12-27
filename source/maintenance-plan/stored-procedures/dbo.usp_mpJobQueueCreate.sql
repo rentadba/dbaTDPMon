@@ -420,7 +420,7 @@ WHILE @@FETCH_STATUS=0
 
 						/*-------------------------------------------------------------------*/
 						/* Daily: Update Statistics */
-						IF @flgActions & 128 = 128 AND NOT (@flgActions & 64 = 64) AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, @codeDescriptor, 'Update Statistics', GETDATE()) = 1
+						IF @flgActions & 128 = 128 AND [dbo].[ufn_mpCheckTaskSchedulerForDate](@projectCode, @codeDescriptor, 'Update Statistics', GETDATE()) = 1
 							begin
 								SET @taskID = NULL
 								SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = @codeDescriptor AND [task_name] = 'Update Statistics'
