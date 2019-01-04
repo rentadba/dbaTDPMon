@@ -168,7 +168,10 @@ WHILE @@FETCH_STATUS=0
 				SET @queryToRun = @queryToRun + N'DECLARE @cmdQuery [varchar](1024); SET @cmdQuery=''powershell.exe -c "Get-WmiObject -ComputerName ''' + QUOTENAME(REPLACE(@machineName, '.workgroup', ''), '''') + ''' -Class Win32_Volume -Filter ''''DriveType = 3'''' | select name,capacity,freespace | foreach{$_.name+''''|''''+$_.capacity/1048576+''''%''''+$_.freespace/1048576+''''*''''}"''; EXEC xp_cmdshell @cmdQuery;'
 			
 				IF @sqlServerName<>@@SERVERNAME
-					SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+					IF @SQLMajorVersion < 11
+						SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
+					ELSE
+						SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''') WITH RESULT SETS(([Output] [nvarchar](max)))'')'
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 				TRUNCATE TABLE #xpCMDShellOutput
