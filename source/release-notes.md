@@ -817,3 +817,8 @@
 
 27.12.2016
 * maintenance-plan: fix defect with internal job scheduler and update statistics task
+
+------------
+#### January 2019 new features & fixes
+09.01.2019
+* maintenance-plan: implement smart differential backup; default threshold at 50% (appConfigurations and stored procedure option)

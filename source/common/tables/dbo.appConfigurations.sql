@@ -74,6 +74,8 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 		  SELECT 'maintenance-plan'	AS [module], 'Ignore alerts for: Error 1927 - There are already statistics on table'		AS [name], 'true'		AS [value]		UNION ALL
 		  SELECT 'maintenance-plan'	AS [module], 'WAIT_AT_LOW_PRIORITY max duration (min)'										AS [name], '1'			AS [value]		UNION ALL
 		  SELECT 'maintenance-plan'	AS [module], 'Use Default Scheduler for maintenance tasks if project specific not defined'	AS [name], '1'			AS [value]		UNION ALL
+		  SELECT 'maintenance-plan' AS [module], 'SMART default changes threshold'												AS [name], '50'			AS [value]		UNION ALL
+		
 
 		  SELECT 'health-check'		AS [module], 'Collect SQL Agent jobs step details'											AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'health-check'		AS [module], 'Collect SQL Errorlog last files'												AS [name], '1'			AS [value]		UNION ALL

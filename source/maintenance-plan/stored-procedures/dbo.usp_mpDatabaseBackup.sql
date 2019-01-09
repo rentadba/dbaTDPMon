@@ -10,33 +10,35 @@ GO
 
 -----------------------------------------------------------------------------------------
 CREATE PROCEDURE [dbo].[usp_mpDatabaseBackup]
-		@sqlServerName		[sysname] = @@SERVERNAME,
-		@dbName				[sysname],
-		@backupLocation		[nvarchar](1024)=NULL,	/*  disk only: local or UNC */
-		@flgActions			[smallint] = 1,			/*  1 - perform full database backup
-														2 - perform differential database backup
-														4 - perform transaction log backup
+		@sqlServerName			[sysname] = @@SERVERNAME,
+		@dbName					[sysname],
+		@backupLocation			[nvarchar](1024)=NULL,	/*  disk only: local or UNC */
+		@flgActions				[smallint] = 1,			/*  1 - perform full database backup
+															2 - perform differential database backup
+															4 - perform transaction log backup
+														*/
+		@flgOptions				[int] = 5083,		/*  1 - use CHECKSUM (default)
+														2 - use COMPRESSION, if available (default)
+														4 - use COPY_ONLY
+														8 - force change backup type (default): if log is set, and no database backup is found, a database backup will be first triggered
+													  										    if diff is set, and no full database backup is found, a full database backup will be first triggered
+																								if diff is set, and extent changes >=@dataChangesThreshold, a full database backup will be triggered instead (+2016 SP2)
+													   16 - verify backup file (default)
+												       32 - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
+													   64 - create folders for each database (default)
+													  128 - when performing cleanup, delete also orphans diff and log backups, when cleanup full database backups(default)
+													  256 - for +2k5 versions, use xp_delete_file option (default)
+													  512 - skip databases involved in log shipping (primary or secondary or logs, secondary for full/diff backups) (default)
+													 1024 - on alwayson availability groups, for secondary replicas, force copy-only backups
+													 2048 - change retention policy from RetentionDays to RetentionBackupsCount (number of full database backups to be kept)
+														  - this may be forced by setting to true property 'Change retention policy from RetentionDays to RetentionBackupsCount'
+													 4096 - use xp_dirtree to identify orphan backup files to be deleted, when using option 128 (default)
+													 8192 - use tail log backup - NORECOVERY
 													*/
-		@flgOptions			[int] = 5083,		/*  1 - use CHECKSUM (default)
-													2 - use COMPRESSION, if available (default)
-													4 - use COPY_ONLY
-													8 - force change backup type (default): if log is set, and no database backup is found, a database backup will be first triggered
-												  										    if diff is set, and no full database backup is found, a full database backup will be first triggered
-												   16 - verify backup file (default)
-											       32 - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
-												   64 - create folders for each database (default)
-												  128 - when performing cleanup, delete also orphans diff and log backups, when cleanup full database backups(default)
-												  256 - for +2k5 versions, use xp_delete_file option (default)
-												  512 - skip databases involved in log shipping (primary or secondary or logs, secondary for full/diff backups) (default)
-												 1024 - on alwayson availability groups, for secondary replicas, force copy-only backups
-												 2048 - change retention policy from RetentionDays to RetentionBackupsCount (number of full database backups to be kept)
-													  - this may be forced by setting to true property 'Change retention policy from RetentionDays to RetentionBackupsCount'
-												 4096 - use xp_dirtree to identify orphan backup files to be deleted, when using option 128 (default)
-												 8192 - use tail log backup - NORECOVERY
-												*/
-		@retentionDays		[smallint]	= NULL,
-		@executionLevel		[tinyint]	=  0,
-		@debugMode			[bit]		=  0
+		@retentionDays			[smallint]	= NULL,
+		@dataChangesThreshold	[smallint]	=  0,	/* default to value set in dbo.appConfiguration table : 50 */
+		@executionLevel			[tinyint]	=  0,
+		@debugMode				[bit]		=  0
 /* WITH ENCRYPTION */
 AS
 
@@ -136,6 +138,23 @@ IF @retentionDays IS NULL
 				SET @queryToRun= 'WARNING: @retentionDays parameter value not set'
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 			end
+	end
+
+-----------------------------------------------------------------------------------------
+--get default data changes threshold
+IF ISNULL(@dataChangesThreshold, 0) = 0
+	begin
+		BEGIN TRY
+			SELECT	@dataChangesThreshold = [value]
+			FROM	[dbo].[appConfigurations]
+			WHERE	[name] = N'SMART default changes threshold'
+					AND [module] = 'maintenance-plan'
+		END TRY
+		BEGIN CATCH
+			SET @dataChangesThreshold = NULL
+		END CATCH
+		
+		SET @dataChangesThreshold = ISNULL(@dataChangesThreshold, 0)
 	end
 
 -----------------------------------------------------------------------------------------
@@ -435,6 +454,59 @@ IF NOT (@serverVersionNum >= 14 AND @hostPlatform='linux' )
 				RETURN @errorCode
 			end
 	end
+
+--------------------------------------------------------------------------------------------------
+--smart differential backup: apply to SQL Server 2016 SP2 onwards
+IF @serverVersionNum>=13.05026
+	begin
+		DECLARE @dataChangesPercent [numeric](9,2)
+
+		SET @queryToRun = CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
+								SELECT CAST(CAST((SUM(modified_extent_page_count)*100.0)/SUM(allocated_extent_page_count) AS DECIMAL(9,2)) AS [sysname]) AS [changes_percent]
+							FROM ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'.sys.dm_db_file_space_usage'
+		IF @sqlServerName<>@@SERVERNAME
+		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		DELETE FROM #runtimeProperty
+		INSERT	INTO #runtimeProperty([value])
+				EXEC sp_executesql @queryToRun
+
+		BEGIN TRY
+			SELECT @dataChangesPercent = [value]
+			FROM #runtimeProperty
+		END TRY
+		BEGIN CATCH
+			SET @dataChangesPercent = 0
+		END CATCH
+
+		--log information
+		SET @eventData='<backup><info>' + 
+							'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
+							'<requested_backup_type>' + @backupType + '</requested_backup_type>' + 
+							'<data_changes_percent>' + CAST(@dataChangesPercent AS [varchar](32)) + '</data_changes_percent>' + 
+							'<data_changes_threshold>' + CAST(@dataChangesThreshold AS [varchar](32)) + '</data_changes_threshold>' +
+							'<change_backup_type_allowed>' + CASE WHEN @flgOptions & 8 = 8 THEN 'yes' ELSE 'no' END + '</change_backup_type_allowed>' + 
+						'</info></backup>'
+
+		EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+											@dbName			= @dbName,
+											@module			= 'dbo.usp_mpDatabaseBackup',
+											@eventName		= 'database backup',
+											@eventMessage	= @eventData,
+											@eventType		= 0 /* info */
+
+		IF @flgOptions & 8 = 8 AND @dataChangesPercent >= @dataChangesThreshold
+			begin
+				/* convert to a full database backup */
+				SET @flgActions = 1 
+				SET @backupType = N'full'
+
+				SET @queryToRun = 'INFO: The number of extents changed (' + CAST(@dataChangesPercent AS [sysname]) + '%) exceed the specified threshold ('+ CAST(@dataChangesThreshold AS [sysname]) + N'%). A full database backup will be taken instead.'
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+			end
+	end
+
 
 --------------------------------------------------------------------------------------------------
 --check if CHECKSUM backup option may apply

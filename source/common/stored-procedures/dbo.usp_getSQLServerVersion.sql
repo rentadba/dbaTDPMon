@@ -55,6 +55,13 @@ IF @serverEdition IS NULL
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
+		IF object_id('#serverProperty') IS NOT NULL DROP TABLE #serverProperty
+		CREATE TABLE #serverProperty 
+			(
+				[edition]			[sysname]
+			  , [product_version]	[sysname]
+			)
+
 		INSERT	INTO #serverProperty([edition], [product_version])
 				EXEC sp_executesql  @queryToRun
 
@@ -63,9 +70,6 @@ IF @serverEdition IS NULL
 		FROM #serverProperty
 
 		SET @serverVersionNum=SUBSTRING(@serverVersionStr, 1, CHARINDEX('.', @serverVersionStr)-1) + '.' + REPLACE(SUBSTRING(@serverVersionStr, CHARINDEX('.', @serverVersionStr)+1, LEN(@serverVersionStr)), '.', '')
-
-		INSERT	INTO ##tdp_sql_version_requests([instance_name], [edition], [product_version], [product_version_num], [event_date_utc])
-				SELECT @sqlServerName, @serverEdition, @serverVersionStr, @serverVersionNum, GETUTCDATE()
 	end
 -----------------------------------------------------------------------------------------
 GO
