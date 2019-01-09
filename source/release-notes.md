@@ -822,3 +822,4 @@
 #### January 2019 new features & fixes
 09.01.2019
 * maintenance-plan: implement smart differential backup; default threshold at 50% (appConfigurations and stored procedure option)
+* maintenance-plan: force update statistics when the number of changes >= sqrt(1000 * rowcount)

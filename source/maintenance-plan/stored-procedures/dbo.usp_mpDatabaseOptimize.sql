@@ -842,6 +842,12 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 													AND sp.[modification_counter] <> 0 
 													AND (ABS(sp.[modification_counter]) * 100. / CAST(sp.[rows] AS [float])) >= ' + CAST(@statsChangePercent AS [nvarchar](32)) + N'
 													)
+												OR  
+													(
+														DATEDIFF(dd, sp.[last_updated], GETDATE()) < ' + CAST(@statsAgeDays AS [nvarchar](32)) + N' 
+													AND sp.[modification_counter] <> 0 
+													AND SQRT(1000 * CAST(sp.[rows] AS [float])) <= ABS(sp.[modification_counter]) 
+													)
 											)'+
 										CASE WHEN @skipObjectsList IS NOT NULL
 												THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
@@ -871,7 +877,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 										AND sc.[name] LIKE ''' + [dbo].[ufn_getObjectQuoteName](@tableSchema, 'sql') + '''
 										AND ob.[type] <> ''S''
 										AND si.[rowcnt] > 0
-										AND (    (    DATEDIFF(dd, STATS_DATE(si.[id], si.[indid]), GETDATE()) >= ' + CAST(@statsAgeDays AS [nvarchar](32)) + N'
+										AND (    (      DATEDIFF(dd, STATS_DATE(si.[id], si.[indid]), GETDATE()) >= ' + CAST(@statsAgeDays AS [nvarchar](32)) + N'
 													AND si.[rowmodctr] <> 0
 													)
 												OR  
@@ -880,6 +886,12 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 													AND si.[rowmodctr] <> 0 
 													AND (ABS(si.[rowmodctr]) * 100. / si.[rowcnt]) >= ' + CAST(@statsChangePercent AS [nvarchar](32)) + N'
 												)
+												OR  
+													(
+														DATEDIFF(dd, STATS_DATE(si.[id], si.[indid]), GETDATE()) < ' + CAST(@statsAgeDays AS [nvarchar](32)) + N'
+													AND si.[rowmodctr] <> 0
+													AND SQRT(1000 * CAST(si.[rowcnt] AS [float])) <= ABS(si.[rowmodctr]) 
+													)
 										)' +
 										CASE WHEN @skipObjectsList IS NOT NULL
 												THEN N'	AND ob.[name] NOT IN (SELECT [value] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + N'.[dbo].[ufn_getTableFromStringList](''' + @skipObjectsList + N''', '','')) 
@@ -957,6 +969,12 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 															  DATEDIFF(dd, sp.[last_updated], GETDATE()) < ' + CAST(@statsAgeDays AS [nvarchar](32)) + N' 
 														  AND sp.[modification_counter] <> 0 
 														  AND (ABS(sp.[modification_counter]) * 100. / CAST(sp.[rows] AS [float])) >= ' + CAST(@statsChangePercent AS [nvarchar](32)) + N'
+														 )
+													 OR  
+													 	 (
+															  DATEDIFF(dd, sp.[last_updated], GETDATE()) < ' + CAST(@statsAgeDays AS [nvarchar](32)) + N' 
+														  AND sp.[modification_counter] <> 0 
+														  AND SQRT(1000 * CAST(sp.[rows] AS [float])) <= ABS(sp.[modification_counter]) 
 														 )
 													)'+
 												CASE WHEN @skipObjectsList IS NOT NULL
