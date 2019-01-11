@@ -823,3 +823,6 @@
 09.01.2019
 * maintenance-plan: implement smart differential backup; default threshold at 50% (appConfigurations and stored procedure option)
 * maintenance-plan: force update statistics when the number of changes >= sqrt(1000 * rowcount)
+
+11.01.2019
+* maintenance-plan: do not run maintenance for indexes not used in the last X days (appConfigurations option)

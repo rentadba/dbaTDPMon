@@ -117,7 +117,9 @@ DECLARE		@queryToRun    					[nvarchar](4000),
 			@isPartitioned					[bit],
 			@executionDBName				[sysname],
 			@databaseStateDesc				[sysname],
-			@dbIsReadOnly					[bit]
+			@dbIsReadOnly					[bit],
+			@sqlServiceUpTimeDays			[smallint],
+			@unusedIndexesThresholdDays		[smallint]
 
 SET NOCOUNT ON
 
@@ -169,6 +171,22 @@ IF LOWER(@forceCleanupGhostRecords)='true' OR @flgOptions & 65536 = 65536
 	end
 
 SET @thresholdGhostRecords = ISNULL(@thresholdGhostRecords, 0)
+
+-----------------------------------------------------------------------------------------
+--get configuration values: do not run maintenance for unused indexes
+---------------------------------------------------------------------------------------------
+BEGIN TRY
+	SELECT @unusedIndexesThresholdDays = [value] 
+	FROM	[dbo].[appConfigurations] 
+	WHERE	[name]='Do not run maintenance for indexes not used in the last N days (0=disabled)'
+			AND [module] = 'maintenance-plan'
+END TRY
+BEGIN CATCH
+	SET @unusedIndexesThresholdDays = 0
+END CATCH
+
+SET @unusedIndexesThresholdDays = ISNULL(@unusedIndexesThresholdDays, 0)
+
 
 ---------------------------------------------------------------------------------------------
 --get SQL Server running major version and database compatibility level
@@ -405,6 +423,16 @@ CREATE TABLE #objectsInOfflineFileGroups (
 											[index_id]			[int],										
 											[filegroup_name]	[sysname]
 										 )
+
+---------------------------------------------------------------------------------------------
+IF object_id('tempdb..#unusedIndexes') IS NOT NULL 
+	DROP TABLE #unusedIndexes
+
+CREATE TABLE #unusedIndexes (
+								[object_id]			[int],
+								[index_id]			[int]
+							)
+
 
 ---------------------------------------------------------------------------------------------
 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
@@ -702,7 +730,6 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		SET @queryToRun = N''				
-
 		SET @queryToRun = @queryToRun + 
 							CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
 							SELECT DISTINCT 
@@ -789,6 +816,103 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 		FROM #databaseObjectsWithIndexList dtl
 		INNER JOIN #objectsInOfflineFileGroups oofg ON dtl.[object_id] = oofg.[object_id] 
 													AND dtl.[index_id] = oofg.[index_id]
+
+
+		/* do not run maintenance on unused indexes / more than X days */
+		IF @unusedIndexesThresholdDays > 0
+			begin
+				DECLARE @instanceUptimeDays [smallint]
+				SET @queryToRun=N'Get instance uptime...' + [dbo].[ufn_getObjectQuoteName](@sqlServerName, 'quoted')
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+		
+				SET @queryToRun = N'SELECT DATEDIFF(day, [create_date], GETDATE()) AS [uptime_days] FROM sys.databases WHERE [name]=''tempdb'''				
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				SET @queryToRun = N'SELECT @instanceUptimeDays = [uptime_days] FROM (' + @queryToRun + N')x'
+				SET @queryParameters = '@instanceUptimeDays [smallint] OUTPUT'
+
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+				EXEC sp_executesql @queryToRun, @queryParameters, @instanceUptimeDays = @instanceUptimeDays OUTPUT
+				
+				IF @instanceUptimeDays >= @unusedIndexesThresholdDays
+					begin
+						/* get the list of the unused indexes (and not used to support foreing keys) which will be excluded from the maintenance */
+						SET @queryToRun = N''				
+						SET @queryToRun = @queryToRun + 
+											CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
+											SELECT   si.[object_id], si.[index_id]
+											FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[indexes] si
+											INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[tables] st ON si.[object_id]=st.[object_id]
+											LEFT JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[dm_db_index_usage_stats] iut ON	iut.[object_id] = si.[object_id] AND iut.[index_id]=si.[index_id] AND iut.[database_id] = DB_ID()
+											LEFT JOIN 
+												(
+													--indexes used by foreign-key constraints
+													SELECT	DISTINCT 
+															ob.[schema_id],
+															ob.[object_id],
+															ip.[index_id]
+													FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[foreign_key_columns]	fkc
+													INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[foreign_keys]	fk	ON fkc.[constraint_object_id] = fk.[object_id]
+													INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[columns]			cp	ON fkc.[parent_column_id] = cp.[column_id] AND fkc.[parent_object_id] = cp.[object_id]
+													INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[columns]			cr	ON fkc.[referenced_column_id] = cr.[column_id] AND fkc.[referenced_object_id] = cr.[object_id]
+													INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects]			ob	ON ob.[object_id] = fkc.[parent_object_id]
+													INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[index_columns]	icp ON icp.[object_id] = fkc.[parent_object_id] AND icp.[column_id] = fkc.[parent_column_id] AND icp.[key_ordinal] = 1
+													INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[indexes]			ip	ON ip.[object_id] = icp.[object_id] AND ip.[index_id] = icp.[index_id]
+													INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[index_columns]	icr ON icr.[object_id] = fkc.[referenced_object_id] AND icr.[column_id] = fkc.[referenced_column_id] AND icr.[key_ordinal] = 1
+													INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[indexes]			ir	ON ir.[object_id] = icr.[object_id] AND ir.[index_id] = icr.[index_id] AND (ir.[is_unique] = 1 OR ir.[is_primary_key] = 1)
+												)fki ON fki.[object_id] = st.[object_id] AND fki.[schema_id] = st.[schema_id] AND fki.[index_id] = si.[index_id]
+											where   (    iut.[object_id] IS NULL 
+													OR 
+														(iut.[object_id] IS NOT NULL AND (iut.[user_seeks] + iut.[user_scans] + iut.[user_lookups]) = 0)
+													)
+													AND st.[is_ms_shipped] = 0
+													AND si.[index_id] NOT IN (0, 1)
+													AND si.[is_primary_key] = 0
+													AND si.[is_unique_constraint] = 0
+													AND si.[is_disabled] = 0
+													AND fki.[object_id] IS NULL'
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+
+						INSERT	INTO #unusedIndexes([object_id], [index_id])
+								EXEC sp_executesql  @queryToRun
+
+						/* save information about the skipped indexes */
+						DECLARE crsUnusedIndexesToSkip CURSOR LOCAL FAST_FORWARD FOR	SELECT    [dbo].[ufn_getObjectQuoteName]([table_schema], 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM([table_name]), 'quoted') AS [object_name]
+																								, [index_name]
+																						FROM #databaseObjectsWithIndexList doil
+																						INNER JOIN #unusedIndexes ui ON ui.[object_id] = doil.[object_id] AND ui.[index_id] = doil.[index_id]
+						OPEN crsUnusedIndexesToSkip
+						FETCH NEXT FROM crsUnusedIndexesToSkip INTO @objectName, @IndexName
+						WHILE @@FETCH_STATUS=0
+							begin
+								SET @eventData='<skipaction><detail>' + 
+													'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
+													'<object_name>' + [dbo].[ufn_getObjectQuoteName](@objectName, 'xml') + '</object_name>'+ 
+													'<index_name>' + [dbo].[ufn_getObjectQuoteName](@IndexName, 'xml') + '</index_name>' + 
+													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+													'<reason>unused index in the last ' + CAST(@unusedIndexesThresholdDays AS [sysname]) + ' days</reason>' + 
+												'</detail></skipaction>'
+
+								EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+																	@dbName			= @dbName,
+																	@module			= 'dbo.usp_mpDatabaseOptimize',
+																	@eventName		= 'database maintenance',
+																	@eventMessage	= @eventData,
+																	@eventType		= 0 /* info */
+
+								FETCH NEXT FROM crsUnusedIndexesToSkip INTO @objectName, @IndexName
+							end
+						CLOSE crsUnusedIndexesToSkip
+						DEALLOCATE crsUnusedIndexesToSkip	
+
+
+						/* delete unused indexe from the driving table*/
+						DELETE doil
+						FROM #databaseObjectsWithIndexList doil
+						INNER JOIN #unusedIndexes ui ON ui.[object_id] = doil.[object_id] 
+														AND ui.[index_id] = doil.[index_id]
+					end
+			end
 	end
 
 
