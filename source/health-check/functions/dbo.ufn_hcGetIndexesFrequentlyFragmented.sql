@@ -9,7 +9,7 @@ CREATE FUNCTION [dbo].[ufn_hcGetIndexesFrequentlyFragmented]
 (		
 	@projectCode							[varchar](32)=NULL,
 	@minimumIndexMaintenanceFrequencyDays	[tinyint] = 2,
-	@analyzeOnlyMessagesFromTheLastHours	[tinyint] = 24 ,
+	@analyzeOnlyMessagesFromTheLastHours	[smallint] = 24 ,
 	@analyzeIndexMaintenanceOperation		[nvarchar](128) = 'REBUILD'
 )
 RETURNS @fragmentedIndexes TABLE
@@ -97,9 +97,9 @@ begin
 					AND a.[database_name] = i.[database_name] 
 					AND a.[object_name] = i.[object_name] 
 					AND a.[child_object_name] = i.[child_object_name]
-					AND (  a.[event_message_id] = i.[event_message_id] + 1
-						OR DATEDIFF(ss, i.[event_date_utc], a.[event_date_utc]) BETWEEN 0 AND 60 /* 60 seconds delay between info and action messages */
-						)
+					--AND (  a.[event_message_id] = i.[event_message_id] + 1
+					--	OR DATEDIFF(ss, i.[event_date_utc], a.[event_date_utc]) BETWEEN 0 AND 60 /* 60 seconds delay between info and action messages */
+					--	)
 		),
 	fragmentedIndexesInfo AS
 	(

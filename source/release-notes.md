@@ -829,3 +829,4 @@
 
 29.01.2019
 * maintenance-plan: fix small bug on redo mechanism for internal foreign key changes
+* maintenance-plan: fix bug on mechanism for detecting heavy fragmented indexes
