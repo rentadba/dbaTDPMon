@@ -72,6 +72,8 @@ AS
 --					 65536  - cleanup of ghost records (sp_clean_db_free_space)
 --							- this may be forced by setting to true property 'Force cleanup of ghost records'
 --				    131072  - Create statistics on all eligible columns
+--					262144	- take a log backup at the end of the optimization process
+--					524288	- perform a shrink with truncate_only on the log file at the end of the optimization process
 
 --		@defragIndexThreshold		- min value for fragmentation level when to start reorganize it
 --		@@rebuildIndexThreshold		- min value for fragmentation level when to start rebuild it
@@ -1765,6 +1767,7 @@ IF (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 		begin
 			SET @nestExecutionLevel = @executionLevel + 1
 			EXEC [dbo].[usp_mpCheckAndRevertInternalActions]	@sqlServerName	= @sqlServerName,
+																@dbName			= @dbName,
 																@flgOptions		= @flgOptions,
 																@executionLevel	= @nestExecutionLevel, 
 																@debugMode		= @debugMode

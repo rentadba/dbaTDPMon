@@ -826,3 +826,6 @@
 
 11.01.2019
 * maintenance-plan: do not run maintenance for indexes not used in the last X days (appConfigurations option)
+
+29.01.2019
+* maintenance-plan: fix small bug on redo mechanism for internal foreign key changes

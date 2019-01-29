@@ -11,14 +11,14 @@ GO
 -----------------------------------------------------------------------------------------
 CREATE PROCEDURE [dbo].[usp_mpCheckAndRevertInternalActions]
 		@sqlServerName			[sysname],
+		@dbName					[sysname],
 		@flgOptions				[int]	= 12941,
 		@executionLevel			[tinyint]	=     0,
 		@debugMode				[bit]		=     0
 /* WITH ENCRYPTION */
 AS
 
-DECLARE   @crtDatabaseName			[sysname]
-		, @crtSchemaName			[sysname]
+DECLARE   @crtSchemaName			[sysname]
 		, @crtObjectName			[sysname]
 		, @crtChildObjectName		[sysname]
 		, @queryToRun				[nvarchar](1024)
@@ -76,16 +76,17 @@ SET @queryToRun=N'Rebuilding previously disabled indexes...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 SET @nestExecutionLevel = @executionLevel + 1
-DECLARE crslogInternalAction CURSOR LOCAL FAST_FORWARD FOR	SELECT	[database_name], [schema_name], [object_name], [child_object_name]
+DECLARE crslogInternalAction CURSOR LOCAL FAST_FORWARD FOR	SELECT	[schema_name], [object_name], [child_object_name]
 															FROM	[maintenance-plan].[logInternalAction]
 															WHERE	[name] = 'index-made-disable'
 																	AND [server_name] = @sqlServerName
+																	AND [database_name] = @dbName 
 OPEN crslogInternalAction
-FETCH NEXT FROM crslogInternalAction INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+FETCH NEXT FROM crslogInternalAction INTO @crtSchemaName, @crtObjectName, @crtChildObjectName
 WHILE @@FETCH_STATUS=0
 	begin
 		EXEC [dbo].[usp_mpAlterTableIndexes]		@sqlServerName				= @sqlServerName,
-													@dbName						= @crtDatabaseName,
+													@dbName						= @dbName,
 													@tableSchema				= @crtSchemaName,
 													@tableName					= @crtObjectName,
 													@indexName					= @crtChildObjectName,
@@ -98,7 +99,7 @@ WHILE @@FETCH_STATUS=0
 													@affectedDependentObjects	= @affectedDependentObjects OUT,
 													@debugMode					= @debugMode
 
-		FETCH NEXT FROM crslogInternalAction INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+		FETCH NEXT FROM crslogInternalAction INTO @crtSchemaName, @crtObjectName, @crtChildObjectName
 	end
 CLOSE crslogInternalAction
 DEALLOCATE crslogInternalAction
@@ -108,16 +109,17 @@ DEALLOCATE crslogInternalAction
 SET @queryToRun=N'Rebuilding previously disabled foreign key constraints...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-DECLARE crslogInternalAction CURSOR LOCAL FAST_FORWARD FOR	SELECT	[database_name], [schema_name], [object_name], [child_object_name]
+DECLARE crslogInternalAction CURSOR LOCAL FAST_FORWARD FOR	SELECT	[schema_name], [object_name], [child_object_name]
 															FROM	[maintenance-plan].[logInternalAction]
 															WHERE	[name] = 'foreign-key-made-disable'
 																	AND [server_name] = @sqlServerName
+																	AND [database_name] = @dbName 
 OPEN crslogInternalAction
-FETCH NEXT FROM crslogInternalAction INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+FETCH NEXT FROM crslogInternalAction INTO @crtSchemaName, @crtObjectName, @crtChildObjectName
 WHILE @@FETCH_STATUS=0
 	begin
 		EXEC [dbo].[usp_mpAlterTableForeignKeys]	@sqlServerName		= @sqlServerName,
-													@dbName				= @crtDatabaseName,
+													@dbName				= @dbName,
 													@tableSchema		= @crtSchemaName,
 													@tableName			= @crtObjectName,
 													@constraintName		= @crtChildObjectName,
@@ -125,7 +127,7 @@ WHILE @@FETCH_STATUS=0
 													@flgOptions			= @flgOptions,
 													@executionLevel		= @nestExecutionLevel,
 													@debugMode			= @debugMode
-		FETCH NEXT FROM crslogInternalAction INTO @crtDatabaseName, @crtSchemaName, @crtObjectName, @crtChildObjectName
+		FETCH NEXT FROM crslogInternalAction INTO @crtSchemaName, @crtObjectName, @crtChildObjectName
 	end
 CLOSE crslogInternalAction
 DEALLOCATE crslogInternalAction
