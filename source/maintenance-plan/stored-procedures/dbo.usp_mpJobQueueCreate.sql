@@ -168,6 +168,29 @@ WHILE @@FETCH_STATUS=0
 										)
 									)
 
+				/* clean the execution history: delete jobs for non-active databases */
+				DELETE jeq
+				FROM [dbo].[jobExecutionQueue] jeq
+				INNER JOIN [dbo].[catalogDatabaseNames] cdn ON	cdn.[project_id] = jeq.[project_id] 
+																AND cdn.[instance_id] = jeq.[for_instance_id] 
+																AND cdn.[name] = jeq.[database_name]
+				WHERE	jeq.[project_id] = @projectID
+						AND jeq.[instance_id] = @instanceID
+						AND jeq.[descriptor] = @codeDescriptor
+						AND jeq.[for_instance_id] = @forInstanceID 
+						AND jeq.[module] = @module
+						AND jeq.[status] <> -1
+						AND cdn.[active] = 0
+						AND (   @skipDatabasesList IS NULL
+								OR (    @skipDatabasesList IS NOT NULL	
+									AND (
+										SELECT COUNT(*)
+										FROM [dbo].[ufn_getTableFromStringList](@skipDatabasesList, ',') X
+										WHERE jeq.[job_name] LIKE (DB_NAME() + ' - ' + @codeDescriptor + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + REPLACE(@@SERVERNAME, '\', '$') + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
+									) = 0
+								)
+							)
+
 				IF @recreateMode = 1										
 					DELETE jeq
 					FROM [dbo].[jobExecutionQueue]  jeq
