@@ -41,13 +41,10 @@ begin
 			@maxEventDateUTCToAnalyze	[datetime]
 
 	-----------------------------------------------------------------------------------------------------
-	--get default projectCode
-	IF @projectCode IS NULL
-		SET @projectCode = [dbo].[ufn_getProjectCode](NULL, NULL)
-
-	SELECT    @projectID = [id]
-	FROM [dbo].[catalogProjects]
-	WHERE [code] = @projectCode 
+	IF @projectCode IS NOT NULL
+		SELECT    @projectID = [id]
+		FROM [dbo].[catalogProjects]
+		WHERE [code] = @projectCode 
 
 	SET @maxEventDateUTCToAnalyze = DATEADD(hh, -@analyzeOnlyMessagesFromTheLastHours, GETUTCDATE())
 
@@ -72,7 +69,7 @@ begin
 							)
 						)
 						AND [event_type] = 0 --info
-						AND [project_id] = @projectID
+						AND ([project_id] = @projectID OR @projectID IS NULL)
 						AND [event_date_utc] >= @maxEventDateUTCToAnalyze
 			)i
 		INNER JOIN
@@ -91,7 +88,7 @@ begin
 							)
 						)
 						AND [event_type] = 4 --action
-						AND [project_id] = @projectID
+						AND ([project_id] = @projectID OR @projectID IS NULL)
 						AND [event_date_utc] >= @maxEventDateUTCToAnalyze
 			)a ON	a.[instance_name] = i.[instance_name]
 					AND a.[database_name] = i.[database_name] 

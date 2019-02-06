@@ -1,16 +1,16 @@
-RAISERROR('Create procedure: [dbo].[usp_reportHTMLBuildHealthCheck]', 10, 1) WITH NOWAIT
+RAISERROR('Create procedure: [dbo].[usp_reportHTMLBuildHealthCheck2]', 10, 1) WITH NOWAIT
 GO
 IF  EXISTS (
 	    SELECT * 
 	      FROM sys.objects 
-	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_reportHTMLBuildHealthCheck]') 
+	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_reportHTMLBuildHealthCheck2]') 
 	       AND type in (N'P', N'PC'))
-DROP PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
+DROP PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck2]
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
-CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
+CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck2]
 		@projectCode			[varchar](32)=NULL,
 		@flgActions				[int]			= 63,		/*	1 - Instance Availability 
 																2 - Databases status
@@ -47,6 +47,7 @@ CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 														  33554432 - SQL Server Agent Jobs - Long Running SQL Agent Jobs
 														  67108864 - OS Event messages - Permission errors
 														 134217728 - OS Event messages - Issues Detected
+														 268435456 - do not consider @projectCode when filtering database information
 															*/
 		@reportDescription		[nvarchar](256) = NULL,
 		@reportFileName			[nvarchar](max) = NULL,	/* if file name is null, than the name will be generated */
