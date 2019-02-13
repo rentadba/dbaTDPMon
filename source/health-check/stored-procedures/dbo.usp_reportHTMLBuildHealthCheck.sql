@@ -1,16 +1,16 @@
-RAISERROR('Create procedure: [dbo].[usp_reportHTMLBuildHealthCheck2]', 10, 1) WITH NOWAIT
+RAISERROR('Create procedure: [dbo].[usp_reportHTMLBuildHealthCheck]', 10, 1) WITH NOWAIT
 GO
 IF  EXISTS (
 	    SELECT * 
 	      FROM sys.objects 
-	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_reportHTMLBuildHealthCheck2]') 
+	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_reportHTMLBuildHealthCheck]') 
 	       AND type in (N'P', N'PC'))
-DROP PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck2]
+DROP PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
-CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck2]
+CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 		@projectCode			[varchar](32)=NULL,
 		@flgActions				[int]			= 63,		/*	1 - Instance Availability 
 																2 - Databases status
@@ -1034,7 +1034,7 @@ BEGIN TRY
 					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
 					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 32768 = 32768)
 						  THEN N'<A HREF="#DatabaseMaxLogSpaceIssuesDetected" class="summary-style color-1">High Usage of Log Space {DatabaseMaxLogSpaceIssuesDetectedCount}</A>'
-						  ELSE N'High Usage of Log Spacee (N/A)'
+						  ELSE N'High Usage of Log Space (N/A)'
 					END + N'
 					</TD>
 				</TR> 
@@ -1301,6 +1301,7 @@ BEGIN TRY
 																				WHERE ( 
 																						  @reportOptionGetProjectDBSize = 0
 																					   OR (@reportOptionGetProjectDBSize = 1 AND [project_id] = @projectID)
+																					   OR (@flgOptions & 268435456 = 268435456)
 																					 )
 																				GROUP BY [project_id], [instance_name]
 																			) shcdd ON	shcdd.[instance_name] = cin.[instance_name] 
@@ -1325,7 +1326,7 @@ BEGIN TRY
 					SET @hasDatabaseDetails = 0
 					SELECT	@hasDatabaseDetails = COUNT(*)
 					FROM	[dbo].[vw_catalogDatabaseNames]
-					WHERE	[project_id]=@projectID
+					WHERE	([project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 							AND [instance_name] = @instanceName
 
 					SET @hasSQLagentJob = 0
@@ -1565,7 +1566,7 @@ BEGIN TRY
 																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
-																							AND cin.[project_id] = @projectID	
+																							AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																							AND CHARINDEX(cdn.[state_desc], @reportOptionDatabaseAdmittedState)=0
 																							AND rsr.[id] IS NULL
 																					ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
@@ -2124,7 +2125,7 @@ BEGIN TRY
 																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
-																							AND cin.[project_id] = @projectID	
+																							AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																							AND (   (cdn.[database_name]='master' AND shcdd.[size_mb] >= @reportOptionDatabaseMaxSizeMaster AND @reportOptionDatabaseMaxSizeMaster<>0)
 																								 OR (cdn.[database_name]='msdb'   AND shcdd.[size_mb] >= @reportOptionDatabaseMaxSizeMSDB   AND @reportOptionDatabaseMaxSizeMSDB<>0)
 																								)
@@ -2205,7 +2206,7 @@ BEGIN TRY
 																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
-																							AND cin.[project_id] = @projectID
+																							AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																							AND (shcdd.[is_auto_close]=1 OR shcdd.[is_auto_shrink]=1)
 																							AND rsr.[id] IS NULL
 																					ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
@@ -2285,7 +2286,7 @@ BEGIN TRY
 																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																						WHERE cin.[instance_active]=1
 																								AND cdn.[active]=1
-																								AND cin.[project_id] = @projectID	
+																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																								AND shcdd.[log_size_mb] >= @reportOptionLogMaxSize 
 																								AND rsr.[id] IS NULL
 																						ORDER BY shcdd.[log_size_mb] DESC, cin.[instance_name], cin.[machine_name], cdn.[database_name]
@@ -2370,14 +2371,13 @@ BEGIN TRY
 																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																						WHERE cin.[instance_active]=1
 																								AND cdn.[active]=1
-																								AND cin.[project_id] = @projectID	
+																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																								AND shcdd.[size_mb]>=@reportOptionDBMinSizeForAnalysis 
 																								AND shcdd.[data_space_used_percent] <= @reportOptionDataSpaceMinPercent 
 																								AND @reportOptionDataSpaceMinPercent<>0
 																								AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb', 'distribution')
 																								AND rsr.[id] IS NULL
-																						ORDER BY --[reclaimable_space_mb] DESC, 
-																								 cin.[instance_name], cin.[machine_name], shcdd.[data_space_used_percent] DESC, cdn.[database_name]
+																						ORDER BY cin.[instance_name], cin.[machine_name], [reclaimable_space_mb] DESC, cdn.[database_name]
 			OPEN crsDatabaseMinDataSpaceIssuesDetected
 			FETCH NEXT FROM crsDatabaseMinDataSpaceIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @dataSizeMB, @dataSpaceUsedPercent, @reclaimableSpaceMB
 			WHILE @@FETCH_STATUS=0
@@ -2461,7 +2461,7 @@ BEGIN TRY
 																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																						WHERE cin.[instance_active]=1
 																								AND cdn.[active]=1
-																								AND cin.[project_id] = @projectID	
+																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																								AND shcdd.[size_mb]>=@reportOptionDBMinSizeForAnalysis 
 																								AND shcdd.[log_space_used_percent] >= @reportOptionLogSpaceMaxPercent 
 																								AND @reportOptionLogSpaceMaxPercent<>0
@@ -2555,7 +2555,7 @@ BEGIN TRY
 																																				AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																									WHERE cin.[instance_active]=1
 																											AND cdn.[active]=1
-																											AND cin.[project_id] = @projectID	
+																											AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																											AND shcdd.[data_size_mb] <> 0
 																											AND (shcdd.[log_size_mb] / shcdd.[data_size_mb] * 100.) > @reportOptionLogVsDataPercent
 																											AND shcdd.[size_mb]>=@reportOptionDBMinSizeForAnalysis 
@@ -2642,7 +2642,7 @@ BEGIN TRY
 																															AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																				WHERE	cin.[instance_active]=1
 																						AND cdn.[active]=1
-																						AND cin.[project_id] = @projectID	
+																						AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																						AND shcdd.[is_growth_limited]=1
 																						AND rsr.[id] IS NULL
 																				ORDER BY cdn.[database_name]
@@ -2726,7 +2726,7 @@ BEGIN TRY
 																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																						WHERE cin.[instance_active]=1
 																								AND cdn.[active]=1
-																								AND cin.[project_id] = @projectID
+																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																								AND cdn.[database_name] NOT IN ('tempdb')
 																								AND (   
 																										(     shcdd.[page_verify_option_desc] <> 'CHECKSUM'
@@ -2785,13 +2785,10 @@ BEGIN TRY
 			DECLARE @indexAnalyzedCount						[int],
 					@indexesPerInstance						[int],
 					@minimumIndexMaintenanceFrequencyDays	[tinyint],
-					@analyzeOnlyMessagesFromTheLastHours	[tinyint],
-					@analyzeIndexMaintenanceOperation		[nvarchar](128)
+					@analyzeOnlyMessagesFromTheLastHours	[tinyint]
 
 			SET @minimumIndexMaintenanceFrequencyDays = 2
 			SET @analyzeOnlyMessagesFromTheLastHours = 24
-			SET @analyzeIndexMaintenanceOperation = 'REBUILD'
-
 		
 			-----------------------------------------------------------------------------------------------------
 			--reading report options
@@ -2811,18 +2808,12 @@ BEGIN TRY
 			SET @analyzeOnlyMessagesFromTheLastHours = ISNULL(@analyzeOnlyMessagesFromTheLastHours, 24)
 	
 			-----------------------------------------------------------------------------------------------------
-			SELECT	@analyzeIndexMaintenanceOperation = [value]
-			FROM	[report].[htmlOptions]
-			WHERE	[name] = N'Analyze Index Maintenance Operation'
-					AND [module] = 'health-check'
-
-			
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="FrequentlyFragmentedIndexesIssuesDetected" class="category-style">Frequently Fragmented Indexes</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="11">indexes which got fragmented in the last ' + CAST(@minimumIndexMaintenanceFrequencyDays AS [nvarchar](32)) + N' day(s), were analyzed in the last ' + CAST(@analyzeOnlyMessagesFromTheLastHours AS [nvarchar](32)) + N' hours and last action was in (' + @analyzeIndexMaintenanceOperation + N')</TD>
+								<TD class="small-size" COLLSPAN="11">indexes which got fragmented in the last ' + CAST(@minimumIndexMaintenanceFrequencyDays AS [nvarchar](32)) + N' day(s) and were analyzed in the last ' + CAST(@analyzeOnlyMessagesFromTheLastHours AS [nvarchar](32)) + N' hours)</TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD class="small-size" COLLSPAN="11">consider lowering the fill-factor with at least 5 percent</TD>
@@ -2853,9 +2844,19 @@ BEGIN TRY
 			IF OBJECT_ID('tempdb..#filteredStatsIndexesFrequentlyFragmented]') IS NOT NULL
 				DROP TABLE #filteredStatsIndexesFrequentlyFragmented
 
+			DECLARE @projectToAnalyze [varchar](32)
+			SET @projectToAnalyze = CASE WHEN @flgOptions & 268435456 = 268435456 THEN NULL ELSE @projectCode END
+			
 			SELECT iff.*
 			INTO #filteredStatsIndexesFrequentlyFragmented
-			FROM [dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectCode, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, @analyzeIndexMaintenanceOperation) iff
+			FROM 
+				(
+					SELECT *
+					FROM [dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectToAnalyze, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, 'REBUILD') a
+					UNION ALL
+					SELECT *
+					FROM [dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectToAnalyze, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, 'REORGANIZE')b
+				)iff
 			INNER JOIN [dbo].[vw_catalogInstanceNames]  cin ON iff.[instance_name] = cin.[instance_name]
 			LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 														AND rsr.[rule_id] = 16777216
@@ -3003,7 +3004,7 @@ BEGIN TRY
 																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																							WHERE cin.[instance_active]=1
 																									AND cdn.[active]=1
-																									AND cin.[project_id] = @projectID
+																									AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																									AND CHARINDEX(cdn.[state_desc], @reportOptionDatabaseAdmittedState) <> 0
 																									AND rsr.[id] IS NULL
 																						)
@@ -3105,7 +3106,7 @@ BEGIN TRY
 																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																							WHERE cin.[instance_active]=1
 																									AND cdn.[active]=1
-																									AND cin.[project_id] = @projectID	
+																									AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																									AND (
 																											(    cdn.[database_name] NOT IN ('master', 'model', 'msdb', 'distribution') 
 																												AND DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) > @reportOptionUserDBCCCHECKDBAgeDays
@@ -3363,7 +3364,7 @@ BEGIN TRY
 																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
-																							AND cin.[project_id] = @projectID	
+																							AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																							AND rsr.[id] IS NULL
 																					GROUP BY cin.[machine_name], cin.[instance_name]
 																							, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -3405,7 +3406,7 @@ BEGIN TRY
 													LEFT  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
 													WHERE	cin.[instance_active]=1
 															AND cdn.[active]=1
-															AND cin.[project_id] = @projectID	
+															AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 															AND cin.[instance_name] =  @instanceName
 															AND cin.[machine_name] = @machineName
 												)X

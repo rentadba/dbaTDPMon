@@ -833,3 +833,8 @@
 
 31.01.2019
 * maintenance-plan: fix small bug when generating internal jobs on systems with rotating database snapshots
+
+------------
+#### February 2019 new features & fixes
+12.02.2019
+* health-check: add option to the daily health check report not to filter out databases per assigned project
