@@ -132,6 +132,7 @@ DECLARE   @databaseName								[sysname]
 		, @diskPercentAvailable					[numeric](6,2)
 		, @dateTimeLowerLimit					[datetime]
 		, @dateTimeLowerLimitUTC				[datetime]
+		, @dbCount								[smallint]
 
 		, @messageCount							[int]
 		, @issuesDetectedCount					[int]
@@ -1269,12 +1270,13 @@ BEGIN TRY
 										N'<TR class="color-3">
 											<TH WIDTH="100px" class="details-bold" nowrap>Details</TH>
 											<TH WIDTH="150px" class="details-bold">Machine Name</TH>
-											<TH WIDTH="200px" class="details-bold">Instance Name</TH>
-											<TH WIDTH="100px" class="details-bold">Clustered</TH>
-											<TH WIDTH= "90px" class="details-bold" nowrap >Version</TH>
-											<TH WIDTH="260px" class="details-bold">Edition</TH>
+											<TH WIDTH="180px" class="details-bold">Instance Name</TH>
+											<TH WIDTH=" 80px" class="details-bold">Clustered</TH>
+											<TH WIDTH= "80px" class="details-bold" nowrap >Version</TH>
+											<TH WIDTH="240px" class="details-bold">Edition</TH>
 											<TH WIDTH= "80px" class="details-bold" nowrap>DB Size (MB)</TH>
-											<TH WIDTH="150px" class="details-bold" nowrap>Refresh Date (UTC)</TH>'
+											<TH WIDTH= "80px" class="details-bold" nowrap>DB Count</TH>
+											<TH WIDTH="140px" class="details-bold" nowrap>Refresh Date (UTC)</TH>'
 
 			DECLARE   @version				[sysname]
 					, @edition				[varchar](256)
@@ -1291,18 +1293,21 @@ BEGIN TRY
 			DECLARE crsInstancesOffline CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																				, cin.[is_clustered], cin.[cluster_node_machine_name]
 																				, cin.[version], cin.[edition], cin.[last_refresh_date_utc]	
+																				, SUM(shcdd.[db_count]) AS [database_count]
 																				, SUM(shcdd.[size_mb]) AS [size_mb]
 																		FROM [dbo].[vw_catalogInstanceNames]  cin
 																		LEFT JOIN 
 																			(
 																				SELECT    [project_id], [instance_name]
+																						, COUNT(DISTINCT [database_name]) AS [db_count]
 																						, SUM(ISNULL([size_mb], 0)) [size_mb]
 																				FROM [health-check].[vw_statsDatabaseDetails]
-																				WHERE ( 
-																						  @reportOptionGetProjectDBSize = 0
-																					   OR (@reportOptionGetProjectDBSize = 1 AND [project_id] = @projectID)
-																					   OR (@flgOptions & 268435456 = 268435456)
-																					 )
+																				WHERE	( 
+																						     @reportOptionGetProjectDBSize = 0
+																						 OR (@reportOptionGetProjectDBSize = 1 AND [project_id] = @projectID)
+																						 OR (@flgOptions & 268435456 = 268435456)
+																						)
+																						AND [active] = 1
 																				GROUP BY [project_id], [instance_name]
 																			) shcdd ON	shcdd.[instance_name] = cin.[instance_name] 
 																						AND (   (@reportOptionGetProjectDBSize =1 AND shcdd.[project_id] = cin.[project_id])
@@ -1320,7 +1325,7 @@ BEGIN TRY
 																				, cin.[version], cin.[edition], cin.[last_refresh_date_utc]	
 																		ORDER BY cin.[instance_name], cin.[machine_name]
 			OPEN crsInstancesOffline
-			FETCH NEXT FROM crsInstancesOffline INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @version, @edition, @lastRefreshDate, @dbSize
+			FETCH NEXT FROM crsInstancesOffline INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @version, @edition, @lastRefreshDate, @dbCount, @dbSize
 			WHILE @@FETCH_STATUS=0
 				begin
 					SET @hasDatabaseDetails = 0
@@ -1378,16 +1383,17 @@ BEGIN TRY
 											N'<BR><BR>
 										</TD>' + 
 										N'<TD WIDTH="150px" class="details" ALIGN="LEFT">' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
-										N'<TD WIDTH="200px" class="details" ALIGN="LEFT">' + @instanceName + N'</TD>' + 
-										N'<TD WIDTH="100px" class="details" ALIGN="CENTER">' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
-										N'<TD WIDTH= "90px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(@version, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="260px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText](@edition, 0), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="180px" class="details" ALIGN="LEFT">' + @instanceName + N'</TD>' + 
+										N'<TD WIDTH=" 80px" class="details" ALIGN="CENTER">' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
+										N'<TD WIDTH= "80px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(@version, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="240px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText](@edition, 0), N'&nbsp;') + N'</TD>' + 
 										N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbSize AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="150px" class="details" ALIGN="LEFT" nowrap>' + ISNULL(CONVERT([nvarchar](24), @lastRefreshDate, 121), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbCount AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="140px" class="details" ALIGN="LEFT" nowrap>' + ISNULL(CONVERT([nvarchar](24), @lastRefreshDate, 121), N'&nbsp;') + N'</TD>' + 
 									N'</TR>'
 					SET @idx=@idx+1
 
-					FETCH NEXT FROM crsInstancesOffline INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @version, @edition, @lastRefreshDate, @dbSize
+					FETCH NEXT FROM crsInstancesOffline INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @version, @edition, @lastRefreshDate, @dbCount, @dbSize
 				end
 			CLOSE crsInstancesOffline
 			DEALLOCATE crsInstancesOffline
@@ -3329,9 +3335,7 @@ BEGIN TRY
 		begin
 			SET @ErrMessage = 'Build Report: Databases Status - Complete Details'
 			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
-			DECLARE   @dbCount		[int]
-			
+		
 			SET @HTMLReportArea=N''
 			SET @HTMLReportArea = @HTMLReportArea + 
 							N'<A NAME="DatabasesStatusCompleteDetails" class="category-style">Databases Status - Complete Details</A><br>

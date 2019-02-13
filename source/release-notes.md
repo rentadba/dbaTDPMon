@@ -838,3 +838,4 @@
 #### February 2019 new features & fixes
 12.02.2019
 * health-check: add option to the daily health check report not to filter out databases per assigned project
+* health-check: have database count listed in daily report
