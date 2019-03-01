@@ -75,7 +75,10 @@ IF @clusterName IS NOT NULL AND @dbIsPartOfAG=1
 							, ag.[automated_backup_preference]
 							, ar.[secondary_role_allow_connections_desc]
 							, hdrs.[synchronization_state_desc]
-							, sys.fn_hadr_backup_is_preferred_replica(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N''') AS [backup_is_preferred_replica]
+							, CASE	WHEN ars.[role_desc] = ''PRIMARY'' AND ag.[automated_backup_preference] IN (0, 2, 3) THEN 1
+									WHEN ars.[role_desc] = ''SECONDARY'' AND ag.[automated_backup_preference] IN (1, 2) THEN 1
+									ELSE 0
+							  END [backup_is_preferred_replica]
 					FROM sys.availability_replicas ar
 					INNER JOIN sys.dm_hadr_availability_replica_states ars ON ars.[replica_id]=ar.[replica_id] AND ars.[group_id]=ar.[group_id]
 					INNER JOIN sys.availability_groups ag ON ag.[group_id]=ar.[group_id]

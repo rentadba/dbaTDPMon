@@ -109,6 +109,11 @@ INSERT	INTO [report].[hardcodedFilters] ([module], [object_name], [filter_patter
 		SELECT 'health-check', 'statsErrorlogDetails', '%average throughput%I/O saturation%context switches%', 1 UNION ALL
 		SELECT 'health-check', 'statsErrorlogDetails', '%last target outstanding%avgWriteLatency%', 1 UNION ALL
 		SELECT 'health-check', 'statsErrorlogDetails', '%DbMgrPartnerCommitPolicy::SetSyncAndRecoveryPoint:%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Process ID % was killed by hostname %, host process ID %.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Synchronize Database % with Resource Database.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Restore is complete on database %. The database is now available.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%AppDomain % created.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%AppDomain % is marked for unload due to common language runtime (CLR) or security data definition language (DDL) operations.%', 1 UNION ALL
 
 		SELECT 'health-check', 'statsOSEventLogs', '%Logon failed for login%', 1 UNION ALL
 		SELECT 'health-check', 'statsOSEventLogs', '%Unable to retrieve steps for job%', 1 UNION ALL

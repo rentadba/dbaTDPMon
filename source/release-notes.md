@@ -839,3 +839,8 @@
 12.02.2019
 * health-check: add option to the daily health check report not to filter out databases per assigned project
 * health-check: have database count listed in daily report
+
+------------
+#### March 2019 new features & fixes
+01.03.2019
+* health-check: add more messages to be filtered out from daily HTML report, errorlog section
