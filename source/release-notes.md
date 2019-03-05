@@ -844,3 +844,6 @@
 #### March 2019 new features & fixes
 01.03.2019
 * health-check: add more messages to be filtered out from daily HTML report, errorlog section
+
+05.03.2019
+* health-check: add failed login attempts information on daily HTML report

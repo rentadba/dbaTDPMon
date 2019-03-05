@@ -19,7 +19,7 @@ CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 															   16 - Errorlog messages
 															   32 - OS Event messages
 															*/
-		@flgOptions				[int]			= 266338303,/*	 1 - Instances - Offline
+		@flgOptions				[int]			= 803209215,/*	 1 - Instances - Offline
 																 2 - Instances - Online
 																 4 - Databases Status - Issues Detected
 																 8 - Databases Status - Complete Details
@@ -48,6 +48,7 @@ CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 														  67108864 - OS Event messages - Permission errors
 														 134217728 - OS Event messages - Issues Detected
 														 268435456 - do not consider @projectCode when filtering database information
+														 536870912 - Failed Login Attempts - Issues Detected
 															*/
 		@reportDescription		[nvarchar](256) = NULL,
 		@reportFileName			[nvarchar](max) = NULL,	/* if file name is null, than the name will be generated */
@@ -104,6 +105,7 @@ DECLARE   @databaseName								[sysname]
 		, @reportOptionSystemDatabaseBACKUPAgeDays	[int]
 		, @reportOptionFreeDiskMinPercent 			[numeric](6,2)
 		, @reportOptionFreeDiskMinSpaceMB			[int]
+		, @reportOptionFailedLoginAttemptsLimit		[int]
 		, @reportOptionErrorlogMessageLastHours		[int]
 		, @reportOptionErrorlogMessageLimit			[int]
 		, @reportOptionMaxJobRunningTimeInHours		[int]
@@ -365,6 +367,18 @@ BEGIN TRY
 		SET @reportOptionFreeDiskMinSpaceMB = 3000
 	END CATCH
 	SET @reportOptionFreeDiskMinSpaceMB = ISNULL(@reportOptionFreeDiskMinSpaceMB, 3000)
+
+	-----------------------------------------------------------------------------------------------------
+	BEGIN TRY
+		SELECT	@reportOptionFailedLoginAttemptsLimit = [value]
+		FROM	[report].[htmlOptions]
+		WHERE	[name] = N'Minimum Failed Login Attempts'
+				AND [module] = 'health-check'
+	END TRY
+	BEGIN CATCH
+		SET @reportOptionFailedLoginAttemptsLimit = 50
+	END CATCH
+	SET @reportOptionFailedLoginAttemptsLimit = ISNULL(@reportOptionFailedLoginAttemptsLimit, 50)
 
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
@@ -972,7 +986,7 @@ BEGIN TRY
 				<TR VALIGN="TOP" class="color-1">
 					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
 					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 4 = 4)
-						  THEN N'<A HREF="#DatabasesStatusIssuesDetected" class="summary-style color-1">Offline Databases {DatabasesStatusIssuesDetectedCount}</A>'
+						  THEN N'<A HREF="#DatabasesStatusIssuesDetected" class="summary-style color-1">Inaccessible Databases {DatabasesStatusIssuesDetectedCount}</A>'
 						  ELSE N'Offline Databases (N/A)'
 					END + N'
 					</TD>
@@ -1068,11 +1082,15 @@ BEGIN TRY
 					</TD>
 				</TR> 
 				<TR VALIGN="TOP" class="color-2">
-					<TD ALIGN=LEFT class="summary-style add-border color-2">&nbsp;</TD>
 					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
 					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 8388608 = 8388608)
 						  THEN N'<A HREF="#DatabasePageVerifyIssuesDetected" class="summary-style color-2">Databases with Improper Page Verify Option {DatabasePageVerifyIssuesDetectedCount}</A>'
 						  ELSE N'Databases with Improper Page Verify Option (N/A)'
+					END + N'</TD>
+					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
+					CASE WHEN (@flgActions & 16 = 16) AND (@flgOptions & 536870912 = 536870912)
+						  THEN N'<A HREF="#FailedLoginsAttemptsIssuesDetected" class="summary-style color-2">Failed Login Attempts {FailedLoginsAttemptsIssuesDetectedCount}</A>'
+						  ELSE N'Failed Logins Attempts (N/A)'
 					END + N'
 					</TD>
 				</TR>
@@ -1088,7 +1106,7 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 16 = 16) AND (@flgOptions & 1048576 = 1048576)
 		begin
-			SET @ErrMessage = 'analyzing errorlog messages'
+			SET @ErrMessage = 'analyzing errorlog messages - filtering messages'
 			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 
 			IF OBJECT_ID('tempdb..#filteredStatsSQLServerErrorlogDetail') IS NOT NULL
@@ -1124,6 +1142,57 @@ BEGIN TRY
 					AND rsr.[id] IS NULL
 			
 			CREATE INDEX IX_filteredStatsSQLServerErrorlogDetail_InstanceName ON #filteredStatsSQLServerErrorlogDetail([instance_name])
+
+			SET @ErrMessage = 'done'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
+		end
+
+	IF (@flgActions & 16 = 16) AND (@flgOptions & 536870912 = 536870912)
+		begin
+			SET @ErrMessage = 'analyzing errorlog messages - failed login attempts'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
+
+			IF OBJECT_ID('tempdb..#filteredStatsFailedLoginsDetails') IS NOT NULL
+				DROP TABLE #filteredStatsFailedLoginsDetails
+
+			SET @dateTimeLowerLimit		= DATEADD(hh, -@reportOptionErrorlogMessageLastHours, GETDATE())
+			SET @dateTimeLowerLimitUTC	= DATEADD(hh, -@reportOptionErrorlogMessageLastHours, GETUTCDATE())
+
+			SELECT eld.[instance_name], eld.[log_date], eld.[id], eld.[text], eld.[event_date_utc]
+			INTO #filteredStatsFailedLoginsDetails
+			FROM [dbo].[vw_catalogInstanceNames]  cin
+			INNER JOIN [health-check].[vw_statsErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
+			LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+														AND rsr.[rule_id] = 536870912
+														AND rsr.[active] = 1
+														AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+			WHERE	cin.[instance_active]=1
+					AND cin.[project_id] = @projectID																							
+					AND (   (eld.[log_date_utc] IS NOT NULL AND eld.[log_date_utc] >= @dateTimeLowerLimitUTC)
+						 OR (eld.[log_date_utc] IS NULL     AND eld.[log_date] >= @dateTimeLowerLimit)
+						)
+					AND eld.[process_info] = 'Logon'
+					AND eld.[text] LIKE '%failed%'			
+					AND rsr.[id] IS NULL
+
+			IF OBJECT_ID('tempdb..#filteredStatsFailedLoginsAttempts') IS NOT NULL
+				DROP TABLE #filteredStatsFailedLoginsAttempts
+
+			SELECT DISTINCT [instance_name], REPLACE([login_name], '''', '') as [login_name], [reason]
+					, COUNT(*) as [occurencies]
+			INTO #filteredStatsFailedLoginsAttempts
+			FROM (
+					SELECT	[instance_name],
+							SUBSTRING([text], CHARINDEX('Reason: ', [text]), LEN([text]) - CHARINDEX('Reason: ', [text]) + 1) AS [reason],
+							SUBSTRING([text],  CHARINDEX('''', [text]), (CHARINDEX('''', [text],  CHARINDEX('''', [text]) + 1)) - CHARINDEX('''', [text])) AS [login_name],
+							[text]				
+					FROM #filteredStatsFailedLoginsDetails	
+					WHERE	CHARINDEX('.', [text], CHARINDEX('Reason: ', [text]) + 8) - CHARINDEX('Reason: ', [text]) > 0
+							AND CHARINDEX('''', [text], CHARINDEX('''', [text]) + 1) - CHARINDEX('''', [text]) > 0
+				) x 
+			GROUP BY [instance_name], [login_name], [reason]
+
+			CREATE INDEX IX_filteredStatsFailedLoginsAttempts_InstanceName ON #filteredStatsFailedLoginsAttempts([instance_name])
 
 			SET @ErrMessage = 'done'
 			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
@@ -3162,6 +3231,97 @@ BEGIN TRY
 		end
 	ELSE
 		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseDBCCCHECKDBAgeIssuesDetectedCount}', '(N/A)')
+
+
+	-----------------------------------------------------------------------------------------------------
+	--Failed Login Attempts - Issues Detected
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 16 = 16) AND (@flgOptions & 536870912 = 536870912)
+		begin
+			SET @ErrMessage = 'Build Report: Failed Login Attempts - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea = @HTMLReportArea + 
+							N'<A NAME="FailedLoginsAttemptsIssuesDetected" class="category-style">Failed Login Attempts - Issues Detected (last ' + CAST(@reportOptionErrorlogMessageLastHours AS [nvarchar]) + N'h)</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="7">limit results to have minimum ' + CAST(@reportOptionFailedLoginAttemptsLimit AS [nvarchar](32)) + N' </TD>
+							</TR>
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
+											<TH WIDTH="160px" class="details-bold" nowrap>Login Name</TH>
+											<TH WIDTH= "60px" class="details-bold" nowrap>Occurences</TH>
+											<TH WIDTH="710px" class="details-bold">Reason</TH>'
+
+			SET @idx=1		
+
+			-----------------------------------------------------------------------------------------------------
+			SET @issuesDetectedCount = 0 
+			DECLARE crsErrorlogMessagesInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT
+																							  [instance_name]
+																							, COUNT(*) AS [messages_count]
+																					FROM #filteredStatsFailedLoginsAttempts
+																					WHERE [occurencies] >= @reportOptionFailedLoginAttemptsLimit
+																					GROUP BY [instance_name]
+																					ORDER BY [instance_name]
+			OPEN crsErrorlogMessagesInstanceName
+			FETCH NEXT FROM crsErrorlogMessagesInstanceName INTO @instanceName, @messageCount
+			WHILE @@FETCH_STATUS=0
+				begin
+					SET @issuesDetectedCount = @issuesDetectedCount + @messageCount
+
+					SET @HTMLReportArea = @HTMLReportArea + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + '"><A NAME="ErrorlogMessagesIssuesDetected' + @instanceName + N'">' + @instanceName + N'</A></TD>' 
+
+					SET @tmpHTMLReport=N''
+					SELECT @tmpHTMLReport=((
+											SELECT N'<TD WIDTH="160px" class="details" ALIGN="LEFT" nowrap>' + ISNULL(CONVERT([nvarchar](24), [login_name], 121), N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH="60px" class="details" ALIGN="LEFT">' + ISNULL(CAST([occurencies] AS [nvarchar](max)), N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH="710px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText]([reason], 0), N'&nbsp;')  + N'</TD>' + 
+													N'</TR>' + 
+													CASE WHEN [row_count] > [row_no]
+														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+														 ELSE N''
+													END
+
+											FROM (
+													SELECT	TOP (@messageCount)
+															[login_name], [occurencies], 
+															[reason],
+															ROW_NUMBER() OVER(ORDER BY [occurencies] DESC, [login_name]) [row_no],
+															SUM(1) OVER() AS [row_count]
+													FROM	#filteredStatsFailedLoginsAttempts													
+													WHERE	[instance_name] = @instanceName
+												)X
+											ORDER BY [occurencies] DESC, [login_name]
+											FOR XML PATH(''), TYPE
+											).value('.', 'nvarchar(max)'))
+
+					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
+					SET @idx=@idx + 1
+
+					FETCH NEXT FROM crsErrorlogMessagesInstanceName INTO @instanceName, @messageCount
+				end
+			CLOSE crsErrorlogMessagesInstanceName
+			DEALLOCATE crsErrorlogMessagesInstanceName
+
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
+								</TD>
+							</TR>
+						</TABLE>'
+
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{FailedLoginsAttemptsIssuesDetectedCount}', '(' + CAST((@issuesDetectedCount) AS [nvarchar]) + ')')
+		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{FailedLoginsAttemptsIssuesDetectedCount}', '(N/A)')
 
 
 	-----------------------------------------------------------------------------------------------------
