@@ -73,7 +73,7 @@ AS
 --							- this may be forced by setting to true property 'Force cleanup of ghost records'
 --				    131072  - Create statistics on all eligible columns
 --					262144	- take a log backup at the end of the optimization process
---					524288	- perform a shrink with truncate_only on the log file at the end of the optimization process
+--					262144	- perform a shrink with truncate_only on the log file at the end of the optimization process
 
 --		@defragIndexThreshold		- min value for fragmentation level when to start reorganize it
 --		@@rebuildIndexThreshold		- min value for fragmentation level when to start rebuild it
@@ -2089,6 +2089,36 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 ---------------------------------------------------------------------------------------------
 IF object_id('tempdb..#CurrentIndexFragmentationStats') IS NOT NULL DROP TABLE #CurrentIndexFragmentationStats
 IF object_id('tempdb..#databaseObjectsWithIndexList') IS NOT NULL 	DROP TABLE #databaseObjectsWithIndexList
+
+--------------------------------------------------------------------------------------------------
+--additional maintenance, if selected: backup transaction log and shrink log file to reclaim disk space
+--------------------------------------------------------------------------------------------------
+-- 262144	- take a log backup at the end of the optimization process
+IF @flgOptions & 262144 = 262144
+	begin
+		SET @nestedExecutionLevel = @executionLevel + 1
+		EXEC [dbo].[usp_mpDatabaseBackup]	@sqlServerName			= @sqlServerName,
+											@dbName					= @dbName,
+											@backupLocation			= DEFAULT,
+											@flgActions				= 4, /* perform transaction log backup */
+											@flgOptions				= DEFAULT,
+											@retentionDays			= DEFAULT,
+											@dataChangesThreshold	= DEFAULT,
+											@executionLevel			= @nestedExecutionLevel,
+											@debugMode				= DEFAULT
+	end
+
+-- 524288	- perform a shrink with truncate_only on the log file at the end of the optimization process
+IF @flgOptions & 524288 = 524288
+	begin
+		SET @nestedExecutionLevel = @executionLevel
+		EXEC [dbo].[usp_mpDatabaseShrink]	@sqlServerName		= @sqlServerName,
+											@dbName				= @dbName,
+											@flgActions			= 1, /* shrink log file */
+											@flgOptions			= 1, /*	use truncate only */		
+											@executionLevel		= @nestedExecutionLevel,
+											@debugMode			= DEFAULT
+	end
 
 RETURN @errorCode
 GO

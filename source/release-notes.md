@@ -847,3 +847,4 @@
 
 05.03.2019
 * health-check: add failed login attempts information on daily HTML report
+* maintenance-plan: add option to trigger a log backup and log shrink (truncate only) after index maintenance
