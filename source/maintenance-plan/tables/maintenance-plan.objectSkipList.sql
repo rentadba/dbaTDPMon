@@ -51,10 +51,3 @@ CREATE INDEX [IX_MaintenancePlan_objectSkipList_TaskID] ON [maintenance-plan].[o
 		([task_id])
 	ON [FG_Statistics_Index]
 GO
-
-CREATE INDEX [IX_MaintenancePlan_objectSkipList_DatabaseName_TaskID_ObjectType] ON [maintenance-plan].[objectSkipList]
-		([instance_name], [database_name], [task_id])
-	INCLUDE
-		([schema_name], [object_name])
-	ON [FG_Statistics_Index]
-GO
