@@ -850,4 +850,4 @@
 * maintenance-plan: add option to trigger a log backup and log shrink (truncate only) after index maintenance
 
 11.03.2019
-* maintenance-plan: change indexes for [maintenance-plan].[objectSkipList] table
+* maintenance-plan: remove indexes no longer in use
