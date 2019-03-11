@@ -889,7 +889,7 @@ IF NOT (@serverVersionNum >= 14 AND @hostPlatform='linux' )
 															@dbName					= @dbName,
 															@backupLocation			= @backupLocation,
 															@backupFileExtension	= @backupType,
-															@flgOptions				= @flgOptions,
+															@flgOptions				= 3,
 															@retentionDays			= @retentionDays,
 															@executionLevel			= @nestedExecutionLevel,
 															@debugMode				= @debugMode

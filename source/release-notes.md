@@ -851,3 +851,4 @@
 
 11.03.2019
 * maintenance-plan: remove indexes no longer in use
+* maintenance-plan: add option to wait for estimated recovery time to be 0 before shrink if a database is part of AlwaysOn AG

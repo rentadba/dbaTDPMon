@@ -2115,7 +2115,7 @@ IF @flgOptions & 524288 = 524288
 		EXEC [dbo].[usp_mpDatabaseShrink]	@sqlServerName		= @sqlServerName,
 											@dbName				= @dbName,
 											@flgActions			= 1, /* shrink log file */
-											@flgOptions			= 1, /*	use truncate only */		
+											@flgOptions			= 3, /*	use truncate only and wait when in AG for recovery_time=0 */		
 											@executionLevel		= @nestedExecutionLevel,
 											@debugMode			= DEFAULT
 	end

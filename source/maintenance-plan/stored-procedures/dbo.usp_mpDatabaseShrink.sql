@@ -16,6 +16,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseShrink]
 												2 - shrink database
 											*/
 		@flgOptions			[int] = 1,	/*	1 - use truncate only
+											2 - if database is in AG, in async, wait for estimated_recovery_time = 0
 											*/		
 		@executionLevel		[tinyint] = 0,
 		@debugMode			[bit] = 0
@@ -44,7 +45,8 @@ AS
 
 SET NOCOUNT ON
 
-DECLARE		@queryToRun    			[nvarchar](4000),
+DECLARE		@queryToRun    			[nvarchar](max),
+			@queryParam				[nvarchar](512),
 			@databaseName			[sysname],
 			@logName				[sysname],
 			@errorCode				[int],
@@ -163,6 +165,57 @@ OPEN crsDatabases
 FETCH NEXT FROM crsDatabases INTO @databaseName
 WHILE @@FETCH_STATUS=0
 	begin
+		---------------------------------------------------------------------------------------------
+		--if database is part of an AlwaysOn Availability Group, wait for estimated_recovery_time to be 0
+		IF @flgOptions & 2 = 2 AND @clusterName IS NOT NULL
+			begin
+				DECLARE @estimatedRecoveryTime [int] = 0
+				SET @queryToRun=N'SELECT MAX(CASE WHEN s.[redo_rate] = 0 THEN 0 ELSE CAST(s.[redo_queue_size] / s.[redo_rate] AS BIGINT) END) AS [estimated_recovery_time]
+								FROM (
+										SELECT    adc.[database_name]
+												, hdrs.[redo_queue_size]
+												, hdrs.[redo_rate]
+										FROM sys.dm_hadr_database_replica_states hdrs
+										INNER JOIN sys.availability_replicas ar on ar.replica_id=hdrs.replica_id
+										INNER JOIN sys.dm_hadr_availability_replica_states ars on ars.replica_id=ar.replica_id and ars.group_id=ar.group_id
+										INNER JOIN sys.availability_databases_cluster adc on adc.group_id=hdrs.group_id and adc.group_database_id=hdrs.group_database_id
+										WHERE adc.[database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
+											AND [role_desc] = ''PRIMARY''
+									) p
+								LEFT JOIN 
+									(
+										SELECT    adc.[database_name]
+												, hdrs.[redo_queue_size]
+												, hdrs.[redo_rate]
+										FROM sys.dm_hadr_database_replica_states hdrs
+										INNER JOIN sys.availability_replicas ar on ar.replica_id=hdrs.replica_id
+										INNER JOIN sys.dm_hadr_availability_replica_states ars on ars.replica_id=ar.replica_id and ars.group_id=ar.group_id
+										INNER JOIN sys.availability_databases_cluster adc on adc.group_id=hdrs.group_id and adc.group_database_id=hdrs.group_database_id
+										WHERE adc.[database_name] = ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''
+												AND	[role_desc] = ''SECONDARY''
+									) s ON [s].[database_name] = [p].[database_name]'
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				SET @queryToRun = N'SELECT @estimatedRecoveryTime = [estimated_recovery_time]
+									FROM (' + @queryToRun + N')y'
+				SET @queryParam = '@estimatedRecoveryTime [int] OUTPUT'
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+				SET @estimatedRecoveryTime = 1
+				WHILE @estimatedRecoveryTime > 0
+					begin
+						EXEC sp_executesql @queryToRun, @queryParam, @estimatedRecoveryTime = @estimatedRecoveryTime OUTPUT
+						SET @estimatedRecoveryTime = ISNULL(@estimatedRecoveryTime, 0)
+
+						IF @estimatedRecoveryTime > 0
+							begin
+								SET @logName = 'Run in AlwaysON AG mode: Waiting for databases to be in sync...'
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @logName, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+								WAITFOR DELAY '00:00:05'
+							end
+					end
+			end
+		
 		---------------------------------------------------------------------------------------------
 		--shrink database
 		IF @flgActions & 2 = 2
