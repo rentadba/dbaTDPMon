@@ -24,3 +24,11 @@ GO
 IF EXISTS(SELECT * FROM sys.indexes WHERE [name] = 'IX_jobExecutionQueue_InstanceID' AND [object_id]=OBJECT_ID('[dbo].[jobExecutionQueue]'))
 	DROP INDEX [IX_jobExecutionQueue_InstanceID] ON [dbo].[jobExecutionQueue]
 GO
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE [object_id] = OBJECT_ID('dbo.logEventMessages') AND [name] = 'IX_logEventMessages_project_id') 
+	CREATE INDEX [IX_logEventMessages_project_id] ON [dbo].[logEventMessages] 
+			([project_id], [instance_id], [is_email_sent]) 
+		INCLUDE 
+			([event_date_utc]) 
+		ON [FG_Statistics_Index]
+GO
