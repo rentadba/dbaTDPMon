@@ -169,7 +169,7 @@ WHILE @@FETCH_STATUS=0
 		--if database is part of an AlwaysOn Availability Group, wait for estimated_recovery_time to be 0
 		IF @flgOptions & 2 = 2 AND @clusterName IS NOT NULL
 			begin
-				DECLARE @estimatedRecoveryTime [int] = 0
+				DECLARE @estimatedRecoveryTime [int] 
 				SET @queryToRun=N'SELECT MAX(CASE WHEN s.[redo_rate] = 0 THEN 0 ELSE CAST(s.[redo_queue_size] / s.[redo_rate] AS BIGINT) END) AS [estimated_recovery_time]
 								FROM (
 										SELECT    adc.[database_name]
