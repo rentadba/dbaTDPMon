@@ -852,3 +852,6 @@
 11.03.2019
 * maintenance-plan: remove indexes no longer in use
 * maintenance-plan: add option to wait for estimated recovery time to be 0 before shrink if a database is part of AlwaysOn AG
+
+15.03.2019
+* monitoring: fix "Arithmetic overflow error converting expression to data type int" for transaction status monitoring

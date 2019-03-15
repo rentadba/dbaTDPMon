@@ -244,7 +244,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<login_name>' + [dbo].[ufn_getObjectQuoteName](sts.[login_name], 'xml') + '</login_name>' + 
 																				'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN ISNULL(sh.[sql_handle], '') ELSE N'' END + '</sql_handle>' + 
 																				'<transaction_begin_time>' + CASE WHEN  sts.[transaction_begin_time] IS NOT NULL THEN CONVERT([varchar](20), sts.[transaction_begin_time], 120) ELSE N'N/A' END + '</transaction_begin_time>' + 
-																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
+																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(CAST(sts.[last_request_elapsed_time_sec] AS [bigint])*1000, 0)) +'</last_request_elapsed_time>' + 
 																				'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
 																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdWarningRunningTransactions*1000) + '</threshold_value>' + 
 																				'<measure_unit>sec</measure_unit>' + 
@@ -325,7 +325,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<login_name>' + [dbo].[ufn_getObjectQuoteName](sts.[login_name], 'xml') + '</login_name>' + 
 																				'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN ISNULL(sh.[sql_handle], '') ELSE N'' END + '</sql_handle>' + 
 																				'<transaction_begin_time>' + CASE WHEN  sts.[transaction_begin_time] IS NOT NULL THEN CONVERT([varchar](20), sts.[transaction_begin_time], 120) ELSE N'N/A' END + '</transaction_begin_time>' + 
-																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
+																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(CAST(sts.[last_request_elapsed_time_sec] AS [bigint])*1000, 0)) +'</last_request_elapsed_time>' + 
 																				'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
 																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdCriticalRunningTransactions*1000) + '</threshold_value>' + 
 																				'<measure_unit>sec</measure_unit>' + 
@@ -404,7 +404,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<login_name>' + [dbo].[ufn_getObjectQuoteName](sts.[login_name], 'xml') + '</login_name>' + 
 																				'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN ISNULL(sh.[sql_handle], '') ELSE N'' END + '</sql_handle>' + 
 																				'<transaction_begin_time>' + CASE WHEN  sts.[transaction_begin_time] IS NOT NULL THEN CONVERT([varchar](20), sts.[transaction_begin_time], 120) ELSE N'' END + '</transaction_begin_time>' + 
-																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
+																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(CAST(sts.[last_request_elapsed_time_sec] AS [bigint])*1000, 0)) +'</last_request_elapsed_time>' + 
 																				'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
 																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdWarningUncommitted*1000) + '</threshold_value>' + 
 																				'<measure_unit>sec</measure_unit>' + 
@@ -484,7 +484,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<login_name>' + [dbo].[ufn_getObjectQuoteName](sts.[login_name], 'xml') + '</login_name>' + 
 																				'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN ISNULL(sh.[sql_handle], '') ELSE N'' END + '</sql_handle>' + 
 																				'<transaction_begin_time>' + CASE WHEN  sts.[transaction_begin_time] IS NOT NULL THEN CONVERT([varchar](20), sts.[transaction_begin_time], 120) ELSE N'' END + '</transaction_begin_time>' + 
-																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
+																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(CAST(sts.[last_request_elapsed_time_sec] AS [bigint])*1000, 0)) +'</last_request_elapsed_time>' + 
 																				'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
 																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdCriticalUncommitted*1000) + '</threshold_value>' + 
 																				'<measure_unit>sec</measure_unit>' + 
@@ -563,7 +563,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<login_name>' + [dbo].[ufn_getObjectQuoteName](sts.[login_name], 'xml') + '</login_name>' + 
 																				'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN ISNULL(sh.[sql_handle], '') ELSE N'' END + '</sql_handle>' + 
 																				'<transaction_begin_time>' + CASE WHEN  sts.[transaction_begin_time] IS NOT NULL THEN CONVERT([varchar](20), sts.[transaction_begin_time], 120) ELSE N'' END + '</transaction_begin_time>' + 
-																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
+																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(CAST(sts.[last_request_elapsed_time_sec] AS [bigint])*1000, 0)) +'</last_request_elapsed_time>' + 
 																				'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
 																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdWarningBlocking*1000) + '</threshold_value>' + 
 																				'<measure_unit>sec</measure_unit>' + 
@@ -643,7 +643,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<login_name>' + [dbo].[ufn_getObjectQuoteName](sts.[login_name], 'xml') + '</login_name>' + 
 																				'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN ISNULL(sh.[sql_handle], '') ELSE N'' END + '</sql_handle>' + 
 																				'<transaction_begin_time>' + CASE WHEN  sts.[transaction_begin_time] IS NOT NULL THEN CONVERT([varchar](20), sts.[transaction_begin_time], 120) ELSE N'' END + '</transaction_begin_time>' + 
-																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
+																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(CAST(sts.[last_request_elapsed_time_sec] AS [bigint])*1000, 0)) +'</last_request_elapsed_time>' + 
 																				'<transaction_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[transaction_elapsed_time_sec]*1000, 0)) +'</transaction_elapsed_time>' + 
 																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdCriticalBlocking*1000) + '</threshold_value>' + 
 																				'<measure_unit>sec</measure_unit>' + 
@@ -878,7 +878,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<program_name>' + ISNULL([dbo].[ufn_getObjectQuoteName](sts.[program_name], 'xml'), N'')  + '</program_name>' + 
 																				'<login_name>' + ISNULL([dbo].[ufn_getObjectQuoteName](sts.[login_name], 'xml'), N'')  + '</login_name>' + 
 																				'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN ISNULL(sh.[sql_handle], '') ELSE N'' END + '</sql_handle>' + 
-																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
+																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(CAST(sts.[last_request_elapsed_time_sec] AS [bigint])*1000, 0)) +'</last_request_elapsed_time>' + 
 																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdWarningActiveRequest*1000) + '</threshold_value>' + 
 																				'<measure_unit>sec</measure_unit>' + 
 																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
@@ -957,7 +957,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<program_name>' + ISNULL([dbo].[ufn_getObjectQuoteName](sts.[program_name], 'xml'), N'')  + '</program_name>' + 
 																				'<login_name>' + ISNULL([dbo].[ufn_getObjectQuoteName](sts.[login_name], 'xml'), N'')  + '</login_name>' + 
 																				'<sql_handle>' + CASE WHEN sts.[sql_handle] IS NOT NULL THEN ISNULL(sh.[sql_handle], '') ELSE N'' END + '</sql_handle>' + 
-																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(sts.[last_request_elapsed_time_sec]*1000, 0)) +'</last_request_elapsed_time>' + 
+																				'<last_request_elapsed_time>' + [dbo].[ufn_reportHTMLFormatTimeValue](ISNULL(CAST(sts.[last_request_elapsed_time_sec] AS [bigint])*1000, 0)) +'</last_request_elapsed_time>' + 
 																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdCriticalActiveRequest*1000) + '</threshold_value>' + 
 																				'<measure_unit>sec</measure_unit>' + 
 																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 

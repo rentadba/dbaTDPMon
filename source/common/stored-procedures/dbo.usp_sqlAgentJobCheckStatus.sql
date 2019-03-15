@@ -134,6 +134,7 @@ ELSE
 		CREATE TABLE #runningSQLAgentJobsProcess
 			(
 				  [step_id]		[int], 
+				  [step_name]	[sysname],
 				  [job_id]		[uniqueidentifier],
 				  [session_id]	[int]
 			)
@@ -141,7 +142,7 @@ ELSE
 		--check for active processes started by SQL Agent job
 		SET @currentRunning=0
 		IF @serverVersionNum >= 10
-			SET @queryToRun=N'SELECT	js.[step_id], ja.[job_id], es.[session_id]
+			SET @queryToRun=N'SELECT	js.[step_id], js.[step_name], ja.[job_id], es.[session_id]
 							FROM  [msdb].[dbo].[sysjobactivity] ja WITH (NOLOCK)
 							INNER JOIN [msdb].[dbo].[sysjobs] j WITH (NOLOCK) ON ja.[job_id] = j.[job_id]
 							INNER JOIN [msdb].[dbo].[sysjobsteps] js WITH (NOLOCK) ON ja.[job_id] = js.[job_id] AND ISNULL(ja.[last_executed_step_id], 0)+ 1 = js.[step_id]
@@ -161,7 +162,7 @@ ELSE
 									AND ja.[stop_execution_date] IS NULL
 									AND CHARINDEX(j.[name], @jobName) <> 0'
 		ELSE
-			SET @queryToRun=N'SELECT DISTINCT sp.[step_id], sp.[job_id], sp.[spid]
+			SET @queryToRun=N'SELECT DISTINCT sp.[step_id], sjs.[step_name], sp.[job_id], sp.[spid]
 							FROM (
 								  SELECT  [step_id]
 										, SUBSTRING([job_id], 7, 2) + SUBSTRING([job_id], 5, 2) + SUBSTRING([job_id], 3, 2) + LEFT([job_id], 2) + ''-'' + SUBSTRING([job_id], 11, 2) + SUBSTRING([job_id], 9, 2) + ''-'' + SUBSTRING([job_id], 15, 2) + SUBSTRING([job_id], 13, 2) + ''-'' + SUBSTRING([job_id], 17, 4) + ''-'' + RIGHT([job_id], 12) AS [job_id] 
@@ -175,9 +176,10 @@ ELSE
 									   ) sp
 								) sp
 							INNER JOIN [msdb].[dbo].[sysjobs] sj WITH (NOLOCK) ON sj.[job_id] = sp.[job_id]
+							INNER JOIN [msdb].[dbo].[sysjobsteps] sjs WITH (NOLOCK) ON sj.[job_id] = sjs.[job_id]
 							WHERE CHARINDEX(sj.[name], @jobName) <> 0
 							UNION
-							SELECT DISTINCT sjs.[step_id], sj.[job_id], sp.[spid]
+							SELECT DISTINCT sjs.[step_id], sjs.[step_name], sj.[job_id], sp.[spid]
 							FROM [master].[dbo].[sysprocesses] sp WITH (NOLOCK) 
 							INNER JOIN [msdb].[dbo].[sysjobs]		sj WITH (NOLOCK) ON sj.[name] = sp.[program_name]
 							INNER JOIN [msdb].[dbo].[sysjobsteps]	sjs WITH (NOLOCK) ON sjs.[job_id] = sj.[job_id]
@@ -192,7 +194,7 @@ ELSE
 			end
 		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-		INSERT	INTO #runningSQLAgentJobsProcess([step_id], [job_id], [session_id])
+		INSERT	INTO #runningSQLAgentJobsProcess([step_id], [step_name], [job_id], [session_id])
 				EXEC sp_executesql  @queryToRun, @queryParams, @jobName = @jobName 
 
 		SET @StepID = NULL
@@ -200,6 +202,7 @@ ELSE
 
 		SELECT @currentRunning = COUNT(*) FROM #runningSQLAgentJobsProcess
 		SELECT TOP 1  @StepID = [step_id]
+					, @StepName = [step_name]
 					, @JobID  = CAST([job_id] AS [varchar](255))
 					, @JobSessionID = [session_id]
 		FROM #runningSQLAgentJobsProcess	
@@ -208,14 +211,6 @@ ELSE
 	
 		IF @currentRunning > 0 
 			begin
-				SET @queryToRun=N'SELECT [step_name] FROM [msdb].[dbo].[sysjobsteps] WITH (NOLOCK) WHERE [step_id]=' + CAST(@StepID AS [nvarchar]) + ' AND [job_id]=''' + @JobID + ''''
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
-				TRUNCATE TABLE #tmpCheck
-				INSERT INTO #tmpCheck EXEC sp_executesql  @queryToRun
-				SELECT TOP 1 @StepName=Result FROM #tmpCheck
-
 				SET @lastExecutionStatus=4 -- in progress
 				IF @debugMode=1
 					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
