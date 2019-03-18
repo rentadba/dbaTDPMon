@@ -457,7 +457,7 @@ IF NOT (@serverVersionNum >= 14 AND @hostPlatform='linux' )
 
 --------------------------------------------------------------------------------------------------
 --smart differential backup: apply to SQL Server 2016 SP2 onwards
-IF @serverVersionNum>=13.05026
+IF @flgActions & 2 = 2 AND @serverVersionNum>=13.05026
 	begin
 		DECLARE @dataChangesPercent [numeric](9,2)
 

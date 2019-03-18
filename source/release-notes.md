@@ -855,3 +855,6 @@
 
 15.03.2019
 * monitoring: fix "Arithmetic overflow error converting expression to data type int" for transaction status monitoring
+
+18.03.2019
+* maintenance-plan: fix issue on smart differential backup triggering at transaction log backup
