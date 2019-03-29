@@ -858,3 +858,6 @@
 
 18.03.2019
 * maintenance-plan: fix issue on smart differential backup triggering at transaction log backup
+
+29.03.2019
+* health-check: enhance dbo.usp_hcCollectOSEventLogs stored procedure (add @configEventsInLastHours parameter)

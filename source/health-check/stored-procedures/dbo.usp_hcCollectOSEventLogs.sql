@@ -14,11 +14,12 @@ DROP PROCEDURE [dbo].[usp_hcCollectOSEventLogs]
 GO
 
 CREATE PROCEDURE [dbo].[usp_hcCollectOSEventLogs]
-		@projectCode			[varchar](32)=NULL,
-		@sqlServerNameFilter	[sysname]='%',
-		@logNameFilter			[sysname]='%',
-		@enableXPCMDSHELL		[bit]=1,
-		@debugMode				[bit]=0
+		@projectCode				[varchar](32)=NULL,
+		@sqlServerNameFilter		[sysname]='%',
+		@logNameFilter				[sysname]='%',
+		@enableXPCMDSHELL			[bit]=1,
+		@configEventsInLastHours	[smallint] = NULL,
+		@debugMode					[bit]=0
 
 /* WITH ENCRYPTION */
 AS
@@ -48,7 +49,6 @@ DECLARE   @eventDescriptor				[varchar](256)
 		, @instanceName					[sysname]
 		, @psFileLocation				[nvarchar](260)
 		, @psFileName					[nvarchar](260)
-		, @configEventsInLastHours		[smallint]
 		, @configEventsTimeOutSeconds	[int]
 		, @startTime					[datetime]
 		, @endTime						[datetime]
@@ -121,15 +121,16 @@ IF @projectID IS NULL
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get event messages time delta
-BEGIN TRY
-	SELECT	@configEventsInLastHours = [value]
-	FROM	[dbo].[appConfigurations]
-	WHERE	[name] = N'Collect OS Events from last hours'
-			AND [module] = 'health-check'
-END TRY
-BEGIN CATCH
-	SET @configEventsInLastHours = 24
-END CATCH
+IF @configEventsInLastHours IS NULL
+	BEGIN TRY
+		SELECT	@configEventsInLastHours = [value]
+		FROM	[dbo].[appConfigurations]
+		WHERE	[name] = N'Collect OS Events from last hours'
+				AND [module] = 'health-check'
+	END TRY
+	BEGIN CATCH
+		SET @configEventsInLastHours = 24
+	END CATCH
 
 SET @configEventsInLastHours = ISNULL(@configEventsInLastHours, 24)
 
