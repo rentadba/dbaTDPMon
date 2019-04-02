@@ -211,7 +211,18 @@ FROM [health-check].[statsOSEventLogs]			soel
 INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = soel.[instance_id] AND cin.[project_id] = soel.[project_id]
 WHERE cin.[project_id] = @projectID
 		AND cin.[name] LIKE @sqlServerNameFilter
+		AND soel.[log_type_id] IN	(	
+									 SELECT [log_type_id]
+									 FROM (
+											SELECT 'Application' AS [log_type_name], 1 AS [log_type_id] UNION ALL
+											SELECT 'System'		 AS [log_type_name], 2 AS [log_type_id] UNION ALL
+											SELECT 'Setup'		 AS [log_type_name], 3 AS [log_type_id] 
+									      )l
+									 WHERE [log_type_name] LIKE @logNameFilter
+									)
+		AND [time_created_utc] >= DATEADD(hour, -@configEventsInLastHours, GETUTCDATE())
 
+		
 DELETE lsam
 FROM [dbo].[logAnalysisMessages]	lsam
 INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = lsam.[instance_id] AND cin.[project_id] = lsam.[project_id]
