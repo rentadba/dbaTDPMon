@@ -756,10 +756,22 @@ WHILE @@FETCH_STATUS=0
 							end
 					end
 
+					/* if recreate mode = 1, set default priority */
+					IF @recreateMode = 1
+						UPDATE jeqX
+								SET jeqX.[priority] = X.[new_priority]
+						FROM  @jobExecutionQueue jeqX
+						INNER JOIN (
+									SELECT	[id], 
+											ROW_NUMBER() OVER (ORDER BY [id]) AS [new_priority]
+									FROM @jobExecutionQueue 
+									) X ON jeqX.[id] = X.[id] 
+
 				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 														, [for_instance_id], [job_name], [job_step_name], [job_database_name]
 														, [job_command], [task_id], [database_name], [priority])
-						SELECT	  S.[instance_id], S.[project_id], S.[module], S.[descriptor]
+						SELECT DISTINCT
+								  S.[instance_id], S.[project_id], S.[module], S.[descriptor]
 								, S.[for_instance_id]
 								, REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_')	/* manage special characters in job names */
 								, S.[job_step_name], S.[job_database_name]

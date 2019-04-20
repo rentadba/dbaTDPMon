@@ -75,7 +75,6 @@ EXEC sp_executesql  @queryToRun
 
 SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_Module_EventName] ON [dbo].[logEventMessages] ([project_id], [instance_id], [module], [event_name]) INCLUDE ([parameters], [database_name], [object_name], [child_object_name], [event_date_utc]) ON [FG_Statistics_Index]'
 EXEC sp_executesql  @queryToRun
-GO
 
 SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_project_id] ON [dbo].[logEventMessages] ([project_id], [instance_id], [is_email_sent]) INCLUDE ([event_date_utc]) ON [FG_Statistics_Index]'
 EXEC sp_executesql  @queryToRun
