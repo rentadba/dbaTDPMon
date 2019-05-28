@@ -112,6 +112,7 @@ DECLARE   @databaseName								[sysname]
 		, @reportOptionOSEventMessageLimit			[int]
 		, @reportOptionOSEventMessageLastHours		[int]
 		, @reportOptionGetProjectDBSize				[bit]
+		, @reportOptionMinSpaceToReclaim			[int]
 		, @configOSEventMessageLastHours			[int]
 		, @configOSEventGetInformationEvent			[bit]
 		, @configOSEventGetWarningsEvent			[bit]
@@ -283,7 +284,19 @@ BEGIN TRY
 		SET @reportOptionLogVsDataPercent = 50
 	END CATCH
 	SET @reportOptionLogVsDataPercent = ISNULL(@reportOptionLogVsDataPercent, 50)
-									
+							
+	-----------------------------------------------------------------------------------------------------			
+	BEGIN TRY
+		SELECT	@reportOptionMinSpaceToReclaim = [value]
+		FROM	[report].[htmlOptions]
+		WHERE	[name] = N'Minimum Disk space to reclaim (mb)'
+				AND [module] = 'health-check'
+	END TRY
+	BEGIN CATCH
+		SET @reportOptionMinSpaceToReclaim = 10240
+	END CATCH
+	SET @reportOptionMinSpaceToReclaim = ISNULL(@reportOptionMinSpaceToReclaim, 10240)
+							
 	-----------------------------------------------------------------------------------------------------
 	BEGIN TRY
 		SELECT	@reportOptionJobFailuresInLastHours = [value]
@@ -2412,7 +2425,7 @@ BEGIN TRY
 							N'<A NAME="DatabaseMinDataSpaceIssuesDetected" class="category-style">Low Usage of Data Space - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="8">size (MB) &ge; ' + CAST(@reportOptionDBMinSizeForAnalysis  AS [nvarchar](32)) + N' AND data size used (%) &le; ' + CAST(@reportOptionDataSpaceMinPercent AS [nvarchar](32)) + N'</TD>
+								<TD class="small-size" COLLSPAN="8">size (MB) &ge; ' + CAST(@reportOptionDBMinSizeForAnalysis  AS [nvarchar](32)) + N' AND data size used (%) &le; ' + CAST(@reportOptionDataSpaceMinPercent AS [nvarchar](32)) + N' AND data space available (mb) &ge; ' + CAST(@reportOptionMinSpaceToReclaim AS [nvarchar](32)) + N'</TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -2452,6 +2465,7 @@ BEGIN TRY
 																								AND @reportOptionDataSpaceMinPercent<>0
 																								AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb', 'distribution')
 																								AND rsr.[id] IS NULL
+																								AND (((100.0 - shcdd.[data_space_used_percent]) * shcdd.[data_size_mb]) / 100 ) >= @reportOptionMinSpaceToReclaim
 																						ORDER BY cin.[instance_name], cin.[machine_name], [reclaimable_space_mb] DESC, cdn.[database_name]
 			OPEN crsDatabaseMinDataSpaceIssuesDetected
 			FETCH NEXT FROM crsDatabaseMinDataSpaceIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @dataSizeMB, @dataSpaceUsedPercent, @reclaimableSpaceMB
@@ -2502,7 +2516,7 @@ BEGIN TRY
 							N'<A NAME="DatabaseMaxLogSpaceIssuesDetected" class="category-style">High Usage of Log Space - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="8">size (MB) &ge; ' + CAST(@reportOptionDBMinSizeForAnalysis  AS [nvarchar](32)) + N' AND log size used (%) &ge; ' + CAST(@reportOptionLogSpaceMaxPercent AS [nvarchar](32)) + N'</TD>
+								<TD class="small-size" COLLSPAN="8">size (MB) &ge; ' + CAST(@reportOptionDBMinSizeForAnalysis  AS [nvarchar](32)) + N' AND log size used (%) &ge; ' + CAST(@reportOptionLogSpaceMaxPercent AS [nvarchar](32)) + N' AND log space available (mb) &ge; ' + CAST(@reportOptionMinSpaceToReclaim AS [nvarchar](32)) + N'</TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -2542,6 +2556,7 @@ BEGIN TRY
 																								AND @reportOptionLogSpaceMaxPercent<>0
 																								AND cdn.[database_name] NOT IN ('master', 'msdb', 'model', 'tempdb', 'distribution')
 																								AND rsr.[id] IS NULL
+																								AND (((100.0 - shcdd.[log_space_used_percent]) * shcdd.[log_size_mb]) / 100) >= @reportOptionMinSpaceToReclaim
 																						ORDER BY --[available_space_mb] DESC, 
 																								 cin.[instance_name], cin.[machine_name], shcdd.[data_space_used_percent] DESC, cdn.[database_name]
 			OPEN crsDatabaseMaxLogSpaceIssuesDetected

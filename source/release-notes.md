@@ -861,3 +861,11 @@
 
 29.03.2019
 * health-check: enhance dbo.usp_hcCollectOSEventLogs stored procedure (add @configEventsInLastHours parameter)
+
+------------
+#### May 2019 new features & fixes
+10.05.2019
+* health-check: add option to limit the reported reclaimable data and log space; default beyond 10 GB
+
+28.05.2019
+* health-check: improve performance for fetching AlwaysOn details data
