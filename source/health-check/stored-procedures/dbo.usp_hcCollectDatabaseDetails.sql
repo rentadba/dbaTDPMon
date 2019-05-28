@@ -435,7 +435,6 @@ WHILE @@FETCH_STATUS=0
 									INNER JOIN sys.dm_hadr_database_replica_states hdrs ON ar.[replica_id]=hdrs.[replica_id]
 									INNER JOIN sys.availability_databases_cluster adc ON adc.[group_id]=hdrs.[group_id] AND adc.[group_database_id]=hdrs.[group_database_id]
 									INNER JOIN sys.dm_hadr_instance_node_map hinm ON hinm.[ag_resource_id] = ag.[resource_id] AND hinm.[instance_name] = arcn.[replica_server_name]
-									INNER JOIN sys.dm_hadr_cluster_members hcm ON hcm.[member_name] = hinm.[node_name]
 									INNER JOIN sys.dm_hadr_cluster hc ON 1=1
 									WHERE arcn.[replica_server_name] = ''' + @sqlServerName + ''''
 
