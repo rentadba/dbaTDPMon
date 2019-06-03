@@ -31,6 +31,7 @@ SET NOCOUNT ON
 
 DECLARE   @projectID					[smallint]
 		, @jobName						[sysname]
+		, @jobID						[sysname]
 		, @jobStepName					[sysname]
 		, @jobDBName					[sysname]
 		, @sqlServerName				[sysname]
@@ -300,7 +301,7 @@ DECLARE crsJobQueue CURSOR LOCAL FAST_FORWARD FOR	SELECT    [id], [instance_name
 															AND (    [descriptor] LIKE @descriptorFilter
 																  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
 																)			
-															AND [status]=-1
+															AND [status] = - 1
 															AND (    DATEDIFF(minute, [event_date_utc], GETUTCDATE()) < (@configMaxQueueExecutionTime * 60)
 																  OR @configMaxQueueExecutionTime = 0
 																)																
@@ -399,8 +400,10 @@ WHILE @@FETCH_STATUS=0
 						---------------------------------------------------------------------------------------------------
 						/* check if job is running and stop it */
 						SET @jobCurrentRunning = 0
+						SET @jobID = NULL
 						EXEC  dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
 																@jobName				= @jobName,
+																@jobID					= @jobID OUTPUT,
 																@strMessage				= DEFAULT,	
 																@currentRunning			= @jobCurrentRunning OUTPUT,			
 																@lastExecutionStatus	= DEFAULT,			
@@ -422,6 +425,7 @@ WHILE @@FETCH_STATUS=0
 								SET @jobCurrentRunning = 0
 								EXEC  dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
 																		@jobName				= @jobName,
+																		@jobID					= @jobID,
 																		@strMessage				= DEFAULT,	
 																		@currentRunning			= @jobCurrentRunning OUTPUT,			
 																		@lastExecutionStatus	= DEFAULT,			
@@ -438,6 +442,7 @@ WHILE @@FETCH_STATUS=0
 
 										EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
 																		@jobName		= @jobName,
+																		@jobID			= @jobID,
 																		@operation		= 'Stop',
 																		@dbName			= @jobDBName, 
 																		@jobStepName 	= @jobStepName,
@@ -451,6 +456,7 @@ WHILE @@FETCH_STATUS=0
 												SET @jobCurrentRunning = 0
 												EXEC  dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
 																						@jobName				= @jobName,
+																						@jobID					= @jobID,
 																						@strMessage				= DEFAULT,	
 																						@currentRunning			= @jobCurrentRunning OUTPUT,			
 																						@lastExecutionStatus	= DEFAULT,			
@@ -470,13 +476,16 @@ WHILE @@FETCH_STATUS=0
 						/* defining job and start it */
 						EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
 														@jobName		= @jobName,
+														@jobID			= @jobID,
 														@operation		= 'Clean',
 														@dbName			= @jobDBName, 
 														@jobStepName 	= @jobStepName,
 														@debugMode		= @debugMode
 
+						SET @jobID = NULL
 						EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
 														@jobName		= @jobName,
+														@jobID			= @jobID OUTPUT,
 														@operation		= 'Add',
 														@dbName			= @jobDBName, 
 														@jobStepName 	= @jobStepName,
@@ -532,7 +541,7 @@ WHILE @@FETCH_STATUS=0
 																	INNER JOIN [msdb].[dbo].[sysjobsteps] js WITH (NOLOCK) ON ja.[job_id] = js.[job_id] AND ISNULL(ja.[last_executed_step_id], 0)+ 1  = js.[step_id]
 																	WHERE	ja.[session_id] = (
 																								SELECT TOP 1 [session_id] 
-																								FROM [msdb].[dbo].[syssessions] 
+																								FROM [msdb].[dbo].[syssessions] WITH (NOLOCK)
 																								ORDER BY [agent_start_date] DESC
 																								)
 																			AND ja.[start_execution_date] IS NOT NULL
@@ -646,6 +655,7 @@ WHILE @@FETCH_STATUS=0
 						/* starting job: 0 = job started, 1 = error occured */
 						EXEC @lastExecutionStatus = dbo.usp_sqlAgentJobStartAndWatch	@sqlServerName						= @sqlServerName,
 																						@jobName							= @jobName,
+																						@jobID								= @jobID,
 																						@stepToStart						= 1,
 																						@stepToStop							= 1,
 																						@waitForDelay						= @waitForDelay,

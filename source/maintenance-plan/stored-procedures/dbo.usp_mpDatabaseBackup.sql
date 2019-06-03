@@ -884,7 +884,7 @@ IF NOT (@serverVersionNum >= 14 AND @hostPlatform='linux' )
 				SELECT	@backupType = SUBSTRING(@backupFileName, LEN(@backupFileName)-CHARINDEX('.', REVERSE(@backupFileName))+2, CHARINDEX('.', REVERSE(@backupFileName)))
 
 				SET @nestedExecutionLevel = @executionLevel + 1
-
+					
 				EXEC [dbo].[usp_mpDatabaseBackupCleanup]	@sqlServerName			= @sqlServerName,
 															@dbName					= @dbName,
 															@backupLocation			= @backupLocation,

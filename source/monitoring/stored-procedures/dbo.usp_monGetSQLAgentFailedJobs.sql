@@ -131,7 +131,7 @@ WHILE @@FETCH_STATUS=0
 																				SUBSTRING((REPLICATE(''0'', 6 - LEN(CAST(sjh.[run_time] AS [varchar](6)))) + CAST(sjh.[run_time] AS [varchar](6))), 5, 2)
 																	, 120) AS [last_completion_time]
 
-												FROM msdb.dbo.sysjobs sj
+												FROM msdb.dbo.sysjobs sj WITH (NOLOCK)
 												INNER JOIN 
 													(
 														/* last job execution failed */
@@ -139,7 +139,7 @@ WHILE @@FETCH_STATUS=0
 														FROM (
 																SELECT    [instance_id], [job_id], [run_status], [run_date], [run_time]
 																		, ROW_NUMBER() OVER(PARTITION BY [job_id] ORDER BY [instance_id] DESC) [row_no]
-																FROM [msdb].[dbo].[sysjobhistory]
+																FROM [msdb].[dbo].[sysjobhistory] WITH (NOLOCK)
 																WHERE [step_name] =''(Job outcome)''
 															)X
 														WHERE	[run_status] = 0

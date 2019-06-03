@@ -32,6 +32,7 @@ SET NOCOUNT ON
 
 DECLARE   @projectID				[smallint]
 		, @jobName					[sysname]
+		, @jobID					[sysname]
 		, @sqlServerName			[sysname]
 		, @jobDBName				[sysname]
 		, @jobQueueID				[int]
@@ -77,7 +78,7 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 		/* check running job status and make updates */
 		SET @runningJobs = 0
 
-		DECLARE crsRunningJobs CURSOR LOCAL FAST_FORWARD FOR	SELECT  [id], [instance_name], [job_name]
+		DECLARE crsRunningJobs CURSOR LOCAL FAST_FORWARD FOR	SELECT  [id], [instance_name], [job_name], [job_id]
 																FROM [dbo].[vw_jobExecutionQueue]
 																WHERE  [project_id] = @projectID 
 																		AND [module] LIKE @moduleFilter
@@ -87,7 +88,7 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 																		AND [status]=4
 																ORDER BY [id]
 		OPEN crsRunningJobs
-		FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName
+		FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName, @jobID
 		WHILE @@FETCH_STATUS=0
 			begin
 				SET @strMessage			= NULL
@@ -99,6 +100,7 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 
 				EXEC dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
 													@jobName				= @jobName,
+													@jobID					= @jobID,
 													@strMessage				= @strMessage OUTPUT,
 													@currentRunning			= @currentRunning OUTPUT,
 													@lastExecutionStatus	= @lastExecutionStatus OUTPUT,
@@ -115,6 +117,7 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 						WAITFOR DELAY '00:00:01'						
 						EXEC dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
 															@jobName				= @jobName,
+															@jobID					= @jobID,
 															@strMessage				= @strMessage OUTPUT,
 															@currentRunning			= @currentRunning OUTPUT,
 															@lastExecutionStatus	= @lastExecutionStatus OUTPUT,
@@ -149,6 +152,7 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 									end
 								EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
 																@jobName		= @jobName,
+																@jobID			= @jobID,
 																@operation		= 'Clean',
 																@dbName			= @jobDBName, 
 																@jobStepName 	= '',
@@ -164,7 +168,7 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 					IF @currentRunning <> 0
 						SET @runningJobs = @runningJobs + 1
 
-				FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName
+				FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName, @jobID
 			end
 		CLOSE crsRunningJobs
 		DEALLOCATE crsRunningJobs
@@ -182,7 +186,7 @@ IF @minJobToRunBeforeExit=0
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 
 		SET @queryToRun = N''
-		SET @queryToRun = 'SELECT [name] FROM [msdb].[dbo].[sysjobs]'
+		SET @queryToRun = 'SELECT [name] FROM [msdb].[dbo].[sysjobs] WITH (NOLOCK)'
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
@@ -196,7 +200,7 @@ IF @minJobToRunBeforeExit=0
 				EXEC sp_executesql  @queryToRun
 
 		SET @runningJobs = 0
-		DECLARE crsRunningJobs CURSOR LOCAL FAST_FORWARD FOR	SELECT  jeq.[id], jeq.[instance_name], jeq.[job_name]
+		DECLARE crsRunningJobs CURSOR LOCAL FAST_FORWARD FOR	SELECT  jeq.[id], jeq.[instance_name], jeq.[job_name], jeq.[job_id]
 																FROM [dbo].[vw_jobExecutionQueue] jeq
 																INNER JOIN #existingSQLAgentJobs esaj ON esaj.[job_name] = jeq.[job_name]
 																WHERE  jeq.[project_id] = @projectID 
@@ -207,7 +211,7 @@ IF @minJobToRunBeforeExit=0
 																		AND jeq.[status]<>-1
 																ORDER BY jeq.[id]
 		OPEN crsRunningJobs
-		FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName
+		FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName, @jobID
 		WHILE @@FETCH_STATUS=0
 			begin
 				SET @strMessage			= NULL
@@ -219,6 +223,7 @@ IF @minJobToRunBeforeExit=0
 
 				EXEC dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @sqlServerName,
 													@jobName				= @jobName,
+													@jobID					= @jobID,
 													@strMessage				= @strMessage OUTPUT,
 													@currentRunning			= @currentRunning OUTPUT,
 													@lastExecutionStatus	= @lastExecutionStatus OUTPUT,
@@ -249,6 +254,7 @@ IF @minJobToRunBeforeExit=0
 		
 						EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
 														@jobName		= @jobName,
+														@jobID			= @jobID,
 														@operation		= 'Clean',
 														@dbName			= @jobDBName, 
 														@jobStepName 	= '',
@@ -257,7 +263,7 @@ IF @minJobToRunBeforeExit=0
 				ELSE
 					SET @runningJobs = @runningJobs + 1
 
-				FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName
+				FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName, @jobID
 			end
 		CLOSE crsRunningJobs
 		DEALLOCATE crsRunningJobs

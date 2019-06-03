@@ -26,6 +26,7 @@ CREATE TABLE [dbo].[jobExecutionHistory]
 	[database_name]			[sysname]		NULL,
 	[for_instance_id]		[smallint]		NOT NULL,
 	[job_name]				[sysname]		NOT NULL,
+	[job_id]				[uniqueidentifier] NULL,
 	[job_step_name]			[sysname]		NOT NULL,
 	[job_database_name]		[sysname]		NOT NULL,
 	[job_command]			[nvarchar](max) NOT NULL,

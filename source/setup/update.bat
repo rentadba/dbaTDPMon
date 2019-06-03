@@ -159,6 +159,9 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20190510-patch-upgrade-from-v2019_3-to-v2019_5-common.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20190531-patch-upgrade-from-v2019_3-to-v2019_5-common.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 
 echo *-----------------------------------------------------------------------------*
 echo Common: Creating Views ...
@@ -596,7 +599,7 @@ if errorlevel 1 goto install_err
 
 
 :done
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2019.05.10' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2019.06.03' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err  
 
 echo *-----------------------------------------------------------------------------*

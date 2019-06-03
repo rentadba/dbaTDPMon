@@ -869,3 +869,11 @@
 
 28.05.2019
 * health-check: improve performance for fetching AlwaysOn details data
+
+31.05.2019
+* add SQL Agent job_id information to dbo.jobExecutionQueue table
+
+------------
+#### June 2019 new features & fixes
+03.06.2019
+* optimize the calls to msdb system tables when running an internal job queue

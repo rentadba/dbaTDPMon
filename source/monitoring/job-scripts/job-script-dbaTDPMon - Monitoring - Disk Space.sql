@@ -87,13 +87,15 @@ http://dbaTDPMon.codeplex.com',
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 
 	---------------------------------------------------------------------------------------------------
-	SET @queryToRun = N'DECLARE		@strMessage				[varchar](8000),
+	SET @queryToRun = N'
+DECLARE		@strMessage				[varchar](8000),
 			@currentRunning			[int],
 			@lastExecutionStatus	[int],
 			@lastExecutionDate		[varchar](10),
 			@lastExecutionTime 		[varchar](8),
 			@runningTimeSec			[bigint],
-			@jobName				[sysname]
+			@jobName				[sysname],
+			@jobID					[sysname]
 
 SELECT		@strMessage			 = '''',
 			@currentRunning		 = 0,
@@ -104,7 +106,8 @@ SELECT		@strMessage			 = '''',
 
 
 /* check execution overlapping with Health Check job */
-SELECT TOP 1 @jobName = sj.[name]
+SELECT TOP 1 @jobName = sj.[name], 
+			 @jobID   = sj.[job_id]
 FROM [msdb].dbo.sysjobs sj
 INNER JOIN [msdb].dbo.sysjobsteps sjs ON sj.[job_id] = sjs.[job_id] 
 WHERE sj.[name] LIKE ''%Discovery & Health Check%''
@@ -115,6 +118,7 @@ WHILE @lastExecutionStatus = 4 AND @jobName IS NOT NULL
 	begin
 		EXEC dbo.usp_sqlAgentJobCheckStatus	@sqlServerName			= @@SERVERNAME,
 											@jobName				= @jobName,
+											@jobID					= @jobID,
 											@strMessage				= @strMessage OUTPUT,	
 											@currentRunning			= @currentRunning OUTPUT,			
 											@lastExecutionStatus	= @lastExecutionStatus OUTPUT,			

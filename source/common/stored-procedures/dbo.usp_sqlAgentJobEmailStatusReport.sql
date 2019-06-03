@@ -40,7 +40,7 @@ DECLARE @eventMessageData			[varchar](max),
 -----------------------------------------------------------------------------------------------------
 --get job id
 SET @queryToRun = N''
-SET @queryToRun = @queryToRun + N'SELECT [job_id] FROM [msdb].[dbo].[sysjobs] WHERE [name]=''' + [dbo].[ufn_getObjectQuoteName](@jobName, 'sql') + ''''
+SET @queryToRun = @queryToRun + N'SELECT [job_id] FROM [msdb].[dbo].[sysjobs] WITH (NOLOCK) WHERE [name]=''' + [dbo].[ufn_getObjectQuoteName](@jobName, 'sql') + ''''
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 
 SET @queryToRun = N'SELECT @jobID = [job_id] FROM (' + @queryToRun + N')inq'
@@ -53,8 +53,8 @@ EXEC sp_executesql @queryToRun, @queryParams, @jobID = @jobID OUTPUT
 --get last instance_id when job completed
 SET @queryToRun = N''
 SET @queryToRun = @queryToRun + N'SELECT MAX(h.[instance_id]) AS [instance_id]
-					FROM [msdb].[dbo].[sysjobs] j 
-					RIGHT JOIN [msdb].[dbo].[sysjobhistory] h WITH (READPAST) ON j.[job_id] = h.[job_id] 
+					FROM [msdb].[dbo].[sysjobs] j WITH (NOLOCK)
+					RIGHT JOIN [msdb].[dbo].[sysjobhistory] h WITH (NOLOCK) ON j.[job_id] = h.[job_id] 
 					WHERE	j.[job_id] = ''' + CAST(@jobID AS [nvarchar](36)) + N'''
 							AND h.[step_name] =''(Job outcome)'''
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
@@ -109,13 +109,13 @@ IF @currentlyRunning = 0
 							, REPLICATE(''0'', 6 - LEN(CAST(h.[run_duration] AS varchar))) + CAST(h.[run_duration] AS varchar) AS [run_duration]
 							, CASE WHEN [run_status] IN (0, 2) THEN LEFT(h.[message], 256) ELSE '''' END AS [message]
 							, sjs.[output_file_name]
-					FROM [msdb].[dbo].[sysjobhistory] h WITH (READPAST) 
-					LEFT JOIN [msdb].[dbo].[sysjobsteps] sjs ON sjs.[job_id] = h.[job_id] AND sjs.[step_id] = h.[step_id]
+					FROM [msdb].[dbo].[sysjobhistory] h WITH (NOLOCK) 
+					LEFT JOIN [msdb].[dbo].[sysjobsteps] sjs WITH (NOLOCK) ON sjs.[job_id] = h.[job_id] AND sjs.[step_id] = h.[step_id]
 					WHERE	 h.[instance_id] < (
 												SELECT TOP 1 [instance_id] 
 												FROM (	
 														SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-														FROM [msdb].[dbo].[sysjobhistory] h WITH (READPAST) 
+														FROM [msdb].[dbo].[sysjobhistory] hWITH (NOLOCK) 
 														WHERE	h.[job_id]= ''' + CAST(@jobID AS [nvarchar](36)) + N'''
 																AND h.[step_name] =''(Job outcome)''
 														ORDER BY h.[instance_id] DESC
@@ -125,7 +125,7 @@ IF @currentlyRunning = 0
 												( SELECT [instance_id] 
 												FROM (	
 														SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-														FROM [msdb].[dbo].[sysjobhistory] h WITH (READPAST) 
+														FROM [msdb].[dbo].[sysjobhistory] h WITH (NOLOCK) 
 														WHERE	h.[job_id]= ''' + CAST(@jobID AS [nvarchar](36)) + N'''
 																AND h.[step_name] =''(Job outcome)''
 														ORDER BY h.[instance_id] DESC
@@ -134,7 +134,7 @@ IF @currentlyRunning = 0
 													(
 													SELECT TOP 1 [instance_id] 
 													FROM (	SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-															FROM [msdb].[dbo].[sysjobhistory] h WITH (READPAST) 
+															FROM [msdb].[dbo].[sysjobhistory] h WITH (NOLOCK)
 															WHERE	h.[job_id]= ''' + CAST(@jobID AS [nvarchar](36)) + N'''
 																	AND h.[step_name] =''(Job outcome)''
 															ORDER BY h.[instance_id] DESC
@@ -167,13 +167,13 @@ ELSE
 							, REPLICATE(''0'', 6 - LEN(CAST(h.[run_duration] AS varchar))) + CAST(h.[run_duration] AS varchar) AS [run_duration]
 							, CASE WHEN [run_status] IN (0, 2) THEN LEFT(h.[message], 256) ELSE '''' END AS [message]
 							, sjs.[output_file_name]
-					FROM [msdb].[dbo].[sysjobhistory] h WITH (READPAST) 
-					LEFT JOIN [msdb].[dbo].[sysjobsteps] sjs ON sjs.[job_id] = h.[job_id] AND sjs.[step_id] = h.[step_id]
+					FROM [msdb].[dbo].[sysjobhistory] h WITH (NOLOCK)
+					LEFT JOIN [msdb].[dbo].[sysjobsteps] sjs WITH (NOLOCK) ON sjs.[job_id] = h.[job_id] AND sjs.[step_id] = h.[step_id]
 					WHERE	 h.[instance_id] > ISNULL((
 														SELECT TOP 1 [instance_id] 
 														FROM (	
 																SELECT TOP 2 h.[instance_id], h.[message], h.[step_id], h.[step_name], h.[run_status], CAST(h.[run_date] AS varchar) AS [run_date], CAST(h.[run_time] AS varchar) AS [run_time], CAST(h.[run_duration] AS varchar) AS [run_duration]
-																FROM [msdb].[dbo].[sysjobhistory] h WITH (READPAST) 
+																FROM [msdb].[dbo].[sysjobhistory] h WITH (NOLOCK)
 																WHERE	h.[job_id] = ''' + CAST(@jobID AS [nvarchar](36)) + N'''
 																		AND h.[step_name] =''(Job outcome)''
 																ORDER BY h.[instance_id] DESC

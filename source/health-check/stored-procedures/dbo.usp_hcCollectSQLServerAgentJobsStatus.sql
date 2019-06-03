@@ -132,7 +132,7 @@ WHILE @@FETCH_STATUS=0
 		-------------------------------------------------------------------------------------------------------------------------
 		TRUNCATE TABLE #msdbSysJobs
 		BEGIN TRY
-			SET @queryToRun='SELECT [name] FROM msdb.dbo.sysjobs WHERE [name] LIKE ''' + @jobNameFilter + ''' ORDER BY [name]'
+			SET @queryToRun='SELECT [name] FROM [msdb].[dbo].[sysjobs] WITH (NOLOCK) WHERE [name] LIKE ''' + @jobNameFilter + ''''
 			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 			IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
@@ -150,6 +150,7 @@ WHILE @@FETCH_STATUS=0
 
 		DECLARE crsJobs CURSOR LOCAL FAST_FORWARD FOR	SELECT REPLACE([name] , '''', '''''')
 														FROM #msdbSysJobs
+														ORDER BY [name]
 		OPEN crsJobs
 		FETCH NEXT FROM crsJobs INTO @jobName
 		WHILE @@FETCH_STATUS=0
@@ -163,6 +164,7 @@ WHILE @@FETCH_STATUS=0
 				BEGIN TRY
 					EXEC dbo.usp_sqlAgentJobCheckStatus		@sqlServerName			= @sqlServerName,
 															@jobName				= @jobName,
+															@jobID					= DEFAULT,
 															@strMessage				= @strMessage OUT,
 															@currentRunning			= @currentRunning OUT,
 															@lastExecutionStatus	= @lastExecutionStatus OUT,
