@@ -64,5 +64,6 @@ INSERT	INTO [report].[htmlOptions] ([module], [name], [value], [description])
 		  SELECT 'health-check' AS [module], N'SQL Agent Job - Maximum Running Time (hours)'	AS [name], '3'					AS [value], 'maximum accepted job running time; default 3'								AS [description] UNION ALL
 		  SELECT 'health-check' AS [module], N'Online Instance Get Databases Size per Project'	AS [name], 'false'				AS [value], 'get only project databases size for an instance; default get all dbs'		AS [description] UNION ALL
 		  SELECT 'health-check' AS [module], N'Minimum Failed Login Attempts'					AS [name], '50'					AS [value], 'minimum failed login attempts per interval to be reported'					AS [description] UNION ALL
-		  SELECT 'health-check' AS [module], N'Minimum Disk space to reclaim (mb)'				AS [name], '10240'				AS [value], 'minimum disk space to reclaim when reporting data and log space available'	AS [description]
+		  SELECT 'health-check' AS [module], N'Minimum Disk space to reclaim (mb)'				AS [name], '10240'				AS [value], 'minimum disk space to reclaim when reporting data and log space available'	AS [description] UNION ALL
+		  SELECT 'health-check' AS [module], N'Exclude Database Snapshots for Backup/DBCC checks'AS [name], 'true'				AS [value], 'do not check for outdated backups/dbcc for database snapshot(s)'			AS [description]
 GO

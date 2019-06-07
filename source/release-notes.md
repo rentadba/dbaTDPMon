@@ -877,3 +877,6 @@
 #### June 2019 new features & fixes
 03.06.2019
 * optimize the calls to msdb system tables when running an internal job queue
+
+07.06.2019
+* health-chec: option not to display outdated backups/dbcc for database snapshot(s)

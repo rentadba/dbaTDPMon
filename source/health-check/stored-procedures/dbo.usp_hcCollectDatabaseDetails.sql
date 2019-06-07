@@ -92,7 +92,8 @@ CREATE TABLE #statsDatabaseDetails
 	[recovery_model]			[tinyint]		NULL,
 	[page_verify_option]		[tinyint]		NULL,
 	[compatibility_level]		[tinyint]		NULL,
-	[is_growth_limited]			[bit]			NULL
+	[is_growth_limited]			[bit]			NULL,
+	[is_snapshot]				[bit]			NULL
 )
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
@@ -386,6 +387,7 @@ WHILE @@FETCH_STATUS=0
 									, bkp.[recovery_model]
 									, bkp.[page_verify_option]
 									, bkp.[compatibility_level]
+									, bkp.[is_snapshot]
 							FROM (
 								  SELECT	  sdb.[name]	AS [database_name]
 											, sdb.[database_id]
@@ -393,16 +395,17 @@ WHILE @@FETCH_STATUS=0
 											, sdb.[page_verify_option]
 											, sdb.[compatibility_level]
 											, MAX(bs.[backup_finish_date]) AS [last_backup_time]
+											, CASE WHEN sdb.[source_database_id] IS NULL THEN 0 ELSE 1 END AS [is_snapshot]
 								  FROM sys.databases sdb
 								  LEFT OUTER JOIN msdb.dbo.backupset bs ON bs.[database_name] = sdb.[name] AND bs.type IN (''D'', ''I'')
 								  WHERE sdb.[name] LIKE ''' + @databaseNameFilter + N'''
-								  GROUP BY sdb.[name], sdb.[database_id], sdb.[recovery_model], sdb.[page_verify_option], sdb.[compatibility_level]
+								  GROUP BY sdb.[name], sdb.[database_id], sdb.[recovery_model], sdb.[page_verify_option], sdb.[compatibility_level], sdb.[source_database_id]
 							    )bkp'
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		
 		BEGIN TRY
-			INSERT	INTO #statsDatabaseDetails([query_type], [database_id], [last_backup_time], [is_auto_close], [is_auto_shrink], [recovery_model], [page_verify_option], [compatibility_level])
+			INSERT	INTO #statsDatabaseDetails([query_type], [database_id], [last_backup_time], [is_auto_close], [is_auto_shrink], [recovery_model], [page_verify_option], [compatibility_level], [is_snapshot])
 					EXEC sp_executesql @queryToRun
 		END TRY
 		BEGIN CATCH
@@ -459,15 +462,16 @@ WHILE @@FETCH_STATUS=0
 			end
 
 
+
 		/* save results to stats table */
 		INSERT	INTO [health-check].[statsDatabaseDetails]([catalog_database_id], [instance_id], 
 				 											 [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], 
 															 [is_auto_close], [is_auto_shrink], [volume_mount_point], 
-															 [last_backup_time], [last_dbcc checkdb_time],  [recovery_model], [page_verify_option], [compatibility_level], [is_growth_limited], [event_date_utc])
+															 [last_backup_time], [last_dbcc checkdb_time],  [recovery_model], [page_verify_option], [compatibility_level], [is_growth_limited], [is_snapshot], [event_date_utc])
 				SELECT cdn.[id], @instanceID, 
 				 		qt.[data_size_mb], qt.[data_space_used_percent], qt.[log_size_mb], qt.[log_space_used_percent], 
 						qt.[is_auto_close], qt.[is_auto_shrink], qt.[volume_mount_point], 
-						qt.[last_backup_time], qt.[last_dbcc checkdb_time],  qt.[recovery_model], qt.[page_verify_option], qt.[compatibility_level], qt.[is_growth_limited], GETUTCDATE()
+						qt.[last_backup_time], qt.[last_dbcc checkdb_time],  qt.[recovery_model], qt.[page_verify_option], qt.[compatibility_level], qt.[is_growth_limited], qt.[is_snapshot], GETUTCDATE()
 				FROM (
 						SELECT    ISNULL(qt1.[database_id], qt2.[database_id]) [database_id]
 								, qt2.[recovery_model]
@@ -483,6 +487,7 @@ WHILE @@FETCH_STATUS=0
 								, qt2.[last_backup_time]
 								, qt1.[last_dbcc checkdb_time]
 								, qt1.[is_growth_limited]
+								, qt2.[is_snapshot]
 						FROM (
 								SELECT    [database_id]
 										, [data_size_mb]
@@ -491,7 +496,7 @@ WHILE @@FETCH_STATUS=0
 										, [log_space_used_percent]
 										, [volume_mount_point]
 										, [last_dbcc checkdb_time]
-										, [is_growth_limited]
+										, [is_growth_limited]										
 								FROM #statsDatabaseDetails
 								WHERE [query_type]=1
 							) qt1
@@ -504,6 +509,7 @@ WHILE @@FETCH_STATUS=0
 										, [recovery_model]
 										, [page_verify_option]
 										, [compatibility_level]
+										, [is_snapshot]
 								FROM #statsDatabaseDetails
 								WHERE [query_type]=2
 							) qt2 ON qt1.[database_id] = qt2.[database_id]

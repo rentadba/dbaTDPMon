@@ -113,6 +113,7 @@ DECLARE   @databaseName								[sysname]
 		, @reportOptionOSEventMessageLastHours		[int]
 		, @reportOptionGetProjectDBSize				[bit]
 		, @reportOptionMinSpaceToReclaim			[int]
+		, @reportOptionSkipDatabaseSnapshots		[bit]
 		, @configOSEventMessageLastHours			[int]
 		, @configOSEventGetInformationEvent			[bit]
 		, @configOSEventGetWarningsEvent			[bit]
@@ -480,6 +481,20 @@ BEGIN TRY
 		SET @reportOptionGetProjectDBSize = 0
 	END CATCH
 	SET @reportOptionGetProjectDBSize = ISNULL(@reportOptionGetProjectDBSize, 0)
+
+
+	-----------------------------------------------------------------------------------------------------
+	BEGIN TRY
+		SELECT	@reportOptionSkipDatabaseSnapshots = CASE WHEN [value]='true' THEN 1 ELSE 0 END
+		FROM	[report].[htmlOptions]
+		WHERE	[name] = N'Exclude Database Snapshots for Backup/DBCC checks'
+				AND [module] = 'health-check'
+	END TRY
+	BEGIN CATCH
+		SET @reportOptionSkipDatabaseSnapshots = 1
+	END CATCH
+	SET @reportOptionSkipDatabaseSnapshots = ISNULL(@reportOptionSkipDatabaseSnapshots, 1)
+	
 
 	------------------------------------------------------------------------------------------------------------------------------------------
 	--option for timeout when fetching OS events
@@ -3097,6 +3112,9 @@ BEGIN TRY
 																									AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																									AND CHARINDEX(cdn.[state_desc], @reportOptionDatabaseAdmittedState) <> 0
 																									AND rsr.[id] IS NULL
+																									AND (   (@reportOptionSkipDatabaseSnapshots = 0)
+																										 OR (@reportOptionSkipDatabaseSnapshots = 1 AND shcdd.[is_snapshot] = 0)
+																										)
 																						)
 																						SELECT   dbad.[machine_name], dbad.[instance_name], dbad.[is_clustered], dbad.[cluster_node_machine_name]
 																							   , dbad.[database_name], dbad.[size_mb], dbad.[last_backup_time], dbad.[backup_age_days]
@@ -3212,6 +3230,9 @@ BEGIN TRY
 																									AND CHARINDEX(cdn.[state_desc], 'ONLINE')<>0
 																									AND cin.[version] NOT LIKE '8.%'
 																									AND rsr.[id] IS NULL
+																									AND (   (@reportOptionSkipDatabaseSnapshots = 0)
+																										 OR (@reportOptionSkipDatabaseSnapshots = 1 AND shcdd.[is_snapshot] = 0)
+																										)
 																							ORDER BY [instance_name], [machine_name], [dbcc_checkdb_age_days] DESC, [database_name]
 			OPEN crsDatabaseDBCCCHECKDBAgeIssuesDetected
 			FETCH NEXT FROM crsDatabaseDBCCCHECKDBAgeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @lastCheckDBDate, @lastDatabaseEventAgeDays

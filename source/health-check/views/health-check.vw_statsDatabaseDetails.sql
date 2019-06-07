@@ -39,6 +39,7 @@ SELECT 	  cin.[project_id]		AS [project_id]
 		, CASE shcdd.[page_verify_option] WHEN 0 THEN 'NONE' WHEN 1 THEN 'TORN_PAGE_DETECTION' WHEN 2 THEN 'CHECKSUM' ELSE NULL END AS [page_verify_option_desc]
 		, shcdd.[compatibility_level]
 		, shcdd.[is_growth_limited]
+		, shcdd.[is_snapshot]
 		, shcdd.[event_date_utc]
 FROM [dbo].[catalogInstanceNames]	cin	
 INNER JOIN [dbo].[catalogDatabaseNames] cdn ON cin.[id] = cdn.[instance_id] AND cin.[project_id] = cdn.[project_id]
