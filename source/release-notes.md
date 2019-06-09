@@ -879,4 +879,7 @@
 * optimize the calls to msdb system tables when running an internal job queue
 
 07.06.2019
-* health-chec: option not to display outdated backups/dbcc for database snapshot(s)
+* health-check: option not to display outdated backups/dbcc for database snapshot(s)
+
+09.06.2019
+* health-check: add stored procedure for reporting database(s) and backup file(s) storage capacity
