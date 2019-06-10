@@ -883,3 +883,6 @@
 
 09.06.2019
 * health-check: add stored procedure for reporting database(s) and backup file(s) storage capacity
+
+10.06.2019
+* health-check: add stored procedure for reporting database(s) growth
