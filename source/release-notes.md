@@ -886,3 +886,6 @@
 
 10.06.2019
 * health-check: add stored procedure for reporting database(s) growth
+
+14.06.2019
+* health-check: enhancements to the daily health-check report: add Capacity Analysis category

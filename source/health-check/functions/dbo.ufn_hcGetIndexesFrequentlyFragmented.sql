@@ -8,7 +8,7 @@ GO
 CREATE FUNCTION [dbo].[ufn_hcGetIndexesFrequentlyFragmented]
 (		
 	@projectCode							[varchar](32)=NULL,
-	@minimumIndexMaintenanceFrequencyDays	[tinyint] = 2,
+	@minimumIndexMaintenanceFrequencyDays	[smallint] = 2,
 	@analyzeOnlyMessagesFromTheLastHours	[smallint] = 24 ,
 	@analyzeIndexMaintenanceOperation		[nvarchar](128) = 'REBUILD'
 )

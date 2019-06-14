@@ -114,6 +114,7 @@ DECLARE   @databaseName								[sysname]
 		, @reportOptionGetProjectDBSize				[bit]
 		, @reportOptionMinSpaceToReclaim			[int]
 		, @reportOptionSkipDatabaseSnapshots		[bit]
+		, @reportOptionGetBackupSizeLastDays		[smallint]
 		, @configOSEventMessageLastHours			[int]
 		, @configOSEventGetInformationEvent			[bit]
 		, @configOSEventGetWarningsEvent			[bit]
@@ -131,8 +132,8 @@ DECLARE   @databaseName								[sysname]
 		, @lastDatabaseEventAgeDays				[int]
 		, @logicalDrive							[char](1)
 		, @volumeMountPoint						[nvarchar](512)
-		, @diskTotalSizeMB						[numeric](18,3)
-		, @diskAvailableSpaceMB					[numeric](18,3)
+		, @diskTotalSizeGB						[numeric](18,3)
+		, @diskAvailableSpaceGB					[numeric](18,3)
 		, @diskPercentAvailable					[numeric](6,2)
 		, @dateTimeLowerLimit					[datetime]
 		, @dateTimeLowerLimitUTC				[datetime]
@@ -494,6 +495,18 @@ BEGIN TRY
 		SET @reportOptionSkipDatabaseSnapshots = 1
 	END CATCH
 	SET @reportOptionSkipDatabaseSnapshots = ISNULL(@reportOptionSkipDatabaseSnapshots, 1)
+
+	-----------------------------------------------------------------------------------------------------
+	BEGIN TRY
+		SELECT	@reportOptionGetBackupSizeLastDays = [value]
+		FROM	[report].[htmlOptions]
+		WHERE	[name] = N'Analyze backup size (GB) in the last days'
+				AND [module] = 'health-check'
+	END TRY
+	BEGIN CATCH
+		SET @reportOptionGetBackupSizeLastDays = 7
+	END CATCH
+	SET @reportOptionGetBackupSizeLastDays = ISNULL(@reportOptionGetBackupSizeLastDays, 7)
 	
 
 	------------------------------------------------------------------------------------------------------------------------------------------
@@ -1019,9 +1032,9 @@ BEGIN TRY
 					END + N'
 					</TD>
 					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
-					CASE WHEN (@flgActions & 2 = 2)  AND (@flgOptions & 128 = 128)
-						  THEN N'<A HREF="#SystemDatabasesSizeIssuesDetected" class="summary-style color-1">Big Size for System Databases {SystemDatabasesSizeIssuesDetectedCount}</A>'
-						  ELSE N'Big Size for System Databases (N/A)'
+					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 8192 = 8192)
+						  THEN N'<A HREF="#DatabaseBACKUPAgeIssuesDetected" class="summary-style color-1">Outdated Backup for Databases {DatabaseBACKUPAgeIssuesDetectedCount}</A>'
+						  ELSE N'Outdated Backup for Databases (N/A)'
 					END + N'
 					</TD>
 				</TR>
@@ -1033,9 +1046,9 @@ BEGIN TRY
 					END + N'
 					</TD>
 					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
-					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 1024 = 1024)
-						  THEN N'<A HREF="#DatabaseMaxLogSizeIssuesDetected" class="summary-style color-2">Big Size for Database Log files {DatabaseMaxLogSizeIssuesDetectedCount}</A>'
-						  ELSE N'Big Size for Database Log files (N/A)'
+					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 16384 = 16384)
+						  THEN N'<A HREF="#DatabaseDBCCCHECKDBAgeIssuesDetected" class="summary-style color-2">Outdated DBCC CHECKDB Databases {DatabaseDBCCCHECKDBAgeIssuesDetectedCount}</A>'
+						  ELSE N'Outdated DBCC CHECKDB Databases (N/A)'
 					END + N'
 					</TD>
 				</TR>
@@ -1055,51 +1068,23 @@ BEGIN TRY
 				</TR>
 				<TR VALIGN="TOP" class="color-2">
 					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
-					CASE WHEN (@flgActions & 8 = 8) AND (@flgOptions & 262144 = 262144)
-						  THEN N'<A HREF="#DiskSpaceInformationIssuesDetected" class="summary-style color-2">Low Free Disk Space {DiskSpaceInformationIssuesDetectedCount}</A>'
-						  ELSE N'Low Free Disk Space (N/A)'
+					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 16777216 = 16777216)
+						  THEN N'<A HREF="#FrequentlyFragmentedIndexesIssuesDetected" class="summary-style color-2">Frequently Fragmented Indexes {FrequentlyFragmentedIndexesIssuesDetectedCount}</A>'
+						  ELSE N'Frequently Fragmented Indexes (N/A)'
 					END + N'
 					</TD>
 					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
-					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 2048 = 2048)
-						  THEN N'<A HREF="#DatabaseMinDataSpaceIssuesDetected" class="summary-style color-2">Low Usage of Data Space {DatabaseMinDataSpaceIssuesDetectedCount}</A>'
-						  ELSE N'Low Usage of Data Space (N/A)'
+					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 8388608 = 8388608)
+						  THEN N'<A HREF="#DatabasePageVerifyIssuesDetected" class="summary-style color-2">Databases with Improper Page Verify Option {DatabasePageVerifyIssuesDetectedCount}</A>'
+						  ELSE N'Databases with Improper Page Verify Option (N/A)'
 					END + N'
 					</TD>
 				</TR>
 				<TR VALIGN="TOP" class="color-1">
 					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
-					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 8192 = 8192)
-						  THEN N'<A HREF="#DatabaseBACKUPAgeIssuesDetected" class="summary-style color-1">Outdated Backup for Databases {DatabaseBACKUPAgeIssuesDetectedCount}</A>'
-						  ELSE N'Outdated Backup for Databases (N/A)'
-					END + N'
-					</TD>
-					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
-					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 32768 = 32768)
-						  THEN N'<A HREF="#DatabaseMaxLogSpaceIssuesDetected" class="summary-style color-1">High Usage of Log Space {DatabaseMaxLogSpaceIssuesDetectedCount}</A>'
-						  ELSE N'High Usage of Log Space (N/A)'
-					END + N'
-					</TD>
-				</TR> 
-				<TR VALIGN="TOP" class="color-2">
-					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
-					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 16384 = 16384)
-						  THEN N'<A HREF="#DatabaseDBCCCHECKDBAgeIssuesDetected" class="summary-style color-2">Outdated DBCC CHECKDB Databases {DatabaseDBCCCHECKDBAgeIssuesDetectedCount}</A>'
-						  ELSE N'Outdated DBCC CHECKDB Databases (N/A)'
-					END + N'
-					</TD>
-					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
-					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 4096 = 4096)
-						  THEN N'<A HREF="#DatabaseLogVsDataSizeIssuesDetected" class="summary-style color-2">Log vs. Data - Allocated Size {DatabaseLogVsDataSizeIssuesDetectedCount}</A>'
-						  ELSE N'Log vs. Data - Allocated Size (N/A)'
-					END + N'
-					</TD>
-				</TR> 
-				<TR VALIGN="TOP" class="color-1">
-					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
-					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 16777216 = 16777216)
-						  THEN N'<A HREF="#FrequentlyFragmentedIndexesIssuesDetected" class="summary-style color-1">Frequently Fragmented Indexes {FrequentlyFragmentedIndexesIssuesDetectedCount}</A>'
-						  ELSE N'Frequently Fragmented Indexes (N/A)'
+					CASE WHEN (@flgActions & 16 = 16) AND (@flgOptions & 536870912 = 536870912)
+						  THEN N'<A HREF="#FailedLoginsAttemptsIssuesDetected" class="summary-style color-1">Failed Login Attempts {FailedLoginsAttemptsIssuesDetectedCount}</A>'
+						  ELSE N'Failed Logins Attempts (N/A)'
 					END + N'
 					</TD>
 					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
@@ -1108,21 +1093,57 @@ BEGIN TRY
 						  ELSE N'Databases with Fixed File(s) Size (N/A)'
 					END + N'
 					</TD>
-				</TR> 
+				</TR>
+			</table>
+			<br>
+			<table CELLSPACING=0 CELLPADDING="3px" border=0 width="552px" class="with-border">
+				<TR VALIGN="TOP" class="color-3">
+					<TD ALIGN=LEFT class="summary-style-title add-border color-3" colspan="2">Capacity analysis</TD>
+				</TR>
+				<TR VALIGN="TOP" class="color-1">
+					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
+					CASE WHEN (@flgActions & 8 = 8) AND (@flgOptions & 262144 = 262144)
+						  THEN N'<A HREF="#DiskSpaceInformationIssuesDetected" class="summary-style color-1">Low Free Disk Space {DiskSpaceInformationIssuesDetectedCount}</A>'
+						  ELSE N'Low Free Disk Space (N/A)'
+					END + N'
+					</TD>
+					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
+					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 2048 = 2048)
+						  THEN N'<A HREF="#DatabaseMinDataSpaceIssuesDetected" class="summary-style color-1">Low Usage of Data Space {DatabaseMinDataSpaceIssuesDetectedCount}</A>'
+						  ELSE N'Low Usage of Data Space (N/A)'
+					END + N'
+					</TD>
+				</TR>
 				<TR VALIGN="TOP" class="color-2">
 					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
-					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 8388608 = 8388608)
-						  THEN N'<A HREF="#DatabasePageVerifyIssuesDetected" class="summary-style color-2">Databases with Improper Page Verify Option {DatabasePageVerifyIssuesDetectedCount}</A>'
-						  ELSE N'Databases with Improper Page Verify Option (N/A)'
-					END + N'</TD>
+					CASE WHEN (@flgActions & 2 = 2)  AND (@flgOptions & 128 = 128)
+						  THEN N'<A HREF="#SystemDatabasesSizeIssuesDetected" class="summary-style color-2">Big Size for System Databases {SystemDatabasesSizeIssuesDetectedCount}</A>'
+						  ELSE N'Big Size for System Databases (N/A)'
+					END + N'
+					</TD>
 					<TD ALIGN=LEFT class="summary-style add-border color-2">' +
-					CASE WHEN (@flgActions & 16 = 16) AND (@flgOptions & 536870912 = 536870912)
-						  THEN N'<A HREF="#FailedLoginsAttemptsIssuesDetected" class="summary-style color-2">Failed Login Attempts {FailedLoginsAttemptsIssuesDetectedCount}</A>'
-						  ELSE N'Failed Logins Attempts (N/A)'
+					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 32768 = 32768)
+						  THEN N'<A HREF="#DatabaseMaxLogSpaceIssuesDetected" class="summary-style color-2">High Usage of Log Space {DatabaseMaxLogSpaceIssuesDetectedCount}</A>'
+						  ELSE N'High Usage of Log Space (N/A)'
+					END + N'
+					</TD>
+				</TR>
+				<TR VALIGN="TOP" class="color-1">
+					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
+					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 1024 = 1024)
+						  THEN N'<A HREF="#DatabaseMaxLogSizeIssuesDetected" class="summary-style color-1">Big Size for Database Log files {DatabaseMaxLogSizeIssuesDetectedCount}</A>'
+						  ELSE N'Big Size for Database Log files (N/A)'
+					END + N'
+					</TD>
+					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
+					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 4096 = 4096)
+						  THEN N'<A HREF="#DatabaseLogVsDataSizeIssuesDetected" class="summary-style color-1">Log vs. Data - Allocated Size {DatabaseLogVsDataSizeIssuesDetectedCount}</A>'
+						  ELSE N'Log vs. Data - Allocated Size (N/A)'
 					END + N'
 					</TD>
 				</TR>
 			</table>
+
 		</TD>
 	</TR>
 	</TABLE>			
@@ -1132,6 +1153,41 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	--prepare data for the report. apply filters where needed. build temporary tables
 	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 1 = 1) AND (@flgOptions & 2 = 2)
+		begin
+			SET @ErrMessage = 'analyzing database details - size and backup info'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
+
+			DECLARE @tmpProjectFilter [varchar](32)
+
+			IF @reportOptionGetProjectDBSize = 1
+				SET @tmpProjectFilter = @projectCode
+			ELSE
+				IF @reportOptionGetProjectDBSize = 0 OR (@flgOptions & 268435456 = 268435456)
+					SET @tmpProjectFilter = '%'
+			
+			IF OBJECT_ID('tempdb..#hcReportCapacityDatabaseBackups') IS NOT NULL DROP TABLE #hcReportCapacityDatabaseBackups
+			CREATE TABLE #hcReportCapacityDatabaseBackups
+			(
+				[instance_name]			[sysname]		NULL,
+				[solution_name]			[nvarchar](128)	NULL,
+				[is_production]			[bit]			NULL,
+				[database_count]		[smallint]		NULL,
+				[database_size_gb]		[numeric](18,3)	NULL,
+				[backup_size_gb]		[numeric](18,3)	NULL,
+				[backup_files_count]	[int]			NULL,
+				[full_backup_gb]		[numeric](18,3)	NULL,
+				[diff_backup_gb]		[numeric](18,3)	NULL,
+				[log_backup_gb]			[numeric](18,3)	NULL
+			)
+
+			INSERT INTO #hcReportCapacityDatabaseBackups([instance_name], [solution_name], [is_production], [database_count], [database_size_gb], 
+														 [backup_size_gb], [backup_files_count], [full_backup_gb], [diff_backup_gb], [log_backup_gb])
+			EXEC [dbo].[usp_hcReportCapacityDatabaseBackups]	@projectCode		= @tmpProjectFilter,
+																@sqlServerNameFilter= '%',
+																@daysToAnalyze		= @reportOptionGetBackupSizeLastDays
+		end
+
 	IF (@flgActions & 16 = 16) AND (@flgOptions & 1048576 = 1048576)
 		begin
 			SET @ErrMessage = 'analyzing errorlog messages - filtering messages'
@@ -1371,7 +1427,7 @@ BEGIN TRY
 											<TH WIDTH=" 80px" class="details-bold">Clustered</TH>
 											<TH WIDTH= "80px" class="details-bold" nowrap >Version</TH>
 											<TH WIDTH="240px" class="details-bold">Edition</TH>
-											<TH WIDTH= "80px" class="details-bold" nowrap>DB Size (MB)</TH>
+											<TH WIDTH= "80px" class="details-bold" nowrap>DB Size (GB)</TH>
 											<TH WIDTH= "80px" class="details-bold" nowrap>DB Count</TH>
 											<TH WIDTH="140px" class="details-bold" nowrap>Refresh Date (UTC)</TH>'
 
@@ -1390,26 +1446,17 @@ BEGIN TRY
 			DECLARE crsInstancesOffline CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																				, cin.[is_clustered], cin.[cluster_node_machine_name]
 																				, cin.[version], cin.[edition], cin.[last_refresh_date_utc]	
-																				, SUM(shcdd.[db_count]) AS [database_count]
-																				, SUM(shcdd.[size_mb]) AS [size_mb]
+																				, SUM(shcdd.[database_count])   AS [database_count]
+																				, SUM(shcdd.[db_size_gb])		AS [db_size_gb]
 																		FROM [dbo].[vw_catalogInstanceNames]  cin
 																		LEFT JOIN 
 																			(
-																				SELECT    [project_id], [instance_name]
-																						, COUNT(DISTINCT [database_name]) AS [db_count]
-																						, SUM(ISNULL([size_mb], 0)) [size_mb]
-																				FROM [health-check].[vw_statsDatabaseDetails]
-																				WHERE	( 
-																						     @reportOptionGetProjectDBSize = 0
-																						 OR (@reportOptionGetProjectDBSize = 1 AND [project_id] = @projectID)
-																						 OR (@flgOptions & 268435456 = 268435456)
-																						)
-																						AND [active] = 1
-																				GROUP BY [project_id], [instance_name]
+																				SELECT	[instance_name], 
+																						SUM([database_count])	AS [database_count],
+																						SUM([database_size_gb]) AS [db_size_gb]
+																				FROM #hcReportCapacityDatabaseBackups
+																				GROUP BY [instance_name]
 																			) shcdd ON	shcdd.[instance_name] = cin.[instance_name] 
-																						AND (   (@reportOptionGetProjectDBSize =1 AND shcdd.[project_id] = cin.[project_id])
-																							 OR @reportOptionGetProjectDBSize = 0
-																							)
 																		LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																													AND rsr.[rule_id] = 2
 																													AND rsr.[active] = 1
@@ -1968,7 +2015,762 @@ BEGIN TRY
 		end
 	ELSE
 		SET @HTMLReport = REPLACE(@HTMLReport, '{LongRunningSQLAgentJobsIssuesDetectedCount}', '(N/A)')	
+
+
+	-----------------------------------------------------------------------------------------------------
+	--Frequently Fragmented Indexes
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 2 = 2) AND (@flgOptions & 16777216 = 16777216)
+		begin
+			SET @ErrMessage = 'Frequently Fragmented Indexes - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+			DECLARE @indexAnalyzedCount						[int],
+					@indexesPerInstance						[int],
+					@minimumIndexMaintenanceFrequencyDays	[smallint],
+					@analyzeOnlyMessagesFromTheLastHours	[smallint],
+					@minimumIndexSizeInPages				[int],
+					@minimumIndexFillFactor					[int]
+
+			SET @minimumIndexMaintenanceFrequencyDays = 2
+			SET @analyzeOnlyMessagesFromTheLastHours = 24
 		
+			-----------------------------------------------------------------------------------------------------
+			--reading report options
+			SELECT	@minimumIndexMaintenanceFrequencyDays = [value]
+			FROM	[report].[htmlOptions]
+			WHERE	[name] = N'Minimum Index Maintenance Frequency (days)'
+					AND [module] = 'health-check'
+
+			SET @minimumIndexMaintenanceFrequencyDays = ISNULL(@minimumIndexMaintenanceFrequencyDays, 2)
+
+			-----------------------------------------------------------------------------------------------------
+			SELECT	@analyzeOnlyMessagesFromTheLastHours = [value]
+			FROM	[report].[htmlOptions]
+			WHERE	[name] = N'Analyze Only Messages from the last hours'
+					AND [module] = 'health-check'
+
+			SET @analyzeOnlyMessagesFromTheLastHours = ISNULL(@analyzeOnlyMessagesFromTheLastHours, 24)
+
+			-----------------------------------------------------------------------------------------------------
+			SELECT	@minimumIndexSizeInPages = [value]
+			FROM	[report].[htmlOptions]
+			WHERE	[name] = N'Minimum Index Size (pages)'
+					AND [module] = 'health-check'
+
+			SET @minimumIndexSizeInPages = ISNULL(@minimumIndexSizeInPages, 50000)
+		
+			-----------------------------------------------------------------------------------------------------
+			SELECT	@minimumIndexFillFactor = [value]
+			FROM	[report].[htmlOptions]
+			WHERE	[name] = N'Minimum Index fill-factor'
+					AND [module] = 'health-check'
+
+			SET @minimumIndexFillFactor = ISNULL(@minimumIndexFillFactor, 90)
+		
+			-----------------------------------------------------------------------------------------------------
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea = @HTMLReportArea + 
+							N'<A NAME="FrequentlyFragmentedIndexesIssuesDetected" class="category-style">Frequently Fragmented Indexes</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="11">indexes which got fragmented in the last ' + CAST(@minimumIndexMaintenanceFrequencyDays AS [nvarchar](32)) + N' day(s), were analyzed in the last ' + CAST(@analyzeOnlyMessagesFromTheLastHours AS [nvarchar](32)) + N' hours, having minimum ' + CAST(@minimumIndexSizeInPages AS [nvarchar]) + N' pages and fillfactor &ge; ' + CAST(@minimumIndexFillFactor AS [nvarchar]) + N'</TD>
+							</TR>
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="11">consider lowering the fill-factor with at least 5 percent</TD>
+							</TR>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="120px" class="details-bold">Instance Name</TH>
+											<TH WIDTH="120px" class="details-bold">Database Name</TH>
+											<TH WIDTH="120px" class="details-bold">Table Name</TH>
+											<TH WIDTH="120px" class="details-bold">Index Name</TH>
+											<TH WIDTH="100px" class="details-bold">Type</TH>
+											<TH WIDTH=" 80px" class="details-bold">Frequency (days)</TH>
+											<TH WIDTH=" 80px" class="details-bold">Page Count</TH>
+											<TH WIDTH=" 90px" class="details-bold">Fragmentation</TH>
+											<TH WIDTH="100px" class="details-bold">Page Density Deviation</TH>
+											<TH WIDTH=" 80px" class="details-bold">Fill-Factor</TH>
+											<TH WIDTH="120px" class="details-bold">Last Action</TH>
+											'
+			SET @idx=1		
+
+			-----------------------------------------------------------------------------------------------------
+			SET @ErrMessage = 'analyzing fragmentation logs'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
+
+			IF OBJECT_ID('tempdb..#filteredStatsIndexesFrequentlyFragmented]') IS NOT NULL
+				DROP TABLE #filteredStatsIndexesFrequentlyFragmented
+
+			DECLARE @projectToAnalyze [varchar](32)
+			SET @projectToAnalyze = CASE WHEN @flgOptions & 268435456 = 268435456 THEN NULL ELSE @projectCode END
+			
+			SELECT iff.*
+			INTO #filteredStatsIndexesFrequentlyFragmented
+			FROM 
+				(
+					SELECT *
+					FROM [dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectToAnalyze, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, 'REBUILD') a
+					UNION ALL
+					SELECT *
+					FROM [dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectToAnalyze, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, 'REORGANIZE')b
+				)iff
+			INNER JOIN [dbo].[vw_catalogInstanceNames]  cin ON iff.[instance_name] = cin.[instance_name]
+			LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+														AND rsr.[rule_id] = 16777216
+														AND rsr.[active] = 1
+														AND (rsr.[skip_value]=iff.[instance_name])
+			WHERE cin.[instance_active] = 1
+				 AND cin.[project_id] = @projectID
+				 AND iff.[page_count] >= @minimumIndexSizeInPages
+				 AND iff.[fill_factor] >= @minimumIndexFillFactor
+
+			CREATE INDEX IX_filteredStatsIndexesFrequentlyFragmented_InstanceName ON #filteredStatsIndexesFrequentlyFragmented([instance_name])
+
+			SET @ErrMessage = 'done'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
+
+			-----------------------------------------------------------------------------------------------------
+			SET @indexAnalyzedCount=0
+
+			DECLARE crsFrequentlyFragmentedIndexesMachineNames CURSOR LOCAL FAST_FORWARD FOR	SELECT    iff.[instance_name]
+																										, COUNT(*) AS [index_count]
+																								FROM #filteredStatsIndexesFrequentlyFragmented iff
+																								GROUP BY iff.[instance_name]
+																								ORDER BY iff.[instance_name]
+			OPEN crsFrequentlyFragmentedIndexesMachineNames
+			FETCH NEXT FROM crsFrequentlyFragmentedIndexesMachineNames INTO  @instanceName, @indexesPerInstance
+			WHILE @@FETCH_STATUS=0
+				begin
+					SET @indexAnalyzedCount = @indexAnalyzedCount + @indexesPerInstance
+					SET @HTMLReportArea = @HTMLReportArea + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" ROWSPAN="' + CAST(@indexesPerInstance AS [nvarchar](64)) + N'"><A NAME="FrequentlyFragmentedIndexesCompleteDetails' + @instanceName + N'">' + @instanceName + N'</A></TD>' 
+
+					SET @tmpHTMLReport=N''
+					SELECT @tmpHTMLReport=((
+											SELECT	N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL([database_name], N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL([object_name], N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH="120px" class="details" ALIGN="LEFT" >' + ISNULL([index_name], N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH="100px" class="details" ALIGN="LEFT" >' + ISNULL([index_type], N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH= "80px" class="details" ALIGN="CENTER" >' + ISNULL(CAST([interval_days] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST([page_count] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH= "90px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST([fragmentation] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH="100px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST([page_density_deviation] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST([fill_factor] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+													N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL([last_action_made], N'&nbsp;') + N'</TD>' + 
+													N'</TR>' + 
+													CASE WHEN [row_count] > [row_no]
+														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+														 ELSE N''
+													END
+											FROM (
+													SELECT    [event_date_utc], [database_name], [object_name], [index_name]
+															, [interval_days], [index_type], [fragmentation], [page_count], [fill_factor], [page_density_deviation], [last_action_made]
+															, ROW_NUMBER() OVER(ORDER BY [database_name], [object_name], [index_name]) [row_no]
+															, SUM(1) OVER() AS [row_count]
+													FROM	#filteredStatsIndexesFrequentlyFragmented
+													WHERE	[instance_name] =  @instanceName
+												)X
+											ORDER BY [database_name], [object_name], [index_name]
+											FOR XML PATH(''), TYPE
+											).value('.', 'nvarchar(max)'))
+
+					SET @idx=@idx+1
+					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
+
+					FETCH NEXT FROM crsFrequentlyFragmentedIndexesMachineNames INTO  @instanceName, @indexesPerInstance
+
+					IF @@FETCH_STATUS=0
+						SET @HTMLReportArea = @HTMLReportArea + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
+												<TD class="details" COLSPAN=11>&nbsp;</TD>
+										</TR>'
+				end
+			CLOSE crsFrequentlyFragmentedIndexesMachineNames
+			DEALLOCATE crsFrequentlyFragmentedIndexesMachineNames
+
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
+								</TD>
+							</TR>
+						</TABLE>'
+
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea						
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{FrequentlyFragmentedIndexesIssuesDetectedCount}', '(' + CAST((@indexAnalyzedCount) AS [nvarchar]) + ')')			
+		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{FrequentlyFragmentedIndexesIssuesDetectedCount}', '(N/A)')				
+	
+
+	-----------------------------------------------------------------------------------------------------
+	--Failed Login Attempts - Issues Detected
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 16 = 16) AND (@flgOptions & 536870912 = 536870912)
+		begin
+			SET @ErrMessage = 'Build Report: Failed Login Attempts - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea = @HTMLReportArea + 
+							N'<A NAME="FailedLoginsAttemptsIssuesDetected" class="category-style">Failed Login Attempts - Issues Detected (last ' + CAST(@reportOptionErrorlogMessageLastHours AS [nvarchar]) + N'h)</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="7">limit results to have minimum ' + CAST(@reportOptionFailedLoginAttemptsLimit AS [nvarchar](32)) + N' </TD>
+							</TR>
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
+											<TH WIDTH="160px" class="details-bold" nowrap>Login Name</TH>
+											<TH WIDTH= "60px" class="details-bold" nowrap>Occurences</TH>
+											<TH WIDTH="710px" class="details-bold">Reason</TH>'
+
+			SET @idx=1		
+
+			-----------------------------------------------------------------------------------------------------
+			SET @issuesDetectedCount = 0 
+			DECLARE crsErrorlogMessagesInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT
+																							  [instance_name]
+																							, COUNT(*) AS [messages_count]
+																					FROM #filteredStatsFailedLoginsAttempts
+																					WHERE [occurencies] >= @reportOptionFailedLoginAttemptsLimit
+																					GROUP BY [instance_name]
+																					ORDER BY [instance_name]
+			OPEN crsErrorlogMessagesInstanceName
+			FETCH NEXT FROM crsErrorlogMessagesInstanceName INTO @instanceName, @messageCount
+			WHILE @@FETCH_STATUS=0
+				begin
+					SET @issuesDetectedCount = @issuesDetectedCount + @messageCount
+
+					SET @HTMLReportArea = @HTMLReportArea + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + '"><A NAME="ErrorlogMessagesIssuesDetected' + @instanceName + N'">' + @instanceName + N'</A></TD>' 
+
+					SET @tmpHTMLReport=N''
+					SELECT @tmpHTMLReport=((
+											SELECT N'<TD WIDTH="160px" class="details" ALIGN="LEFT" nowrap>' + ISNULL(CONVERT([nvarchar](24), [login_name], 121), N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH="60px" class="details" ALIGN="LEFT">' + ISNULL(CAST([occurencies] AS [nvarchar](max)), N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH="710px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText]([reason], 0), N'&nbsp;')  + N'</TD>' + 
+													N'</TR>' + 
+													CASE WHEN [row_count] > [row_no]
+														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+														 ELSE N''
+													END
+
+											FROM (
+													SELECT	TOP (@messageCount)
+															[login_name], [occurencies], 
+															[reason],
+															ROW_NUMBER() OVER(ORDER BY [occurencies] DESC, [login_name]) [row_no],
+															SUM(1) OVER() AS [row_count]
+													FROM	#filteredStatsFailedLoginsAttempts													
+													WHERE	[instance_name] = @instanceName
+												)X
+											ORDER BY [occurencies] DESC, [login_name]
+											FOR XML PATH(''), TYPE
+											).value('.', 'nvarchar(max)'))
+
+					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
+					SET @idx=@idx + 1
+
+					FETCH NEXT FROM crsErrorlogMessagesInstanceName INTO @instanceName, @messageCount
+				end
+			CLOSE crsErrorlogMessagesInstanceName
+			DEALLOCATE crsErrorlogMessagesInstanceName
+
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
+								</TD>
+							</TR>
+						</TABLE>'
+
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{FailedLoginsAttemptsIssuesDetectedCount}', '(' + CAST((@issuesDetectedCount) AS [nvarchar]) + ')')
+		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{FailedLoginsAttemptsIssuesDetectedCount}', '(N/A)')
+
+
+	-----------------------------------------------------------------------------------------------------
+	--Outdated Backup for Databases - Issues Detected
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 2 = 2) AND (@flgOptions & 8192 = 8192)
+		begin
+			SET @ErrMessage = 'Build Report: Outdated Backup for Databases - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+			
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea = @HTMLReportArea + 
+							N'<A NAME="DatabaseBACKUPAgeIssuesDetected" class="category-style">Outdated Backup for Databases - Issues Detected</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="7">backup age (system db) &gt; ' + CAST(@reportOptionSystemDatabaseBACKUPAgeDays AS [nvarchar](32)) + N' OR backup age (user db) &gt; ' + CAST(@reportOptionUserDatabaseBACKUPAgeDays AS [nvarchar](32)) + N'</TD>
+							</TR>
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="120px" class="details-bold" nowrap>Machine Name</TH>
+											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
+											<TH WIDTH="120px" class="details-bold" nowrap>Clustered</TH>
+											<TH WIDTH="360px" class="details-bold">Database Name</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>DB Size (MB)</TH>
+											<TH WIDTH="150px" class="details-bold" nowrap>Last Backup Date</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Backup Age (Days)</TH>'
+			SET @idx=1		
+
+			DECLARE crsDatabaseBACKUPAgeIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	WITH databaseBackupAgeDetails AS
+																						(
+																							SELECT    cin.[machine_name], cin.[instance_name]
+																									, cin.[is_clustered], cin.[cluster_node_machine_name]
+																									, cdn.[database_name]
+																									, shcdd.[size_mb]
+																									, shcdd.[last_backup_time]
+																									, DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) AS [backup_age_days]
+																									, CASE WHEN (    cdn.[database_name] NOT IN ('master', 'model', 'msdb', 'distribution') 
+																												AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @reportOptionUserDatabaseBACKUPAgeDays
+																												)
+																												OR (    cdn.[database_name] IN ('master', 'model', 'msdb', 'distribution') 
+																													AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @reportOptionSystemDatabaseBACKUPAgeDays
+																												)
+																												OR (
+																														cdn.[database_name] NOT IN ('tempdb')
+																													AND shcdd.[last_backup_time] IS NULL
+																												) THEN 1 ELSE 0 
+																										END AS [outdated_backup]
+																									, cdn.[catalog_database_id] 
+																									, cdn.[instance_id] 
+																									, sdaod.[cluster_name]
+																									, sdaod.[ag_name]
+																							FROM [dbo].[vw_catalogInstanceNames]  cin
+																							INNER JOIN [dbo].[vw_catalogDatabaseNames]					cdn   ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																							INNER JOIN [health-check].[vw_statsDatabaseDetails]			shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id] 
+																							LEFT JOIN [health-check].[vw_statsDatabaseAlwaysOnDetails]	sdaod ON sdaod.[catalog_database_id] = cdn.[catalog_database_id] AND sdaod.[instance_id] = cdn.[instance_id] 
+																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																		AND rsr.[rule_id] = 8192
+																																		AND rsr.[active] = 1
+																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																							WHERE cin.[instance_active]=1
+																									AND cdn.[active]=1
+																									AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																									AND CHARINDEX(cdn.[state_desc], @reportOptionDatabaseAdmittedState) <> 0
+																									AND rsr.[id] IS NULL
+																									AND (   (@reportOptionSkipDatabaseSnapshots = 0)
+																										 OR (@reportOptionSkipDatabaseSnapshots = 1 AND shcdd.[is_snapshot] = 0)
+																										)
+																						)
+																						SELECT   dbad.[machine_name], dbad.[instance_name], dbad.[is_clustered], dbad.[cluster_node_machine_name]
+																							   , dbad.[database_name], dbad.[size_mb], dbad.[last_backup_time], dbad.[backup_age_days]
+																						FROM databaseBackupAgeDetails dbad
+																						WHERE [outdated_backup]=1
+																							 AND NOT EXISTS (	
+																												SELECT *
+																												FROM databaseBackupAgeDetails dbad2
+																												INNER JOIN [health-check].[vw_statsDatabaseAlwaysOnDetails] sdaod ON sdaod.[catalog_database_id] = dbad2.[catalog_database_id] AND sdaod.[instance_id] = dbad2.[instance_id] 
+																												WHERE sdaod.[synchronization_health_desc] = 'HEALTHY'
+																													  AND dbad2.[outdated_backup] = 0
+																													  AND dbad2.[cluster_name] = dbad.[cluster_name]
+																													  AND dbad2.[ag_name] = dbad.[ag_name]
+																													  AND dbad2.[database_name] = dbad.[database_name]
+																											)
+
+																						ORDER BY [instance_name], [machine_name], [backup_age_days] DESC, [database_name]
+
+			OPEN crsDatabaseBACKUPAgeIssuesDetected
+			FETCH NEXT FROM crsDatabaseBACKUPAgeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @lastBackupDate, @lastDatabaseEventAgeDays
+			WHILE @@FETCH_STATUS=0
+				begin
+					SET @HTMLReportArea = @HTMLReportArea + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
+										N'<TD WIDTH="360px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @lastBackupDate, 121), N'N/A') + N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@lastDatabaseEventAgeDays AS [nvarchar](64)), N'N/A')+ N'</TD>' + 
+									N'</TR>'
+					SET @idx=@idx+1
+
+					FETCH NEXT FROM crsDatabaseBACKUPAgeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @lastBackupDate, @lastDatabaseEventAgeDays
+				end
+			CLOSE crsDatabaseBACKUPAgeIssuesDetected
+			DEALLOCATE crsDatabaseBACKUPAgeIssuesDetected
+
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
+								</TD>
+							</TR>
+						</TABLE>'
+
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseBACKUPAgeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
+		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseBACKUPAgeIssuesDetectedCount}', '(N/A)')
+		
+
+	-----------------------------------------------------------------------------------------------------
+	--Outdated DBCC CHECKDB Databases - Issues Detected
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 2 = 2) AND (@flgOptions & 16384 = 16384)
+		begin
+			SET @ErrMessage = 'Build Report: Outdated DBCC CHECKDB Databases - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+			
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea = @HTMLReportArea + 
+							N'<A NAME="DatabaseDBCCCHECKDBAgeIssuesDetected" class="category-style">Outdated DBCC CHECKDB Databases - Issues Detected</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="7">dbcc checkdb age (system db) &gt; ' + CAST(@reportOptionSystemDBCCCHECKDBAgeDays AS [nvarchar](32)) + N' OR dbcc checkdb age (user db) &gt; ' + CAST(@reportOptionUserDBCCCHECKDBAgeDays AS [nvarchar](32)) + N'</TD>
+							</TR>
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="120px" class="details-bold" nowrap>Machine Name</TH>
+											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
+											<TH WIDTH="120px" class="details-bold" nowrap>Clustered</TH>
+											<TH WIDTH="360px" class="details-bold">Database Name</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>DB Size (MB)</TH>
+											<TH WIDTH="150px" class="details-bold" nowrap>Last CHECKDB Date</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>CHECKDB Age (Days)</TH>'
+			SET @idx=1		
+
+			DECLARE crsDatabaseDBCCCHECKDBAgeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																									, cin.[is_clustered], cin.[cluster_node_machine_name]
+																									, cdn.[database_name]
+																									, shcdd.[size_mb]
+																									, shcdd.[last_dbcc checkdb_time]
+																									, CASE	 WHEN shcdd.[last_dbcc checkdb_time] IS NOT NULL 
+																											THEN DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) 
+																											ELSE NULL
+																										END AS [dbcc_checkdb_age_days]
+																							FROM [dbo].[vw_catalogInstanceNames]  cin
+																							INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																							INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																		AND rsr.[rule_id] = 16384
+																																		AND rsr.[active] = 1
+																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																							WHERE cin.[instance_active]=1
+																									AND cdn.[active]=1
+																									AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																									AND (
+																											(    cdn.[database_name] NOT IN ('master', 'model', 'msdb', 'distribution') 
+																												AND DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) > @reportOptionUserDBCCCHECKDBAgeDays
+																											)
+																											OR (    cdn.[database_name] IN ('master', 'model', 'msdb', 'distribution') 
+																												AND DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) > @reportOptionSystemDBCCCHECKDBAgeDays
+																											)
+																											OR (
+																													cdn.[database_name] NOT IN ('tempdb')
+																												AND shcdd.[last_dbcc checkdb_time] IS NULL
+																											)
+																										)
+																									AND CHARINDEX(cdn.[state_desc], 'ONLINE')<>0
+																									AND cin.[version] NOT LIKE '8.%'
+																									AND rsr.[id] IS NULL
+																									AND (   (@reportOptionSkipDatabaseSnapshots = 0)
+																										 OR (@reportOptionSkipDatabaseSnapshots = 1 AND shcdd.[is_snapshot] = 0)
+																										)
+																							ORDER BY [instance_name], [machine_name], [dbcc_checkdb_age_days] DESC, [database_name]
+			OPEN crsDatabaseDBCCCHECKDBAgeIssuesDetected
+			FETCH NEXT FROM crsDatabaseDBCCCHECKDBAgeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @lastCheckDBDate, @lastDatabaseEventAgeDays
+			WHILE @@FETCH_STATUS=0
+				begin
+					SET @HTMLReportArea = @HTMLReportArea + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
+										N'<TD WIDTH="360px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @lastCheckDBDate, 121), N'N/A') + N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@lastDatabaseEventAgeDays AS [nvarchar](64)), N'N/A')+ N'</TD>' + 
+									N'</TR>'
+					SET @idx=@idx+1
+
+					FETCH NEXT FROM crsDatabaseDBCCCHECKDBAgeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @lastCheckDBDate, @lastDatabaseEventAgeDays
+				end
+			CLOSE crsDatabaseDBCCCHECKDBAgeIssuesDetected
+			DEALLOCATE crsDatabaseDBCCCHECKDBAgeIssuesDetected
+
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
+								</TD>
+							</TR>
+						</TABLE>'
+
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseDBCCCHECKDBAgeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
+		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseDBCCCHECKDBAgeIssuesDetectedCount}', '(N/A)')
+
+
+	-----------------------------------------------------------------------------------------------------
+	--Databases with Auto Close / Shrink - Issues Detected
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 2 = 2) AND (@flgOptions & 512 = 512)
+		begin
+			SET @ErrMessage = 'Build Report: Databases with Auto Close / Shrink - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+			
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea = @HTMLReportArea + 
+							N'<A NAME="DatabasesWithAutoCloseShrinkIssuesDetected" class="category-style">Databases with Auto Close / Shrink - Issues Detected</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="120px" class="details-bold" nowrap>Machine Name</TH>
+											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
+											<TH WIDTH="120px" class="details-bold" nowrap>Clustered</TH>
+											<TH WIDTH="490px" class="details-bold">Database Name</TH>
+											<TH WIDTH="100px" class="details-bold" nowrap>Auto Close</TH>
+											<TH WIDTH="100px" class="details-bold" nowrap>Auto Shrink</TH>'
+
+			SET @idx=1		
+
+			DECLARE   @isAutoClose		[bit]
+					, @isAutoShrink		[bit]
+
+			DECLARE crsDatabasesStatusIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																							, cin.[is_clustered], cin.[cluster_node_machine_name]
+																							, cdn.[database_name]
+																							, shcdd.[is_auto_close]
+																							, shcdd.[is_auto_shrink]
+																					FROM [dbo].[vw_catalogInstanceNames]  cin
+																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																					INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																AND rsr.[rule_id] = 512
+																																AND rsr.[active] = 1
+																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																					WHERE cin.[instance_active]=1
+																							AND cdn.[active]=1
+																							AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																							AND (shcdd.[is_auto_close]=1 OR shcdd.[is_auto_shrink]=1)
+																							AND rsr.[id] IS NULL
+																					ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
+			OPEN crsDatabasesStatusIssuesDetected
+			FETCH NEXT FROM crsDatabasesStatusIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @isAutoClose, @isAutoShrink
+			WHILE @@FETCH_STATUS=0
+				begin
+					SET @HTMLReportArea = @HTMLReportArea + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
+										N'<TD WIDTH="490px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="100px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isAutoClose=0 THEN N'No' ELSE N'Yes' END + N'</TD>' + 
+										N'<TD WIDTH="100px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isAutoShrink=0 THEN N'No' ELSE N'Yes' END + N'</TD>' + 
+									N'</TR>'
+					SET @idx=@idx+1
+
+					FETCH NEXT FROM crsDatabasesStatusIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @isAutoClose, @isAutoShrink
+				end
+			CLOSE crsDatabasesStatusIssuesDetected
+			DEALLOCATE crsDatabasesStatusIssuesDetected
+
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
+								</TD>
+							</TR>
+						</TABLE>'
+
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasesWithAutoCloseShrinkIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
+		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasesWithAutoCloseShrinkIssuesDetectedCount}', '(N/A)')	
+	
+
+	-----------------------------------------------------------------------------------------------------
+	--Databases with Improper Page Verify Option
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 2 = 2) AND (@flgOptions & 8388608 = 8388608)
+		begin
+			SET @ErrMessage = 'Databases with Improper Page Verify Option - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+		
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea = @HTMLReportArea + 
+							N'<A NAME="DatabasePageVerifyIssuesDetected" class="category-style">Databases with Improper Page Verify Option</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="120px" class="details-bold" nowrap>Machine Name</TH>
+											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
+											<TH WIDTH="120px" class="details-bold" nowrap>Clustered</TH>
+											<TH WIDTH="340px" class="details-bold">Database Name</TH>
+											<TH WIDTH= "90px" class="details-bold" nowrap>SQL Version</TH>
+											<TH WIDTH="100px" class="details-bold" nowrap>Compatibility</TH>
+											<TH WIDTH="160px" class="details-bold" nowrap>Page Verify</TH>'
+
+			SET @idx=1		
+
+			DECLARE @pageVerify			[sysname],
+					@compatibilityLevel	[tinyint]
+
+			DECLARE crsDatabasePageVerifyIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
+																								, cin.[is_clustered], cin.[cluster_node_machine_name]
+																								, cdn.[database_name]
+																								, cin.[version]
+																								, shcdd.[page_verify_option_desc]
+																								, shcdd.[compatibility_level]
+																						FROM [dbo].[vw_catalogInstanceNames]  cin
+																						INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																						INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 8388608
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																						WHERE cin.[instance_active]=1
+																								AND cdn.[active]=1
+																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																								AND cdn.[database_name] NOT IN ('tempdb')
+																								AND (   
+																										(     shcdd.[page_verify_option_desc] <> 'CHECKSUM'
+																										  AND cin.[version] NOT LIKE '8.%'
+																										)
+																									 OR (     shcdd.[page_verify_option_desc] = 'NONE'
+																										  AND cin.[version] LIKE '8.%'
+																										)
+																									)
+																								AND CHARINDEX(cdn.[state_desc], @reportOptionDatabaseAdmittedState)<>0
+																								AND rsr.[id] IS NULL
+																						ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
+			OPEN crsDatabasePageVerifyIssuesDetected
+			FETCH NEXT FROM crsDatabasePageVerifyIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @version, @pageVerify, @compatibilityLevel
+			WHILE @@FETCH_STATUS=0
+				begin
+					SET @HTMLReportArea = @HTMLReportArea + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
+										N'<TD WIDTH="340px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH= "90px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(@version, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="100px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CAST(@compatibilityLevel AS [sysname]), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="160px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(@pageVerify, N'&nbsp;') + N'</TD>' + 
+									N'</TR>'
+					SET @idx=@idx+1
+
+					FETCH NEXT FROM crsDatabasePageVerifyIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @version, @pageVerify, @compatibilityLevel
+				end
+			CLOSE crsDatabasePageVerifyIssuesDetected
+			DEALLOCATE crsDatabasePageVerifyIssuesDetected
+
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
+								</TD>
+							</TR>
+						</TABLE>'
+
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasePageVerifyIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')			
+		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasePageVerifyIssuesDetectedCount}', '(N/A)')
+
+
+	-----------------------------------------------------------------------------------------------------
+	--Databases with Fixed File(s) Size - Issues Detected
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 2 = 2) AND (@flgOptions & 4194304 = 4194304)
+		begin
+			SET @ErrMessage = 'Databases with Fixed File(s) Size - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+		
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea = @HTMLReportArea + 
+							N'<A NAME="DatabaseFixedFileSizeIssuesDetected" class="category-style">Databases with Fixed File(s) Size</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="200px" class="details-bold">Instance Name</TH>
+											<TH WIDTH="220px" class="details-bold">Database Name</TH>
+											<TH WIDTH="120px" class="details-bold">Size (MB)</TH>
+											<TH WIDTH="120px" class="details-bold">Data Size (MB)</TH>
+											<TH WIDTH="100px" class="details-bold">Data Space Used (%)</TH>
+											<TH WIDTH="120px" class="details-bold">Log Size (MB)</TH>
+											<TH WIDTH="100px" class="details-bold">Log Space Used (%)</TH>
+											<TH WIDTH="150px" class="details-bold">State</TH>'
+
+			SET @idx=1		
+			
+			DECLARE crsDatabaseFixedFileSizeIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	
+																				SELECT    cin.[instance_name]
+																						, cdn.[database_name], cdn.[state_desc]
+																						, shcdd.[size_mb]
+																						, shcdd.[data_size_mb], shcdd.[data_space_used_percent]
+																						, shcdd.[log_size_mb], shcdd.[log_space_used_percent] 
+																				FROM [dbo].[vw_catalogInstanceNames] cin
+																				INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
+																				LEFT  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
+																				LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																															AND rsr.[rule_id] = 4194304
+																															AND rsr.[active] = 1
+																															AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																				WHERE	cin.[instance_active]=1
+																						AND cdn.[active]=1
+																						AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																						AND shcdd.[is_growth_limited]=1
+																						AND rsr.[id] IS NULL
+																				ORDER BY cdn.[database_name]
+			OPEN crsDatabaseFixedFileSizeIssuesDetected
+			FETCH NEXT FROM crsDatabaseFixedFileSizeIssuesDetected INTO  @instanceName, @databaseName, @stateDesc, @dbSize, @dataSizeMB, @dataSpaceUsedPercent, @logSizeMB, @logSpaceUsedPercent
+			WHILE @@FETCH_STATUS=0
+				begin
+					SET @HTMLReportArea = @HTMLReportArea + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="220px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
+										N'<TD WIDTH="200px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbSize AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dataSizeMB AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="100px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dataSpaceUsedPercent AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@logSizeMB AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="100px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@logSpaceUsedPercent AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="150px" class="details" ALIGN="LEFT">' + ISNULL(@stateDesc, N'&nbsp;') + N'</TD>' + 
+									N'</TR>'
+					SET @idx=@idx+1
+
+					FETCH NEXT FROM crsDatabaseFixedFileSizeIssuesDetected INTO @instanceName, @databaseName, @stateDesc, @dbSize, @dataSizeMB, @dataSpaceUsedPercent, @logSizeMB, @logSpaceUsedPercent
+				end
+			CLOSE crsDatabaseFixedFileSizeIssuesDetected
+			DEALLOCATE crsDatabaseFixedFileSizeIssuesDetected
+
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
+								</TD>
+							</TR>
+						</TABLE>'
+
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseFixedFileSizeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
+		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseFixedFileSizeIssuesDetectedCount}', '(N/A)')
+
 
 	-----------------------------------------------------------------------------------------------------
 	--Low Free Disk Space - Permission Errors
@@ -2110,8 +2912,8 @@ BEGIN TRY
 											<TH WIDTH="120px" class="details-bold" nowrap>Clustered</TH>
 											<TH WIDTH="100px" class="details-bold">Logical Drive</TH>
 											<TH WIDTH="230px" class="details-bold" nowrap>Volume Mount Point</TH>
-											<TH WIDTH="120px" class="details-bold">Total Size (MB)</TH>
-											<TH WIDTH="120px" class="details-bold">Available Space (MB)</TH>
+											<TH WIDTH="120px" class="details-bold">Total Size (GB)</TH>
+											<TH WIDTH="120px" class="details-bold">Available Space (GB)</TH>
 											<TH WIDTH="120px" class="details-bold">Percent Available (%)</TH>'
 
 			SET @idx=1		
@@ -2120,8 +2922,8 @@ BEGIN TRY
 																									, cin.[is_clustered], cin.[cluster_node_machine_name]
 																									, dsi.[logical_drive]
 																									, dsi.[volume_mount_point]
-																									, MAX(dsi.[total_size_mb]) AS [total_size_mb]
-																									, MIN(dsi.[available_space_mb]) AS [available_space_mb]
+																									, CAST(ROUND(MAX(dsi.[total_size_mb])/1024, 0) AS [int]) AS [total_size_gb]
+																									, CAST(ROUND(MIN(dsi.[available_space_mb])/1024, 0) AS [int]) [available_space_gb]
 																									, MIN(dsi.[percent_available]) AS [percent_available]
 																							FROM [dbo].[vw_catalogInstanceNames]  cin
 																							INNER JOIN [health-check].[vw_statsDiskSpaceInfo]		dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
@@ -2153,7 +2955,7 @@ BEGIN TRY
 																									, dsi.[volume_mount_point]
 																							ORDER BY cin.[instance_name], cin.[machine_name]
 			OPEN crsDiskSpaceInformationIssuesDetected
-			FETCH NEXT FROM crsDiskSpaceInformationIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @logicalDrive, @volumeMountPoint, @diskTotalSizeMB, @diskAvailableSpaceMB, @diskPercentAvailable
+			FETCH NEXT FROM crsDiskSpaceInformationIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @logicalDrive, @volumeMountPoint, @diskTotalSizeGB, @diskAvailableSpaceGB, @diskPercentAvailable
 			WHILE @@FETCH_STATUS=0
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
@@ -2163,13 +2965,13 @@ BEGIN TRY
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
 										N'<TD WIDTH="100px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(@logicalDrive, N'&nbsp;') + N'</TD>' + 
 										N'<TD WIDTH="230px" class="details" ALIGN="LEFT" nowrap>' + ISNULL(@volumeMountPoint, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@diskTotalSizeMB AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@diskAvailableSpaceMB AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@diskTotalSizeGB AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@diskAvailableSpaceGB AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@diskPercentAvailable AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
 									N'</TR>'
 					SET @idx=@idx+1
 
-					FETCH NEXT FROM crsDiskSpaceInformationIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @logicalDrive, @volumeMountPoint, @diskTotalSizeMB, @diskAvailableSpaceMB, @diskPercentAvailable
+					FETCH NEXT FROM crsDiskSpaceInformationIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @logicalDrive, @volumeMountPoint, @diskTotalSizeGB, @diskAvailableSpaceGB, @diskPercentAvailable
 				end
 			CLOSE crsDiskSpaceInformationIssuesDetected
 			DEALLOCATE crsDiskSpaceInformationIssuesDetected
@@ -2268,86 +3070,6 @@ BEGIN TRY
 		
 
 	-----------------------------------------------------------------------------------------------------
-	--Databases with Auto Close / Shrink - Issues Detected
-	-----------------------------------------------------------------------------------------------------
-	IF (@flgActions & 2 = 2) AND (@flgOptions & 512 = 512)
-		begin
-			SET @ErrMessage = 'Build Report: Databases with Auto Close / Shrink - Issues Detected'
-			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-			
-			SET @HTMLReportArea=N''
-			SET @HTMLReportArea = @HTMLReportArea + 
-							N'<A NAME="DatabasesWithAutoCloseShrinkIssuesDetected" class="category-style">Databases with Auto Close / Shrink - Issues Detected</A><br>
-							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
-							<TR VALIGN=TOP>
-								<TD WIDTH="1130px">
-									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
-										N'<TR class="color-3">
-											<TH WIDTH="120px" class="details-bold" nowrap>Machine Name</TH>
-											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
-											<TH WIDTH="120px" class="details-bold" nowrap>Clustered</TH>
-											<TH WIDTH="490px" class="details-bold">Database Name</TH>
-											<TH WIDTH="100px" class="details-bold" nowrap>Auto Close</TH>
-											<TH WIDTH="100px" class="details-bold" nowrap>Auto Shrink</TH>'
-
-			SET @idx=1		
-
-			DECLARE   @isAutoClose		[bit]
-					, @isAutoShrink		[bit]
-
-			DECLARE crsDatabasesStatusIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																							, cin.[is_clustered], cin.[cluster_node_machine_name]
-																							, cdn.[database_name]
-																							, shcdd.[is_auto_close]
-																							, shcdd.[is_auto_shrink]
-																					FROM [dbo].[vw_catalogInstanceNames]  cin
-																					INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																					INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
-																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																AND rsr.[rule_id] = 512
-																																AND rsr.[active] = 1
-																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																					WHERE cin.[instance_active]=1
-																							AND cdn.[active]=1
-																							AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
-																							AND (shcdd.[is_auto_close]=1 OR shcdd.[is_auto_shrink]=1)
-																							AND rsr.[id] IS NULL
-																					ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
-			OPEN crsDatabasesStatusIssuesDetected
-			FETCH NEXT FROM crsDatabasesStatusIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @isAutoClose, @isAutoShrink
-			WHILE @@FETCH_STATUS=0
-				begin
-					SET @HTMLReportArea = @HTMLReportArea + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
-										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
-										N'<TD WIDTH="490px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="100px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isAutoClose=0 THEN N'No' ELSE N'Yes' END + N'</TD>' + 
-										N'<TD WIDTH="100px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isAutoShrink=0 THEN N'No' ELSE N'Yes' END + N'</TD>' + 
-									N'</TR>'
-					SET @idx=@idx+1
-
-					FETCH NEXT FROM crsDatabasesStatusIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @isAutoClose, @isAutoShrink
-				end
-			CLOSE crsDatabasesStatusIssuesDetected
-			DEALLOCATE crsDatabasesStatusIssuesDetected
-
-			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
-								</TD>
-							</TR>
-						</TABLE>'
-
-			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
-			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
-
-			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasesWithAutoCloseShrinkIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
-		end
-	ELSE
-		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasesWithAutoCloseShrinkIssuesDetectedCount}', '(N/A)')	
-	
-
-	-----------------------------------------------------------------------------------------------------
 	--Big Size for Database Log files - Issues Detected
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2) AND (@flgOptions & 1024 = 1024)
@@ -2369,17 +3091,22 @@ BEGIN TRY
 											<TH WIDTH="120px" class="details-bold" nowrap>Machine Name</TH>
 											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
 											<TH WIDTH="120px" class="details-bold" nowrap>Clustered</TH>
-											<TH WIDTH="450px" class="details-bold">Database Name</TH>
-											<TH WIDTH="120px" class="details-bold" nowrap>Log Size (MB)</TH>
-											<TH WIDTH="120px" class="details-bold" nowrap>Log Used (%)</TH>'
+											<TH WIDTH="370px" class="details-bold">Database Name</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>DB Size (MB)</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Log Size (MB)</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Log Used (%)</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Reclaimable Space (MB)</TH>											
+											'
 
 			SET @idx=1		
 
 			DECLARE crsDatabaseMaxLogSizeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																								, cin.[is_clustered], cin.[cluster_node_machine_name]
 																								, cdn.[database_name]
+																								, shcdd.[size_mb]
 																								, shcdd.[log_size_mb]
 																								, shcdd.[log_space_used_percent]
+																								, ((100.0 - shcdd.[log_space_used_percent]) * shcdd.[log_size_mb]) / 100 AS [reclaimable_space_mb]
 																						FROM [dbo].[vw_catalogInstanceNames]  cin
 																						INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
 																						INNER  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
@@ -2392,9 +3119,9 @@ BEGIN TRY
 																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																								AND shcdd.[log_size_mb] >= @reportOptionLogMaxSize 
 																								AND rsr.[id] IS NULL
-																						ORDER BY shcdd.[log_size_mb] DESC, cin.[instance_name], cin.[machine_name], cdn.[database_name]
+																						ORDER BY cin.[instance_name], cin.[machine_name], [reclaimable_space_mb] DESC, cdn.[database_name]
 			OPEN crsDatabaseMaxLogSizeIssuesDetected
-			FETCH NEXT FROM crsDatabaseMaxLogSizeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @logSizeMB, @logSpaceUsedPercent
+			FETCH NEXT FROM crsDatabaseMaxLogSizeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @logSizeMB, @logSpaceUsedPercent, @reclaimableSpaceMB
 			WHILE @@FETCH_STATUS=0
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
@@ -2402,13 +3129,16 @@ BEGIN TRY
 										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
-										N'<TD WIDTH="450px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@logSizeMB AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@logSpaceUsedPercent AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="370px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@logSizeMB AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@logSpaceUsedPercent AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@reclaimableSpaceMB AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+
 									N'</TR>'
 					SET @idx=@idx+1
 
-					FETCH NEXT FROM crsDatabaseMaxLogSizeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @logSizeMB, @logSpaceUsedPercent
+					FETCH NEXT FROM crsDatabaseMaxLogSizeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @logSizeMB, @logSpaceUsedPercent, @reclaimableSpaceMB
 				end
 			CLOSE crsDatabaseMaxLogSizeIssuesDetected
 			DEALLOCATE crsDatabaseMaxLogSizeIssuesDetected
@@ -2706,661 +3436,6 @@ BEGIN TRY
 
 
 	-----------------------------------------------------------------------------------------------------
-	--Databases with Fixed File(s) Size - Issues Detected
-	-----------------------------------------------------------------------------------------------------
-	IF (@flgActions & 2 = 2) AND (@flgOptions & 4194304 = 4194304)
-		begin
-			SET @ErrMessage = 'Databases with Fixed File(s) Size - Issues Detected'
-			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-		
-			SET @HTMLReportArea=N''
-			SET @HTMLReportArea = @HTMLReportArea + 
-							N'<A NAME="DatabaseFixedFileSizeIssuesDetected" class="category-style">Databases with Fixed File(s) Size</A><br>
-							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
-							<TR VALIGN=TOP>
-								<TD WIDTH="1130px">
-									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
-										N'<TR class="color-3">
-											<TH WIDTH="200px" class="details-bold">Instance Name</TH>
-											<TH WIDTH="220px" class="details-bold">Database Name</TH>
-											<TH WIDTH="120px" class="details-bold">Size (MB)</TH>
-											<TH WIDTH="120px" class="details-bold">Data Size (MB)</TH>
-											<TH WIDTH="100px" class="details-bold">Data Space Used (%)</TH>
-											<TH WIDTH="120px" class="details-bold">Log Size (MB)</TH>
-											<TH WIDTH="100px" class="details-bold">Log Space Used (%)</TH>
-											<TH WIDTH="150px" class="details-bold">State</TH>'
-
-			SET @idx=1		
-			
-			DECLARE crsDatabaseFixedFileSizeIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	
-																				SELECT    cin.[instance_name]
-																						, cdn.[database_name], cdn.[state_desc]
-																						, shcdd.[size_mb]
-																						, shcdd.[data_size_mb], shcdd.[data_space_used_percent]
-																						, shcdd.[log_size_mb], shcdd.[log_space_used_percent] 
-																				FROM [dbo].[vw_catalogInstanceNames] cin
-																				INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																				LEFT  JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
-																				LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																															AND rsr.[rule_id] = 4194304
-																															AND rsr.[active] = 1
-																															AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																				WHERE	cin.[instance_active]=1
-																						AND cdn.[active]=1
-																						AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
-																						AND shcdd.[is_growth_limited]=1
-																						AND rsr.[id] IS NULL
-																				ORDER BY cdn.[database_name]
-			OPEN crsDatabaseFixedFileSizeIssuesDetected
-			FETCH NEXT FROM crsDatabaseFixedFileSizeIssuesDetected INTO  @instanceName, @databaseName, @stateDesc, @dbSize, @dataSizeMB, @dataSpaceUsedPercent, @logSizeMB, @logSpaceUsedPercent
-			WHILE @@FETCH_STATUS=0
-				begin
-					SET @HTMLReportArea = @HTMLReportArea + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="220px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
-										N'<TD WIDTH="200px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbSize AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dataSizeMB AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="100px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dataSpaceUsedPercent AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@logSizeMB AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="100px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@logSpaceUsedPercent AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="150px" class="details" ALIGN="LEFT">' + ISNULL(@stateDesc, N'&nbsp;') + N'</TD>' + 
-									N'</TR>'
-					SET @idx=@idx+1
-
-					FETCH NEXT FROM crsDatabaseFixedFileSizeIssuesDetected INTO @instanceName, @databaseName, @stateDesc, @dbSize, @dataSizeMB, @dataSpaceUsedPercent, @logSizeMB, @logSpaceUsedPercent
-				end
-			CLOSE crsDatabaseFixedFileSizeIssuesDetected
-			DEALLOCATE crsDatabaseFixedFileSizeIssuesDetected
-
-			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
-								</TD>
-							</TR>
-						</TABLE>'
-
-			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
-			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
-
-			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseFixedFileSizeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
-		end
-	ELSE
-		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseFixedFileSizeIssuesDetectedCount}', '(N/A)')
-
-
-	-----------------------------------------------------------------------------------------------------
-	--Databases with Improper Page Verify Option
-	-----------------------------------------------------------------------------------------------------
-	IF (@flgActions & 2 = 2) AND (@flgOptions & 8388608 = 8388608)
-		begin
-			SET @ErrMessage = 'Databases with Improper Page Verify Option - Issues Detected'
-			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-		
-			SET @HTMLReportArea=N''
-			SET @HTMLReportArea = @HTMLReportArea + 
-							N'<A NAME="DatabasePageVerifyIssuesDetected" class="category-style">Databases with Improper Page Verify Option</A><br>
-							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
-							<TR VALIGN=TOP>
-								<TD WIDTH="1130px">
-									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
-										N'<TR class="color-3">
-											<TH WIDTH="120px" class="details-bold" nowrap>Machine Name</TH>
-											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
-											<TH WIDTH="120px" class="details-bold" nowrap>Clustered</TH>
-											<TH WIDTH="340px" class="details-bold">Database Name</TH>
-											<TH WIDTH= "90px" class="details-bold" nowrap>SQL Version</TH>
-											<TH WIDTH="100px" class="details-bold" nowrap>Compatibility</TH>
-											<TH WIDTH="160px" class="details-bold" nowrap>Page Verify</TH>'
-
-			SET @idx=1		
-
-			DECLARE @pageVerify			[sysname],
-					@compatibilityLevel	[tinyint]
-
-			DECLARE crsDatabasePageVerifyIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																								, cin.[is_clustered], cin.[cluster_node_machine_name]
-																								, cdn.[database_name]
-																								, cin.[version]
-																								, shcdd.[page_verify_option_desc]
-																								, shcdd.[compatibility_level]
-																						FROM [dbo].[vw_catalogInstanceNames]  cin
-																						INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																						INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
-																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																	AND rsr.[rule_id] = 8388608
-																																	AND rsr.[active] = 1
-																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																						WHERE cin.[instance_active]=1
-																								AND cdn.[active]=1
-																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
-																								AND cdn.[database_name] NOT IN ('tempdb')
-																								AND (   
-																										(     shcdd.[page_verify_option_desc] <> 'CHECKSUM'
-																										  AND cin.[version] NOT LIKE '8.%'
-																										)
-																									 OR (     shcdd.[page_verify_option_desc] = 'NONE'
-																										  AND cin.[version] LIKE '8.%'
-																										)
-																									)
-																								AND CHARINDEX(cdn.[state_desc], @reportOptionDatabaseAdmittedState)<>0
-																								AND rsr.[id] IS NULL
-																						ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
-			OPEN crsDatabasePageVerifyIssuesDetected
-			FETCH NEXT FROM crsDatabasePageVerifyIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @version, @pageVerify, @compatibilityLevel
-			WHILE @@FETCH_STATUS=0
-				begin
-					SET @HTMLReportArea = @HTMLReportArea + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
-										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
-										N'<TD WIDTH="340px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH= "90px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(@version, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="100px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CAST(@compatibilityLevel AS [sysname]), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="160px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(@pageVerify, N'&nbsp;') + N'</TD>' + 
-									N'</TR>'
-					SET @idx=@idx+1
-
-					FETCH NEXT FROM crsDatabasePageVerifyIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @version, @pageVerify, @compatibilityLevel
-				end
-			CLOSE crsDatabasePageVerifyIssuesDetected
-			DEALLOCATE crsDatabasePageVerifyIssuesDetected
-
-			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
-								</TD>
-							</TR>
-						</TABLE>'
-
-			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
-			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
-
-			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasePageVerifyIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')			
-		end
-	ELSE
-		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabasePageVerifyIssuesDetectedCount}', '(N/A)')
-
-
-	-----------------------------------------------------------------------------------------------------
-	--Frequently Fragmented Indexes
-	-----------------------------------------------------------------------------------------------------
-	IF (@flgActions & 2 = 2) AND (@flgOptions & 16777216 = 16777216)
-		begin
-			SET @ErrMessage = 'Frequently Fragmented Indexes - Issues Detected'
-			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
-			DECLARE @indexAnalyzedCount						[int],
-					@indexesPerInstance						[int],
-					@minimumIndexMaintenanceFrequencyDays	[tinyint],
-					@analyzeOnlyMessagesFromTheLastHours	[tinyint]
-
-			SET @minimumIndexMaintenanceFrequencyDays = 2
-			SET @analyzeOnlyMessagesFromTheLastHours = 24
-		
-			-----------------------------------------------------------------------------------------------------
-			--reading report options
-			SELECT	@minimumIndexMaintenanceFrequencyDays = [value]
-			FROM	[report].[htmlOptions]
-			WHERE	[name] = N'Minimum Index Maintenance Frequency (days)'
-					AND [module] = 'health-check'
-
-			SET @minimumIndexMaintenanceFrequencyDays = ISNULL(@minimumIndexMaintenanceFrequencyDays, 2)
-
-			-----------------------------------------------------------------------------------------------------
-			SELECT	@analyzeOnlyMessagesFromTheLastHours = [value]
-			FROM	[report].[htmlOptions]
-			WHERE	[name] = N'Analyze Only Messages from the last hours'
-					AND [module] = 'health-check'
-
-			SET @analyzeOnlyMessagesFromTheLastHours = ISNULL(@analyzeOnlyMessagesFromTheLastHours, 24)
-	
-			-----------------------------------------------------------------------------------------------------
-			SET @HTMLReportArea=N''
-			SET @HTMLReportArea = @HTMLReportArea + 
-							N'<A NAME="FrequentlyFragmentedIndexesIssuesDetected" class="category-style">Frequently Fragmented Indexes</A><br>
-							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
-							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="11">indexes which got fragmented in the last ' + CAST(@minimumIndexMaintenanceFrequencyDays AS [nvarchar](32)) + N' day(s) and were analyzed in the last ' + CAST(@analyzeOnlyMessagesFromTheLastHours AS [nvarchar](32)) + N' hours)</TD>
-							</TR>
-							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="11">consider lowering the fill-factor with at least 5 percent</TD>
-							</TR>
-							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
-							<TR VALIGN=TOP>
-								<TD WIDTH="1130px">
-									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
-										N'<TR class="color-3">
-											<TH WIDTH="120px" class="details-bold">Instance Name</TH>
-											<TH WIDTH="120px" class="details-bold">Database Name</TH>
-											<TH WIDTH="120px" class="details-bold">Table Name</TH>
-											<TH WIDTH="120px" class="details-bold">Index Name</TH>
-											<TH WIDTH="100px" class="details-bold">Type</TH>
-											<TH WIDTH=" 80px" class="details-bold">Frequency (days)</TH>
-											<TH WIDTH=" 80px" class="details-bold">Page Count</TH>
-											<TH WIDTH=" 90px" class="details-bold">Fragmentation</TH>
-											<TH WIDTH="100px" class="details-bold">Page Density Deviation</TH>
-											<TH WIDTH=" 80px" class="details-bold">Fill-Factor</TH>
-											<TH WIDTH="120px" class="details-bold">Last Action</TH>
-											'
-			SET @idx=1		
-
-			-----------------------------------------------------------------------------------------------------
-			SET @ErrMessage = 'analyzing fragmentation logs'
-			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
-
-			IF OBJECT_ID('tempdb..#filteredStatsIndexesFrequentlyFragmented]') IS NOT NULL
-				DROP TABLE #filteredStatsIndexesFrequentlyFragmented
-
-			DECLARE @projectToAnalyze [varchar](32)
-			SET @projectToAnalyze = CASE WHEN @flgOptions & 268435456 = 268435456 THEN NULL ELSE @projectCode END
-			
-			SELECT iff.*
-			INTO #filteredStatsIndexesFrequentlyFragmented
-			FROM 
-				(
-					SELECT *
-					FROM [dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectToAnalyze, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, 'REBUILD') a
-					UNION ALL
-					SELECT *
-					FROM [dbo].[ufn_hcGetIndexesFrequentlyFragmented](@projectToAnalyze, @minimumIndexMaintenanceFrequencyDays, @analyzeOnlyMessagesFromTheLastHours, 'REORGANIZE')b
-				)iff
-			INNER JOIN [dbo].[vw_catalogInstanceNames]  cin ON iff.[instance_name] = cin.[instance_name]
-			LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-														AND rsr.[rule_id] = 16777216
-														AND rsr.[active] = 1
-														AND (rsr.[skip_value]=iff.[instance_name])
-			WHERE cin.[instance_active] = 1
-				 AND cin.[project_id] = @projectID
-
-			CREATE INDEX IX_filteredStatsIndexesFrequentlyFragmented_InstanceName ON #filteredStatsIndexesFrequentlyFragmented([instance_name])
-
-			SET @ErrMessage = 'done'
-			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
-
-			-----------------------------------------------------------------------------------------------------
-			SET @indexAnalyzedCount=0
-
-			DECLARE crsFrequentlyFragmentedIndexesMachineNames CURSOR LOCAL FAST_FORWARD FOR	SELECT    iff.[instance_name]
-																										, COUNT(*) AS [index_count]
-																								FROM #filteredStatsIndexesFrequentlyFragmented iff
-																								GROUP BY iff.[instance_name]
-																								ORDER BY iff.[instance_name]
-			OPEN crsFrequentlyFragmentedIndexesMachineNames
-			FETCH NEXT FROM crsFrequentlyFragmentedIndexesMachineNames INTO  @instanceName, @indexesPerInstance
-			WHILE @@FETCH_STATUS=0
-				begin
-					SET @indexAnalyzedCount = @indexAnalyzedCount + @indexesPerInstance
-					SET @HTMLReportArea = @HTMLReportArea + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" ROWSPAN="' + CAST(@indexesPerInstance AS [nvarchar](64)) + N'"><A NAME="FrequentlyFragmentedIndexesCompleteDetails' + @instanceName + N'">' + @instanceName + N'</A></TD>' 
-
-					SET @tmpHTMLReport=N''
-					SELECT @tmpHTMLReport=((
-											SELECT	N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL([database_name], N'&nbsp;') + N'</TD>' + 
-													N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL([object_name], N'&nbsp;') + N'</TD>' + 
-													N'<TD WIDTH="120px" class="details" ALIGN="LEFT" >' + ISNULL([index_name], N'&nbsp;') + N'</TD>' + 
-													N'<TD WIDTH="100px" class="details" ALIGN="LEFT" >' + ISNULL([index_type], N'&nbsp;') + N'</TD>' + 
-													N'<TD WIDTH= "80px" class="details" ALIGN="CENTER" >' + ISNULL(CAST([interval_days] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-													N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST([page_count] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-													N'<TD WIDTH= "90px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST([fragmentation] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-													N'<TD WIDTH="100px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST([page_density_deviation] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-													N'<TD WIDTH= "80px" class="details" ALIGN="RIGHT" >' + ISNULL(CAST([fill_factor] AS [nvarchar](64)), N'&nbsp;') + N'</TD>' + 
-													N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL([last_action_made], N'&nbsp;') + N'</TD>' + 
-													N'</TR>' + 
-													CASE WHEN [row_count] > [row_no]
-														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
-														 ELSE N''
-													END
-											FROM (
-													SELECT    [event_date_utc], [database_name], [object_name], [index_name]
-															, [interval_days], [index_type], [fragmentation], [page_count], [fill_factor], [page_density_deviation], [last_action_made]
-															, ROW_NUMBER() OVER(ORDER BY [database_name], [object_name], [index_name]) [row_no]
-															, SUM(1) OVER() AS [row_count]
-													FROM	#filteredStatsIndexesFrequentlyFragmented
-													WHERE	[instance_name] =  @instanceName
-												)X
-											ORDER BY [database_name], [object_name], [index_name]
-											FOR XML PATH(''), TYPE
-											).value('.', 'nvarchar(max)'))
-
-					SET @idx=@idx+1
-					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
-
-					FETCH NEXT FROM crsFrequentlyFragmentedIndexesMachineNames INTO  @instanceName, @indexesPerInstance
-
-					IF @@FETCH_STATUS=0
-						SET @HTMLReportArea = @HTMLReportArea + N'<TR VALIGN="TOP" class="color-2" HEIGHT="5px">
-												<TD class="details" COLSPAN=11>&nbsp;</TD>
-										</TR>'
-				end
-			CLOSE crsFrequentlyFragmentedIndexesMachineNames
-			DEALLOCATE crsFrequentlyFragmentedIndexesMachineNames
-
-			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
-								</TD>
-							</TR>
-						</TABLE>'
-
-			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
-			SET @HTMLReport = @HTMLReport + @HTMLReportArea						
-
-			SET @HTMLReport = REPLACE(@HTMLReport, '{FrequentlyFragmentedIndexesIssuesDetectedCount}', '(' + CAST((@indexAnalyzedCount) AS [nvarchar]) + ')')			
-		end
-	ELSE
-		SET @HTMLReport = REPLACE(@HTMLReport, '{FrequentlyFragmentedIndexesIssuesDetectedCount}', '(N/A)')				
-	
-
-	-----------------------------------------------------------------------------------------------------
-	--Outdated Backup for Databases - Issues Detected
-	-----------------------------------------------------------------------------------------------------
-	IF (@flgActions & 2 = 2) AND (@flgOptions & 8192 = 8192)
-		begin
-			SET @ErrMessage = 'Build Report: Outdated Backup for Databases - Issues Detected'
-			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-			
-			SET @HTMLReportArea=N''
-			SET @HTMLReportArea = @HTMLReportArea + 
-							N'<A NAME="DatabaseBACKUPAgeIssuesDetected" class="category-style">Outdated Backup for Databases - Issues Detected</A><br>
-							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
-							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="7">backup age (system db) &gt; ' + CAST(@reportOptionSystemDatabaseBACKUPAgeDays AS [nvarchar](32)) + N' OR backup age (user db) &gt; ' + CAST(@reportOptionUserDatabaseBACKUPAgeDays AS [nvarchar](32)) + N'</TD>
-							</TR>
-							<TR VALIGN=TOP>
-								<TD WIDTH="1130px">
-									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
-										N'<TR class="color-3">
-											<TH WIDTH="120px" class="details-bold" nowrap>Machine Name</TH>
-											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
-											<TH WIDTH="120px" class="details-bold" nowrap>Clustered</TH>
-											<TH WIDTH="360px" class="details-bold">Database Name</TH>
-											<TH WIDTH="80px" class="details-bold" nowrap>DB Size (MB)</TH>
-											<TH WIDTH="150px" class="details-bold" nowrap>Last Backup Date</TH>
-											<TH WIDTH="80px" class="details-bold" nowrap>Backup Age (Days)</TH>'
-			SET @idx=1		
-
-			DECLARE crsDatabaseBACKUPAgeIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	WITH databaseBackupAgeDetails AS
-																						(
-																							SELECT    cin.[machine_name], cin.[instance_name]
-																									, cin.[is_clustered], cin.[cluster_node_machine_name]
-																									, cdn.[database_name]
-																									, shcdd.[size_mb]
-																									, shcdd.[last_backup_time]
-																									, DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) AS [backup_age_days]
-																									, CASE WHEN (    cdn.[database_name] NOT IN ('master', 'model', 'msdb', 'distribution') 
-																												AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @reportOptionUserDatabaseBACKUPAgeDays
-																												)
-																												OR (    cdn.[database_name] IN ('master', 'model', 'msdb', 'distribution') 
-																													AND DATEDIFF(dd, shcdd.[last_backup_time], GETDATE()) > @reportOptionSystemDatabaseBACKUPAgeDays
-																												)
-																												OR (
-																														cdn.[database_name] NOT IN ('tempdb')
-																													AND shcdd.[last_backup_time] IS NULL
-																												) THEN 1 ELSE 0 
-																										END AS [outdated_backup]
-																									, cdn.[catalog_database_id] 
-																									, cdn.[instance_id] 
-																									, sdaod.[cluster_name]
-																									, sdaod.[ag_name]
-																							FROM [dbo].[vw_catalogInstanceNames]  cin
-																							INNER JOIN [dbo].[vw_catalogDatabaseNames]					cdn   ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																							INNER JOIN [health-check].[vw_statsDatabaseDetails]			shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id] 
-																							LEFT JOIN [health-check].[vw_statsDatabaseAlwaysOnDetails]	sdaod ON sdaod.[catalog_database_id] = cdn.[catalog_database_id] AND sdaod.[instance_id] = cdn.[instance_id] 
-																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																		AND rsr.[rule_id] = 8192
-																																		AND rsr.[active] = 1
-																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																							WHERE cin.[instance_active]=1
-																									AND cdn.[active]=1
-																									AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
-																									AND CHARINDEX(cdn.[state_desc], @reportOptionDatabaseAdmittedState) <> 0
-																									AND rsr.[id] IS NULL
-																									AND (   (@reportOptionSkipDatabaseSnapshots = 0)
-																										 OR (@reportOptionSkipDatabaseSnapshots = 1 AND shcdd.[is_snapshot] = 0)
-																										)
-																						)
-																						SELECT   dbad.[machine_name], dbad.[instance_name], dbad.[is_clustered], dbad.[cluster_node_machine_name]
-																							   , dbad.[database_name], dbad.[size_mb], dbad.[last_backup_time], dbad.[backup_age_days]
-																						FROM databaseBackupAgeDetails dbad
-																						WHERE [outdated_backup]=1
-																							 AND NOT EXISTS (	
-																												SELECT *
-																												FROM databaseBackupAgeDetails dbad2
-																												INNER JOIN [health-check].[vw_statsDatabaseAlwaysOnDetails] sdaod ON sdaod.[catalog_database_id] = dbad2.[catalog_database_id] AND sdaod.[instance_id] = dbad2.[instance_id] 
-																												WHERE sdaod.[synchronization_health_desc] = 'HEALTHY'
-																													  AND dbad2.[outdated_backup] = 0
-																													  AND dbad2.[cluster_name] = dbad.[cluster_name]
-																													  AND dbad2.[ag_name] = dbad.[ag_name]
-																													  AND dbad2.[database_name] = dbad.[database_name]
-																											)
-
-																						ORDER BY [instance_name], [machine_name], [backup_age_days] DESC, [database_name]
-
-			OPEN crsDatabaseBACKUPAgeIssuesDetected
-			FETCH NEXT FROM crsDatabaseBACKUPAgeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @lastBackupDate, @lastDatabaseEventAgeDays
-			WHILE @@FETCH_STATUS=0
-				begin
-					SET @HTMLReportArea = @HTMLReportArea + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
-										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
-										N'<TD WIDTH="360px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @lastBackupDate, 121), N'N/A') + N'</TD>' + 
-										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@lastDatabaseEventAgeDays AS [nvarchar](64)), N'N/A')+ N'</TD>' + 
-									N'</TR>'
-					SET @idx=@idx+1
-
-					FETCH NEXT FROM crsDatabaseBACKUPAgeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @lastBackupDate, @lastDatabaseEventAgeDays
-				end
-			CLOSE crsDatabaseBACKUPAgeIssuesDetected
-			DEALLOCATE crsDatabaseBACKUPAgeIssuesDetected
-
-			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
-								</TD>
-							</TR>
-						</TABLE>'
-
-			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
-			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
-
-			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseBACKUPAgeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
-		end
-	ELSE
-		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseBACKUPAgeIssuesDetectedCount}', '(N/A)')
-		
-
-	-----------------------------------------------------------------------------------------------------
-	--Outdated DBCC CHECKDB Databases - Issues Detected
-	-----------------------------------------------------------------------------------------------------
-	IF (@flgActions & 2 = 2) AND (@flgOptions & 16384 = 16384)
-		begin
-			SET @ErrMessage = 'Build Report: Outdated DBCC CHECKDB Databases - Issues Detected'
-			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-			
-			SET @HTMLReportArea=N''
-			SET @HTMLReportArea = @HTMLReportArea + 
-							N'<A NAME="DatabaseDBCCCHECKDBAgeIssuesDetected" class="category-style">Outdated DBCC CHECKDB Databases - Issues Detected</A><br>
-							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
-							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="7">dbcc checkdb age (system db) &gt; ' + CAST(@reportOptionSystemDBCCCHECKDBAgeDays AS [nvarchar](32)) + N' OR dbcc checkdb age (user db) &gt; ' + CAST(@reportOptionUserDBCCCHECKDBAgeDays AS [nvarchar](32)) + N'</TD>
-							</TR>
-							<TR VALIGN=TOP>
-								<TD WIDTH="1130px">
-									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
-										N'<TR class="color-3">
-											<TH WIDTH="120px" class="details-bold" nowrap>Machine Name</TH>
-											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
-											<TH WIDTH="120px" class="details-bold" nowrap>Clustered</TH>
-											<TH WIDTH="360px" class="details-bold">Database Name</TH>
-											<TH WIDTH="80px" class="details-bold" nowrap>DB Size (MB)</TH>
-											<TH WIDTH="150px" class="details-bold" nowrap>Last CHECKDB Date</TH>
-											<TH WIDTH="80px" class="details-bold" nowrap>CHECKDB Age (Days)</TH>'
-			SET @idx=1		
-
-			DECLARE crsDatabaseDBCCCHECKDBAgeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
-																									, cin.[is_clustered], cin.[cluster_node_machine_name]
-																									, cdn.[database_name]
-																									, shcdd.[size_mb]
-																									, shcdd.[last_dbcc checkdb_time]
-																									, CASE	 WHEN shcdd.[last_dbcc checkdb_time] IS NOT NULL 
-																											THEN DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) 
-																											ELSE NULL
-																										END AS [dbcc_checkdb_age_days]
-																							FROM [dbo].[vw_catalogInstanceNames]  cin
-																							INNER JOIN [dbo].[vw_catalogDatabaseNames]			  cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id]
-																							INNER JOIN [health-check].[vw_statsDatabaseDetails] shcdd ON shcdd.[catalog_database_id] = cdn.[catalog_database_id] AND shcdd.[instance_id] = cdn.[instance_id]
-																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																		AND rsr.[rule_id] = 16384
-																																		AND rsr.[active] = 1
-																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																							WHERE cin.[instance_active]=1
-																									AND cdn.[active]=1
-																									AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
-																									AND (
-																											(    cdn.[database_name] NOT IN ('master', 'model', 'msdb', 'distribution') 
-																												AND DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) > @reportOptionUserDBCCCHECKDBAgeDays
-																											)
-																											OR (    cdn.[database_name] IN ('master', 'model', 'msdb', 'distribution') 
-																												AND DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) > @reportOptionSystemDBCCCHECKDBAgeDays
-																											)
-																											OR (
-																													cdn.[database_name] NOT IN ('tempdb')
-																												AND shcdd.[last_dbcc checkdb_time] IS NULL
-																											)
-																										)
-																									AND CHARINDEX(cdn.[state_desc], 'ONLINE')<>0
-																									AND cin.[version] NOT LIKE '8.%'
-																									AND rsr.[id] IS NULL
-																									AND (   (@reportOptionSkipDatabaseSnapshots = 0)
-																										 OR (@reportOptionSkipDatabaseSnapshots = 1 AND shcdd.[is_snapshot] = 0)
-																										)
-																							ORDER BY [instance_name], [machine_name], [dbcc_checkdb_age_days] DESC, [database_name]
-			OPEN crsDatabaseDBCCCHECKDBAgeIssuesDetected
-			FETCH NEXT FROM crsDatabaseDBCCCHECKDBAgeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @lastCheckDBDate, @lastDatabaseEventAgeDays
-			WHILE @@FETCH_STATUS=0
-				begin
-					SET @HTMLReportArea = @HTMLReportArea + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
-										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
-										N'<TD WIDTH="360px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @lastCheckDBDate, 121), N'N/A') + N'</TD>' + 
-										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@lastDatabaseEventAgeDays AS [nvarchar](64)), N'N/A')+ N'</TD>' + 
-									N'</TR>'
-					SET @idx=@idx+1
-
-					FETCH NEXT FROM crsDatabaseDBCCCHECKDBAgeIssuesDetected INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @databaseName, @dbSize, @lastCheckDBDate, @lastDatabaseEventAgeDays
-				end
-			CLOSE crsDatabaseDBCCCHECKDBAgeIssuesDetected
-			DEALLOCATE crsDatabaseDBCCCHECKDBAgeIssuesDetected
-
-			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
-								</TD>
-							</TR>
-						</TABLE>'
-
-			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
-			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
-
-			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseDBCCCHECKDBAgeIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
-		end
-	ELSE
-		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseDBCCCHECKDBAgeIssuesDetectedCount}', '(N/A)')
-
-
-	-----------------------------------------------------------------------------------------------------
-	--Failed Login Attempts - Issues Detected
-	-----------------------------------------------------------------------------------------------------
-	IF (@flgActions & 16 = 16) AND (@flgOptions & 536870912 = 536870912)
-		begin
-			SET @ErrMessage = 'Build Report: Failed Login Attempts - Issues Detected'
-			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
-			SET @HTMLReportArea=N''
-			SET @HTMLReportArea = @HTMLReportArea + 
-							N'<A NAME="FailedLoginsAttemptsIssuesDetected" class="category-style">Failed Login Attempts - Issues Detected (last ' + CAST(@reportOptionErrorlogMessageLastHours AS [nvarchar]) + N'h)</A><br>
-							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
-							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="7">limit results to have minimum ' + CAST(@reportOptionFailedLoginAttemptsLimit AS [nvarchar](32)) + N' </TD>
-							</TR>
-							<TR VALIGN=TOP>
-								<TD WIDTH="1130px">
-									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
-										N'<TR class="color-3">
-											<TH WIDTH="200px" class="details-bold" nowrap>Instance Name</TH>
-											<TH WIDTH="160px" class="details-bold" nowrap>Login Name</TH>
-											<TH WIDTH= "60px" class="details-bold" nowrap>Occurences</TH>
-											<TH WIDTH="710px" class="details-bold">Reason</TH>'
-
-			SET @idx=1		
-
-			-----------------------------------------------------------------------------------------------------
-			SET @issuesDetectedCount = 0 
-			DECLARE crsErrorlogMessagesInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT
-																							  [instance_name]
-																							, COUNT(*) AS [messages_count]
-																					FROM #filteredStatsFailedLoginsAttempts
-																					WHERE [occurencies] >= @reportOptionFailedLoginAttemptsLimit
-																					GROUP BY [instance_name]
-																					ORDER BY [instance_name]
-			OPEN crsErrorlogMessagesInstanceName
-			FETCH NEXT FROM crsErrorlogMessagesInstanceName INTO @instanceName, @messageCount
-			WHILE @@FETCH_STATUS=0
-				begin
-					SET @issuesDetectedCount = @issuesDetectedCount + @messageCount
-
-					SET @HTMLReportArea = @HTMLReportArea + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + '"><A NAME="ErrorlogMessagesIssuesDetected' + @instanceName + N'">' + @instanceName + N'</A></TD>' 
-
-					SET @tmpHTMLReport=N''
-					SELECT @tmpHTMLReport=((
-											SELECT N'<TD WIDTH="160px" class="details" ALIGN="LEFT" nowrap>' + ISNULL(CONVERT([nvarchar](24), [login_name], 121), N'&nbsp;') + N'</TD>' + 
-														N'<TD WIDTH="60px" class="details" ALIGN="LEFT">' + ISNULL(CAST([occurencies] AS [nvarchar](max)), N'&nbsp;') + N'</TD>' + 
-														N'<TD WIDTH="710px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText]([reason], 0), N'&nbsp;')  + N'</TD>' + 
-													N'</TR>' + 
-													CASE WHEN [row_count] > [row_no]
-														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
-														 ELSE N''
-													END
-
-											FROM (
-													SELECT	TOP (@messageCount)
-															[login_name], [occurencies], 
-															[reason],
-															ROW_NUMBER() OVER(ORDER BY [occurencies] DESC, [login_name]) [row_no],
-															SUM(1) OVER() AS [row_count]
-													FROM	#filteredStatsFailedLoginsAttempts													
-													WHERE	[instance_name] = @instanceName
-												)X
-											ORDER BY [occurencies] DESC, [login_name]
-											FOR XML PATH(''), TYPE
-											).value('.', 'nvarchar(max)'))
-
-					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
-					SET @idx=@idx + 1
-
-					FETCH NEXT FROM crsErrorlogMessagesInstanceName INTO @instanceName, @messageCount
-				end
-			CLOSE crsErrorlogMessagesInstanceName
-			DEALLOCATE crsErrorlogMessagesInstanceName
-
-			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
-								</TD>
-							</TR>
-						</TABLE>'
-
-			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
-			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
-
-			SET @HTMLReport = REPLACE(@HTMLReport, '{FailedLoginsAttemptsIssuesDetectedCount}', '(' + CAST((@issuesDetectedCount) AS [nvarchar]) + ')')
-		end
-	ELSE
-		SET @HTMLReport = REPLACE(@HTMLReport, '{FailedLoginsAttemptsIssuesDetectedCount}', '(N/A)')
-
-
-	-----------------------------------------------------------------------------------------------------
 	--Errorlog Messages - Permission Errors
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 16 = 16) AND (@flgOptions & 524288 = 524288)
@@ -3522,7 +3597,179 @@ BEGIN TRY
 		end
 	ELSE
 		SET @HTMLReport = REPLACE(@HTMLReport, '{ErrorlogMessagesIssuesDetectedCount}', '(N/A)')
+
 	
+	-----------------------------------------------------------------------------------------------------
+	--OS Event Messages - Permission Errors
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 32 = 32) AND (@flgOptions & 67108864 = 67108864)
+		begin
+			SET @ErrMessage = 'Build Report: OS Event Messages - Permission Errors'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+			
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea = @HTMLReportArea + 
+							N'<A NAME="OSEventMessagesPermissionErrors" class="category-style">OS Event Messages - Permission Errors</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="7">powershell script timeout value = ' + CAST(@configOSEventsTimeOutSeconds AS [nvarchar](32)) + N' seconds </TD>
+							</TR>
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="120px" class="details-bold" nowrap>Machine Name</TH>
+											<TH WIDTH="120px" class="details-bold" nowrap>Clustered</TH>
+											<TH WIDTH="150px" class="details-bold" nowrap>Event Date (UTC)</TH>
+											<TH WIDTH="740px" class="details-bold">Message</TH>'
+
+			SET @idx=1		
+
+			DECLARE crsOSEventMessagesPermissionErrors CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name]
+																								, MAX(lsam.[event_date_utc]) [event_date_utc]
+																								, lsam.[message]
+																						FROM [dbo].[vw_catalogInstanceNames]  cin
+																						INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
+																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																	AND rsr.[rule_id] = 67108864
+																																	AND rsr.[active] = 1
+																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																						WHERE	cin.[instance_active]=1
+																								AND cin.[project_id] = @projectID
+																								AND lsam.descriptor IN (N'dbo.usp_hcCollectOSEventLogs')
+																								AND rsr.[id] IS NULL
+																						GROUP BY cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
+																						ORDER BY cin.[machine_name], [event_date_utc]
+			OPEN crsOSEventMessagesPermissionErrors
+			FETCH NEXT FROM crsOSEventMessagesPermissionErrors INTO @machineName, @isClustered, @clusterNodeName, @eventDate, @message
+			WHILE @@FETCH_STATUS=0
+				begin
+					SET @HTMLReportArea = @HTMLReportArea + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + @machineName + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes<BR>' + ISNULL(N'[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
+										N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @eventDate, 121), N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="740px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') + N'</TD>' + 
+									N'</TR>'
+					SET @idx=@idx+1
+
+					FETCH NEXT FROM crsOSEventMessagesPermissionErrors INTO @machineName, @isClustered, @clusterNodeName, @eventDate, @message
+				end
+			CLOSE crsOSEventMessagesPermissionErrors
+			DEALLOCATE crsOSEventMessagesPermissionErrors
+
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
+								</TD>
+							</TR>
+						</TABLE>'
+
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesPermissionErrorsCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
+		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesPermissionErrorsCount}', '(N/A)')
+
+
+	-----------------------------------------------------------------------------------------------------
+	--OS Event messages - Issues Detected
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 32 = 32) AND (@flgOptions & 134217728 = 134217728)
+		begin
+			SET @ErrMessage = 'Build Report: OS Event messages - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+			
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea = @HTMLReportArea + 
+							N'<A NAME="OSEventMessagesIssuesDetected" class="category-style">OS Events Messages - Issues Detected (last ' + CAST(@reportOptionOSEventMessageLastHours AS [nvarchar]) + N'h)</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="7">limit messages per machine to maximum ' + CAST(@reportOptionOSEventMessageLimit AS [nvarchar](32)) + N' </TD>
+							</TR>
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="7">Severity: Critical, Error' + CASE WHEN @configOSEventGetWarningsEvent=1 THEN N', Warning' ELSE N'' END + CASE WHEN @configOSEventGetInformationEvent=1 THEN N', Information' ELSE N'' END + N' </TD>
+							</TR>
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="200px" class="details-bold" nowrap>Machine Name</TH>
+											<TH WIDTH="120px" class="details-bold" nowrap>Event Time</TH>
+											<TH WIDTH=" 80px" class="details-bold" nowrap>Log Name</TH>
+											<TH WIDTH=" 60px" class="details-bold" nowrap>Level</TH>
+											<TH WIDTH=" 60px" class="details-bold" nowrap>Event ID</TH>
+											<TH WIDTH="120px" class="details-bold">Source</TH>
+											<TH WIDTH="480px" class="details-bold">Message</TH>'
+			SET @idx=1		
+
+			SET @issuesDetectedCount = 0 
+			
+			DECLARE crsOSEventMessagesInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT
+																							  [machine_name]
+																							, COUNT(*) AS [messages_count]
+																					FROM #filteredStatsOSEventMessagesDetail
+																					GROUP BY [machine_name]
+																					ORDER BY [machine_name]
+			OPEN crsOSEventMessagesInstanceName
+			FETCH NEXT FROM crsOSEventMessagesInstanceName INTO @machineName, @messageCount
+			WHILE @@FETCH_STATUS=0
+				begin
+					IF @messageCount > @reportOptionOSEventMessageLimit SET @messageCount = @reportOptionOSEventMessageLimit
+					SET @issuesDetectedCount = @issuesDetectedCount + @messageCount
+
+					SET @HTMLReportArea = @HTMLReportArea + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + '"><A NAME="OSEventMessagesIssuesDetected' + @machineName + N'">' + @machineName + N'</A></TD>' 
+
+					SET @tmpHTMLReport=N''
+					SELECT @tmpHTMLReport=((
+											SELECT	N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), [time_created], 121), N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH=" 80px" class="details" ALIGN="LEFT" >' + ISNULL([log_type_desc], N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH=" 60px" class="details" ALIGN="LEFT">' + ISNULL([level_desc], N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH=" 60px" class="details" ALIGN="LEFT">' + ISNULL(CAST([event_id] AS [nvarchar]), N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL([source], N'&nbsp;') + N'</TD>' + 
+														N'<TD WIDTH="480px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText]([message], 0), N'&nbsp;')  + N'</TD>' + 
+													N'</TR>' + 
+													CASE WHEN [row_count] > [row_no]
+														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+														 ELSE N''
+													END
+
+											FROM (
+													SELECT  TOP (@reportOptionOSEventMessageLimit)
+															[time_created], [log_type_desc], [level_desc], 
+															[event_id], [record_id], [source], [message]
+															, ROW_NUMBER() OVER(ORDER BY [time_created], [record_id]) [row_no]
+															, SUM(1) OVER() AS [row_count]
+													FROM #filteredStatsOSEventMessagesDetail
+													WHERE	[machine_name] = @machineName
+												)X
+											ORDER BY [time_created], [record_id]
+											FOR XML PATH(''), TYPE
+											).value('.', 'nvarchar(max)'))
+
+					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
+					SET @idx=@idx + 1
+				
+					FETCH NEXT FROM crsOSEventMessagesInstanceName INTO @machineName, @messageCount
+				end
+			CLOSE crsOSEventMessagesInstanceName
+			DEALLOCATE crsOSEventMessagesInstanceName
+
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
+								</TD>
+							</TR>
+						</TABLE>'
+
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea						
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesIssuesDetectedCount}', '(' + CAST((@issuesDetectedCount) AS [nvarchar]) + ')')
+		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesIssuesDetectedCount}', '(N/A)')
+
 
 	-----------------------------------------------------------------------------------------------------
 	--Databases Status - Complete Details
@@ -3760,8 +4007,8 @@ BEGIN TRY
 											<TH WIDTH="300px" class="details-bold" nowrap>Machine Name</TH>
 											<TH WIDTH="100px" class="details-bold">Logical Drive</TH>
 											<TH WIDTH="370px" class="details-bold">Volume Mount Point</TH>
-											<TH WIDTH="120px" class="details-bold" nowrap>Total Size (MB)</TH>
-											<TH WIDTH="120px" class="details-bold" nowrap>Available Space (MB)</TH>
+											<TH WIDTH="120px" class="details-bold" nowrap>Total Size (GB)</TH>
+											<TH WIDTH="120px" class="details-bold" nowrap>Available Space (GB)</TH>
 											<TH WIDTH="120px" class="details-bold" nowrap>Percent Available (%)</TH>'
 
 			SET @idx=1		
@@ -3780,8 +4027,8 @@ BEGIN TRY
 																										, dsi.[project_id] 
 																										, dsi.[logical_drive]
 																										, dsi.[volume_mount_point]
-																										, MAX(dsi.[total_size_mb])		AS [total_size_mb]
-																										, MIN(dsi.[available_space_mb]) AS [available_space_mb]
+																										, MAX(dsi.[total_size_mb])/1024		 AS [total_size_gb]
+																										, MIN(dsi.[available_space_mb])/1024 AS [available_space_gb]
 																										, MIN(dsi.[percent_available])	AS [percent_available]
 																								 FROM [health-check].[vw_statsDiskSpaceInfo]		dsi
 																								 GROUP BY  dsi.[instance_id], dsi.[project_id], dsi.[logical_drive], dsi.[volume_mount_point]
@@ -3807,8 +4054,8 @@ BEGIN TRY
 					SELECT @tmpHTMLReport=((
 											SELECT	N'<TD WIDTH="100px" class="details" ALIGN="CENTER">' + ISNULL([logical_drive], N'&nbsp;') + N'</TD>' + 
 													N'<TD WIDTH="270px" class="details" ALIGN="LEFT">' + ISNULL([volume_mount_point], N'&nbsp;') + N'</TD>' + 
-													N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST([total_size_mb] AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-													N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST([available_space_mb] AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+													N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(CAST(ROUND([total_size_gb], 0) AS [int]) AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+													N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(CAST(ROUND([available_space_gb], 0) AS [int]) AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
 													N'<TD WIDTH="120px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST([percent_available] AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
 													N'</TR>' + 
 													CASE WHEN [row_count] > [row_no]
@@ -3820,8 +4067,8 @@ BEGIN TRY
 													SELECT  DISTINCT
 																  dsi.[logical_drive]
 																, dsi.[volume_mount_point]
-																, MAX(dsi.[total_size_mb])		AS [total_size_mb]
-																, MIN(dsi.[available_space_mb]) AS [available_space_mb]
+																, MAX(dsi.[total_size_mb])/1024		 AS [total_size_gb]
+																, MIN(dsi.[available_space_mb])/1024 AS [available_space_gb]
 																, MIN(dsi.[percent_available])	AS [percent_available]
 																, ROW_NUMBER() OVER(ORDER BY dsi.[logical_drive], dsi.[volume_mount_point]) [row_no]
 																, SUM(1) OVER() AS [row_count]
@@ -3870,179 +4117,7 @@ BEGIN TRY
 			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 		end
-
-
-	-----------------------------------------------------------------------------------------------------
-	--OS Event Messages - Permission Errors
-	-----------------------------------------------------------------------------------------------------
-	IF (@flgActions & 32 = 32) AND (@flgOptions & 67108864 = 67108864)
-		begin
-			SET @ErrMessage = 'Build Report: OS Event Messages - Permission Errors'
-			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-			
-			SET @HTMLReportArea=N''
-			SET @HTMLReportArea = @HTMLReportArea + 
-							N'<A NAME="OSEventMessagesPermissionErrors" class="category-style">OS Event Messages - Permission Errors</A><br>
-							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
-							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="7">powershell script timeout value = ' + CAST(@configOSEventsTimeOutSeconds AS [nvarchar](32)) + N' seconds </TD>
-							</TR>
-							<TR VALIGN=TOP>
-								<TD WIDTH="1130px">
-									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
-										N'<TR class="color-3">
-											<TH WIDTH="120px" class="details-bold" nowrap>Machine Name</TH>
-											<TH WIDTH="120px" class="details-bold" nowrap>Clustered</TH>
-											<TH WIDTH="150px" class="details-bold" nowrap>Event Date (UTC)</TH>
-											<TH WIDTH="740px" class="details-bold">Message</TH>'
-
-			SET @idx=1		
-
-			DECLARE crsOSEventMessagesPermissionErrors CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name]
-																								, MAX(lsam.[event_date_utc]) [event_date_utc]
-																								, lsam.[message]
-																						FROM [dbo].[vw_catalogInstanceNames]  cin
-																						INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
-																						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
-																																	AND rsr.[rule_id] = 67108864
-																																	AND rsr.[active] = 1
-																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
-																						WHERE	cin.[instance_active]=1
-																								AND cin.[project_id] = @projectID
-																								AND lsam.descriptor IN (N'dbo.usp_hcCollectOSEventLogs')
-																								AND rsr.[id] IS NULL
-																						GROUP BY cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
-																						ORDER BY cin.[machine_name], [event_date_utc]
-			OPEN crsOSEventMessagesPermissionErrors
-			FETCH NEXT FROM crsOSEventMessagesPermissionErrors INTO @machineName, @isClustered, @clusterNodeName, @eventDate, @message
-			WHILE @@FETCH_STATUS=0
-				begin
-					SET @HTMLReportArea = @HTMLReportArea + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + @machineName + N'</TD>' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes<BR>' + ISNULL(N'[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
-										N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @eventDate, 121), N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="740px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText](@message, 0), N'&nbsp;') + N'</TD>' + 
-									N'</TR>'
-					SET @idx=@idx+1
-
-					FETCH NEXT FROM crsOSEventMessagesPermissionErrors INTO @machineName, @isClustered, @clusterNodeName, @eventDate, @message
-				end
-			CLOSE crsOSEventMessagesPermissionErrors
-			DEALLOCATE crsOSEventMessagesPermissionErrors
-
-			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
-								</TD>
-							</TR>
-						</TABLE>'
-
-			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
-			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
-
-			SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesPermissionErrorsCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
-		end
-	ELSE
-		SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesPermissionErrorsCount}', '(N/A)')
-
-
-	-----------------------------------------------------------------------------------------------------
-	--OS Event messages - Issues Detected
-	-----------------------------------------------------------------------------------------------------
-	IF (@flgActions & 32 = 32) AND (@flgOptions & 134217728 = 134217728)
-		begin
-			SET @ErrMessage = 'Build Report: OS Event messages - Issues Detected'
-			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-			
-			SET @HTMLReportArea=N''
-			SET @HTMLReportArea = @HTMLReportArea + 
-							N'<A NAME="OSEventMessagesIssuesDetected" class="category-style">OS Events Messages - Issues Detected (last ' + CAST(@reportOptionOSEventMessageLastHours AS [nvarchar]) + N'h)</A><br>
-							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
-							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="7">limit messages per machine to maximum ' + CAST(@reportOptionOSEventMessageLimit AS [nvarchar](32)) + N' </TD>
-							</TR>
-							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="7">Severity: Critical, Error' + CASE WHEN @configOSEventGetWarningsEvent=1 THEN N', Warning' ELSE N'' END + CASE WHEN @configOSEventGetInformationEvent=1 THEN N', Information' ELSE N'' END + N' </TD>
-							</TR>
-							<TR VALIGN=TOP>
-								<TD WIDTH="1130px">
-									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
-										N'<TR class="color-3">
-											<TH WIDTH="200px" class="details-bold" nowrap>Machine Name</TH>
-											<TH WIDTH="120px" class="details-bold" nowrap>Event Time</TH>
-											<TH WIDTH=" 80px" class="details-bold" nowrap>Log Name</TH>
-											<TH WIDTH=" 60px" class="details-bold" nowrap>Level</TH>
-											<TH WIDTH=" 60px" class="details-bold" nowrap>Event ID</TH>
-											<TH WIDTH="120px" class="details-bold">Source</TH>
-											<TH WIDTH="480px" class="details-bold">Message</TH>'
-			SET @idx=1		
-
-			SET @issuesDetectedCount = 0 
-			
-			DECLARE crsOSEventMessagesInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT
-																							  [machine_name]
-																							, COUNT(*) AS [messages_count]
-																					FROM #filteredStatsOSEventMessagesDetail
-																					GROUP BY [machine_name]
-																					ORDER BY [machine_name]
-			OPEN crsOSEventMessagesInstanceName
-			FETCH NEXT FROM crsOSEventMessagesInstanceName INTO @machineName, @messageCount
-			WHILE @@FETCH_STATUS=0
-				begin
-					IF @messageCount > @reportOptionOSEventMessageLimit SET @messageCount = @reportOptionOSEventMessageLimit
-					SET @issuesDetectedCount = @issuesDetectedCount + @messageCount
-
-					SET @HTMLReportArea = @HTMLReportArea + 
-								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + '"><A NAME="OSEventMessagesIssuesDetected' + @machineName + N'">' + @machineName + N'</A></TD>' 
-
-					SET @tmpHTMLReport=N''
-					SELECT @tmpHTMLReport=((
-											SELECT	N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), [time_created], 121), N'&nbsp;') + N'</TD>' + 
-														N'<TD WIDTH=" 80px" class="details" ALIGN="LEFT" >' + ISNULL([log_type_desc], N'&nbsp;') + N'</TD>' + 
-														N'<TD WIDTH=" 60px" class="details" ALIGN="LEFT">' + ISNULL([level_desc], N'&nbsp;') + N'</TD>' + 
-														N'<TD WIDTH=" 60px" class="details" ALIGN="LEFT">' + ISNULL(CAST([event_id] AS [nvarchar]), N'&nbsp;') + N'</TD>' + 
-														N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + ISNULL([source], N'&nbsp;') + N'</TD>' + 
-														N'<TD WIDTH="480px" class="details" ALIGN="LEFT">' + ISNULL([dbo].[ufn_reportHTMLPrepareText]([message], 0), N'&nbsp;')  + N'</TD>' + 
-													N'</TR>' + 
-													CASE WHEN [row_count] > [row_no]
-														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
-														 ELSE N''
-													END
-
-											FROM (
-													SELECT  TOP (@reportOptionOSEventMessageLimit)
-															[time_created], [log_type_desc], [level_desc], 
-															[event_id], [record_id], [source], [message]
-															, ROW_NUMBER() OVER(ORDER BY [time_created], [record_id]) [row_no]
-															, SUM(1) OVER() AS [row_count]
-													FROM #filteredStatsOSEventMessagesDetail
-													WHERE	[machine_name] = @machineName
-												)X
-											ORDER BY [time_created], [record_id]
-											FOR XML PATH(''), TYPE
-											).value('.', 'nvarchar(max)'))
-
-					SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
-					SET @idx=@idx + 1
-				
-					FETCH NEXT FROM crsOSEventMessagesInstanceName INTO @machineName, @messageCount
-				end
-			CLOSE crsOSEventMessagesInstanceName
-			DEALLOCATE crsOSEventMessagesInstanceName
-
-			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
-								</TD>
-							</TR>
-						</TABLE>'
-
-			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
-			SET @HTMLReport = @HTMLReport + @HTMLReportArea						
-
-			SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesIssuesDetectedCount}', '(' + CAST((@issuesDetectedCount) AS [nvarchar]) + ')')
-		end
-	ELSE
-		SET @HTMLReport = REPLACE(@HTMLReport, '{OSEventMessagesIssuesDetectedCount}', '(N/A)')
-
+		
 
 	-----------------------------------------------------------------------------------------------------
 	SET @HTMLReport = @HTMLReport + N'</body></html>'	
@@ -4084,23 +4159,20 @@ BEGIN TRY
 													, @debugMode	 = 0
 
 	/* save report using bcp */	
-	IF @optionXPValue = 1
-		begin
-			SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [html_content] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[report].[htmlContent] WHERE [id]=' + CAST(@reportID AS [varchar]) + '" queryout ' + @reportFilePath + ' -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'''
-			EXEC sp_executesql  @queryToRun
+	SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [html_content] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[report].[htmlContent] WHERE [id]=' + CAST(@reportID AS [varchar]) + '" queryout ' + @reportFilePath + ' -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'''
+	EXEC sp_executesql  @queryToRun
 
-			/* disable xp_cmdshell configuration option */
-			EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @@SERVERNAME
-															, @flgAction	 = 0			-- 1=enable | 0=disable
-															, @optionXPValue = @optionXPValue OUTPUT
-															, @debugMode	 = 0
+	/* disable xp_cmdshell configuration option */
+	EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @@SERVERNAME
+													, @flgAction	 = 0			-- 1=enable | 0=disable
+													, @optionXPValue = @optionXPValue OUTPUT
+													, @debugMode	 = 0
 
-			IF @@ERROR=0
-				UPDATE [report].[htmlContent]
-					SET   [html_content] = NULL
-						, [file_name]	 = @HTMLReportFileName
-				WHERE [id] = @reportID
-		end
+	IF @@ERROR=0
+		UPDATE [report].[htmlContent]
+			SET   [html_content] = NULL
+				, [file_name]	 = @HTMLReportFileName
+		WHERE [id] = @reportID
 				
 	-----------------------------------------------------------------------------------------------------
 	--
