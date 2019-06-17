@@ -24,6 +24,7 @@ CREATE TABLE [health-check].[statsDatabaseAlwaysOnDetails]
 	[role_desc]						[nvarchar](60)	NULL,
 	[synchronization_health_desc]	[nvarchar](60)	NULL,
 	[synchronization_state_desc]	[nvarchar](60)	NULL,
+	[readable_secondary_replica]	[nvarchar](60)	NULL,
 	[event_date_utc]				[datetime]		NOT NULL,
 	CONSTRAINT [PK_statsDatabaseAlwaysOnDetails] PRIMARY KEY  CLUSTERED 
 	(

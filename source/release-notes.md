@@ -892,3 +892,4 @@
 
 17.06.2019
 * maintenance-plan: option to allow/block maintenance operations on a non-readable AlwaysOn secondary replica
+* health-check: collect secondary replica readable state in [health-check].[statsDatabaseAlwaysOnDetails] table

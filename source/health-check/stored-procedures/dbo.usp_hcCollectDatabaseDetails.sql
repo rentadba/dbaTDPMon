@@ -107,7 +107,8 @@ CREATE TABLE #statsDatabaseAlwaysOnDetails
 	[database_name]					[sysname]		NOT NULL,
 	[role_desc]						[nvarchar](60)	NULL,
 	[synchronization_health_desc]	[nvarchar](60)	NULL,
-	[synchronization_state_desc]	[nvarchar](60)	NULL
+	[synchronization_state_desc]	[nvarchar](60)	NULL,
+	[readable_secondary_replica]	[nvarchar](60)	NULL
 )
 
 ------------------------------------------------------------------------------------------------------------------------------------------
@@ -431,6 +432,7 @@ WHILE @@FETCH_STATUS=0
 											, ars.[role_desc]
 											, ars.[synchronization_health_desc]
 											, hdrs.[synchronization_state_desc]
+											, ar.[secondary_role_allow_connections_desc]
 									FROM sys.availability_replicas ar
 									INNER JOIN sys.dm_hadr_availability_replica_states ars ON ars.[replica_id]=ar.[replica_id] AND ars.[group_id]=ar.[group_id]
 									INNER JOIN sys.availability_groups ag ON ag.[group_id]=ar.[group_id]
@@ -445,7 +447,7 @@ WHILE @@FETCH_STATUS=0
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		
 				BEGIN TRY
-					INSERT	INTO #statsDatabaseAlwaysOnDetails([cluster_name], [ag_name], [host_name], [instance_name], [database_name], [role_desc], [synchronization_health_desc], [synchronization_state_desc])
+					INSERT	INTO #statsDatabaseAlwaysOnDetails([cluster_name], [ag_name], [host_name], [instance_name], [database_name], [role_desc], [synchronization_health_desc], [synchronization_state_desc], [readable_secondary_replica])
 							EXEC sp_executesql @queryToRun
 				END TRY
 				BEGIN CATCH
@@ -519,7 +521,7 @@ WHILE @@FETCH_STATUS=0
 															AND cdn.[project_id] = @projectID
 
 		INSERT	INTO [health-check].[statsDatabaseAlwaysOnDetails]([catalog_database_id], [instance_id], [cluster_name], [ag_name]
-																	, [role_desc], [synchronization_health_desc], [synchronization_state_desc], [event_date_utc])
+																	, [role_desc], [synchronization_health_desc], [synchronization_state_desc], [readable_secondary_replica], [event_date_utc])
 				SELECT    cdn.[id] AS [catalog_database_id]
 						, cin.[id] AS [instance_id]
 						, X.[cluster_name]
@@ -527,6 +529,7 @@ WHILE @@FETCH_STATUS=0
 						, X.[role_desc]
 						, X.[synchronization_health_desc]
 						, X.[synchronization_state_desc]
+						, X.[readable_secondary_replica]
 						, GETUTCDATE()
 				FROM #statsDatabaseAlwaysOnDetails X
 				INNER JOIN dbo.catalogMachineNames cmn ON cmn.[name] = X.[host_name]

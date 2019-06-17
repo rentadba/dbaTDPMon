@@ -32,6 +32,7 @@ SELECT 	  cin.[project_id]		AS [project_id]
 		, sdaod.[role_desc]
 		, sdaod.[synchronization_health_desc]
 		, sdaod.[synchronization_state_desc]
+		, sdaod.[readable_secondary_replica]
 		, sdaod.[event_date_utc]
 FROM [dbo].[catalogInstanceNames]	cin	
 INNER JOIN [dbo].[catalogMachineNames] cmn ON cmn.[id] = cin.[machine_id] AND cmn.[project_id] = cin.[project_id]
