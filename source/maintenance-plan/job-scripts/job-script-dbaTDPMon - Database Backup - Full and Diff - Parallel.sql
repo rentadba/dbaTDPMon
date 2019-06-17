@@ -117,6 +117,7 @@ http://dbaTDPMon.codeplex.com',
 													@moduleFilter		= ''maintenance-plan'',
 													@descriptorFilter	= ''dbo.usp_mpDatabaseBackup(Data)'',
 													@waitForDelay		= ''00:00:05'',
+													@maxRunningTimeInMinutes = DEFAULT,
 													@debugMode			= 0'
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 

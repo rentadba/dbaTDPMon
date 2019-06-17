@@ -10,16 +10,17 @@ GO
 
 -----------------------------------------------------------------------------------------
 CREATE PROCEDURE [dbo].[usp_mpDatabaseConsistencyCheck]
-		@sqlServerName			[sysname]=@@SERVERNAME,
-		@dbName					[sysname],
-		@tableSchema			[sysname]	=  '%',
-		@tableName				[sysname]   =  '%',
-		@flgActions				[smallint]	=   12,
-		@flgOptions				[int]		=    0,
-		@maxDOP					[smallint]	=	 1,
-		@skipObjectsList		[nvarchar](1024) = NULL,
-		@executionLevel			[tinyint]	=    0,
-		@debugMode				[bit]		=    0
+		@sqlServerName				[sysname]=@@SERVERNAME,
+		@dbName						[sysname],
+		@tableSchema				[sysname]	=  '%',
+		@tableName					[sysname]   =  '%',
+		@flgActions					[smallint]	=   12,
+		@flgOptions					[int]		=    0,
+		@maxDOP						[smallint]	=	 1,
+		@maxRunningTimeInMinutes	[smallint]	=    0,
+		@skipObjectsList			[nvarchar](1024) = NULL,
+		@executionLevel				[tinyint]	=    0,
+		@debugMode					[bit]		=    0
 /* WITH ENCRYPTION */
 AS
 
@@ -58,17 +59,20 @@ AS
 --							  by default DBCC CHECKDB is doing all consistency checks and for a VLDB it may take a very long time
 --					    2  - use NOINDEX when running DBCC CHECKTABLE. Index consistency errors are not critical
 --					   32  - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
---		@skipObjectsList	- comma separated list of the objects (tables) to be excluded from maintenance.
---		@debugMode			- 1 - print dynamic SQL statements / 0 - no statements will be displayed
+--		@maxDOP						- when applicable, use this MAXDOP value (ex. dbcc checkdb
+--		@maxRunningTimeInMinutes	- the number of minutes the optimization job will run. after time exceeds, it will exist. 0 or null means no limit
+--		@skipObjectsList			- comma separated list of the objects (tables) to be excluded from maintenance.
+--		@debugMode					- 1 - print dynamic SQL statements / 0 - no statements will be displayed
 -----------------------------------------------------------------------------------------
 /*
 	--usage sample
 	EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= @@SERVERNAME,
-												@dbName					= 'dbSQLTools',
-												@tableSchema			= 'dbo',
+												@dbName					= 'dbaTDPMon',
+												@tableSchema			= '%',
 												@tableName				= '%',
 												@flgActions				= DEFAULT,
 												@flgOptions				= DEFAULT,
+												@maxRunningTimeInMinutes= DEFAULT,
 												@debugMode				= DEFAULT
 */
 
@@ -81,9 +85,18 @@ DECLARE		@queryToRun  					[nvarchar](2048),
 			@errorCode						[int],
 			@databaseStatus					[int],
 			@dbi_dbccFlags					[int],
-			@executionDBName				[sysname]
+			@executionDBName				[sysname],
+			@stopTimeLimit					[datetime]
 
 SET NOCOUNT ON
+
+---------------------------------------------------------------------------------------------
+--determine when to stop current optimization task, based on @maxRunningTimeInMinutes value
+---------------------------------------------------------------------------------------------
+IF ISNULL(@maxRunningTimeInMinutes, 0)=0
+	SET @stopTimeLimit = CONVERT([datetime], '9999-12-31 23:23:59', 120)
+ELSE
+	SET @stopTimeLimit = DATEADD(minute, @maxRunningTimeInMinutes, GETDATE())
 
 ---------------------------------------------------------------------------------------------
 --get destination server running version/edition
@@ -337,7 +350,7 @@ IF @flgActions & 1 = 1 AND @flgOptions & 1 = 0
 --------------------------------------------------------------------------------------------------
 --database consistency check
 --------------------------------------------------------------------------------------------------
-IF @flgActions & 1 = 1
+IF @flgActions & 1 = 1 AND (GETDATE() <= @stopTimeLimit)
 	begin
 		IF @executionLevel=0 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -372,7 +385,7 @@ IF @flgActions & 1 = 1
 --------------------------------------------------------------------------------------------------
 --tables and views consistency check
 --------------------------------------------------------------------------------------------------
-IF @flgActions & 2 = 2
+IF @flgActions & 2 = 2 AND (GETDATE() <= @stopTimeLimit)
 	begin
 		IF @executionLevel=0 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -384,7 +397,7 @@ IF @flgActions & 2 = 2
 															ORDER BY [table_name]
 		OPEN crsTableList
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
-		WHILE @@FETCH_STATUS = 0
+		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 			begin
 				SET @objectName=[dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted')
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
@@ -423,7 +436,7 @@ IF @flgActions & 2 = 2
 --------------------------------------------------------------------------------------------------
 --allocation structures consistency check
 --------------------------------------------------------------------------------------------------
-IF @flgActions & 4 = 4
+IF @flgActions & 4 = 4 AND (GETDATE() <= @stopTimeLimit)
 	begin
 		IF @executionLevel=0 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -448,7 +461,7 @@ IF @flgActions & 4 = 4
 --------------------------------------------------------------------------------------------------
 --catalogs consistency check
 --------------------------------------------------------------------------------------------------
-IF @flgActions & 8 = 8
+IF @flgActions & 8 = 8 AND (GETDATE() <= @stopTimeLimit)
 	begin
 		IF @executionLevel=0 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -473,7 +486,7 @@ IF @flgActions & 8 = 8
 --------------------------------------------------------------------------------------------------
 --table constraints consistency check
 --------------------------------------------------------------------------------------------------
-IF @flgActions & 16 = 16
+IF @flgActions & 16 = 16 AND (GETDATE() <= @stopTimeLimit)
 	begin
 		IF @executionLevel=0 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -485,7 +498,7 @@ IF @flgActions & 16 = 16
 															ORDER BY [table_name]
 		OPEN crsTableList
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
-		WHILE @@FETCH_STATUS = 0
+		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 			begin
 				SET @objectName= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted')
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
@@ -514,7 +527,7 @@ IF @flgActions & 16 = 16
 --------------------------------------------------------------------------------------------------
 --table identity value consistency check
 --------------------------------------------------------------------------------------------------
-IF @flgActions & 32 = 32
+IF @flgActions & 32 = 32 AND (GETDATE() <= @stopTimeLimit)
 	begin
 		IF	@databaseStatus & 32 = 32				/* LOADING */
 			OR @databaseStatus & 64 = 64			/* PRE RECOVERY */
@@ -611,7 +624,7 @@ IF @flgActions & 32 = 32
 																	ORDER BY [table_name]
 				OPEN crsTableList
 				FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
-				WHILE @@FETCH_STATUS = 0
+				WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 					begin
 						SET @objectName=[dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted')
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
@@ -643,7 +656,7 @@ IF @flgActions & 32 = 32
 --------------------------------------------------------------------------------------------------
 --correct space usage
 --------------------------------------------------------------------------------------------------
-IF @flgActions & 64 = 64
+IF @flgActions & 64 = 64 AND (GETDATE() <= @stopTimeLimit)
 	begin
 		IF @executionLevel=0 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -673,7 +686,7 @@ IF @flgActions & 64 = 64
 																	ORDER BY [table_name]
 				OPEN crsTableList
 				FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
-				WHILE @@FETCH_STATUS = 0
+				WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 					begin
 						SET @objectName= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted')
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
@@ -714,7 +727,7 @@ IF @flgActions & 64 = 64
 --		Alternatively, you can rebuild the indexes on the table or view; however, doing so is a more 
 --		resource-intensive operation.
 --------------------------------------------------------------------------------------------------
-IF @flgActions & 128 = 128
+IF @flgActions & 128 = 128 AND (GETDATE() <= @stopTimeLimit)
 	begin
 		IF @executionLevel=0 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -726,7 +739,7 @@ IF @flgActions & 128 = 128
 															ORDER BY [table_name]
 		OPEN crsTableList
 		FETCH NEXT FROM crsTableList INTO @CurrentTableSchema, @CurrentTableName
-		WHILE @@FETCH_STATUS = 0
+		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 			begin
 				SET @objectName= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted')
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0

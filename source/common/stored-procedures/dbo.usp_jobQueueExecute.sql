@@ -10,12 +10,13 @@ drop procedure [dbo].[usp_jobQueueExecute]
 GO
 
 CREATE PROCEDURE dbo.usp_jobQueueExecute
-		@projectCode			[varchar](32) = NULL,
-		@moduleFilter			[varchar](32) = '%',
-		@descriptorFilter		[varchar](256)= '%',
-		@waitForDelay			[varchar](8) = '00:00:05',
-		@parallelJobs			[int] = NULL,
-		@debugMode				[bit] = 0
+		@projectCode				[varchar](32) = NULL,
+		@moduleFilter				[varchar](32) = '%',
+		@descriptorFilter			[varchar](256)= '%',
+		@waitForDelay				[varchar](8)  = '00:00:05',
+		@parallelJobs				[int]		  = NULL,
+		@maxRunningTimeInMinutes	[smallint]	  = 0,
+		@debugMode					[bit]		  = 0
 /* WITH ENCRYPTION */
 AS
 
@@ -72,16 +73,25 @@ DECLARE	  @serverEdition			[sysname]
 		, @serverVersionNum			[numeric](9,6)
 		, @nestedExecutionLevel		[tinyint]
 
-DECLARE	  @queryToRun  			[nvarchar](2048)
-		, @queryParameters		[nvarchar](512)
-		, @eventData			[varchar](8000)
-
+DECLARE	  @queryToRun  				[nvarchar](2048)
+		, @queryParameters			[nvarchar](512)
+		, @eventData				[varchar](8000)
+		, @stopTimeLimit			[datetime]
+			
 /* for the jobs per volume limit */
 DECLARE	  @moduleHealthCheckExists				[bit]
 		, @forDatabaseName						[sysname]
 		, @forDatabaseMountPoint				[nvarchar](512)
 		, @jobsRunningOnSameVolume				[smallint]
 		, @configMaxSQLJobsRunningOnSameVolume	[smallint]
+
+---------------------------------------------------------------------------------------------
+--determine when to stop current optimization task, based on @maxRunningTimeInMinutes value
+---------------------------------------------------------------------------------------------
+IF ISNULL(@maxRunningTimeInMinutes, 0)=0
+	SET @stopTimeLimit = CONVERT([datetime], '9999-12-31 23:23:59', 120)
+ELSE
+	SET @stopTimeLimit = DATEADD(minute, @maxRunningTimeInMinutes, GETDATE())
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default projectCode
@@ -304,12 +314,12 @@ DECLARE crsJobQueue CURSOR LOCAL FAST_FORWARD FOR	SELECT    [id], [instance_name
 															AND [status] = - 1
 															AND (    DATEDIFF(minute, [event_date_utc], GETUTCDATE()) < (@configMaxQueueExecutionTime * 60)
 																  OR @configMaxQueueExecutionTime = 0
-																)																
+																)																													
 													ORDER BY [priority], [id]
 OPEN crsJobQueue
 FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @forDatabaseName, @jobCreateTimeUTC
 SET @executedJobs = 1
-WHILE @@FETCH_STATUS=0
+WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 	begin
 		/* check if job should be "skipped" */
 		IF NOT (DATEDIFF(minute, @jobCreateTimeUTC, GETUTCDATE()) < (@configMaxQueueExecutionTime * 60) OR @configMaxQueueExecutionTime = 0)

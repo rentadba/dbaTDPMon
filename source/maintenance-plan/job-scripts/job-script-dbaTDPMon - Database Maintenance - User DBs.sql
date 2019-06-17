@@ -142,6 +142,8 @@ IF DATENAME(weekday, GETDATE()) = ''Saturday''
 															@tableName				= ''%'',
 															@flgActions				= 1,
 															@flgOptions				= 3,
+															@maxDOP					= DEFAULT,
+															@maxRunningTimeInMinutes= DEFAULT,
 															@debugMode				= DEFAULT
 				
 				FETCH NEXT FROM crsDatabases INTO @databaseName
@@ -206,6 +208,8 @@ IF DATENAME(weekday, GETDATE()) = ''Saturday''
 															@tableName				= ''%'',
 															@flgActions				= @flgActions,
 															@flgOptions				= DEFAULT,
+															@maxDOP					= DEFAULT,
+															@maxRunningTimeInMinutes= DEFAULT,
 															@debugMode				= DEFAULT
 
 				FETCH NEXT FROM crsDatabases INTO @databaseName
@@ -264,6 +268,8 @@ IF DATENAME(weekday, GETDATE()) = ''Sunday''
 															@tableName				= ''%'',
 															@flgActions				= 34,
 															@flgOptions				= DEFAULT,
+															@maxDOP					= DEFAULT,
+															@maxRunningTimeInMinutes= DEFAULT,
 															@debugMode				= DEFAULT
 
 				FETCH NEXT FROM crsDatabases INTO @databaseName
@@ -322,6 +328,8 @@ IF DATENAME(weekday, GETDATE()) = ''Sunday''
 															@tableName				= ''%'',
 															@flgActions				= 16,
 															@flgOptions				= DEFAULT,
+															@maxDOP					= DEFAULT,
+															@maxRunningTimeInMinutes= DEFAULT,
 															@debugMode				= DEFAULT
 				
 				FETCH NEXT FROM crsDatabases INTO @databaseName
@@ -381,6 +389,8 @@ IF DATENAME(weekday, GETDATE()) = ''Monday''
 															@tableName				= ''%'',
 															@flgActions				= 64,
 															@flgOptions				= DEFAULT,
+															@maxDOP					= DEFAULT,
+															@maxRunningTimeInMinutes= DEFAULT,
 															@debugMode				= DEFAULT
 
 				FETCH NEXT FROM crsDatabases INTO @databaseName
