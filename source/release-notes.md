@@ -889,3 +889,6 @@
 
 14.06.2019
 * health-check: enhancements to the daily health-check report: add Capacity Analysis category
+
+17.06.2019
+* maintenance-plan: option to allow/block maintenance operations on a non-readable AlwaysOn secondary replica

@@ -40,14 +40,15 @@ DECLARE @agName						 [sysname],
 		@agSynchronizationState		 [sysname],
 		@agPreferredBackupReplica	 [bit],
 		@agAutomatedBackupPreference [tinyint],
-		@dbIsPartOfAG				 [bit]
+		@dbIsPartOfAG				 [bit],
+		@allowDBCCOnNonReadSecondary [bit]
 		
-
 SET @agName = NULL
 SET @clusterName = NULL
 SET @agSynchronizationState = NULL
 SET @agInstanceRoleDesc = NULL
 SET @dbIsPartOfAG = 0
+SET @allowDBCCOnNonReadSecondary = 0
 
 /* get cluster name */
 SET @queryToRun = N' SELECT [cluster_name], CAST([db_is_part_of_ag] AS [bit]) AS [db_is_part_of_ag] 
@@ -160,9 +161,47 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL AND ISNULL(@agSynchronizatio
 			end
 
 		/*-------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+		IF UPPER(@agInstanceRoleDesc) = 'SECONDARY'
+			begin
+				BEGIN TRY
+					SELECT	@allowDBCCOnNonReadSecondary = CASE WHEN [value]='true' THEN 1 ELSE 0 END
+					FROM	[dbo].[appConfigurations]
+					WHERE	[name] ='Allow DBCC operations on non-readable secondary replicas (AlwaysOn)' 
+							AND [module] = 'maintenance-plan'
+				END TRY
+				BEGIN CATCH
+					SET @allowDBCCOnNonReadSecondary = 0
+				END CATCH
+				SET @allowDBCCOnNonReadSecondary = ISNULL(@allowDBCCOnNonReadSecondary, 0)
+			end
+
+		/*-------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 		/* database backup - allowed actions on a secondary replica */
 		IF @actionName = 'database backup' AND UPPER(@agInstanceRoleDesc) = 'SECONDARY'
 			begin	
+				IF @agReadableSecondary='NO' AND @allowDBCCOnNonReadSecondary = 0
+					begin								
+						SET @queryToRun=N'Availability Group: Operation is not allowed on a non-readable secondary replica.'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+						SET @eventData='<skipaction><detail>' + 
+											'<name>' + @actionName + '</name>' + 
+											'<type>' + @actionType + '</type>' + 
+											'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+											'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+											'<reason>' + @queryToRun + '</reason>' + 
+										'</detail></skipaction>'
+
+						EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+															@dbName			= @dbName,
+															@module			= 'dbo.usp_mpCheckAvailabilityGroupLimitations',
+															@eventName		= @actionName,
+															@eventMessage	= @eventData,
+															@eventType		= 0 /* info */
+
+						RETURN 1
+					end
+
 				/* if automated_backup_preference is 0 (primary), Backups should always occur on the primary replica */
 				IF @agAutomatedBackupPreference = 0
 					begin
@@ -425,27 +464,53 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL AND ISNULL(@agSynchronizatio
 
 		/*-------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 		/* database consistency check - allowed actions on a secondary replica */
-		IF @actionName = 'database consistency check' AND UPPER(@agInstanceRoleDesc) = 'SECONDARY' AND @agReadableSecondary='NO' AND (@flgActions & 2 = 2 OR @flgActions & 16 = 16)
-			begin								
-				SET @queryToRun=N'Availability Group: Operation is not supported on a non-readable secondary replica.'
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+		IF @actionName = 'database consistency check' AND UPPER(@agInstanceRoleDesc) = 'SECONDARY' 
+			begin
+				IF @agReadableSecondary='NO' AND @allowDBCCOnNonReadSecondary = 0
+					begin								
+						SET @queryToRun=N'Availability Group: Operation is not allowed on a non-readable secondary replica.'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-				SET @eventData='<skipaction><detail>' + 
-									'<name>' + @actionName + '</name>' + 
-									'<type>' + @actionType + '</type>' + 
-									'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
-									'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
-									'<reason>' + @queryToRun + '</reason>' + 
-								'</detail></skipaction>'
+						SET @eventData='<skipaction><detail>' + 
+											'<name>' + @actionName + '</name>' + 
+											'<type>' + @actionType + '</type>' + 
+											'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+											'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+											'<reason>' + @queryToRun + '</reason>' + 
+										'</detail></skipaction>'
 
-				EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
-													@dbName			= @dbName,
-													@module			= 'dbo.usp_mpCheckAvailabilityGroupLimitations',
-													@eventName		= @actionName,
-													@eventMessage	= @eventData,
-													@eventType		= 0 /* info */
+						EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+															@dbName			= @dbName,
+															@module			= 'dbo.usp_mpCheckAvailabilityGroupLimitations',
+															@eventName		= @actionName,
+															@eventMessage	= @eventData,
+															@eventType		= 0 /* info */
 
-				RETURN 1
+						RETURN 1
+					end
+			
+				IF @agReadableSecondary='NO' AND (@flgActions & 2 = 2 OR @flgActions & 16 = 16)
+					begin
+						SET @queryToRun=N'Availability Group: Operation is not supported on a non-readable secondary replica.'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+						SET @eventData='<skipaction><detail>' + 
+											'<name>' + @actionName + '</name>' + 
+											'<type>' + @actionType + '</type>' + 
+											'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
+											'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+											'<reason>' + @queryToRun + '</reason>' + 
+										'</detail></skipaction>'
+
+						EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+															@dbName			= @dbName,
+															@module			= 'dbo.usp_mpCheckAvailabilityGroupLimitations',
+															@eventName		= @actionName,
+															@eventMessage	= @eventData,
+															@eventType		= 0 /* info */
+
+						RETURN 1
+					end
 			end
 
 		/*-------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
