@@ -110,7 +110,7 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 													@selectResult			= 0,
 													@extentedStepDetails	= 0,		
 													@debugMode				= @debugMode
-
+				
 				IF @currentRunning = 0 AND @lastExecutionStatus<>5 /* Unknown */
 					begin
 						--double check
@@ -160,13 +160,15 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 							end
 						ELSE
 							begin
-								IF @currentRunning <> 0
+								--IF @currentRunning <> 0
 									SET @runningJobs = @runningJobs + 1
 							end
 					end
 				ELSE
-					IF @currentRunning <> 0
+					begin
+					--IF @currentRunning <> 0
 						SET @runningJobs = @runningJobs + 1
+					end
 
 				FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName, @jobID
 			end
@@ -176,7 +178,7 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 		SET @strMessage='Currently running jobs : ' + CAST(@runningJobs AS [varchar])
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 						
-		IF @runningJobs > @minJobToRunBeforeExit
+		IF @runningJobs >= @minJobToRunBeforeExit
 			WAITFOR DELAY @waitForDelay
 	end
 
