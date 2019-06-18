@@ -32,7 +32,7 @@ CREATE TABLE [health-check].[statsDatabaseDetails]
 	[last_backup_time]			[datetime]		NULL,
 	[last_dbcc checkdb_time]	[datetime]		NULL,
 	[is_growth_limited]			[bit]			NULL,
-	[is_snapshot]				[bit]			NOT NULL DEFAULT [DF_health_check_statsDatabaseDetails_IsSnapshot] (0),
+	[is_snapshot]				[bit]			NOT NULL CONSTRAINT [DF_health_check_statsDatabaseDetails_IsSnapshot] DEFAULT (0),
 	[event_date_utc]			[datetime]		NOT NULL,
 	CONSTRAINT [PK_statsDatabaseDetails] PRIMARY KEY  CLUSTERED 
 	(
