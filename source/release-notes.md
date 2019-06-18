@@ -895,3 +895,7 @@
 * maintenance-plan: add time limit option for the consistency tasks in maintenance plan
 * health-check: collect secondary replica readable state in [health-check].[statsDatabaseAlwaysOnDetails] table
 * add time limit for executing internal jobs (dbo.usp_jobQueueExecute)
+
+18.06.2019
+* integrations: stored procedure for running dbcc checkdb in a time limit mode / for all databases on all servers
+* fix issue which allowed running more jobs in parallel than the @parallelJobs parameter value

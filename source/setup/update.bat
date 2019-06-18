@@ -546,9 +546,6 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpAlterTableIndexes.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcChangeFillFactorForIndexesFrequentlyFragmented.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcJobQueueCreate.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -564,7 +561,7 @@ SET schema_installed=0
 sqlcmd.exe -S%server% %autentif% -Q "set nocount on; select name from sys.schemas where name='monitoring'" -d %dbname% -o check-schema.out -b -r 1
 FOR /F "tokens=1 delims==" %%A IN ('FINDSTR /R "monitoring" check-schema.out') DO (SET schema_installed=1)
 del check-schema.out
-if "%schema_installed%" == "0" goto done
+if "%schema_installed%" == "0" goto integration
 
 echo *-----------------------------------------------------------------------------*
 echo Monitoring: Running table's patching scripts...
@@ -617,8 +614,26 @@ sqlcmd.exe -S%server% %autentif% -i "..\monitoring\stored-procedures\dbo.usp_mon
 if errorlevel 1 goto install_err
 
 
+:integration
+SET schema_installed=0
+sqlcmd.exe -S%server% %autentif% -Q "set nocount on; select count(*) from sys.schemas where name in ('health-check','maintenance-plan')" -d %dbname% -o check-schema.out -b -r 1
+FOR /F "tokens=1 delims==" %%A IN ('FINDSTR /R "2" check-schema.out') DO (SET schema_installed=1)
+del check-schema.out
+if "%schema_installed%" == "0" goto done
+
+echo *-----------------------------------------------------------------------------*
+echo Integrations: Creating Functions / Stored Procedures
+echo *-----------------------------------------------------------------------------*
+
+sqlcmd.exe -S%server% %autentif% -i "..\integrations\stored-procedures\dbo.usp_runChangeFillFactorForIndexesFrequentlyFragmented.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\integrations\stored-procedures\dbo.usp_runDatabaseCheckDBForAllSkippedWithinLastXDays.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+
 :done
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2019.06.17' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2019.06.18' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err  
 
 echo *-----------------------------------------------------------------------------*

@@ -768,9 +768,9 @@ WHILE @@FETCH_STATUS=0
 									FROM @jobExecutionQueue 
 									) X ON jeqX.[id] = X.[id] 
 
-				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
-														, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-														, [job_command], [task_id], [database_name], [priority])
+					INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
+															, [for_instance_id], [job_name], [job_step_name], [job_database_name]
+															, [job_command], [task_id], [database_name], [priority])
 						SELECT DISTINCT
 								  S.[instance_id], S.[project_id], S.[module], S.[descriptor]
 								, S.[for_instance_id]

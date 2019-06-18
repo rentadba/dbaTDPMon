@@ -1,14 +1,14 @@
-RAISERROR('Create procedure: [dbo].[usp_hcChangeFillFactorForIndexesFrequentlyFragmented]', 10, 1) WITH NOWAIT
+RAISERROR('Create procedure: [dbo].[usp_runChangeFillFactorForIndexesFrequentlyFragmented]', 10, 1) WITH NOWAIT
 GO
 IF  EXISTS (
 	    SELECT * 
 	      FROM sys.objects 
-	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_hcChangeFillFactorForIndexesFrequentlyFragmented]') 
+	     WHERE object_id = OBJECT_ID(N'[dbo].[usp_runChangeFillFactorForIndexesFrequentlyFragmented]') 
 	       AND type in (N'P', N'PC'))
-DROP PROCEDURE [dbo].[usp_hcChangeFillFactorForIndexesFrequentlyFragmented]
+DROP PROCEDURE [dbo].[usp_runChangeFillFactorForIndexesFrequentlyFragmented]
 GO
 
-CREATE PROCEDURE [dbo].[usp_hcChangeFillFactorForIndexesFrequentlyFragmented]
+CREATE PROCEDURE [dbo].[usp_runChangeFillFactorForIndexesFrequentlyFragmented]
 		@projectCode				[varchar](32)=NULL,
 		@dropFillFactorByPercent	[tinyint] = 5,
 		@minFillFactorAcceptedLevel	[tinyint] = 50,

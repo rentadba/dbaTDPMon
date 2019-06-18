@@ -392,9 +392,6 @@ if errorlevel 1 goto install_err
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpAlterTableRebuildHeap.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDatabaseOptimize.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDeleteFileOnDisk.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -402,6 +399,9 @@ sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.u
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDatabaseBackup.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDatabaseOptimize.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpJobQueueCreate.sql" -d %dbname%  -b -r 1
@@ -530,9 +530,6 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpAlterTableIndexes.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcChangeFillFactorForIndexesFrequentlyFragmented.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcJobQueueCreate.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -634,7 +631,6 @@ if "%healthCheckInstalled%" == "false" sqlcmd.exe -S%server% %autentif% -i "..\h
 if errorlevel 1 goto install_err
 
 
-
 echo *-----------------------------------------------------------------------------*
 echo Monitoring: Creating SQL Server Agent Jobs
 echo *-----------------------------------------------------------------------------*
@@ -652,13 +648,29 @@ sqlcmd.exe -S%server% %autentif% -i "..\monitoring\job-scripts\job-script-dbaTDP
 if errorlevel 1 goto install_err
 
 
+if "%module%"=="all" goto integration
+goto done
+
+
+:integration
+echo *-----------------------------------------------------------------------------*
+echo Integrations: Creating Functions / Stored Procedures
+echo *-----------------------------------------------------------------------------*
+
+sqlcmd.exe -S%server% %autentif% -i "..\integrations\stored-procedures\dbo.usp_runChangeFillFactorForIndexesFrequentlyFragmented.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\integrations\stored-procedures\dbo.usp_runDatabaseCheckDBForAllSkippedWithinLastXDays.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 
 
 if "%module%"=="all" goto done
 goto done
 
+
 :done
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2019.06.17' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2019.06.18' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err  
 
 echo *-----------------------------------------------------------------------------*
