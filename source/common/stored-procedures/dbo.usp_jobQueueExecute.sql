@@ -653,8 +653,7 @@ WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 									end
 							end
 
-						---------------------------------------------------------------------------------------------------
-						PRINT @jobID
+						---------------------------------------------------------------------------------------------------						
 						/* starting job: 0 = job started, 1 = error occured */
 						EXEC @lastExecutionStatus = dbo.usp_sqlAgentJobStartAndWatch	@sqlServerName						= @sqlServerName,
 																						@jobName							= @jobName,
