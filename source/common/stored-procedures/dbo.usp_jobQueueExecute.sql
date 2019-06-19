@@ -94,20 +94,12 @@ ELSE
 	SET @stopTimeLimit = DATEADD(minute, @maxRunningTimeInMinutes, GETDATE())
 
 ------------------------------------------------------------------------------------------------------------------------------------------
---get default projectCode
-IF @projectCode IS NULL
-	SET @projectCode = [dbo].[ufn_getProjectCode](NULL, NULL)
+--get default projectID
+IF @projectCode IS NOT NULL
+	SELECT @projectID = [id]
+	FROM [dbo].[catalogProjects]
+	WHERE [code] = @projectCode 
 
-SELECT @projectID = [id]
-FROM [dbo].[catalogProjects]
-WHERE [code] = @projectCode 
-
-IF @projectID IS NULL
-	begin
-		SET @strMessage=N'ERROR: The value specifief for Project Code is not valid.'
-		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
-	end
-	
 ------------------------------------------------------------------------------------------------------------------------------------------
 --check if parallel executor is enabled
 IF @parallelJobs IS NULL
@@ -283,7 +275,7 @@ EXEC  [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @@SERVERNAME,
 ------------------------------------------------------------------------------------------------------------------------------------------
 SELECT @jobQueueCount = COUNT(*)
 FROM [dbo].[vw_jobExecutionQueue]
-WHERE  [project_id] = @projectID 
+WHERE  ([project_id] = @projectID OR @projectID IS NULL)
 		AND [module] LIKE @moduleFilter
 		AND (    [descriptor] LIKE @descriptorFilter
 			  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
@@ -302,11 +294,11 @@ IF @jobQueueCount=0
 SET @runningJobs  = 0
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-DECLARE crsJobQueue CURSOR LOCAL FAST_FORWARD FOR	SELECT    [id], [instance_name]
+DECLARE crsJobQueue CURSOR LOCAL FAST_FORWARD FOR	SELECT    [id], [project_id], [instance_name]
 															, [job_name], [job_step_name], [job_database_name], REPLACE([job_command], '''', '''''') AS [job_command]
 															, [database_name], [event_date_utc]
 													FROM [dbo].[vw_jobExecutionQueue]
-													WHERE  [project_id] = @projectID 
+													WHERE  ([project_id] = @projectID OR @projectID IS NULL)
 															AND [module] LIKE @moduleFilter
 															AND (    [descriptor] LIKE @descriptorFilter
 																  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
@@ -317,14 +309,14 @@ DECLARE crsJobQueue CURSOR LOCAL FAST_FORWARD FOR	SELECT    [id], [instance_name
 																)																													
 													ORDER BY [priority], [id]
 OPEN crsJobQueue
-FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @forDatabaseName, @jobCreateTimeUTC
+FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @projectID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @forDatabaseName, @jobCreateTimeUTC
 SET @executedJobs = 1
 WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 	begin
 		/* check if job should be "skipped" */
 		IF NOT (DATEDIFF(minute, @jobCreateTimeUTC, GETUTCDATE()) < (@configMaxQueueExecutionTime * 60) OR @configMaxQueueExecutionTime = 0)
 			begin
-				FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @forDatabaseName, @jobCreateTimeUTC				
+				FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @projectID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @forDatabaseName, @jobCreateTimeUTC				
 			end
 		/* execute the job */
 		ELSE
@@ -373,7 +365,7 @@ WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 
 							SET @executedJobs = @executedJobs + 1
 
-							FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @forDatabaseName, @jobCreateTimeUTC
+							FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @projectID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @forDatabaseName, @jobCreateTimeUTC
 						END TRY
 						BEGIN CATCH		
 								SET @ErrorNumber = ERROR_NUMBER();
@@ -662,6 +654,7 @@ WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 							end
 
 						---------------------------------------------------------------------------------------------------
+						PRINT @jobID
 						/* starting job: 0 = job started, 1 = error occured */
 						EXEC @lastExecutionStatus = dbo.usp_sqlAgentJobStartAndWatch	@sqlServerName						= @sqlServerName,
 																						@jobName							= @jobName,
@@ -701,9 +694,11 @@ WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 						---------------------------------------------------------------------------------------------------
 						IF @runningJobs < @jobQueueCount
 							begin
-								FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @forDatabaseName, @jobCreateTimeUTC
+								FETCH NEXT FROM crsJobQueue INTO @jobQueueID, @projectID, @sqlServerName, @jobName, @jobStepName, @jobDBName, @jobCommand, @forDatabaseName, @jobCreateTimeUTC
 								SET @executedJobs = @executedJobs + 1
 							end
+						ELSE
+							BREAK
 					end
 			end
 	end

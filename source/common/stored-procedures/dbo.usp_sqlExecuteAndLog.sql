@@ -38,30 +38,13 @@ DECLARE		@queryParameters				[nvarchar](512),
 			@tmpServer						[varchar](256),
 			@ReturnValue					[int]
 
-DECLARE		@projectID						[smallint],
-			@instanceID						[smallint],
+DECLARE		@instanceID						[smallint],
 			@errorCode						[int],
 			@durationSeconds				[bigint],
-			@eventData						[varchar](8000),
-			@projectCode					[varchar](32)
+			@eventData						[varchar](8000)
 			
 SET NOCOUNT ON
 
-
----------------------------------------------------------------------------------------------
--- try to get project code by database name / or get the default project value
-IF @projectCode IS NULL
-	SET @projectCode = [dbo].[ufn_getProjectCode](@sqlServerName, @dbName)
-
-SELECT	@projectID = [id]
-FROM	[dbo].[catalogProjects]
-WHERE	[code] = @projectCode
-
----------------------------------------------------------------------------------------------
-SELECT  @instanceID = [id] 
-FROM	[dbo].[catalogInstanceNames]  
-WHERE	[name] = @sqlServerName
-		AND [project_id] = @projectID
 
 ---------------------------------------------------------------------------------------------
 DECLARE @logEventActions	[nvarchar](32)

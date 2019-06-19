@@ -16,6 +16,7 @@ CREATE PROCEDURE [dbo].[usp_runDatabaseCheckDBForAllSkippedWithinLastXDays]
 		@parallelJobs				[int]		= NULL,
 		@maxRunningTimeInMinutes	[smallint]	= 0,
 		@skipObjectsList			[nvarchar](1024) = NULL,
+		@executeProjectBased		[bit]		= 0,
 		@debugMode					[bit]		= 0
 AS
 
@@ -261,10 +262,10 @@ UPDATE jeq
 	SET jeq.[priority] = @priority -1 + X.[priority]
 FROM @jobExecutionQueue jeq
 INNER JOIN	(
-			 SELECT [id], ROW_NUMBER() OVER(PARTITION BY [for_instance_id] ORDER BY [is_production] DESC, 
-																					CASE WHEN [prev_run_time_minutes] IS NOT NULL THEN [prev_run_time_minutes] 
-																																  ELSE [size_mb] 
-																					END DESC
+			 SELECT [id], ROW_NUMBER() OVER(ORDER BY [is_production] DESC, 
+													CASE WHEN [prev_run_time_minutes] IS NOT NULL THEN [prev_run_time_minutes] 
+																								  ELSE [size_mb] 
+													END DESC
 											) [priority]
 			 FROM @jobExecutionQueue
 			 WHERE [priority] IS NULL
@@ -310,18 +311,50 @@ WHERE	jeq.[job_name] IS NULL
 SET @strMessage='Running queue...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
 
-DECLARE crsProjectsDatabaseJobs CURSOR READ_ONLY FAST_FORWARD FOR	SELECT DISTINCT [project_code]
-																	FROM [dbo].[vw_jobExecutionQueue]
-																	WHERE [module] = @module
-																		  AND [descriptor] = @codeDescriptor
-																		  AND [status] = -1
-OPEN crsProjectsDatabaseJobs
-FETCH NEXT FROM crsProjectsDatabaseJobs INTO @projectCode
-WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
+IF @executeProjectBased = 1
 	begin
-		SET @remainingRunTime = DATEDIFF(minute, GETDATE(), @stopTimeLimit)
+		/* run project by project, pending on inter project task priority */
+		DECLARE crsProjectsDatabaseJobs CURSOR READ_ONLY FAST_FORWARD FOR	SELECT TOP 1000000 [project_code]
+																			FROM (
+																					SELECT [project_code], MIN([priority]) [priority]
+																					FROM (
+																							SELECT [project_code], ROW_NUMBER() OVER(ORDER BY [priority]) [priority]
+																							FROM [dbo].[vw_jobExecutionQueue]
+																							WHERE	[module] = @module
+																									AND [descriptor] = @codeDescriptor
+																									AND [status] = -1
+																						)X
+																					GROUP BY [project_code]
+																				)Y
+																			ORDER BY [priority]
+		OPEN crsProjectsDatabaseJobs
+		FETCH NEXT FROM crsProjectsDatabaseJobs INTO @projectCode
+		WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
+			begin
+				SET @remainingRunTime = DATEDIFF(minute, GETDATE(), @stopTimeLimit)
 
-		EXEC dbo.usp_jobQueueExecute	@projectCode				= @projectCode,
+				EXEC dbo.usp_jobQueueExecute	@projectCode				= @projectCode,
+												@moduleFilter				= @module,
+												@descriptorFilter			= @codeDescriptor,
+												@waitForDelay				= @waitForDelay,
+												@parallelJobs				= @parallelJobs,
+												@maxRunningTimeInMinutes	= @remainingRunTime,
+												@debugMode					= @debugMode
+
+				EXEC [dbo].[usp_hcCollectDatabaseDetails]	@projectCode			= @projectCode,
+															@sqlServerNameFilter	= DEFAULT,
+															@databaseNameFilter		= DEFAULT,
+															@debugMode				= @debugMode	
+
+				FETCH NEXT FROM crsProjectsDatabaseJobs INTO @projectCode
+			end
+		CLOSE crsProjectsDatabaseJobs
+		DEALLOCATE crsProjectsDatabaseJobs
+	end
+ELSE
+	begin
+		/* run queue regardless of project, based on database task priority */
+		EXEC dbo.usp_jobQueueExecute	@projectCode				= NULL,
 										@moduleFilter				= @module,
 										@descriptorFilter			= @codeDescriptor,
 										@waitForDelay				= @waitForDelay,
@@ -329,14 +362,25 @@ WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 										@maxRunningTimeInMinutes	= @remainingRunTime,
 										@debugMode					= @debugMode
 
-		EXEC [dbo].[usp_hcCollectDatabaseDetails]	@projectCode			= @projectCode,
-													@sqlServerNameFilter	= DEFAULT,
-													@databaseNameFilter		= DEFAULT,
-													@debugMode				= @debugMode	
-
+		/* update internal catalogs */
+		DECLARE crsProjectsDatabaseJobs CURSOR READ_ONLY FAST_FORWARD FOR	SELECT DISTINCT [project_code]
+																			FROM [dbo].[vw_jobExecutionQueue]
+																			WHERE	[module] = @module
+																					AND [descriptor] = @codeDescriptor
+																					AND [status] = 1
+																			ORDER BY [project_code]
+		OPEN crsProjectsDatabaseJobs
 		FETCH NEXT FROM crsProjectsDatabaseJobs INTO @projectCode
-	end
-CLOSE crsProjectsDatabaseJobs
-DEALLOCATE crsProjectsDatabaseJobs
-GO
+		WHILE @@FETCH_STATUS=0
+			begin
+				EXEC [dbo].[usp_hcCollectDatabaseDetails]	@projectCode			= @projectCode,
+															@sqlServerNameFilter	= DEFAULT,
+															@databaseNameFilter		= DEFAULT,
+															@debugMode				= @debugMode	
 
+				FETCH NEXT FROM crsProjectsDatabaseJobs INTO @projectCode
+			end
+		CLOSE crsProjectsDatabaseJobs
+		DEALLOCATE crsProjectsDatabaseJobs
+	end
+GO

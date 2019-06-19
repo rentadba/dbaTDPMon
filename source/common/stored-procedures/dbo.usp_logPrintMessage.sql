@@ -44,5 +44,5 @@ IF @stopExecution=0
 			PRINT @customMessage
 	end
 ELSE
-			RAISERROR(@customMessage, 16, 1) WITH NOWAIT
+	RAISERROR(@customMessage, 16, 1) WITH NOWAIT
 GO

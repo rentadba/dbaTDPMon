@@ -48,24 +48,16 @@ DECLARE   @projectID				[smallint]
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
---get default projectCode
-IF @projectCode IS NULL
-	SET @projectCode = [dbo].[ufn_getProjectCode](NULL, NULL)
+--get default projectID
+IF @projectCode IS NOT NULL
+	SELECT @projectID = [id]
+	FROM [dbo].[catalogProjects]
+	WHERE [code] = @projectCode 
 
-SELECT @projectID = [id]
-FROM [dbo].[catalogProjects]
-WHERE [code] = @projectCode 
-
-IF @projectID IS NULL
-	begin
-		SET @strMessage=N'ERROR: The value specifief for Project Code is not valid.'
-		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
-	end
-	
 ------------------------------------------------------------------------------------------------------------------------------------------
 SELECT @runningJobs = COUNT(*)
 FROM [dbo].[vw_jobExecutionQueue]
-WHERE  [project_id] = @projectID 
+WHERE   ([project_id] = @projectID OR @projectID IS NULL)
 		AND [module] LIKE @moduleFilter
 		AND (    [descriptor] LIKE @descriptorFilter
 			  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
@@ -80,7 +72,7 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 
 		DECLARE crsRunningJobs CURSOR LOCAL FAST_FORWARD FOR	SELECT  [id], [instance_name], [job_name], [job_id]
 																FROM [dbo].[vw_jobExecutionQueue]
-																WHERE  [project_id] = @projectID 
+																WHERE   ([project_id] = @projectID OR @projectID IS NULL)
 																		AND [module] LIKE @moduleFilter
 																		AND (    [descriptor] LIKE @descriptorFilter
 																			  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
@@ -110,7 +102,7 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 													@selectResult			= 0,
 													@extentedStepDetails	= 0,		
 													@debugMode				= @debugMode
-				
+
 				IF @currentRunning = 0 AND @lastExecutionStatus<>5 /* Unknown */
 					begin
 						--double check
@@ -127,6 +119,7 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 															@selectResult			= 0,
 															@extentedStepDetails	= 0,		
 															@debugMode				= @debugMode
+
 						IF @currentRunning = 0 AND @lastExecutionStatus<>5 /* Unknown */
 							begin
 								
@@ -205,7 +198,7 @@ IF @minJobToRunBeforeExit=0
 		DECLARE crsRunningJobs CURSOR LOCAL FAST_FORWARD FOR	SELECT  jeq.[id], jeq.[instance_name], jeq.[job_name], jeq.[job_id]
 																FROM [dbo].[vw_jobExecutionQueue] jeq
 																INNER JOIN #existingSQLAgentJobs esaj ON esaj.[job_name] = jeq.[job_name]
-																WHERE  jeq.[project_id] = @projectID 
+																WHERE  (jeq.[project_id] = @projectID OR @projectID IS NULL)
 																		AND jeq.[module] LIKE @moduleFilter
 																		AND (    [descriptor] LIKE @descriptorFilter
 																			  OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
@@ -279,7 +272,7 @@ IF @minJobToRunBeforeExit=0
 		WHERE [id] IN (
 						SELECT  [id]
 						FROM [dbo].[vw_jobExecutionQueue]
-						WHERE  [project_id] = @projectID 
+						WHERE   ([project_id] = @projectID OR @projectID IS NULL)
 								AND [module] LIKE @moduleFilter
 								AND (    [descriptor] LIKE @descriptorFilter
 										OR ISNULL(CHARINDEX([descriptor], @descriptorFilter), 0) <> 0
