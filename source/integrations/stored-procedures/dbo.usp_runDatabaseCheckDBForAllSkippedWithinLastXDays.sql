@@ -57,19 +57,23 @@ DECLARE @module				[varchar](32)  = 'automation-dbcc-checkdb',
 
 DECLARE @jobExecutionQueue TABLE
 		(
-			[id]					[int]			NOT NULL IDENTITY(1,1),
-			[instance_id]			[smallint]		NOT NULL,
-			[project_id]			[smallint]		NOT NULL,
-			[module]				[varchar](32)	NOT NULL,
-			[descriptor]			[varchar](256)	NOT NULL,
-			[for_instance_id]		[smallint]		NOT NULL,
-			[job_name]				[sysname]		NOT NULL,
-			[job_step_name]			[sysname]		NOT NULL,
-			[job_database_name]		[sysname]		NOT NULL,
-			[job_command]			[nvarchar](max) NOT NULL,
-			[task_id]				[bigint]		NULL,
-			[database_name]			[sysname]		NULL,
-			[priority]				[int]			NULL
+			[id]						[int]			NOT NULL IDENTITY(1,1),
+			[instance_id]				[smallint]		NOT NULL,
+			[project_id]				[smallint]		NOT NULL,
+			[module]					[varchar](32)	NOT NULL,
+			[descriptor]				[varchar](256)	NOT NULL,
+			[for_instance_id]			[smallint]		NOT NULL,
+			[job_name]					[sysname]		NOT NULL,
+			[job_step_name]				[sysname]		NOT NULL,
+			[job_database_name]			[sysname]		NOT NULL,
+			[job_command]				[nvarchar](max) NOT NULL,
+			[task_id]					[bigint]		NULL,
+			[database_name]				[sysname]		NULL,
+			[last_dbcc_checkdb_time]	[date]			NULL,
+			[size_mb]					[numeric](18,3) NULL,
+			[is_production]				[bit]			NULL,
+			[prev_run_time_minutes]		[int]			NULL,
+			[priority]					[int]			NULL
 		)
 
 ---------------------------------------------------------------------------------------------
@@ -161,7 +165,7 @@ SELECT @taskID = [id] FROM [dbo].[appInternalTasks] WHERE [descriptor] = @codeDe
 
 INSERT	INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descriptor]
 								 , [for_instance_id], [job_name], [job_step_name], [job_database_name]
-								 , [job_command], [task_id], [database_name], [priority])
+								 , [job_command], [task_id], [database_name], [last_dbcc_checkdb_time], [size_mb], [is_production])
 		SELECT	@instanceID AS [instance_id], X.[project_id], 
 				@module AS [module], 
 				@codeDescriptor AS [descriptor],
@@ -170,8 +174,8 @@ INSERT	INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descri
 				'Run'		AS [job_step_name],
 				DB_NAME()	AS [job_database_name],
 				'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName	= ''' + X.[for_instance_name] + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 1, @flgOptions = 3, @maxDOP	= ' + CAST(@maxDOP AS [nvarchar]) + N', @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
-				@taskID, [database_name],
-				ROW_NUMBER() OVER(PARTITION BY X.[for_instance_name] ORDER BY X.[is_production] DESC, X.[last_dbcc checkdb_time] ASC, X.[size_mb] DESC) AS [priority]
+				@taskID, [database_name], 
+				X.[last_dbcc checkdb_time], X.[size_mb], X.[is_production] 
 		FROM
 			(
 				SELECT	sdd.[project_id], sdd.[instance_id] AS [for_instance_id], 
@@ -196,8 +200,79 @@ INSERT	INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descri
 						AND sdaod.[id] IS NULL
 			)X
 
+
+------------------------------------------------------------------------------------------------------------------------------------------
+/* get previously execution run statistics */
+SET @strMessage='Optimizing tasks priority in queue...'
+EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
+
+IF OBJECT_ID('tempdb..#jobExecutionHistoryStats') IS NOT NULL DROP TABLE #jobExecutionHistoryStats
+SELECT	[project_id], [for_instance_id], [database_name], 
+		ROUND(AVG([running_time_sec]), 0)  AS [running_time_sec]
+INTO #jobExecutionHistoryStats
+FROM [dbo].[vw_jobExecutionHistory]
+WHERE [module] = 'automation-dbcc-checkdb'
+	AND [descriptor] = 'dbo.usp_mpDatabaseConsistencyCheck'
+	AND [status] = 1
+	AND [database_name] IN (SELECT [database_name] FROM @jobExecutionQueue)
+GROUP BY [project_id], [for_instance_id], [database_name]
+
+UPDATE jeq
+	SET jeq.[prev_run_time_minutes] = ROUND(jehs.[running_time_sec] / 60, 0)
+FROM @jobExecutionQueue jeq
+INNER JOIN #jobExecutionHistoryStats jehs ON	jehs.[project_id] = jeq.[project_id]
+												AND jehs.[for_instance_id] = jeq.[for_instance_id]
+												AND jehs.[database_name] = jeq.[database_name]
+
+
+/* optimize the queue priority based on runtime duration set and previously average execution times */
+/* will take into account the degree of parallelism set */
+DECLARE @id				[int],
+		@runTime		[int],
+		@priority		[int]
+
+SET @remainingRunTime = @maxRunningTimeInMinutes * @maxDOP 
+SET @priority = 1
+DECLARE crsOptimizeQueue CURSOR READ_ONLY FAST_FORWARD FOR	SELECT [id], [prev_run_time_minutes]
+															FROM @jobExecutionQueue
+															WHERE [prev_run_time_minutes] IS NOT NULL
+															ORDER BY [is_production] DESC, [last_dbcc_checkdb_time], [prev_run_time_minutes] DESC
+OPEN crsOptimizeQueue
+FETCH NEXT FROM crsOptimizeQueue INTO @id, @runTime
+WHILE @@FETCH_STATUS=0 AND @remainingRunTime > 0
+	begin
+		IF @runTime <= @remainingRunTime AND @runTime <= @maxRunningTimeInMinutes
+			begin
+				UPDATE @jobExecutionQueue
+					SET [priority] = @priority
+				WHERE [id] = @id
+
+				SET @priority = @priority + 1
+				SET @remainingRunTime = @remainingRunTime - @runTime
+			end
+
+		FETCH NEXT FROM crsOptimizeQueue INTO @id, @runTime
+	end
+CLOSE crsOptimizeQueue
+DEALLOCATE crsOptimizeQueue
+
+/* set default priority for the remaining items, based on run_time, size and production flag */
+UPDATE jeq
+	SET jeq.[priority] = @priority -1 + X.[priority]
+FROM @jobExecutionQueue jeq
+INNER JOIN	(
+			 SELECT [id], ROW_NUMBER() OVER(PARTITION BY [for_instance_id] ORDER BY [is_production] DESC, 
+																					CASE WHEN [prev_run_time_minutes] IS NOT NULL THEN [prev_run_time_minutes] 
+																																  ELSE [size_mb] 
+																					END DESC
+											) [priority]
+			 FROM @jobExecutionQueue
+			 WHERE [priority] IS NULL
+			)X ON X.[id] = jeq.[id]
+
 IF @debugMode = 1 SELECT * FROM @jobExecutionQueue
 
+------------------------------------------------------------------------------------------------------------------------------------------
 INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 									   , [for_instance_id], [job_name], [job_step_name], [job_database_name]
 									   , [job_command], [task_id], [database_name], [priority])

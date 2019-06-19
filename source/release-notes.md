@@ -899,3 +899,6 @@
 18.06.2019
 * integrations: stored procedure for running dbcc checkdb in a time limit mode / for all databases on all servers
 * fix issue which allowed running more jobs in parallel than the @parallelJobs parameter value
+
+19.06.2019
+* integrations: optimize the dbcc checkdb queue priority to take into account the run time, max dop and previously execution times
