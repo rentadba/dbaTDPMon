@@ -32,8 +32,8 @@ SET NOCOUNT ON
 DECLARE @startWeek			[tinyint],
 		@endWeek			[tinyint]
 
-SET @startWeek = DATENAME(week, CAST(DATEADD(day, -@daysToAnalyze, GETUTCDATE()) AS [date]))
-SET @endWeek = DATENAME(week, GETUTCDATE())
+SET @startWeek = DATENAME(week, DATEADD(day, -@daysToAnalyze, GETUTCDATE()))
+SET @endWeek   = DATENAME(week, GETUTCDATE())
 
 SELECT	new.[instance_name], new.[database_name], 
 		new.[size_mb] AS [current_size_mb], old.[size_mb] AS [old_size_mb],

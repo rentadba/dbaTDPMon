@@ -46,15 +46,19 @@ EXEC [dbo].[usp_runDatabaseCheckDBForAllSkippedWithinLastXDays]	@sqlServerNameFi
 */
 SET NOCOUNT ON
 
-DECLARE @module				[varchar](32)  = 'automation-dbcc-checkdb',
-		@codeDescriptor		[varchar](256) = 'dbo.usp_mpDatabaseConsistencyCheck',
-		@taskName			[varchar](256) = 'Database Consistency Check',
+DECLARE @module				[varchar](32),
+		@codeDescriptor		[varchar](256),
+		@taskName			[varchar](256),
 		@taskID				[bigint], 
 		@instanceID			[smallint],
 		@strMessage			[varchar](512),
 		@projectCode		[sysname],
 		@stopTimeLimit		[datetime],
 		@remainingRunTime	[int]
+
+SET @module = 'automation-dbcc-checkdb'
+SET @codeDescriptor = 'dbo.usp_mpDatabaseConsistencyCheck'
+SET @taskName = 'Database Consistency Check'
 
 DECLARE @jobExecutionQueue TABLE
 		(
@@ -70,7 +74,7 @@ DECLARE @jobExecutionQueue TABLE
 			[job_command]				[nvarchar](max) NOT NULL,
 			[task_id]					[bigint]		NULL,
 			[database_name]				[sysname]		NULL,
-			[last_dbcc_checkdb_time]	[date]			NULL,
+			[last_dbcc_checkdb_time]	[datetime]		NULL,
 			[size_mb]					[numeric](18,3) NULL,
 			[is_production]				[bit]			NULL,
 			[prev_run_time_minutes]		[int]			NULL,
@@ -182,7 +186,7 @@ INSERT	INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descri
 				SELECT	sdd.[project_id], sdd.[instance_id] AS [for_instance_id], 
 						sdd.[instance_name] AS [for_instance_name],
 						sdd.[database_id], sdd.[database_name], 
-						CAST(sdd.[last_dbcc checkdb_time] AS [date]) [last_dbcc checkdb_time], 
+						CONVERT([datetime], CONVERT([varchar](10), sdd.[last_dbcc checkdb_time], 120), 120) [last_dbcc checkdb_time], 
 						cp.[is_production],
 						sdd.[size_mb]
 				FROM [health-check].[vw_statsDatabaseDetails] sdd

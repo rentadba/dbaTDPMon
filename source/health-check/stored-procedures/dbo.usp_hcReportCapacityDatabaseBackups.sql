@@ -31,7 +31,8 @@ SET NOCOUNT ON
 
 DECLARE   @startEvent		[datetime]
 
-SET @startEvent = CAST(DATEADD(day, -@daysToAnalyze, GETUTCDATE()) AS [date])
+SET @startEvent = DATEADD(day, -@daysToAnalyze, GETUTCDATE())
+SET @startEvent = CONVERT([datetime], CONVERT([varchar](10), @startEvent, 120), 120)
 
 IF OBJECT_ID('tempdb..#backupData') IS NOT NULL DROP TABLE #backupData
 
