@@ -205,7 +205,7 @@ BEGIN TRY
 			-----------------------------------------------------------------------------------------------------
 			SET @isClustered=0
 
-			SET @queryToRun = N'SELECT [NodeName] FROM sys.dm_os_cluster_nodes'
+			SET @queryToRun = N'SELECT [NodeName] FROM sys.dm_os_cluster_nodes WITH (NOLOCK)'
 			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 			IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
@@ -257,19 +257,19 @@ BEGIN TRY
 			--discover database names
 			-----------------------------------------------------------------------------------------------------
 			SET @queryToRun = N'SELECT sdb.[database_id], sdb.[name], sdb.[state], sdb.[state_desc]
-								FROM sys.databases sdb
+								FROM sys.databases sdb WITH (NOLOCK)
 								WHERE	[is_read_only] = 0 
 										AND [is_in_standby] = 0
 										/* AND sdb.[name] LIKE ''' + @dbFilter + ''' */
 								UNION ALL
 								SELECT sdb.[database_id], sdb.[name], sdb.[state], ''READ ONLY''
-								FROM sys.databases sdb
+								FROM sys.databases sdb WITH (NOLOCK)
 								WHERE	[is_read_only] = 1
 										AND [is_in_standby] = 0
 										/* AND sdb.[name] LIKE ''' + @dbFilter + ''' */
 								UNION ALL
 								SELECT sdb.[database_id], sdb.[name], sdb.[state], ''STANDBY''
-								FROM sys.databases sdb
+								FROM sys.databases sdb WITH (NOLOCK)
 								WHERE	[is_in_standby] = 1
 										/* AND sdb.[name] LIKE ''' + @dbFilter + ''' */'
 			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
@@ -358,7 +358,7 @@ BEGIN TRY
 			-----------------------------------------------------------------------------------------------------
 			IF @SQLMajorVersion>=14
 				begin
-					SET @queryToRun = N'SELECT [host_platform] FROM sys.dm_os_host_info'
+					SET @queryToRun = N'SELECT [host_platform] FROM sys.dm_os_host_info WITH (NOLOCK)'
 					SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 					IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 

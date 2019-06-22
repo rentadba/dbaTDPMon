@@ -96,15 +96,16 @@ ORDER BY [id]
 DECLARE crsCollectorDescriptor CURSOR LOCAL FAST_FORWARD FOR	SELECT x.[descriptor], it.[id] AS [task_id]
 																FROM
 																	(
-																		SELECT 'dbo.usp_hcCollectDatabaseDetails' AS [descriptor] UNION ALL
-																		SELECT 'dbo.usp_hcCollectSQLServerAgentJobsStatus' AS [descriptor] UNION ALL
-																		SELECT 'dbo.usp_hcCollectDiskSpaceUsage' AS [descriptor] UNION ALL
-																		SELECT 'dbo.usp_hcCollectErrorlogMessages' AS [descriptor] UNION ALL
-																		SELECT 'dbo.usp_hcCollectOSEventLogs' AS [descriptor] UNION ALL
-																		SELECT 'dbo.usp_hcCollectEventMessages' AS [descriptor]
+																		SELECT 'dbo.usp_hcCollectDiskSpaceUsage' AS [descriptor], 1 AS [execution_order] UNION ALL
+																		SELECT 'dbo.usp_hcCollectDatabaseDetails' AS [descriptor], 2 AS [execution_order] UNION ALL
+																		SELECT 'dbo.usp_hcCollectSQLServerAgentJobsStatus' AS [descriptor], 3 AS [execution_order] UNION ALL
+																		SELECT 'dbo.usp_hcCollectErrorlogMessages' AS [descriptor], 4 AS [execution_order] UNION ALL
+																		SELECT 'dbo.usp_hcCollectOSEventLogs' AS [descriptor], 5 AS [execution_order] UNION ALL
+																		SELECT 'dbo.usp_hcCollectEventMessages' AS [descriptor], 6 AS [execution_order]
 																	)x
 																INNER JOIN [dbo].[appInternalTasks] it ON it.[descriptor] = x.[descriptor]
 																WHERE x.[descriptor] LIKE @collectorDescriptor
+																ORDER BY [execution_order]
 OPEN crsCollectorDescriptor
 FETCH NEXT FROM crsCollectorDescriptor INTO @codeDescriptor, @taskID
 WHILE @@FETCH_STATUS=0

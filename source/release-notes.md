@@ -903,3 +903,6 @@
 19.06.2019
 * integrations: optimize the dbcc checkdb queue priority to take into account the run time, max dop and previously execution times
 * allow executing a job queue across multiple projects, not project by project
+
+22.06.2019
+* health-check: remove unnecessary calls to sys.dm_os_volume_stats

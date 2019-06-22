@@ -212,9 +212,86 @@ WHILE @@FETCH_STATUS=0
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 2, @stopExecution=0
 
 				/* get space allocated / used details */
-				IF @sqlServerName <> @@SERVERNAME
-					SET @queryToRun = N'SELECT *
-										FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC (''''USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
+				IF (SELECT COUNT(*) FROM [health-check].[statsDiskSpaceInfo] 
+					WHERE	[instance_id] = @instanceID 
+							AND DATEDIFF(day, [event_date_utc], GETUTCDATE()) <= 1
+					) = 0
+				begin
+					IF @sqlServerName <> @@SERVERNAME
+						SET @queryToRun = N'SELECT *
+											FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC (''''USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
+													SELECT    [volume_mount_point]
+															, CAST([is_logfile]		AS [bit]) AS [is_logfile]
+															, SUM([size_mb])		AS [size_mb]
+															, SUM([space_used_mb])	AS [space_used_mb]
+															, MAX(CAST([is_growth_limited] AS [tinyint])) AS [is_growth_limited]
+													FROM (		
+															SELECT    [name]
+																	, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
+																	, CAST(FILEPROPERTY([name], ''''''''SpaceUsed'''''''') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
+																	, CAST(FILEPROPERTY([name], ''''''''IsLogFile'''''''') AS [bit])		AS [is_logfile] ' + 
+																	CASE WHEN @serverVersionNum >= 10.5
+																		 THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
+																		 ELSE N', REPLACE(LEFT([physical_name], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
+																	END + '
+																	, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
+															FROM sys.database_files' + 
+															CASE WHEN @serverVersionNum >= 10.5
+																 THEN N' CROSS APPLY sys.dm_os_volume_stats(DB_ID(), [file_id])'
+																 ELSE N''
+															END + 
+															N'
+														)sf
+													GROUP BY [volume_mount_point], [is_logfile]
+											'''')'')x'
+					ELSE
+						SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
+											SELECT    [volume_mount_point]
+													, CAST([is_logfile]		AS [bit]) AS [is_logfile]
+													, SUM([size_mb])		AS [size_mb]
+													, SUM([space_used_mb])	AS [space_used_mb]
+													, MAX(CAST([is_growth_limited] AS [tinyint])) AS [is_growth_limited]
+											FROM (		
+													SELECT    [name]
+															, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
+															, CAST(FILEPROPERTY([name], ''SpaceUsed'') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
+															, CAST(FILEPROPERTY([name], ''IsLogFile'') AS [bit])		AS [is_logfile] ' + 
+															CASE WHEN @serverVersionNum >= 10.5
+																	THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
+																	ELSE N', REPLACE(LEFT([physical_name], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
+															END + '
+															, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
+													FROM sys.database_files' + 
+													CASE WHEN @serverVersionNum >= 10.5
+															THEN N' CROSS APPLY sys.dm_os_volume_stats(DB_ID(), [file_id])'
+															ELSE N''
+													END + N'
+												)sf
+											GROUP BY [volume_mount_point], [is_logfile]'			
+				end
+				ELSE
+					begin
+						IF @sqlServerName <> @@SERVERNAME
+								SET @queryToRun = N'OPENQUERY([' + @sqlServerName + N'], ''EXEC (''''USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
+																									SELECT    [name]
+																											, [physical_name]
+																											, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
+																											, CAST(FILEPROPERTY([name], ''''''''SpaceUsed'''''''') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
+																											, CAST(FILEPROPERTY([name], ''''''''IsLogFile'''''''') AS [bit])		AS [is_logfile]
+																											, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
+																									FROM sys.database_files
+																								'''')'')'
+						ELSE
+							SET @queryToRun = N'(SELECT   [name]
+														, [physical_name]
+														, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
+														, CAST(FILEPROPERTY([name], ''SpaceUsed'') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
+														, CAST(FILEPROPERTY([name], ''IsLogFile'') AS [bit])		AS [is_logfile]
+														, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
+												FROM sys.database_files
+												)'
+
+						SET @queryToRun = CASE WHEN  @sqlServerName = @@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N';' ELSE N'' END + N'
 												SELECT    [volume_mount_point]
 														, CAST([is_logfile]		AS [bit]) AS [is_logfile]
 														, SUM([size_mb])		AS [size_mb]
@@ -222,49 +299,19 @@ WHILE @@FETCH_STATUS=0
 														, MAX(CAST([is_growth_limited] AS [tinyint])) AS [is_growth_limited]
 												FROM (		
 														SELECT    [name]
-																, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
-																, CAST(FILEPROPERTY([name], ''''''''SpaceUsed'''''''') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
-																, CAST(FILEPROPERTY([name], ''''''''IsLogFile'''''''') AS [bit])		AS [is_logfile] ' + 
-																CASE WHEN @serverVersionNum >= 10.5
-																	 THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
-																	 ELSE N', REPLACE(LEFT([physical_name], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
-																END + '
-																, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
-														FROM sys.database_files' + 
-														CASE WHEN @serverVersionNum >= 10.5
-															 THEN N' CROSS APPLY sys.dm_os_volume_stats(DB_ID(), [file_id])'
-															 ELSE N''
-														END + 
-														N'
+																, [is_logfile]
+																, MAX([size_mb])				AS [size_mb]
+																, MAX([space_used_mb])			AS [space_used_mb]
+																, MAX(dsi.[volume_mount_point])	AS [volume_mount_point]
+																, MAX([is_growth_limited])		AS [is_growth_limited]
+														FROM ' + @queryToRun + N' df
+														LEFT JOIN [dbaTDPMon].[health-check].[vw_statsDiskSpaceInfo] dsi ON CHARINDEX(dsi.[volume_mount_point], df.[physical_name]) > 0 AND dsi.[instance_name] = @@SERVERNAME
+														GROUP BY [name], [is_logfile]
 													)sf
-												GROUP BY [volume_mount_point], [is_logfile]
-										'''')'')x'
-				ELSE
-					SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
-										SELECT    [volume_mount_point]
-												, CAST([is_logfile]		AS [bit]) AS [is_logfile]
-												, SUM([size_mb])		AS [size_mb]
-												, SUM([space_used_mb])	AS [space_used_mb]
-												, MAX(CAST([is_growth_limited] AS [tinyint])) AS [is_growth_limited]
-										FROM (		
-												SELECT    [name]
-														, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
-														, CAST(FILEPROPERTY([name], ''SpaceUsed'') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
-														, CAST(FILEPROPERTY([name], ''IsLogFile'') AS [bit])		AS [is_logfile] ' + 
-														CASE WHEN @serverVersionNum >= 10.5
-																THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
-																ELSE N', REPLACE(LEFT([physical_name], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
-														END + '
-														, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
-												FROM sys.database_files' + 
-												CASE WHEN @serverVersionNum >= 10.5
-														THEN N' CROSS APPLY sys.dm_os_volume_stats(DB_ID(), [file_id])'
-														ELSE N''
-												END + N'
-											)sf
-										GROUP BY [volume_mount_point], [is_logfile]'			
+												GROUP BY [volume_mount_point], [is_logfile]'
+						end
+
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-				
 				TRUNCATE TABLE #databaseSpaceInfo
 				BEGIN TRY
 						INSERT	INTO #databaseSpaceInfo([volume_mount_point], [is_log_file], [size_mb], [space_used_mb], [is_growth_limited])
