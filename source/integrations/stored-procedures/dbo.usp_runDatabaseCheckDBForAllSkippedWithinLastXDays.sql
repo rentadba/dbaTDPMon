@@ -17,6 +17,7 @@ CREATE PROCEDURE [dbo].[usp_runDatabaseCheckDBForAllSkippedWithinLastXDays]
 		@maxRunningTimeInMinutes	[smallint]	= 0,
 		@skipObjectsList			[nvarchar](1024) = NULL,
 		@executeProjectBased		[bit]		= 0,
+		@onlyForProduction			[bit]		= 0,
 		@debugMode					[bit]		= 0
 AS
 
@@ -203,6 +204,10 @@ INSERT	INTO @jobExecutionQueue (  [instance_id], [project_id], [module], [descri
 						AND cdn.[state_desc] IN  ('ONLINE', 'READ ONLY')
 						AND DATEDIFF(day, sdd.[last_dbcc checkdb_time], GETDATE()) >= @dbccCheckDBAgeDays
 						AND sdaod.[id] IS NULL
+						AND (   (@onlyForProduction = 1 AND cp.[is_production] = 1)
+							 OR @onlyForProduction = 0
+							 OR @onlyForProduction IS NULL
+							)
 			)X
 
 
