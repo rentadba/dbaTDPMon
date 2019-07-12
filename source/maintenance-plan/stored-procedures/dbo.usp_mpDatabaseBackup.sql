@@ -203,16 +203,16 @@ IF @backupLocation LIKE 'https://%'
 				IF (SELECT COUNT(*) FROM #runtimeProperty) = 0
 					begin
 						SET @queryToRun=N'Credential specified as parameter does not exist.' 
-						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-						RETURN 0
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=1
+						RETURN 1
 					end
 			end
 		ELSE
 			IF @serverVersionNum < 13
 				begin
 					SET @queryToRun=N'Credential parameter value was not set.' 
-					EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-					RETURN 0
+					EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=1
+					RETURN 1
 				end
 			ELSE
 				begin
@@ -231,10 +231,11 @@ IF @backupLocation LIKE 'https://%'
 					IF (SELECT COUNT(*) FROM #runtimeProperty) = 0
 						begin
 							SET @queryToRun=N'SHARED ACCESS SIGNATURE credential is not defined for the specified URL/container: '  + @backupLocation
-							EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-							RETURN 0
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=1
+							RETURN 1
 						end	
 				end
+		IF RIGHT(@backupLocation, 1)<>'/' SET @backupLocation = @backupLocation + N'/'
 	end
 
 -----------------------------------------------------------------------------------------
@@ -482,7 +483,7 @@ IF @flgActions & 4 = 4
 --------------------------------------------------------------------------------------------------
 SET @maxPATHLength = 259
 --as XP is not yet available on Linux, custom folder structure creation won't be possible
-IF NOT (@serverVersionNum >= 14 AND @hostPlatform='linux' )
+IF NOT (@serverVersionNum >= 14 AND @hostPlatform='linux' ) AND NOT (@backupToURL=1)
 	begin
 		--create destination path: <@backupLocation>\@sqlServerName\@dbName
 		IF RIGHT(@backupLocation, 1)<>'\' SET @backupLocation = @backupLocation + N'\'
@@ -761,7 +762,7 @@ IF @optionBackupWithCopyOnly=1
 	SET @backupOptions = @backupOptions + N', COPY_ONLY'
 IF @optionTailLogBackup=1
 	SET @backupOptions = @backupOptions + N', NORECOVERY'
-IF ISNULL(@retentionDays, 0) <> 0
+IF ISNULL(@retentionDays, 0) <> 0 AND @backupToURL=0
 	SET @backupOptions = @backupOptions + N', RETAINDAYS=' + CAST(@retentionDays AS [nvarchar](32))
 IF @backupToURL=1 AND @credential IS NOT NULL
 	SET @backupOptions = @backupOptions + N', CREDENTIAL=''' + @credential + ''''
@@ -814,7 +815,9 @@ IF @optionForceChangeBackupType=1
 			end
 		ELSE
 			begin
-				SET @queryToRun	= N'BACKUP DATABASE '+ [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N' TO DISK = ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH STATS = 10, NAME = ''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
+				SET @queryToRun	= N'BACKUP DATABASE '+ [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + 
+									CASE WHEN @backupToURL = 0 THEN N' TO DISK = ''' ELSE N' TO URL = ''' END + 
+									[dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH STATS = 10, NAME = ''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
@@ -843,17 +846,23 @@ ELSE
 
 IF @flgActions & 1 = 1 
 	begin
-		SET @queryToRun	= N'BACKUP DATABASE '+ [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N' TO DISK = ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH STATS = 10, NAME = ''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
+		SET @queryToRun	= N'BACKUP DATABASE '+ [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') +  + 
+									CASE WHEN @backupToURL = 0 THEN N' TO DISK = ''' ELSE N' TO URL = ''' END + 
+									[dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH STATS = 10, NAME = ''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
 	end
 
 IF @flgActions & 2 = 2
 	begin
-		SET @queryToRun	= N'BACKUP DATABASE '+ [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N' TO DISK = ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH DIFFERENTIAL, STATS = 10, NAME=''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
+		SET @queryToRun	= N'BACKUP DATABASE '+ [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + 
+									CASE WHEN @backupToURL = 0 THEN N' TO DISK = ''' ELSE N' TO URL = ''' END + 
+									[dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH DIFFERENTIAL, STATS = 10, NAME=''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
 	end
 
 IF @flgActions & 4 = 4
 	begin
-		SET @queryToRun	= N'BACKUP LOG '+ [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N' TO DISK = ''' + [dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH STATS = 10, NAME=''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
+		SET @queryToRun	= N'BACKUP LOG '+ [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + 
+									CASE WHEN @backupToURL = 0 THEN N' TO DISK = ''' ELSE N' TO URL = ''' END + 
+									[dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH STATS = 10, NAME=''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
 	end
 
 --check for maximum length of the file path
@@ -926,7 +935,7 @@ IF @errorCode=0
 --verify backup, if option is selected
 IF @flgOptions & 16 = 16 AND @errorCode = 0 
 	begin
-		SET @queryToRun	= N'RESTORE VERIFYONLY FROM DISK=''' + [dbo].[ufn_getObjectQuoteName](@backupLocation + @backupFileName, 'sql') + N''''
+		SET @queryToRun	= N'RESTORE VERIFYONLY FROM ' + CASE WHEN @backupToURL = 0 THEN N' DISK = ''' ELSE N' URL = ''' END + [dbo].[ufn_getObjectQuoteName](@backupLocation + @backupFileName, 'sql') + N''''
 		IF @optionBackupWithChecksum=1
 			SET @queryToRun = @queryToRun + N' WITH CHECKSUM'
 
