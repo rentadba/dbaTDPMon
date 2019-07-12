@@ -12,7 +12,7 @@ GO
 CREATE PROCEDURE [dbo].[usp_mpDatabaseBackup]
 		@sqlServerName			[sysname] = @@SERVERNAME,
 		@dbName					[sysname],
-		@backupLocation			[nvarchar](1024)=NULL,	/*  disk only: local or UNC */
+		@backupLocation			[nvarchar](1024)=NULL,	/*  disk: local / UNC or URL https:// */
 		@flgActions				[smallint] = 1,			/*  1 - perform full database backup
 															2 - perform differential database backup
 															4 - perform transaction log backup
@@ -37,6 +37,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseBackup]
 													*/
 		@retentionDays			[smallint]	= NULL,
 		@dataChangesThreshold	[smallint]	=  0,	/* default to value set in dbo.appConfiguration table : 50 */
+		@credential				[sysname]	= NULL,
 		@executionLevel			[tinyint]	=  0,
 		@debugMode				[bit]		=  0
 /* WITH ENCRYPTION */
@@ -74,7 +75,9 @@ DECLARE		@backupFileName					[nvarchar](1024),
 			@errorCode						[int],
 			@currentDate					[datetime],
 			@databaseStatus					[int],
-			@databaseStateDesc				[sysname]
+			@databaseStateDesc				[sysname], 
+			@isAzureSQLDatabase				[bit],
+			@backupToURL					[bit]
 
 DECLARE		@backupStartDate				[datetime],
 			@backupDurationSec				[int],
@@ -165,6 +168,95 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName		= @sqlServerName,
 										@serverVersionNum	= @serverVersionNum OUT,
 										@executionLevel		= @executionLevel,
 										@debugMode			= @debugMode
+
+---------------------------------------------------------------------------------------------
+SET @isAzureSQLDatabase = CASE WHEN @serverEdition LIKE '%SQL Azure' THEN 1 ELSE 0 END
+
+-----------------------------------------------------------------------------------------
+--backup to URL pre-requisites
+SET @backupToURL = 0
+IF @backupLocation LIKE 'https://%'
+	begin
+		SET @backupToURL = 1
+		IF @serverVersionNum < 11.03339
+			begin
+				SET @queryToRun=N'Backup to URL functionaly is only available starting with SQL Server 2012 SP1 onwards.' 
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+				RETURN 0
+			end
+		IF RIGHT(@backupLocation, 1) IN ('\', '/')
+			SET @backupLocation = SUBSTRING(@backupLocation, 1, LEN(@backupLocation)-1)
+		
+		IF @credential IS NOT NULL 
+			begin
+				/* get credentials defined on destination server name */
+				SET @queryToRun = N'SELECT [name]
+									FROM sys.credentials
+									WHERE [name] = ''' + @credential + ''''
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+				DELETE FROM #runtimeProperty
+				INSERT	INTO #runtimeProperty([value])
+						EXEC sp_executesql @queryToRun
+
+				IF (SELECT COUNT(*) FROM #runtimeProperty) = 0
+					begin
+						SET @queryToRun=N'Credential specified as parameter does not exist.' 
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+						RETURN 0
+					end
+			end
+		ELSE
+			IF @serverVersionNum < 13
+				begin
+					SET @queryToRun=N'Credential parameter value was not set.' 
+					EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+					RETURN 0
+				end
+			ELSE
+				begin
+					/* check shared access signature defined credentials */
+					SET @queryToRun = N'SELECT [name]
+										FROM sys.credentials 
+										WHERE UPPER([credential_identity]) = ''SHARED ACCESS SIGNATURE''
+												AND [name] = ''' + @backupLocation + ''''
+					SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+					IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+					DELETE FROM #runtimeProperty
+					INSERT	INTO #runtimeProperty([value])
+							EXEC sp_executesql @queryToRun
+
+					IF (SELECT COUNT(*) FROM #runtimeProperty) = 0
+						begin
+							SET @queryToRun=N'SHARED ACCESS SIGNATURE credential is not defined for the specified URL/container: '  + @backupLocation
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+							RETURN 0
+						end	
+				end
+	end
+
+-----------------------------------------------------------------------------------------
+IF @isAzureSQLDatabase = 1
+	begin
+		SELECT @sqlServerName = CASE WHEN ss.[name] IS NOT NULL THEN ss.[name] ELSE NULL END 
+		FROM	[dbo].[vw_catalogDatabaseNames] cdn
+		LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] 
+		WHERE 	cdn.[instance_name] = @sqlServerName
+				AND cdn.[active]=1
+				AND cdn.[database_name] = @dbName
+
+		IF @sqlServerName IS NULL
+			begin
+				SET @queryToRun=N'Could not find a linked server defined for Azure SQL database: [' + @dbName + ']' 
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=1
+			end
+
+		SET @queryToRun=N'Azure provides automated backups for a SQL Database (https://docs.microsoft.com/en-us/azure/sql-database/sql-database-automated-backups).' 
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+		RETURN 0
+	end
 
 --get OS platform
 SELECT	@hostPlatform = [host_platform]
@@ -671,7 +763,9 @@ IF @optionTailLogBackup=1
 	SET @backupOptions = @backupOptions + N', NORECOVERY'
 IF ISNULL(@retentionDays, 0) <> 0
 	SET @backupOptions = @backupOptions + N', RETAINDAYS=' + CAST(@retentionDays AS [nvarchar](32))
-
+IF @backupToURL=1 AND @credential IS NOT NULL
+	SET @backupOptions = @backupOptions + N', CREDENTIAL=''' + @credential + ''''
+	
 --------------------------------------------------------------------------------------------------
 --run a full database backup, in order to perform an additional diff or log backup
 IF @optionForceChangeBackupType=1

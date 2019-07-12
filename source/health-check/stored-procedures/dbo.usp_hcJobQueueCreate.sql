@@ -412,6 +412,18 @@ WHILE @@FETCH_STATUS=0
 													AND jeq.[job_step_name] = S.[job_step_name]
 													AND jeq.[job_database_name] = S.[job_database_name]			
 			end
+		
+		------------------------------------------------------------------------------------------------------------------------------------------
+		/* if recreate mode = 1, set default priority */
+		IF @recreateMode = 1
+			UPDATE jeqX
+					SET jeqX.[priority] = X.[new_priority]
+			FROM  @jobExecutionQueue jeqX
+			INNER JOIN (
+						SELECT	[id], 
+								ROW_NUMBER() OVER (ORDER BY [id]) AS [new_priority]
+						FROM @jobExecutionQueue 
+						) X ON jeqX.[id] = X.[id] 
 
 		INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor], [task_id]
 												, [for_instance_id], [job_name], [job_step_name], [job_database_name]

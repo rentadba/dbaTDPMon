@@ -69,16 +69,8 @@ SET @optionIsAvailable=0
 SET @optionHasChanged=0
 
 SET @queryToRun = N''
-SET @queryToRun = @queryToRun + N'EXEC master.dbo.sp_configure'
-	
-IF @sqlServerName<>@@SERVERNAME
-	begin
-		IF @serverVersionNum < 11
-			SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''')'')'
-		ELSE
-			SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''') WITH RESULT SETS(([name] [nvarchar](70), [minimum] [sql_variant], [maximum] [sql_variant], [config_value] [sql_variant], [run_value] [sql_variant]))'')'
-	end
-
+SET @queryToRun = @queryToRun + N'SELECT [name], [minimum], [maximum], [value], [value_in_use] FROM sys.configurations ORDER BY [name]'
+SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 INSERT	INTO #serverPropertyConfig--([config_name], [minimum], [maximum], [config_value], [run_value])
@@ -95,7 +87,7 @@ EXEC sp_executesql @queryToRun, @queryParameters, @configOptionName = @configOpt
 												, @optionCurrentValue = @optionCurrentValue OUT
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
-IF @optionIsAvailable=1 AND ISNULL(@optionCurrentValue, 0) <> @configOptionValue
+IF @optionIsAvailable=1 AND ISNULL(@optionCurrentValue, 0) <> @configOptionValue AND @serverEdition <> 'SQL Azure'
 	begin
 		--changing option value and run reconfigure
 		SET @queryToRun  = N'sp_executesql N''sp_configure ''''' + @configOptionName + N''''', ' + CAST(@configOptionValue AS [nvarchar](32)) + N'''; RECONFIGURE WITH OVERRIDE;'

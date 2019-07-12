@@ -86,7 +86,8 @@ DECLARE		@queryToRun  					[nvarchar](2048),
 			@databaseStatus					[int],
 			@dbi_dbccFlags					[int],
 			@executionDBName				[sysname],
-			@stopTimeLimit					[datetime]
+			@stopTimeLimit					[datetime], 
+			@isAzureSQLDatabase				[bit]
 
 SET NOCOUNT ON
 
@@ -113,6 +114,25 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@executionLevel			= @nestedExecutionLevel,
 										@debugMode				= @debugMode
 
+---------------------------------------------------------------------------------------------
+SET @isAzureSQLDatabase = CASE WHEN @serverEdition LIKE '%SQL Azure' THEN 1 ELSE 0 END
+
+IF @isAzureSQLDatabase = 1
+	begin
+		SELECT @sqlServerName = CASE WHEN ss.[name] IS NOT NULL THEN ss.[name] ELSE NULL END 
+		FROM	[dbo].[vw_catalogDatabaseNames] cdn
+		LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] 
+		WHERE 	cdn.[instance_name] = @sqlServerName
+				AND cdn.[active]=1
+				AND cdn.[database_name] = @dbName
+
+		IF @sqlServerName IS NULL
+			begin
+				SET @queryToRun=N'Could not find a linked server defined for Azure SQL database: [' + @dbName + ']' 
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=1
+			end
+	end
+
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
 DECLARE @clusterName		 [sysname],
@@ -135,7 +155,7 @@ IF @flgActions &  4 =  4	SET @actionName = 'database consistency check'
 IF @flgActions &  8 =  8	SET @actionName = 'database consistency check'
 IF @flgActions & 16 = 16	SET @actionName = 'database consistency check'
 
-IF @serverVersionNum >= 11 AND @flgActions IS NOT NULL
+IF @serverVersionNum >= 11 AND @flgActions IS NOT NULL AND @isAzureSQLDatabase = 0
 	begin
 		EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @sqlServerName,
 																			@dbName				= @dbName,
@@ -196,28 +216,6 @@ CREATE TABLE #databaseTableList(
 								[type]			[sysname]	NULL
 								)
 CREATE INDEX IX_databaseTableList_TableName ON #databaseTableList([table_name])
-
-
-
---------------------------------------------------------------------------------------------------
---get database status
------------------------------------------------------------------------------------------
-IF object_id('#serverPropertyConfig') IS NOT NULL DROP TABLE #serverPropertyConfig
-CREATE TABLE #serverPropertyConfig
-			(
-				[value]			[sysname]	NULL
-			)
-			
-SET @queryToRun = N'SELECT [status] FROM master.dbo.sysdatabases WHERE [name]=''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''' 
-SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-DELETE FROM #serverPropertyConfig
-INSERT	INTO #serverPropertyConfig([value])
-		EXEC sp_executesql @queryToRun
-
-SELECT @databaseStatus = [value]
-FROM #serverPropertyConfig
 
 ---------------------------------------------------------------------------------------------
 IF @flgActions & 2 = 2 OR @flgActions & 16 = 16 OR @flgActions & 64 = 64 OR @flgActions & 128 = 128
@@ -296,7 +294,7 @@ INNER JOIN
 --------------------------------------------------------------------------------------------------
 --when running DBCC CHECKDB, check if DATA_PURITY option should be used or not (run only when dbi_dbccFlags=0)
 --------------------------------------------------------------------------------------------------
-IF @flgActions & 1 = 1 AND @flgOptions & 1 = 0
+IF @flgActions & 1 = 1 AND @flgOptions & 1 = 0 AND @isAzureSQLDatabase = 0
 	begin
 		IF object_id('tempdb..#dbi_dbccFlags') IS NOT NULL DROP TABLE #dbccLastKnownGood
 		CREATE TABLE #dbi_dbccFlags
@@ -343,8 +341,8 @@ IF @flgActions & 1 = 1 AND @flgOptions & 1 = 0
 		SELECT @dbi_dbccFlags = ISNULL([Value], 0)
 		FROM #dbi_dbccFlags
 		
-		SET @dbi_dbccFlags = ISNULL(@dbi_dbccFlags, 0)
 	end
+SET @dbi_dbccFlags = ISNULL(@dbi_dbccFlags, 0)
 
 
 --------------------------------------------------------------------------------------------------
@@ -529,23 +527,47 @@ IF @flgActions & 16 = 16 AND (GETDATE() <= @stopTimeLimit)
 --------------------------------------------------------------------------------------------------
 IF @flgActions & 32 = 32 AND (GETDATE() <= @stopTimeLimit)
 	begin
-		IF	@databaseStatus & 32 = 32				/* LOADING */
-			OR @databaseStatus & 64 = 64			/* PRE RECOVERY */
-			OR @databaseStatus & 128 = 128			/* RECOVERING */
-			OR @databaseStatus & 256 = 256			/* NOT RECOVERED */
-			OR @databaseStatus & 512 = 512			/* OFFLINE */
-			OR @databaseStatus & 1024 = 1024		/* READ ONLY */
-			OR @databaseStatus & 2048 = 2048		/* DBO USE ONLY */
-			OR @databaseStatus & 4096 = 4096		/* SINGLE USER */
-			OR @databaseStatus & 32768 = 32768		/* EMERGENCY MODE */
-			OR @databaseStatus & 2097152 = 2097152	/* STANDBY */
-			OR @databaseStatus & 4194584 = 4194584	/* SUSPECT */
-			OR @databaseStatus = 0
+		DECLARE @runCheck [bit]
+		SET @runCheck = 1
+		IF @isAzureSQLDatabase = 0
 			begin
-				SET @queryToRun='Current database state does not allow running DBCC CHECKIDENT. It will be skipped.'
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-			end
-		ELSE
+				--get database status
+				IF object_id('#serverPropertyConfig') IS NOT NULL DROP TABLE #serverPropertyConfig
+				CREATE TABLE #serverPropertyConfig
+							(
+								[value]			[sysname]	NULL
+							)
+			
+				SET @queryToRun = N'SELECT [status] FROM master.dbo.sysdatabases WHERE [name]=''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + N'''' 
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+				DELETE FROM #serverPropertyConfig
+				INSERT	INTO #serverPropertyConfig([value])
+						EXEC sp_executesql @queryToRun
+
+				SELECT @databaseStatus = [value]
+				FROM #serverPropertyConfig
+
+				IF	@databaseStatus & 32 = 32				/* LOADING */
+					OR @databaseStatus & 64 = 64			/* PRE RECOVERY */
+					OR @databaseStatus & 128 = 128			/* RECOVERING */
+					OR @databaseStatus & 256 = 256			/* NOT RECOVERED */
+					OR @databaseStatus & 512 = 512			/* OFFLINE */
+					OR @databaseStatus & 1024 = 1024		/* READ ONLY */
+					OR @databaseStatus & 2048 = 2048		/* DBO USE ONLY */
+					OR @databaseStatus & 4096 = 4096		/* SINGLE USER */
+					OR @databaseStatus & 32768 = 32768		/* EMERGENCY MODE */
+					OR @databaseStatus & 2097152 = 2097152	/* STANDBY */
+					OR @databaseStatus & 4194584 = 4194584	/* SUSPECT */
+					OR @databaseStatus = 0
+					begin
+						SET @queryToRun='Current database state does not allow running DBCC CHECKIDENT. It will be skipped.'
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+						SET @runCheck = 0
+					end
+				end
+		IF @runCheck = 1
 			begin
 				IF @executionLevel=0 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 

@@ -60,6 +60,7 @@ DECLARE   @codeDescriptor		[varchar](260)
 		, @forSQLServerName		[sysname]
 		, @maxPriorityValue		[int]
 		, @retryAttempts		[tinyint]
+		, @isAzureSQLDatabase	[bit]
 
 DECLARE @jobExecutionQueue TABLE
 		(
@@ -101,13 +102,14 @@ WHERE [name] = @@SERVERNAME
 ORDER BY [id]
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR	SELECT	cin.[instance_id], cin.[instance_name]
+DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR	SELECT	cin.[instance_id], cin.[instance_name],
+																	CASE WHEN [edition] LIKE '%SQL Azure' THEN 1 ELSE 0 END AS [isAzureSQLDatabase]
 															FROM	[dbo].[vw_catalogInstanceNames] cin
 															WHERE 	cin.[project_id] = @projectID
 																	AND cin.[instance_active]=1
 																	AND cin.[instance_name] LIKE @sqlServerNameFilter
 OPEN crsActiveInstances
-FETCH NEXT FROM crsActiveInstances INTO @forInstanceID, @forSQLServerName
+FETCH NEXT FROM crsActiveInstances INTO @forInstanceID, @forSQLServerName, @isAzureSQLDatabase
 WHILE @@FETCH_STATUS=0
 	begin
 		SET @strMessage='Analyzing server: ' + @forSQLServerName
@@ -236,12 +238,21 @@ WHILE @@FETCH_STATUS=0
 									(
 										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
 												, [database_id]
-										FROM [dbo].[catalogDatabaseNames]
+										FROM [dbo].[catalogDatabaseNames] cdn
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE', 'READ ONLY')
+												AND (     @isAzureSQLDatabase = 0
+													 OR (    @isAzureSQLDatabase = 1
+														 AND EXISTS (
+																	 SELECT 1
+																	 FROM sys.servers ss
+																	 WHERE ss.[catalog] = cdn.[name]
+																	)
+														)
+													)
 									)X
 								end
 
@@ -272,12 +283,21 @@ WHILE @@FETCH_STATUS=0
 									(
 										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
 												, [database_id]
-										FROM [dbo].[catalogDatabaseNames]
+										FROM [dbo].[catalogDatabaseNames] cdn
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE', 'READ ONLY')
+												AND (     @isAzureSQLDatabase = 0
+													 OR (    @isAzureSQLDatabase = 1
+														 AND EXISTS (
+																	 SELECT 1
+																	 FROM sys.servers ss
+																	 WHERE ss.[catalog] = cdn.[name]
+																	)
+														)
+													)
 									)X
 							end
 
@@ -302,12 +322,21 @@ WHILE @@FETCH_STATUS=0
 									(
 										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
 												, [database_id]
-										FROM [dbo].[catalogDatabaseNames]
+										FROM [dbo].[catalogDatabaseNames] cdn
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE', 'READ ONLY')
+												AND (     @isAzureSQLDatabase = 0
+													 OR (    @isAzureSQLDatabase = 1
+														 AND EXISTS (
+																	 SELECT 1
+																	 FROM sys.servers ss
+																	 WHERE ss.[catalog] = cdn.[name]
+																	)
+														)
+													)
 									)X
 							end
 
@@ -332,12 +361,21 @@ WHILE @@FETCH_STATUS=0
 									(
 										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
 												, [database_id]
-										FROM [dbo].[catalogDatabaseNames]
+										FROM [dbo].[catalogDatabaseNames] cdn
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE', 'READ ONLY')
+												AND (     @isAzureSQLDatabase = 0
+													 OR (    @isAzureSQLDatabase = 1
+														 AND EXISTS (
+																	 SELECT 1
+																	 FROM sys.servers ss
+																	 WHERE ss.[catalog] = cdn.[name]
+																	)
+														)
+													)
 									)X
 							end
 
@@ -362,12 +400,21 @@ WHILE @@FETCH_STATUS=0
 									(
 										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
 												, [database_id]
-										FROM [dbo].[catalogDatabaseNames]
+										FROM [dbo].[catalogDatabaseNames] cdn
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE')
+												AND (     @isAzureSQLDatabase = 0
+													 OR (    @isAzureSQLDatabase = 1
+														 AND EXISTS (
+																	 SELECT 1
+																	 FROM sys.servers ss
+																	 WHERE ss.[catalog] = cdn.[name]
+																	)
+														)
+													)
 									)X
 							end
 					end
@@ -397,12 +444,21 @@ WHILE @@FETCH_STATUS=0
 									(
 										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
 												, [database_id]
-										FROM [dbo].[catalogDatabaseNames]
+										FROM [dbo].[catalogDatabaseNames] cdn
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE')
+												AND (     @isAzureSQLDatabase = 0
+													 OR (    @isAzureSQLDatabase = 1
+														 AND EXISTS (
+																	 SELECT 1
+																	 FROM sys.servers ss
+																	 WHERE ss.[catalog] = cdn.[name]
+																	)
+														)
+													)
 									)X
 							end
 
@@ -432,12 +488,21 @@ WHILE @@FETCH_STATUS=0
 									(
 										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
 												, [database_id]
-										FROM [dbo].[catalogDatabaseNames]
+										FROM [dbo].[catalogDatabaseNames] cdn
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE')
+												AND (     @isAzureSQLDatabase = 0
+													 OR (    @isAzureSQLDatabase = 1
+														 AND EXISTS (
+																	 SELECT 1
+																	 FROM sys.servers ss
+																	 WHERE ss.[catalog] = cdn.[name]
+																	)
+														)
+													)
 									)X
 							end
 
@@ -462,12 +527,21 @@ WHILE @@FETCH_STATUS=0
 									(
 										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
 												, [database_id]
-										FROM [dbo].[catalogDatabaseNames]
+										FROM [dbo].[catalogDatabaseNames] cdn
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE')
+												AND (     @isAzureSQLDatabase = 0
+													 OR (    @isAzureSQLDatabase = 1
+														 AND EXISTS (
+																	 SELECT 1
+																	 FROM sys.servers ss
+																	 WHERE ss.[catalog] = cdn.[name]
+																	)
+														)
+													)
 									)X
 							end
 					end
@@ -496,12 +570,21 @@ WHILE @@FETCH_STATUS=0
 									(
 										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
 												, [database_id]
-										FROM [dbo].[catalogDatabaseNames]
+										FROM [dbo].[catalogDatabaseNames] cdn
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE')
+												AND (     @isAzureSQLDatabase = 0
+													 OR (    @isAzureSQLDatabase = 1
+														 AND EXISTS (
+																	 SELECT 1
+																	 FROM sys.servers ss
+																	 WHERE ss.[catalog] = cdn.[name]
+																	)
+														)
+													)
 									)X
 							end
 
@@ -526,12 +609,21 @@ WHILE @@FETCH_STATUS=0
 									(
 										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
 												, [database_id]
-										FROM [dbo].[catalogDatabaseNames]
+										FROM [dbo].[catalogDatabaseNames] cdn
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
 												AND [state_desc] IN  ('ONLINE')
+												AND (     @isAzureSQLDatabase = 0
+													 OR (    @isAzureSQLDatabase = 1
+														 AND EXISTS (
+																	 SELECT 1
+																	 FROM sys.servers ss
+																	 WHERE ss.[catalog] = cdn.[name]
+																	)
+														)
+													)
 									)X
 							end
 
@@ -562,11 +654,20 @@ WHILE @@FETCH_STATUS=0
 									(
 										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
 												, [database_id]
-										FROM [dbo].[catalogDatabaseNames]
+										FROM [dbo].[catalogDatabaseNames] cdn
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
+												AND (     @isAzureSQLDatabase = 0
+													 OR (    @isAzureSQLDatabase = 1
+														 AND EXISTS (
+																	 SELECT 1
+																	 FROM sys.servers ss
+																	 WHERE ss.[catalog] = cdn.[name]
+																	)
+														)
+													)
 									)X
 							end
 
@@ -591,11 +692,20 @@ WHILE @@FETCH_STATUS=0
 									(
 										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
 												, [database_id]
-										FROM [dbo].[catalogDatabaseNames]
+										FROM [dbo].[catalogDatabaseNames] cdn
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')														
+												AND (     @isAzureSQLDatabase = 0
+													 OR (    @isAzureSQLDatabase = 1
+														 AND EXISTS (
+																	 SELECT 1
+																	 FROM sys.servers ss
+																	 WHERE ss.[catalog] = cdn.[name]
+																	)
+														)
+													)
 									)X
 							end
 
@@ -620,11 +730,20 @@ WHILE @@FETCH_STATUS=0
 									(
 										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
 												, [database_id]
-										FROM [dbo].[catalogDatabaseNames]
+										FROM [dbo].[catalogDatabaseNames] cdn
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] IN ('master', 'model', 'msdb', 'distribution')														
+												AND (     @isAzureSQLDatabase = 0
+													 OR (    @isAzureSQLDatabase = 1
+														 AND EXISTS (
+																	 SELECT 1
+																	 FROM sys.servers ss
+																	 WHERE ss.[catalog] = cdn.[name]
+																	)
+														)
+													)
 									)X
 							end
 					end
@@ -653,16 +772,25 @@ WHILE @@FETCH_STATUS=0
 									(
 										SELECT	  [dbo].[ufn_getObjectQuoteName]([name], 'sql') AS [database_name]
 												, [database_id]
-										FROM [dbo].[catalogDatabaseNames]
+										FROM [dbo].[catalogDatabaseNames] cdn
 										WHERE	[project_id] = @projectID
 												AND [instance_id] = @forInstanceID
 												AND [active] = 1
 												AND [name] NOT IN ('master', 'model', 'msdb', 'tempdb', 'distribution')	
+												AND (     @isAzureSQLDatabase = 0
+													 OR (    @isAzureSQLDatabase = 1
+														 AND EXISTS (
+																	 SELECT 1
+																	 FROM sys.servers ss
+																	 WHERE ss.[catalog] = cdn.[name]
+																	)
+														)
+													)
 									)X
 							end
 						end
-				------------------------------------------------------------------------------------------------------------------------------------------
 
+				------------------------------------------------------------------------------------------------------------------------------------------
 				IF @recreateMode = 0
 					begin
 						/* preserve any unfinished job and increase its priority */
@@ -757,48 +885,49 @@ WHILE @@FETCH_STATUS=0
 							end
 					end
 
-					/* if recreate mode = 1, set default priority */
-					IF @recreateMode = 1
-						UPDATE jeqX
-								SET jeqX.[priority] = X.[new_priority]
-						FROM  @jobExecutionQueue jeqX
-						INNER JOIN (
-									SELECT	[id], 
-											ROW_NUMBER() OVER (ORDER BY [id]) AS [new_priority]
-									FROM @jobExecutionQueue 
-									) X ON jeqX.[id] = X.[id] 
+				------------------------------------------------------------------------------------------------------------------------------------------
+				/* if recreate mode = 1, set default priority */
+				IF @recreateMode = 1
+					UPDATE jeqX
+							SET jeqX.[priority] = X.[new_priority]
+					FROM  @jobExecutionQueue jeqX
+					INNER JOIN (
+								SELECT	[id], 
+										ROW_NUMBER() OVER (ORDER BY [id]) AS [new_priority]
+								FROM @jobExecutionQueue 
+								) X ON jeqX.[id] = X.[id] 
 
-					INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
-															, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-															, [job_command], [task_id], [database_name], [priority])
-						SELECT DISTINCT
-								  S.[instance_id], S.[project_id], S.[module], S.[descriptor]
-								, S.[for_instance_id]
-								, REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_')	/* manage special characters in job names */
-								, S.[job_step_name], S.[job_database_name]
-								, S.[job_command]
-								, S.[task_id], S.[database_name], S.[priority]
-						FROM @jobExecutionQueue S
-						LEFT JOIN [dbo].[jobExecutionQueue] jeq ON		jeq.[for_instance_id] = S.[for_instance_id]
-																	AND jeq.[project_id] = S.[project_id]
-																	AND jeq.[task_id] = S.[task_id]
-																	AND jeq.[database_name] = S.[database_name]
-																	AND jeq.[instance_id] = S.[instance_id]
-																	AND jeq.[module] = S.[module]
-																	AND jeq.[descriptor] = S.[descriptor]
-																	AND (jeq.[job_name] = S.[job_name] OR jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_'))
-																	AND jeq.[job_step_name] = S.[job_step_name]
-																	AND jeq.[job_database_name] = S.[job_database_name]
-						WHERE	jeq.[job_name] IS NULL
-								AND (     @skipDatabasesList IS NULL
-										OR (    @skipDatabasesList IS NOT NULL	
-												AND (
-													SELECT COUNT(*)
-													FROM [dbo].[ufn_getTableFromStringList](@skipDatabasesList, ',') X
-													WHERE S.[job_name] LIKE (DB_NAME() + ' - ' + S.[descriptor] + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + REPLACE(@@SERVERNAME, '\', '$') + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
-												) = 0
-											)
-									  )
+				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
+														, [for_instance_id], [job_name], [job_step_name], [job_database_name]
+														, [job_command], [task_id], [database_name], [priority])
+					SELECT DISTINCT
+								S.[instance_id], S.[project_id], S.[module], S.[descriptor]
+							, S.[for_instance_id]
+							, REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_')	/* manage special characters in job names */
+							, S.[job_step_name], S.[job_database_name]
+							, S.[job_command]
+							, S.[task_id], S.[database_name], S.[priority]
+					FROM @jobExecutionQueue S
+					LEFT JOIN [dbo].[jobExecutionQueue] jeq ON		jeq.[for_instance_id] = S.[for_instance_id]
+																AND jeq.[project_id] = S.[project_id]
+																AND jeq.[task_id] = S.[task_id]
+																AND jeq.[database_name] = S.[database_name]
+																AND jeq.[instance_id] = S.[instance_id]
+																AND jeq.[module] = S.[module]
+																AND jeq.[descriptor] = S.[descriptor]
+																AND (jeq.[job_name] = S.[job_name] OR jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_'))
+																AND jeq.[job_step_name] = S.[job_step_name]
+																AND jeq.[job_database_name] = S.[job_database_name]
+					WHERE	jeq.[job_name] IS NULL
+							AND (     @skipDatabasesList IS NULL
+									OR (    @skipDatabasesList IS NOT NULL	
+											AND (
+												SELECT COUNT(*)
+												FROM [dbo].[ufn_getTableFromStringList](@skipDatabasesList, ',') X
+												WHERE S.[job_name] LIKE (DB_NAME() + ' - ' + S.[descriptor] + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + REPLACE(@@SERVERNAME, '\', '$') + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
+											) = 0
+										)
+									)
 
 				FETCH NEXT FROM crsCollectorDescriptor INTO @codeDescriptor
 			end
@@ -806,7 +935,7 @@ WHILE @@FETCH_STATUS=0
 		DEALLOCATE crsCollectorDescriptor
 										
 
-		FETCH NEXT FROM crsActiveInstances INTO @forInstanceID, @forSQLServerName
+		FETCH NEXT FROM crsActiveInstances INTO @forInstanceID, @forSQLServerName, @isAzureSQLDatabase
 	end
 CLOSE crsActiveInstances
 DEALLOCATE crsActiveInstances

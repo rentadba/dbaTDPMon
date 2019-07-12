@@ -906,3 +906,9 @@
 
 22.06.2019
 * health-check: remove unnecessary calls to sys.dm_os_volume_stats
+
+------------
+#### July 2019 new features & fixes
+12.07.2019
+* code tested and ready for Azure SQL Database
+* release of dbaTDPMon - v2019.7

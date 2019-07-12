@@ -51,7 +51,8 @@ DECLARE		@queryToRun    			[nvarchar](max),
 			@logName				[sysname],
 			@errorCode				[int],
 			@nestedExecutionLevel	[int],
-			@executionDBName		[sysname]
+			@executionDBName		[sysname], 
+			@isAzureSQLDatabase		[bit]
 
 ---------------------------------------------------------------------------------------------
 --create temporary tables that will be used 
@@ -85,6 +86,25 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@executionLevel			= @nestedExecutionLevel,
 										@debugMode				= @debugMode
 
+---------------------------------------------------------------------------------------------
+SET @isAzureSQLDatabase = CASE WHEN @serverEdition LIKE '%SQL Azure' THEN 1 ELSE 0 END
+
+IF @isAzureSQLDatabase = 1
+	begin
+		SELECT @sqlServerName = CASE WHEN ss.[name] IS NOT NULL THEN ss.[name] ELSE NULL END 
+		FROM	[dbo].[vw_catalogDatabaseNames] cdn
+		LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] 
+		WHERE 	cdn.[instance_name] = @sqlServerName
+				AND cdn.[active]=1
+				AND cdn.[database_name] = @dbName
+
+		IF @sqlServerName IS NULL
+			begin
+				SET @queryToRun=N'Could not find a linked server defined for Azure SQL database: [' + @dbName + ']' 
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=1
+			end
+	end
+	
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
 DECLARE @clusterName		 [sysname],
@@ -99,7 +119,7 @@ SET @actionType = NULL
 IF @flgActions & 1 = 1	SET @actionType = 'shrink log'
 IF @flgActions & 2 = 2	SET @actionType = 'shrink database'
 
-IF @serverVersionNum >= 11 AND @flgActions IS NOT NULL
+IF @serverVersionNum >= 11 AND @flgActions IS NOT NULL AND @isAzureSQLDatabase = 0
 	EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @sqlServerName,
 																		@dbName				= @dbName,
 																		@actionName			= 'database shrink',
@@ -134,21 +154,21 @@ SET @queryToRun = N''
 */
 IF @dbName IS NULL
 	SET @queryToRun = @queryToRun + N'SELECT DISTINCT sdb.[name] 
-										FROM master..sysdatabases sdb
+										FROM sys.databases sdb
 										WHERE sdb.[name] LIKE ''' + CASE WHEN @dbName IS NULL THEN '%' ELSE [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') END + '''
 											AND NOT EXISTS (
 															 SELECT 1
-															 FROM  master.dbo.sysprocesses sp
-															 WHERE sp.[cmd] LIKE ''BACKUP %''
-																	AND sp.[dbid]=sdb.[dbid]
+															 FROM  sys.dm_exec_requests sp
+															 WHERE sp.[command] LIKE ''BACKUP %''
+																	AND sp.[database_id]=sdb.[database_id]
 															)'
 ELSE
 	SET @queryToRun = @queryToRun + N'SELECT ''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''' AS [name]
 										WHERE NOT EXISTS (
 															 SELECT 1
-															 FROM  master.dbo.sysprocesses sp
-															 WHERE sp.[cmd] LIKE ''BACKUP %''
-																	AND sp.[dbid]= DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''')
+															 FROM  sys.dm_exec_requests sp
+															 WHERE sp.[command] LIKE ''BACKUP %''
+																	AND sp.[database_id]= DB_ID(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''')
 															)'
 
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)

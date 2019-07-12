@@ -44,6 +44,7 @@ DECLARE   @queryToRun			[nvarchar](max)	-- used for dynamic statements
 		, @optionXPValue		[int]
 		, @hostPlatform			[sysname]
 		, @dbFilter				[sysname]
+		, @isAzureSQLDatabase	[bit]
 
 -- { sql_statement | statement_block }
 BEGIN TRY
@@ -191,9 +192,9 @@ BEGIN TRY
 	ELSE
 		begin
 			DECLARE @SQLMajorVersion [int]
-
 			BEGIN TRY
-				SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL([version], ''), 2), '.', '') 
+				SELECT    @SQLMajorVersion = REPLACE(LEFT(ISNULL([version], ''), 2), '.', '') 
+						, @isAzureSQLDatabase = CASE WHEN [edition] LIKE '%SQL Azure' THEN 1 ELSE 0 END
 				FROM #catalogInstanceNames
 			END TRY
 			BEGIN CATCH
@@ -204,54 +205,62 @@ BEGIN TRY
 			--discover machine names (if clustered instance is present, get all cluster nodes)
 			-----------------------------------------------------------------------------------------------------
 			SET @isClustered=0
-
-			SET @queryToRun = N'SELECT [NodeName] FROM sys.dm_os_cluster_nodes WITH (NOLOCK)'
-			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-			IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-			
-			BEGIN TRY
-				INSERT	INTO #catalogMachineNames([name])
-						EXEC sp_executesql @queryToRun
-			END TRY
-			BEGIN CATCH
-				IF @debugMode=1 
-					begin
-						SET @errMessage = 'An error occured. It will be ignored: ' + ERROR_MESSAGE()
-						EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-					end
-			END CATCH
-	
-			IF (SELECT COUNT(*) FROM #catalogMachineNames)=0
+			IF @isAzureSQLDatabase = 0 
 				begin
-					SET @queryToRun = N'SELECT CASE WHEN [computer_name] IS NOT NULL 
-													THEN [computer_name]
-													ELSE [machine_name]
-											  END
-										FROM (
-												SELECT CAST(SERVERPROPERTY(''ComputerNamePhysicalNetBIOS'') AS [sysname]) AS [computer_name]
-											)X,
-											(
-												SELECT CAST(SERVERPROPERTY(''MachineName'') AS [sysname]) AS [machine_name]
-											)Y'
+					SET @queryToRun = N'SELECT [NodeName] FROM sys.dm_os_cluster_nodes WITH (NOLOCK)'
 					SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 					IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
+			
 					BEGIN TRY
 						INSERT	INTO #catalogMachineNames([name])
 								EXEC sp_executesql @queryToRun
 					END TRY
 					BEGIN CATCH
-						SET @errMessage=ERROR_MESSAGE()
-						SET @errDescriptor = 'dbo.usp_refreshMachineCatalogs'
-
-						EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+						IF @debugMode=1 
+							begin
+								SET @errMessage = 'An error occured. It will be ignored: ' + ERROR_MESSAGE()
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+							end
 					END CATCH
+
+					IF (SELECT COUNT(*) FROM #catalogMachineNames)=0
+						begin
+							SET @queryToRun = N'SELECT CASE WHEN [computer_name] IS NOT NULL 
+															THEN [computer_name]
+															ELSE [machine_name]
+													  END
+												FROM (
+														SELECT CAST(SERVERPROPERTY(''ComputerNamePhysicalNetBIOS'') AS [sysname]) AS [computer_name]
+													)X,
+													(
+														SELECT CAST(SERVERPROPERTY(''MachineName'') AS [sysname]) AS [machine_name]
+													)Y'
+							SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+							IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+							BEGIN TRY
+								INSERT	INTO #catalogMachineNames([name])
+										EXEC sp_executesql @queryToRun
+							END TRY
+							BEGIN CATCH
+								SET @errMessage=ERROR_MESSAGE()
+								SET @errDescriptor = 'dbo.usp_refreshMachineCatalogs'
+
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+							END CATCH
+						end
+					ELSE
+						begin
+							SET @isClustered = 1
+						end
 				end
 			ELSE
 				begin
-					SET @isClustered = 1
+					/* On SQL Azure, assume the machine name is the same as the server-name */
+					INSERT	INTO #catalogMachineNames([name])
+					SELECT [name]
+					FROM #catalogInstanceNames
 				end
-				
 			
 			-----------------------------------------------------------------------------------------------------
 			--discover database names
@@ -288,6 +297,7 @@ BEGIN TRY
 
 			/*-------------------------------------------------------------------------------------------------------------------------------*/
 			/* check if xp_cmdshell is enabled or should be enabled																			 */
+			IF @isAzureSQLDatabase = 0
 			BEGIN TRY
 				SET @optionXPValue = 0
 
@@ -354,9 +364,9 @@ BEGIN TRY
 			END CATCH
 
 			-----------------------------------------------------------------------------------------------------
-			--discover platform type: windows/linux
+			--discover platform type: windows/linux/azure
 			-----------------------------------------------------------------------------------------------------
-			IF @SQLMajorVersion>=14
+			IF @SQLMajorVersion>=14 AND @isAzureSQLDatabase = 0
 				begin
 					SET @queryToRun = N'SELECT [host_platform] FROM sys.dm_os_host_info WITH (NOLOCK)'
 					SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
@@ -376,11 +386,38 @@ BEGIN TRY
 						SET @errMessage = ERROR_MESSAGE()
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 					END CATCH
-
 				end
+			ELSE
+				IF @isAzureSQLDatabase = 1
+					UPDATE #catalogMachineNames SET [host_platform] = 'azure' 
 		end
 
+		/* for Azure SQL database, consider the @@servername = UPPER(db_name()0 */
+		IF @isAzureSQLDatabase = 1
+			begin
+				/* Azure SQL Database - linked server defined to a single database */
+				IF (SELECT COUNT(*) FROM #catalogDatabaseNames) = 2
+					begin
+						DELETE FROM #catalogDatabaseNames 
+						WHERE [name] IN ('master')
 
+						UPDATE ci	
+							SET ci.[name] = UPPER(cdn.[name])
+						FROM #catalogInstanceNames ci
+						CROSS JOIN 
+							(
+								SELECT TOP 1 [name]
+								FROM #catalogDatabaseNames
+							) cdn
+					end			
+				ELSE
+					/* Azure SQL Server or Pool - linked server defined to master */
+					begin
+						UPDATE ci	
+								SET ci.[name] = UPPER(ci.[name])
+						FROM #catalogInstanceNames ci
+					end
+			end
 	-----------------------------------------------------------------------------------------------------
 	--upsert catalog tables
 	-----------------------------------------------------------------------------------------------------
@@ -494,6 +531,7 @@ BEGIN TRY
 			INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[name] = srcIN.[name] AND cin.[machine_id] = cmn.[id]
 			WHERE cin.[project_id] = @projectID
 		  ) AS src ON dest.[instance_id] = src.[instance_id] AND dest.[name] = src.[name] AND dest.[project_id] = @projectID;;
+
 
 	IF @addNewDatabasesToProject = 1
 		/* add only databases not allocated to other projects */

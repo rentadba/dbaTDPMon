@@ -36,7 +36,8 @@ DECLARE @projectID				[smallint],
 		@instanceID				[smallint],
 		@executionLevel			[tinyint],
 		@queryToRun				[nvarchar](4000),
-		@strMessage				[nvarchar](4000)
+		@strMessage				[nvarchar](4000),
+		@databaseName			[sysname]
 
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
@@ -152,14 +153,28 @@ WHERE cin.[project_id] = @projectID
 SET @strMessage='Step 2: Get Instance Details Information...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 		
-DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name]
-															FROM	[dbo].[vw_catalogInstanceNames] cin
-															WHERE 	cin.[project_id] = @projectID
-																	AND cin.[instance_active]=1
-																	AND cin.[instance_name] LIKE @sqlServerNameFilter
-															ORDER BY cin.[instance_name]
+DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT DISTINCT [instance_id], [linked_server_name], [database_name]
+															FROM (
+																	SELECT	cdn.[instance_id], 
+																			CASE WHEN [edition] NOT LIKE '%SQL Azure' 
+																				 THEN 'master'
+																				 ELSE cdn.[database_name]
+																			END AS [database_name],
+																			CASE WHEN [edition] NOT LIKE '%SQL Azure' 
+																					THEN cdn.[instance_name]
+																					ELSE CASE WHEN ss.[name] IS NOT NULL AND LOWER(ss.[catalog]) <> 'master' THEN ss.[name] ELSE NULL END
+																			END [linked_server_name]
+																	FROM	[dbo].[vw_catalogDatabaseNames] cdn
+																	INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[project_id] = cdn.[project_id] AND cin.[instance_id] = cdn.[instance_id]
+																	LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] 
+																	WHERE 	cdn.[project_id] = @projectID
+																			and cdn.[active] = 1
+																			AND cin.[instance_active] = 1
+																			AND cin.[instance_name] LIKE @sqlServerNameFilter
+																)x
+															WHERE [linked_server_name] IS NOT NULL
 OPEN crsActiveInstances
-FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName
+FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @databaseName
 WHILE @@FETCH_STATUS=0
 	begin
 		SET @strMessage='Analyzing server: ' + @sqlServerName
@@ -263,16 +278,14 @@ WHILE @@FETCH_STATUS=0
 												, er.[request_id]
 												, es.[host_name]
 												, es.[program_name]
-												, CASE WHEN ISNULL(es.[login_name], '''') <> '''' THEN es.[login_name] ELSE sp.[loginame] END [login_name]
+												, es.[login_name] 
 												, DATEDIFF(ss, es.[last_request_start_time], GETDATE()) AS [last_request_elapsed_time_seconds]
-												, sp.[sql_handle]
+												, er.[sql_handle]
 												, CASE WHEN er.[session_id] IS NULL THEN 1 ELSE 0 END AS [request_completed]
 												, DB_NAME(ISNULL(er.[database_id], es.[database_id])) AS [database_name]
 										FROM sys.dm_exec_sessions es WITH (READPAST)
-										INNER JOIN master.dbo.sysprocesses sp WITH (READPAST) ON sp.[spid] = es.[session_id]
 										LEFT  JOIN sys.dm_exec_requests er WITH (READPAST) ON er.[session_id] = es.[session_id]
-										WHERE es.[is_user_process] = 1
-												AND sp.[ecid] = 0'
+										WHERE es.[is_user_process] = 1'
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 
 		SET @queryToRun = N'SELECT DISTINCT
@@ -347,7 +360,7 @@ WHILE @@FETCH_STATUS=0
 						, [request_completed], [is_session_blocked], [wait_duration_sec], [wait_type], [tempdb_space_used_mb]
 				FROM #monTransactionsStatus
 								
-		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName
+		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @databaseName
 	end
 CLOSE crsActiveInstances
 DEALLOCATE crsActiveInstances

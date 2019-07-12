@@ -121,7 +121,8 @@ DECLARE		@queryToRun    					[nvarchar](4000),
 			@databaseStateDesc				[sysname],
 			@dbIsReadOnly					[bit],
 			@sqlServiceUpTimeDays			[smallint],
-			@unusedIndexesThresholdDays		[smallint]
+			@unusedIndexesThresholdDays		[smallint], 
+			@isAzureSQLDatabase				[bit]
 
 SET NOCOUNT ON
 
@@ -208,6 +209,23 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@debugMode				= @debugMode
 
 ---------------------------------------------------------------------------------------------
+SET @isAzureSQLDatabase = CASE WHEN @serverEdition LIKE '%SQL Azure' THEN 1 ELSE 0 END
+
+IF @isAzureSQLDatabase = 1
+	begin
+		SELECT @sqlServerName = CASE WHEN ss.[name] IS NOT NULL THEN ss.[name] ELSE NULL END 
+		FROM	[dbo].[vw_catalogDatabaseNames] cdn
+		LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] 
+		WHERE 	cdn.[instance_name] = @sqlServerName
+				AND cdn.[active]=1
+				AND cdn.[database_name] = @dbName
+
+		IF @sqlServerName IS NULL
+			begin
+				SET @queryToRun=N'Could not find a linked server defined for Azure SQL database: [' + @dbName + ']' 
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=1
+			end
+	end
 
 --------------------------------------------------------------------------------------------------
 /* AlwaysOn Availability Groups */
@@ -225,7 +243,7 @@ IF @flgActions &  4 =  4	SET @actionType = 'rebuilding index'
 IF @flgActions &  8 =  8	SET @actionType = 'update statistics'
 IF @flgActions & 16 = 16	SET @actionType = 'rebuilding heap'
 
-IF @serverVersionNum >= 11
+IF @serverVersionNum >= 11 AND @isAzureSQLDatabase = 0
 	EXEC @agStopLimit = [dbo].[usp_mpCheckAvailabilityGroupLimitations]	@sqlServerName		= @sqlServerName,
 																		@dbName				= @dbName,
 																		@actionName			= 'database maintenance',
@@ -1983,6 +2001,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 --8  - create statistics for all tables in database
 --------------------------------------------------------------------------------------------------
 IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0 AND (@flgOptions & 128 = 128 OR @flgOptions & 131072 = 131072)
+	AND @isAzureSQLDatabase = 0
 	begin
 		SET @queryToRun=N'Creating statistics for all tables / ' + CASE WHEN @flgOptions & 128 = 128 THEN 'index' ELSE 'all' END + ' columns ...'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0

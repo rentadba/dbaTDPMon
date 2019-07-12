@@ -43,7 +43,8 @@ DECLARE @projectID				[smallint],
 
 DECLARE @serverVersionNum		[numeric](9,6),
 		@sqlServerVersion		[sysname],
-		@dbccLastKnownGood		[datetime]
+		@dbccLastKnownGood		[datetime], 
+		@isAzureSQLDatabase		[bit]
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
 IF object_id('#databaseSpaceInfo') IS NOT NULL DROP TABLE #databaseSpaceInfo
@@ -174,14 +175,15 @@ WHERE cin.[project_id] = @projectID
 SET @strMessage='Step 2: Get Database Details Information....'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		
-DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
+DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version],
+																	CASE WHEN [edition] LIKE '%SQL Azure' THEN 1 ELSE 0 END AS [isAzureSQLDatabase]
 															FROM	[dbo].[vw_catalogInstanceNames] cin
 															WHERE 	cin.[project_id] = @projectID
 																	AND cin.[instance_active]=1
 																	AND cin.[instance_name] LIKE @sqlServerNameFilter
 															ORDER BY cin.[instance_name]
 OPEN crsActiveInstances
-FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
+FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion, @isAzureSQLDatabase
 WHILE @@FETCH_STATUS=0
 	begin
 		SET @strMessage='Analyzing server: ' + @sqlServerName
@@ -196,16 +198,25 @@ WHILE @@FETCH_STATUS=0
 			SET @serverVersionNum = 9.0
 		END CATCH
 
-		DECLARE crsActiveDatabases CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cdn.[catalog_database_id], cdn.[database_id], cdn.[database_name]
-																	FROM	[dbo].[vw_catalogDatabaseNames] cdn
-																	WHERE 	cdn.[project_id] = @projectID
-																			AND cdn.[instance_id] = @instanceID
-																			AND cdn.[active]=1
-																			AND cdn.[database_name] LIKE @databaseNameFilter
-																			AND CHARINDEX(cdn.[state_desc], 'ONLINE, READ ONLY')<>0
-																	ORDER BY cdn.[database_name]
+		DECLARE crsActiveDatabases CURSOR LOCAL FAST_FORWARD FOR 	SELECT [catalog_database_id], [database_id], [database_name], [linked_server_name]
+																	FROM (
+																			SELECT	cdn.[catalog_database_id], cdn.[database_id], cdn.[database_name],
+																					CASE WHEN @isAzureSQLDatabase = 0
+																						 THEN @sqlServerName
+																						 ELSE CASE WHEN ss.[name] IS NOT NULL THEN ss.[name] ELSE NULL END
+																					END [linked_server_name]
+																			FROM	[dbo].[vw_catalogDatabaseNames] cdn
+																			LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] 
+																			WHERE 	cdn.[project_id] = @projectID
+																					AND cdn.[instance_id] = @instanceID
+																					AND cdn.[active]=1
+																					AND cdn.[database_name] LIKE @databaseNameFilter
+																					AND CHARINDEX(cdn.[state_desc], 'ONLINE, READ ONLY')<>0
+																		)x
+																	WHERE [linked_server_name] IS NOT NULL
+																	ORDER BY [database_name]
 		OPEN crsActiveDatabases	
-		FETCH NEXT FROM crsActiveDatabases INTO @catalogDatabaseID, @databaseID, @databaseName
+		FETCH NEXT FROM crsActiveDatabases INTO @catalogDatabaseID, @databaseID, @databaseName, @sqlServerName
 		WHILE @@FETCH_STATUS=0
 			begin
 				SET @strMessage='database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted')
@@ -215,7 +226,7 @@ WHILE @@FETCH_STATUS=0
 				IF (SELECT COUNT(*) FROM [health-check].[statsDiskSpaceInfo] 
 					WHERE	[instance_id] = @instanceID 
 							AND DATEDIFF(day, [event_date_utc], GETUTCDATE()) <= 1
-					) = 0
+					) = 0 OR @isAzureSQLDatabase = 1
 				begin
 					IF @sqlServerName <> @@SERVERNAME
 						SET @queryToRun = N'SELECT *
@@ -230,13 +241,20 @@ WHILE @@FETCH_STATUS=0
 																	, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
 																	, CAST(FILEPROPERTY([name], ''''''''SpaceUsed'''''''') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
 																	, CAST(FILEPROPERTY([name], ''''''''IsLogFile'''''''') AS [bit])		AS [is_logfile] ' + 
-																	CASE WHEN @serverVersionNum >= 10.5
-																		 THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
-																		 ELSE N', REPLACE(LEFT([physical_name], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
-																	END + '
+																	CASE WHEN @isAzureSQLDatabase = 0 
+																		 THEN	CASE WHEN @serverVersionNum >= 10.5
+																					 THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
+																					 ELSE N', REPLACE(LEFT([physical_name], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
+																				END
+																		 ELSE N', ( SELECT ISNULL([elastic_pool_name], sd.[name]) 
+																					FROM sys.database_service_objectives dso
+																					INNER JOIN sys.databases sd ON dso.[database_id] = sd.[database_id]
+																					WHERE sd.[name]=''''''''' + @databaseName + '''''''''
+  																				  ) AS [volume_mount_point] '
+																	END + N'
 																	, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
 															FROM sys.database_files' + 
-															CASE WHEN @serverVersionNum >= 10.5
+															CASE WHEN @serverVersionNum >= 10.5 AND @isAzureSQLDatabase = 0 
 																 THEN N' CROSS APPLY sys.dm_os_volume_stats(DB_ID(), [file_id])'
 																 ELSE N''
 															END + 
@@ -259,7 +277,7 @@ WHILE @@FETCH_STATUS=0
 															CASE WHEN @serverVersionNum >= 10.5
 																	THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
 																	ELSE N', REPLACE(LEFT([physical_name], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
-															END + '
+																END + N'
 															, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
 													FROM sys.database_files' + 
 													CASE WHEN @serverVersionNum >= 10.5
@@ -291,7 +309,10 @@ WHILE @@FETCH_STATUS=0
 												FROM sys.database_files
 												)'
 
-						SET @queryToRun = CASE WHEN  @sqlServerName = @@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N';' ELSE N'' END + N'
+						SET @queryToRun = CASE WHEN  @sqlServerName = @@SERVERNAME 
+											   THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N';' 
+											   ELSE N'' 
+										  END + N'
 												SELECT    [volume_mount_point]
 														, CAST([is_logfile]		AS [bit]) AS [is_logfile]
 														, SUM([size_mb])		AS [size_mb]
@@ -305,7 +326,8 @@ WHILE @@FETCH_STATUS=0
 																, MAX(dsi.[volume_mount_point])	AS [volume_mount_point]
 																, MAX([is_growth_limited])		AS [is_growth_limited]
 														FROM ' + @queryToRun + N' df
-														LEFT JOIN [dbaTDPMon].[health-check].[vw_statsDiskSpaceInfo] dsi ON CHARINDEX(dsi.[volume_mount_point], df.[physical_name]) > 0 AND dsi.[instance_name] = @@SERVERNAME
+														LEFT JOIN [dbaTDPMon].[health-check].[vw_statsDiskSpaceInfo] dsi ON CHARINDEX(dsi.[volume_mount_point] COLLATE SQL_Latin1_General_CP1_CI_AS, df.[physical_name] COLLATE SQL_Latin1_General_CP1_CI_AS) > 0 
+																															AND dsi.[instance_name] = ''' + @sqlServerName + N'''
 														GROUP BY [name], [is_logfile]
 													)sf
 												GROUP BY [volume_mount_point], [is_logfile]'
@@ -330,22 +352,46 @@ WHILE @@FETCH_STATUS=0
 				END CATCH
 
 				/* get last date for dbcc checkdb, only for 2k5+ */
-				IF @sqlServerName <> @@SERVERNAME
+				IF @isAzureSQLDatabase = 0 
 					begin
-						IF @serverVersionNum < 11
-							SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
-												FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''')'')x
-												WHERE [Field]=''dbi_dbccLastKnownGood'''
+						IF @sqlServerName <> @@SERVERNAME
+							begin
+								IF @serverVersionNum < 11
+									SET @queryToRun = N'SELECT MAX([VALUE]) AS [Value]
+														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''')'')x
+														WHERE [Field]=''dbi_dbccLastKnownGood'''
+								ELSE
+									SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
+														FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
+														WHERE [Field]=''dbi_dbccLastKnownGood'''
+							end
 						ELSE
-							SET @queryToRun = N'SELECT MAX([Value]) AS [Value]
-												FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''DBCC DBINFO (' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N') WITH TABLERESULTS, NO_INFOMSGS'''') WITH RESULT SETS(([ParentObject] [nvarchar](max), [Object] [nvarchar](max), [Field] [nvarchar](max), [Value] [nvarchar](max))) '')x
-												WHERE [Field]=''dbi_dbccLastKnownGood'''
-					end
-				ELSE
-					begin							
+							begin							
+								BEGIN TRY
+									SET @queryToRun = N'DBCC DBINFO (''' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'sql') + N''') WITH TABLERESULTS, NO_INFOMSGS'
+									INSERT INTO #dbccDBINFO
+											EXEC sp_executesql @queryToRun
+								END TRY
+								BEGIN CATCH
+									SET @strMessage = ERROR_MESSAGE()
+									EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+									INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+											SELECT  @instanceID
+													, @projectID
+													, GETUTCDATE()
+													, 'dbo.usp_hcCollectDatabaseDetails'
+													, [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ':' + @strMessage
+								END CATCH
+
+								SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_dbccLastKnownGood'''											
+							end
+
+						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+				
+						TRUNCATE TABLE #dbccLastKnownGood
 						BEGIN TRY
-							SET @queryToRun = N'DBCC DBINFO (''' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'sql') + N''') WITH TABLERESULTS, NO_INFOMSGS'
-							INSERT INTO #dbccDBINFO
+							INSERT	INTO #dbccLastKnownGood([Value])
 									EXEC sp_executesql @queryToRun
 						END TRY
 						BEGIN CATCH
@@ -360,35 +406,14 @@ WHILE @@FETCH_STATUS=0
 											, [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ':' + @strMessage
 						END CATCH
 
-						SET @queryToRun = N'SELECT MAX([Value]) AS [Value] FROM #dbccDBINFO WHERE [Field]=''dbi_dbccLastKnownGood'''											
+						BEGIN TRY
+							SELECT @dbccLastKnownGood = CASE WHEN [Value] = '1900-01-01 00:00:00.000' THEN NULL ELSE [Value] END 
+							FROM #dbccLastKnownGood
+						END TRY
+						BEGIN CATCH
+							SET @dbccLastKnownGood=NULL
+						END CATCH
 					end
-
-				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-				
-				TRUNCATE TABLE #dbccLastKnownGood
-				BEGIN TRY
-					INSERT	INTO #dbccLastKnownGood([Value])
-							EXEC sp_executesql @queryToRun
-				END TRY
-				BEGIN CATCH
-					SET @strMessage = ERROR_MESSAGE()
-					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
-					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
-							SELECT  @instanceID
-									, @projectID
-									, GETUTCDATE()
-									, 'dbo.usp_hcCollectDatabaseDetails'
-									, [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ':' + @strMessage
-				END CATCH
-
-				BEGIN TRY
-					SELECT @dbccLastKnownGood = CASE WHEN [Value] = '1900-01-01 00:00:00.000' THEN NULL ELSE [Value] END 
-					FROM #dbccLastKnownGood
-				END TRY
-				BEGIN CATCH
-					SET @dbccLastKnownGood=NULL
-				END CATCH
 
 				/* compute database statistics */
 				INSERT	INTO #statsDatabaseDetails([query_type], [database_id], [data_size_mb], [data_space_used_percent], [log_size_mb], [log_space_used_percent], [volume_mount_point], [last_dbcc checkdb_time], [is_growth_limited])
@@ -397,7 +422,7 @@ WHILE @@FETCH_STATUS=0
 								, CAST(CASE WHEN [data_size_mb] <>0 THEN [data_space_used_mb] * 100. / [data_size_mb] ELSE 0 END AS [numeric](6,2)) AS [data_used_percent]
 								, CAST([log_size_mb] AS [numeric](20,3)) AS [log_size_mb]
 								, CAST(CASE WHEN [log_size_mb] <>0 THEN [log_space_used_mb] * 100. / [log_size_mb] ELSE 0 END AS [numeric](6,2)) AS [log_used_percent]
-								, [volume_mount_point]
+								, LTRIM(RTRIM([volume_mount_point])) AS [volume_mount_point]
 								, @dbccLastKnownGood
 								, [is_growth_limited]
 						FROM (
@@ -421,55 +446,108 @@ WHILE @@FETCH_STATUS=0
 														) AS [volume_mount_points]
 											)x
 							)db
-				FETCH NEXT FROM crsActiveDatabases INTO @catalogDatabaseID, @databaseID, @databaseName
+				
+				IF @isAzureSQLDatabase = 1
+					begin
+						/* get last date for backup and other database flags / options */
+						SET @queryToRun = N'SELECT	  2 AS [query_type]
+													, bkp.[database_id]
+													, NULL AS [last_backup_time]
+													, CAST(DATABASEPROPERTY(bkp.[database_name], ''IsAutoClose'')  AS [bit])	AS [is_auto_close]
+													, CAST(DATABASEPROPERTY(bkp.[database_name], ''IsAutoShrink'')  AS [bit])	AS [is_auto_shrink]
+													, bkp.[recovery_model]
+													, bkp.[page_verify_option]
+													, bkp.[compatibility_level]
+													, bkp.[is_snapshot]
+											FROM (
+													SELECT	  sdb.[name]	AS [database_name]
+															, sdb.[database_id]
+															, sdb.[recovery_model]
+															, sdb.[page_verify_option]
+															, sdb.[compatibility_level] 
+															, CASE WHEN sdb.[source_database_id] IS NULL THEN 0 ELSE 1 END AS [is_snapshot]
+													FROM sys.databases sdb
+													WHERE sdb.[name]=''' + @databaseName + N'''
+													GROUP BY sdb.[name], sdb.[database_id], sdb.[recovery_model], sdb.[page_verify_option], sdb.[compatibility_level], sdb.[source_database_id]
+												)bkp'
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+		
+						BEGIN TRY
+							INSERT	INTO #statsDatabaseDetails([query_type], [database_id], [last_backup_time], [is_auto_close], [is_auto_shrink], [recovery_model], [page_verify_option], [compatibility_level], [is_snapshot])
+									EXEC sp_executesql @queryToRun
+						END TRY
+						BEGIN CATCH
+							SET @strMessage = ERROR_MESSAGE()
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+							INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+									SELECT  @instanceID
+											, @projectID
+											, GETUTCDATE()
+											, 'dbo.usp_hcCollectDatabaseDetails'
+											, @strMessage
+						END CATCH
+					end
+
+				FETCH NEXT FROM crsActiveDatabases INTO @catalogDatabaseID, @databaseID, @databaseName, @sqlServerName
 			end
 		CLOSE crsActiveDatabases
 		DEALLOCATE crsActiveDatabases
-
-		/* get last date for backup and other database flags / options */
-		SET @queryToRun = N'SELECT	  2 AS [query_type]
-									, bkp.[database_id]
-									, CASE WHEN bkp.[last_backup_time] = CONVERT([datetime], ''1900-01-01'', 120) THEN NULL ELSE bkp.[last_backup_time] END AS [last_backup_time]
-									, CAST(DATABASEPROPERTY(bkp.[database_name], ''IsAutoClose'')  AS [bit])	AS [is_auto_close]
-									, CAST(DATABASEPROPERTY(bkp.[database_name], ''IsAutoShrink'')  AS [bit])	AS [is_auto_shrink]
-									, bkp.[recovery_model]
-									, bkp.[page_verify_option]
-									, bkp.[compatibility_level]
-									, bkp.[is_snapshot]
-							FROM (
-								  SELECT	  sdb.[name]	AS [database_name]
-											, sdb.[database_id]
-											, sdb.[recovery_model]
-											, sdb.[page_verify_option]
-											, sdb.[compatibility_level]
-											, MAX(bs.[backup_finish_date]) AS [last_backup_time]
-											, CASE WHEN sdb.[source_database_id] IS NULL THEN 0 ELSE 1 END AS [is_snapshot]
-								  FROM sys.databases sdb
-								  LEFT OUTER JOIN msdb.dbo.backupset bs ON bs.[database_name] = sdb.[name] AND bs.type IN (''D'', ''I'')
-								  WHERE sdb.[name] LIKE ''' + @databaseNameFilter + N'''
-								  GROUP BY sdb.[name], sdb.[database_id], sdb.[recovery_model], sdb.[page_verify_option], sdb.[compatibility_level], sdb.[source_database_id]
-							    )bkp'
-		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		
-		BEGIN TRY
-			INSERT	INTO #statsDatabaseDetails([query_type], [database_id], [last_backup_time], [is_auto_close], [is_auto_shrink], [recovery_model], [page_verify_option], [compatibility_level], [is_snapshot])
-					EXEC sp_executesql @queryToRun
-		END TRY
-		BEGIN CATCH
-			SET @strMessage = ERROR_MESSAGE()
-			EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+		/* get last date for backup and other database flags / options */
+		IF @isAzureSQLDatabase = 0
+			begin
+				SET @queryToRun = N'SELECT	  2 AS [query_type]
+											, bkp.[database_id]
+											, CASE WHEN bkp.[last_backup_time] = CONVERT([datetime], ''1900-01-01'', 120) THEN NULL ELSE bkp.[last_backup_time] END AS [last_backup_time]
+											, CAST(DATABASEPROPERTY(bkp.[database_name], ''IsAutoClose'')  AS [bit])	AS [is_auto_close]
+											, CAST(DATABASEPROPERTY(bkp.[database_name], ''IsAutoShrink'')  AS [bit])	AS [is_auto_shrink]
+											, bkp.[recovery_model]
+											, bkp.[page_verify_option]
+											, bkp.[compatibility_level]
+											, bkp.[is_snapshot]
+									FROM (
+											SELECT	  sdb.[name]	AS [database_name]
+													, sdb.[database_id]
+													, sdb.[recovery_model]
+													, sdb.[page_verify_option]
+													, sdb.[compatibility_level] ' +
+													CASE WHEN @isAzureSQLDatabase = 0 
+														 THEN N', MAX(bs.[backup_finish_date])'
+														 ELSE N', NULL'
+													END + N' AS [last_backup_time]
+													, CASE WHEN sdb.[source_database_id] IS NULL THEN 0 ELSE 1 END AS [is_snapshot]
+											FROM sys.databases sdb ' +
+											CASE WHEN @isAzureSQLDatabase = 0
+												 THEN N'LEFT OUTER JOIN msdb.dbo.backupset bs ON bs.[database_name] = sdb.[name] AND bs.type IN (''D'', ''I'')'
+												 ELSE N''
+											END + N'
+											WHERE sdb.[name] LIKE ''' + @databaseNameFilter + N'''
+											GROUP BY sdb.[name], sdb.[database_id], sdb.[recovery_model], sdb.[page_verify_option], sdb.[compatibility_level], sdb.[source_database_id]
+										)bkp'
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+		
+				BEGIN TRY
+					INSERT	INTO #statsDatabaseDetails([query_type], [database_id], [last_backup_time], [is_auto_close], [is_auto_shrink], [recovery_model], [page_verify_option], [compatibility_level], [is_snapshot])
+							EXEC sp_executesql @queryToRun
+				END TRY
+				BEGIN CATCH
+					SET @strMessage = ERROR_MESSAGE()
+					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-			INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
-					SELECT  @instanceID
-							, @projectID
-							, GETUTCDATE()
-							, 'dbo.usp_hcCollectDatabaseDetails'
-							, @strMessage
-		END CATCH
+					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+							SELECT  @instanceID
+									, @projectID
+									, GETUTCDATE()
+									, 'dbo.usp_hcCollectDatabaseDetails'
+									, @strMessage
+				END CATCH
+			end
 
 		/* check for AlwaysOn Availability Groups configuration */
-		IF @serverVersionNum >= 12
+		IF @serverVersionNum >= 12 AND @isAzureSQLDatabase = 0 
 			begin
 				SET @queryToRun = N'SELECT    hc.[cluster_name]
 											, ag.[name] AS [ag_name]
@@ -536,7 +614,7 @@ WHILE @@FETCH_STATUS=0
 								, qt2.[last_backup_time]
 								, qt1.[last_dbcc checkdb_time]
 								, qt1.[is_growth_limited]
-								, qt2.[is_snapshot]
+								, ISNULL(qt2.[is_snapshot], 0) AS [is_snapshot]
 						FROM (
 								SELECT    [database_id]
 										, [data_size_mb]
@@ -587,7 +665,7 @@ WHILE @@FETCH_STATUS=0
 				WHERE cin.[project_id] = @projectID
 						AND sdaod.[id] IS NULL
 		
-		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
+		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion, @isAzureSQLDatabase
 	end
 CLOSE crsActiveInstances
 DEALLOCATE crsActiveInstances

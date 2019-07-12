@@ -45,7 +45,8 @@ DECLARE @projectID				[smallint],
 DECLARE @SQLMajorVersion		[int],
 		@sqlServerVersion		[sysname],
 		@configErrorlogFileNo	[int],
-		@errorlogFileNo			[int]
+		@errorlogFileNo			[int], 
+		@isAzureSQLDatabase		[bit]
 
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
@@ -114,14 +115,15 @@ WHERE cin.[project_id] = @projectID
 SET @strMessage= 'Step 2: Get Errorlog messages...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 		
-DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version]
+DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version],
+																	CASE WHEN [edition] LIKE '%SQL Azure' THEN 1 ELSE 0 END AS [isAzureSQLDatabase]
 															FROM	[dbo].[vw_catalogInstanceNames] cin
 															WHERE 	cin.[project_id] = @projectID
 																	AND cin.[instance_active]=1
 																	AND cin.[instance_name] LIKE @sqlServerNameFilter
 															ORDER BY cin.[instance_name]
 OPEN crsActiveInstances
-FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
+FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion, @isAzureSQLDatabase
 WHILE @@FETCH_STATUS=0
 	begin
 		SET @strMessage= 'Analyzing server: ' + @sqlServerName
@@ -146,40 +148,90 @@ WHILE @@FETCH_STATUS=0
 		END CATCH
 
 		TRUNCATE TABLE #xpReadErrorLog
-
-		/* get errorlog messages */
-		SET @errorlogFileNo = @configErrorlogFileNo
-		WHILE @errorlogFileNo > 0
+		
+		IF @isAzureSQLDatabase = 0
 			begin
-				IF @sqlServerName <> @@SERVERNAME
+				/* get errorlog messages */
+				SET @errorlogFileNo = @configErrorlogFileNo
+				WHILE @errorlogFileNo > 0
 					begin
-						IF @SQLMajorVersion < 11
-							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar]) + ''')x'
+						IF @sqlServerName <> @@SERVERNAME
+							begin
+								IF @SQLMajorVersion < 11
+									SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar]) + ''')x'
+								ELSE
+									SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar]) + ' WITH RESULT SETS(([log_date] [datetime] NULL, [process_info] [sysname] NULL, [text] [varchar](max) NULL))'')x'
+							end
 						ELSE
-							SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar]) + ' WITH RESULT SETS(([log_date] [datetime] NULL, [process_info] [sysname] NULL, [text] [varchar](max) NULL))'')x'
+							SET @queryToRun = N'xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar])
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+						BEGIN TRY
+							INSERT	INTO #xpReadErrorLog([log_date], [process_info], [text])
+									EXEC sp_executesql  @queryToRun
+						END TRY
+						BEGIN CATCH
+							SET @strMessage = ERROR_MESSAGE()
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+							INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+									SELECT  @instanceID
+											, @projectID
+											, GETUTCDATE()
+											, 'dbo.usp_hcCollectErrorlogMessages'
+											, @strMessage
+						END CATCH
+
+						SET @errorlogFileNo = @errorlogFileNo - 1
 					end
-				ELSE
-					SET @queryToRun = N'xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar])
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
-				BEGIN TRY
-					INSERT	INTO #xpReadErrorLog([log_date], [process_info], [text])
-							EXEC sp_executesql  @queryToRun
-				END TRY
-				BEGIN CATCH
-					SET @strMessage = ERROR_MESSAGE()
-					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
-					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
-							SELECT  @instanceID
-									, @projectID
-									, GETUTCDATE()
-									, 'dbo.usp_hcCollectErrorlogMessages'
-									, @strMessage
-				END CATCH
-
-				SET @errorlogFileNo = @errorlogFileNo - 1
 			end
+		ELSE
+			begin
+				DECLARE @databaseName		[sysname]
+				
+				/* get the linked server database name, if specified */
+				SELECT @databaseName = ISNULL([catalog], 'master')
+				FROM sys.servers
+				WHERE UPPER([name]) = UPPER(@sqlServerName)
+
+				/* Azure System Events are only in master database; get logs only for monitored databases */
+				IF @databaseName = 'master'
+					begin
+						SET @queryToRun = N''
+						SET @queryToRun = @queryToRun + N'SELECT @@SERVERNAME AS [machine_name], [start_time], [event_category], [database_name],
+																''{"database_name":"'' + [database_name] + ''","event_type":"'' + [event_type] + ''","event_subtype":"'' + 
+																	[event_subtype_desc] + ''","description":"'' + [description] + ''","occurrences":'' + CAST([event_count] AS [nvarchar]) + ''}'' AS [text]
+															FROM sys.event_log'
+						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+						SET @queryToRun = N'SELECT [start_time], [event_category], [text]
+										FROM (' + @queryToRun + N')x
+										INNER JOIN 
+												(
+												SELECT DISTINCT cin.[machine_name], sdd.[database_name]
+												FROM [health-check].[vw_statsDatabaseDetails] sdd
+												INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[project_id] = sdd.[project_id] AND cin.[instance_id] = sdd.[instance_id]
+												)y ON x.[machine_name] = y.[machine_name] COLLATE SQL_Latin1_General_CP1_CI_AS
+														AND x.[database_name] = y.[database_name] COLLATE SQL_Latin1_General_CP1_CI_AS'
+
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+						BEGIN TRY
+							INSERT	INTO #xpReadErrorLog([log_date], [process_info], [text])
+									EXEC sp_executesql  @queryToRun
+						END TRY
+						BEGIN CATCH
+							SET @strMessage = ERROR_MESSAGE()
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+							INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+									SELECT  @instanceID
+											, @projectID
+											, GETUTCDATE()
+											, 'dbo.usp_hcCollectErrorlogMessages'
+											, @strMessage
+						END CATCH
+				end
+		end
 
 		/* save results to stats table */
 		INSERT	INTO [health-check].[statsErrorlogDetails]([instance_id], [project_id], [event_date_utc], [log_date], [process_info], [text], [log_date_utc])
@@ -189,7 +241,7 @@ WHILE @@FETCH_STATUS=0
 				WHERE [log_date] IS NOT NULL
 				ORDER BY [log_date], [id]
 
-		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion
+		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion, @isAzureSQLDatabase
 	end
 CLOSE crsActiveInstances
 DEALLOCATE crsActiveInstances

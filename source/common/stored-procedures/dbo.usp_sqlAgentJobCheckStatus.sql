@@ -458,7 +458,53 @@ ELSE
 				SET @RunDurationLast=REPLICATE('0', 6 - LEN(@RunDurationLast)) + @RunDurationLast
 				SET @runningTimeSec = CAST(SUBSTRING(@RunDurationLast, 1, LEN(@RunDurationLast) - 4) AS [bigint])*3600 + CAST(SUBSTRING(RIGHT(@RunDurationLast, 4), 1, 2) AS [bigint])*60 + CAST(SUBSTRING(RIGHT(@RunDurationLast, 4), 3, 2) AS [bigint])
 				SET @RunDurationLast=SUBSTRING(@RunDurationLast, 1, LEN(@RunDurationLast) - 4) + ':' + SUBSTRING(RIGHT(@RunDurationLast, 4), 1, 2) + ':' + SUBSTRING(RIGHT(@RunDurationLast, 4), 3, 2)
-				
+
+				/* 2019 patch - have job status information in another way*/
+				IF @lastExecutionStatus IS NULL
+					begin
+						SET @queryToRun='SELECT TOP 1
+												NULL AS [message], 
+												js.[step_id], 
+												js.step_name AS [step_name], 
+												ISNULL(jh.run_status, js.last_run_outcome) AS [run_status], 
+												REPLACE(CONVERT([varchar](10), ja.start_execution_date, 120), ''-'', '''') AS [run_date],
+												REPLACE(CONVERT([varchar](8), ja.start_execution_date, 108), '':'', '''')  AS [run_time], 
+												DATEDIFF(ss, ja.[start_execution_date], ISNULL(ja.[stop_execution_date], GETDATE())) AS [run_duration], 
+												NULL AS [event_time]
+											FROM msdb.dbo.sysjobs j
+											LEFT JOIN msdb.dbo.sysjobactivity ja ON ja.job_id = j.job_id
+																				AND ja.run_requested_date IS NOT NULL
+																				AND ja.start_execution_date IS NOT NULL
+											LEFT JOIN msdb.dbo.sysjobsteps js ON js.job_id = ja.job_id
+																				AND js.step_id = ja.last_executed_step_id
+											LEFT JOIN msdb.dbo.sysjobhistory jh ON jh.job_id = j.job_id
+																				AND jh.instance_id = ja.job_history_id
+											WHERE j.[job_id] = @jobID 
+											ORDER BY ja.start_execution_date DESC'
+						SET @queryParams = '@jobID [sysname]'
+		
+						IF @sqlServerName <> @@SERVERNAME
+							begin
+								SET @queryToRun = REPLACE(@queryToRun, '@jobID', '''' + @jobID + N'''');
+								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+							end
+						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+						TRUNCATE TABLE #jobLastRunDetails
+						INSERT	INTO #jobLastRunDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
+								EXEC sp_executesql  @queryToRun, @queryParams, @jobID = @jobID
+
+						SET @RunDurationLast=null
+						SET @RunStatus=null
+						SELECT TOP 1  @runningTimeSec		= [run_duration]
+									, @RunStatus			= CAST([run_status] AS varchar)
+									, @lastExecutionStatus	= CAST([run_status] AS varchar) 
+									, @StepName				= [step_name]
+									, @RunDate				= [run_date]
+									, @RunTime				= [run_time]	
+						FROM #jobLastRunDetails
+					end
+
 				IF @lastExecutionStatus IS NULL
 					begin
 						SET @RunStatus='Unknown'
