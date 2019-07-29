@@ -174,3 +174,20 @@ begin
 	RAISERROR('--Creating index => [IX_restorefilegroup_restore_history_id] ON [dbo].[restorefilegroup]', 10, 1) WITH NOWAIT
     CREATE INDEX [IX_restorefilegroup_restore_history_id] ON [dbo].[restorefilegroup]([restore_history_id])
 end
+
+--  sysjobhistory
+IF NOT EXISTS(	SELECT *
+				FROM [msdb]..sysindexes si
+				INNER JOIN [msdb]..sysindexkeys sik ON si.[id] = sik.[id] AND si.[indid] = sik.[indid] 
+				INNER JOIN [msdb]..syscolumns sc ON sik.[id] = sc.[id] AND sik.[colid] = sc.[colid]
+				WHERE si.[id] = OBJECT_ID('dbo.sysjobhistory')
+						AND sc.[name] = 'step_name'
+						and sik.[keyno] = 1
+				)
+	AND NOT EXISTS(SELECT * FROM [msdb]..sysindexes si WHERE [name]='IX_sysjobhistory_step_name_run_date' AND [id]=OBJECT_ID('dbo.sysjobhistory'))
+begin
+	RAISERROR('--Creating index => [IX_sysjobhistory_step_name_run_date] ON [dbo].[sysjobhistory]', 10, 1) WITH NOWAIT
+    CREATE INDEX [IX_sysjobhistory_step_name_run_date] ON [dbo].[sysjobhistory] ([step_name],[run_date]) WITH(FILLFACTOR=80)
+end
+
+

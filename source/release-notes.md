@@ -912,3 +912,6 @@
 12.07.2019
 * code tested and ready for Azure SQL Database
 * release of dbaTDPMon - v2019.7
+
+27.09.2019
+* monitoring: enhance performance for failed jobs detection (dbo.usp_monGetSQLAgentFailedJobs)

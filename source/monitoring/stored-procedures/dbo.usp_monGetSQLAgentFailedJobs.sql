@@ -37,7 +37,7 @@ DECLARE @projectID				[smallint],
 		@executionLevel			[tinyint],
 		@queryToRun				[nvarchar](4000),
 		@strMessage				[nvarchar](4000),
-		@minJobCompletionTime	[datetime],
+		@maxJobCompletionTime	[datetime],
 		@jobName				[sysname]
 		
 /*-------------------------------------------------------------------------------------------------------------------------------*/
@@ -103,12 +103,12 @@ WHILE @@FETCH_STATUS=0
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		------------------------------------------------------------------------------------------------------------------------------------------
-		SELECT	@minJobCompletionTime = MIN([last_completion_time])
+		SELECT	@maxJobCompletionTime = MAX([last_completion_time])
 		FROM	[monitoring].[statsSQLAgentJobs]
 		WHERE	[instance_id] = @instanceID
 				AND [project_id] = @projectID
 
-		SET @minJobCompletionTime = ISNULL(@minJobCompletionTime, CONVERT([datetime], CONVERT([varchar](10), GETDATE(), 120), 120))
+		SET @maxJobCompletionTime = ISNULL(@maxJobCompletionTime, CONVERT([datetime], CONVERT([varchar](10), GETDATE(), 120), 120))
 
 		TRUNCATE TABLE #statsSQLAgentJobs
 		
@@ -141,12 +141,13 @@ WHILE @@FETCH_STATUS=0
 																		, ROW_NUMBER() OVER(PARTITION BY [job_id] ORDER BY [instance_id] DESC) [row_no]
 																FROM [msdb].[dbo].[sysjobhistory] WITH (NOLOCK)
 																WHERE [step_name] =''(Job outcome)''
+																		AND [run_date] >= ' + CONVERT([varchar](8), @maxJobCompletionTime, 112) + N'
 															)X
 														WHERE	[run_status] = 0
 																AND [row_no] = 1
 													)sjh ON sj.[job_id]=sjh.[job_id]
 											)jobs
-										WHERE [last_completion_time] >''' + CONVERT([varchar](24), @minJobCompletionTime, 121)  + ''''
+										WHERE [last_completion_time] >''' + CONVERT([varchar](24), @maxJobCompletionTime, 121)  + ''''
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 				
