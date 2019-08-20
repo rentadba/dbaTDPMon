@@ -915,3 +915,8 @@
 
 27.09.2019
 * monitoring: enhance performance for failed jobs detection (dbo.usp_monGetSQLAgentFailedJobs)
+
+------------
+#### August 2019 new features & fixes
+20.08.2019
+* health-check: fix issue when computing growth for databases in AG and switching nodes
