@@ -29,11 +29,9 @@ AS
 -- ============================================================================
 SET NOCOUNT ON
 
-DECLARE @startWeek			[tinyint],
-		@endWeek			[tinyint]
+DECLARE @startDate [datetime]
 
-SET @startWeek = DATENAME(week, DATEADD(day, -@daysToAnalyze, GETUTCDATE()))
-SET @endWeek   = DATENAME(week, GETUTCDATE())
+SET @startDate = DATEADD(day, -@daysToAnalyze, GETUTCDATE())
 
 SELECT	new.[instance_name], new.[database_name], 
 		new.[size_mb] AS [current_size_mb], old.[size_mb] AS [old_size_mb],
@@ -42,39 +40,48 @@ SELECT	new.[instance_name], new.[database_name],
 		new.[size_mb] - old.[size_mb] AS [growth_size_mb],
 		CAST((new.[data_size_mb] - old.[data_size_mb]) / old.[data_size_mb] * 100. AS [numeric](10,2)) AS [data_growth_percent]
 FROM (
-		SELECT	cdn.[project_code], 
-				cdn.[database_name],
-				MIN(cdn.[instance_name]) AS [instance_name],
-				MIN(duh.[data_size_mb] + duh.[log_size_mb]) [size_mb], 
-				MIN(duh.[data_size_mb]) [data_size_mb], 
-				MIN(duh.[log_size_mb]) [log_size_mb]
-		FROM [health-check].[statsDatabaseUsageHistory]	duh
-		INNER JOIN [dbo].[vw_catalogDatabaseNames]		cdn ON cdn.[catalog_database_id] = duh.[catalog_database_id] AND cdn.[instance_id] = duh.[instance_id]
-		LEFT JOIN [health-check].[vw_statsDatabaseAlwaysOnDetails] sddod ON sddod.[catalog_database_id] = duh.[catalog_database_id] AND sddod.[instance_id] = duh.[instance_id]
-		WHERE	DATENAME(week, duh.[event_date_utc]) = @startWeek
-				AND cdn.[project_code] LIKE @projectCode
-				AND cdn.[instance_name] LIKE @sqlServerNameFilter
-				AND cdn.[active] = 1
-		GROUP BY cdn.[project_code], cdn.[database_name]
+		SELECT [project_code], [database_name], [instance_name], [size_mb], [data_size_mb], [log_size_mb]
+		FROM (
+				SELECT	cdn.[project_code], 
+						cdn.[database_name],
+						cdn.[instance_name] AS [instance_name],
+						(duh.[data_size_mb] + duh.[log_size_mb]) [size_mb], 
+						(duh.[data_size_mb]) [data_size_mb], 
+						(duh.[log_size_mb]) [log_size_mb],
+						ROW_NUMBER() OVER(PARTITION BY cdn.[project_code], cdn.[database_name] ORDER BY duh.[event_date_utc]) AS [row_no]
+				FROM [health-check].[statsDatabaseUsageHistory]	duh
+				INNER JOIN [dbo].[vw_catalogDatabaseNames]		cdn ON cdn.[catalog_database_id] = duh.[catalog_database_id] AND cdn.[instance_id] = duh.[instance_id]
+				LEFT JOIN [health-check].[vw_statsDatabaseAlwaysOnDetails] sddod ON sddod.[catalog_database_id] = duh.[catalog_database_id] AND sddod.[instance_id] = duh.[instance_id]
+				WHERE	duh.[event_date_utc] >= @startDate
+						AND cdn.[project_code] LIKE @projectCode
+						AND cdn.[instance_name] LIKE @sqlServerNameFilter
+						AND cdn.[active] = 1
+						AND duh.[data_size_mb] IS NOT NULL
+			)x
+		WHERE [row_no] = 1	
 	)old
 INNER JOIN
 	(
-		SELECT	cdn.[project_code], 
-				cdn.[database_name],
-				MIN(cdn.[instance_name]) AS [instance_name],
-				MAX(duh.[data_size_mb] + duh.[log_size_mb]) [size_mb], 
-				MAX(duh.[data_size_mb]) [data_size_mb], 
-				MAX(duh.[log_size_mb]) [log_size_mb]
-		FROM [health-check].[statsDatabaseUsageHistory]	duh 
-		INNER JOIN [dbo].[vw_catalogDatabaseNames]		cdn	ON cdn.[catalog_database_id] = duh.[catalog_database_id] AND cdn.[instance_id] = duh.[instance_id]
-		LEFT JOIN [health-check].[vw_statsDatabaseAlwaysOnDetails] sddod ON sddod.[catalog_database_id] = duh.[catalog_database_id] AND sddod.[instance_id] = duh.[instance_id]
-		WHERE	DATENAME(week, duh.[event_date_utc]) = @endWeek
-				AND cdn.[project_code] LIKE @projectCode
-				AND cdn.[instance_name] LIKE @sqlServerNameFilter
-				AND cdn.[active] = 1
-		GROUP BY cdn.[project_code], cdn.[database_name]
+		SELECT [project_code], [database_name], [instance_name], [size_mb], [data_size_mb], [log_size_mb]
+		FROM (
+				SELECT	cdn.[project_code], 
+						cdn.[database_name],
+						cdn.[instance_name] AS [instance_name],
+						(duh.[data_size_mb] + duh.[log_size_mb]) [size_mb], 
+						(duh.[data_size_mb]) [data_size_mb], 
+						(duh.[log_size_mb]) [log_size_mb],
+						ROW_NUMBER() OVER(PARTITION BY cdn.[project_code], cdn.[database_name] ORDER BY duh.[event_date_utc] DESC) AS [row_no]
+				FROM [health-check].[statsDatabaseUsageHistory]	duh
+				INNER JOIN [dbo].[vw_catalogDatabaseNames]		cdn ON cdn.[catalog_database_id] = duh.[catalog_database_id] AND cdn.[instance_id] = duh.[instance_id]
+				LEFT JOIN [health-check].[vw_statsDatabaseAlwaysOnDetails] sddod ON sddod.[catalog_database_id] = duh.[catalog_database_id] AND sddod.[instance_id] = duh.[instance_id]
+				WHERE	duh.[event_date_utc] >= @startDate
+						AND cdn.[project_code] LIKE @projectCode
+						AND cdn.[instance_name] LIKE @sqlServerNameFilter
+						AND cdn.[active] = 1
+						AND duh.[data_size_mb] IS NOT NULL
+			)y
+		WHERE [row_no] = 1	
 	)new ON new.[project_code] = old.[project_code] AND new.[database_name] = old.[database_name]
-WHERE new.[size_mb] > old.[size_mb]
 ORDER BY [growth_size_mb] DESC
 GO
 
