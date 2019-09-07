@@ -104,18 +104,20 @@ ELSE
 DECLARE		@serverEdition					[sysname],
 			@serverVersionStr				[sysname],
 			@serverVersionNum				[numeric](9,6),
-			@nestedExecutionLevel			[tinyint]
+			@nestedExecutionLevel			[tinyint],
+			@serverEngine					[int]
 
 SET @nestedExecutionLevel = @executionLevel + 1
 EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@serverEdition			= @serverEdition OUT,
 										@serverVersionStr		= @serverVersionStr OUT,
 										@serverVersionNum		= @serverVersionNum OUT,
+										@serverEngine			= @serverEngine OUT,
 										@executionLevel			= @nestedExecutionLevel,
 										@debugMode				= @debugMode
 
 ---------------------------------------------------------------------------------------------
-SET @isAzureSQLDatabase = CASE WHEN @serverEdition LIKE '%SQL Azure' THEN 1 ELSE 0 END
+SET @isAzureSQLDatabase = CASE WHEN @serverEngine IN (5, 6) THEN 1 ELSE 0 END
 
 IF @isAzureSQLDatabase = 1
 	begin

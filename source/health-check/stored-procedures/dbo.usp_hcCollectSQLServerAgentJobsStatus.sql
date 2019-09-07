@@ -112,7 +112,7 @@ DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_i
 															WHERE 	cin.[project_id] = @projectID
 																	AND cin.[instance_active]=1
 																	AND cin.[instance_name] LIKE @sqlServerNameFilter
-																	AND cin.[edition] NOT LIKE '%SQL Azure' /* feature not available on Azure SQL*/
+																	AND cin.[engine] NOT IN (5,6) /* feature not available on Azure managed database*/
 OPEN crsActiveInstances
 FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName
 WHILE @@FETCH_STATUS=0

@@ -156,11 +156,11 @@ EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrin
 DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT DISTINCT [instance_id], [linked_server_name], [database_name]
 															FROM (
 																	SELECT	cdn.[instance_id], 
-																			CASE WHEN [edition] NOT LIKE '%SQL Azure' 
+																			CASE WHEN cin.[engine] NOT IN (5, 6)
 																				 THEN 'master'
 																				 ELSE cdn.[database_name]
 																			END AS [database_name],
-																			CASE WHEN [edition] NOT LIKE '%SQL Azure' 
+																			CASE WHEN cin.[engine] NOT IN (5, 6) 
 																					THEN cdn.[instance_name]
 																					ELSE CASE WHEN ss.[name] IS NOT NULL AND LOWER(ss.[catalog]) <> 'master' THEN ss.[name] ELSE NULL END
 																			END [linked_server_name]

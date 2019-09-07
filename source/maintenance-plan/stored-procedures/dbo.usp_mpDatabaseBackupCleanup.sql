@@ -53,6 +53,7 @@ DECLARE		@backupFileName					[nvarchar](1024),
 			@serverEdition					[sysname],
 			@serverVersionStr				[sysname],
 			@serverVersionNum				[numeric](9,6),
+			@serverEngine					[int],
 			@errorCode						[int],
 			@maxAllowedDate					[datetime]
 
@@ -99,6 +100,7 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName		= @sqlServerName,
 										@serverEdition		= @serverEdition OUT,
 										@serverVersionStr	= @serverVersionStr OUT,
 										@serverVersionNum	= @serverVersionNum OUT,
+										@serverEngine		= @serverEngine OUT,
 										@executionLevel		= @nestedExecutionLevel,
 										@debugMode			= @debugMode
 

@@ -56,6 +56,7 @@ DECLARE 	@Message 			[varchar](8000),
 DECLARE	  @serverEdition			[sysname]
 		, @serverVersionStr			[sysname]
 		, @serverVersionNum			[numeric](9,6)
+		, @serverEngine				[int]
 		, @nestedExecutionLevel		[tinyint]
 
 SET NOCOUNT ON
@@ -105,6 +106,7 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName		= @sqlServerName,
 										@serverEdition		= @serverEdition OUT,
 										@serverVersionStr	= @serverVersionStr OUT,
 										@serverVersionNum	= @serverVersionNum OUT,
+										@serverEngine		= @serverEngine OUT,
 										@executionLevel		= 0,
 										@debugMode			= @debugMode
 

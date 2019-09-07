@@ -266,7 +266,7 @@ DECLARE crsMachineList CURSOR LOCAL FAST_FORWARD FOR	SELECT cin.[id] AS [instanc
 																					)
 																		)
 																	)
-																AND [edition] NOT LIKE '%SQL Azure' /* feature not available on Azure SQL*/
+																AND cin.[engine] NOT IN (5, 6, 8) /* feature not available on Azure managed database*/
 														ORDER BY cin.[name], cmn.[name]
 OPEN crsMachineList
 FETCH NEXT FROM crsMachineList INTO @instanceID, @instanceName, @machineID, @machineName

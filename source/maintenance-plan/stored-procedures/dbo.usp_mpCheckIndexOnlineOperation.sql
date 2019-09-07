@@ -45,6 +45,7 @@ DECLARE	  @queryToRun    			[nvarchar](max)
 DECLARE	  @serverEdition			[sysname]
 		, @serverVersionStr			[sysname]
 		, @serverVersionNum			[numeric](9,6)
+		, @serverEngine				[int]
 
 DECLARE @onlineConstraintCheck TABLE	
 	(
@@ -69,6 +70,7 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@serverEdition			= @serverEdition OUT,
 										@serverVersionStr		= @serverVersionStr OUT,
 										@serverVersionNum		= @serverVersionNum OUT,
+										@serverEngine			= @serverEngine OUT,
 										@executionLevel			= 1,
 										@debugMode				= @debugMode
 

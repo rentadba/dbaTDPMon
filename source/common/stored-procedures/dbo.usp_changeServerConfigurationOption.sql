@@ -40,6 +40,7 @@ DECLARE   @queryToRun				[nvarchar](512)	-- used for dynamic statements
 DECLARE	  @serverEdition			[sysname]
 		, @serverVersionStr			[sysname]
 		, @serverVersionNum			[numeric](9,6)
+		, @serverEngine				[int]
 
 
 -----------------------------------------------------------------------------------------------------
@@ -60,6 +61,7 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@serverEdition			= @serverEdition OUT,
 										@serverVersionStr		= @serverVersionStr OUT,
 										@serverVersionNum		= @serverVersionNum OUT,
+										@serverEngine			= @serverEngine OUT,
 										@executionLevel			= @nestedExecutionLevel,
 										@debugMode				= @debugMode
 
@@ -87,7 +89,7 @@ EXEC sp_executesql @queryToRun, @queryParameters, @configOptionName = @configOpt
 												, @optionCurrentValue = @optionCurrentValue OUT
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
-IF @optionIsAvailable=1 AND ISNULL(@optionCurrentValue, 0) <> @configOptionValue AND @serverEdition <> 'SQL Azure'
+IF @optionIsAvailable=1 AND ISNULL(@optionCurrentValue, 0) <> @configOptionValue AND @serverEngine NOT IN (5, 6, 8)
 	begin
 		--changing option value and run reconfigure
 		SET @queryToRun  = N'sp_executesql N''sp_configure ''''' + @configOptionName + N''''', ' + CAST(@configOptionValue AS [nvarchar](32)) + N'''; RECONFIGURE WITH OVERRIDE;'

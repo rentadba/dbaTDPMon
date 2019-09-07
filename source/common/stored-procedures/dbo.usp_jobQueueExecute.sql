@@ -71,6 +71,7 @@ DECLARE   @ErrorNumber [int]
 DECLARE	  @serverEdition			[sysname]
 		, @serverVersionStr			[sysname]
 		, @serverVersionNum			[numeric](9,6)
+		, @serverEngine				[int]
 		, @nestedExecutionLevel		[tinyint]
 
 DECLARE	  @queryToRun  				[nvarchar](2048)
@@ -327,6 +328,7 @@ WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 														@serverEdition		= @serverEdition OUT,
 														@serverVersionStr	= @serverVersionStr OUT,
 														@serverVersionNum	= @serverVersionNum OUT,
+														@serverEngine		= @serverEngine OUT,
 														@executionLevel		= 0,
 														@debugMode			= @debugMode
 

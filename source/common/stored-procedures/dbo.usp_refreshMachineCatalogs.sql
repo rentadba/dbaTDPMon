@@ -109,7 +109,8 @@ BEGIN TRY
 		[name]					[sysname]		NULL,
 		[version]				[sysname]		NULL,
 		[edition]				[varchar](256)	NULL,
-		[machine_name]			[sysname]		NULL
+		[machine_name]			[sysname]		NULL,
+		[engine]				[int]			NULL,
 	)
 
 	-----------------------------------------------------------------------------------------------------
@@ -149,16 +150,18 @@ BEGIN TRY
 								, [product_version]
 								, [edition]
 								, [machine_name]
+								, [engine]
 						FROM (
 								SELECT CAST(SERVERPROPERTY(''ProductVersion'') AS [sysname]) AS [product_version]
 									 , SUBSTRING(@@VERSION, 1, CHARINDEX(CAST(SERVERPROPERTY(''ProductVersion'') AS [sysname]), @@VERSION)-1) + CAST(SERVERPROPERTY(''Edition'') AS [sysname]) AS [edition]
 									 , CAST(SERVERPROPERTY(''ComputerNamePhysicalNetBIOS'') AS [sysname]) AS [machine_name]
+									 , CAST(SERVERPROPERTY(''EngineEdition'') AS [int]) AS [engine]
 							 )X'
 	SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 	IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 	BEGIN TRY
-		INSERT	INTO #catalogInstanceNames([name], [version], [edition], [machine_name])
+		INSERT	INTO #catalogInstanceNames([name], [version], [edition], [machine_name], [engine])
 				EXEC sp_executesql @queryToRun
 		SET @isActive=1
 	END TRY
@@ -194,7 +197,7 @@ BEGIN TRY
 			DECLARE @SQLMajorVersion [int]
 			BEGIN TRY
 				SELECT    @SQLMajorVersion = REPLACE(LEFT(ISNULL([version], ''), 2), '.', '') 
-						, @isAzureSQLDatabase = CASE WHEN [edition] LIKE '%SQL Azure' THEN 1 ELSE 0 END
+						, @isAzureSQLDatabase = CASE WHEN [engine] IN (5, 6, 8) THEN 1 ELSE 0 END
 				FROM #catalogInstanceNames
 			END TRY
 			BEGIN CATCH
@@ -256,7 +259,7 @@ BEGIN TRY
 				end
 			ELSE
 				begin
-					/* On SQL Azure, assume the machine name is the same as the server-name */
+					/* On Azure managed SQL (SQL Database and Managed Instance), assume the machine name is the same as the server-name */
 					INSERT	INTO #catalogMachineNames([name])
 					SELECT [name]
 					FROM #catalogInstanceNames
@@ -452,6 +455,7 @@ BEGIN TRY
 									ELSE src.[active]
 								END
 			, dest.[edition] = src.[edition]
+			, dest.[engine] = src.[engine]
 			, dest.[cluster_node_machine_id] = src.[cluster_node_machine_id]
 			, dest.[last_refresh_date_utc] = GETUTCDATE()
 	FROM [dbo].[catalogInstanceNames] AS dest
@@ -461,6 +465,7 @@ BEGIN TRY
 				  , cin.[name]	  AS [name]
 				  , cin.[version]
 				  , cin.[edition]
+				  , cin.[engine]
 				  , @isClustered  AS [is_clustered]
 				  , @isActive	  AS [active]
 				  , cmnA.[id]	  AS [cluster_node_machine_id]
@@ -473,8 +478,8 @@ BEGIN TRY
 															AND @isClustered=1
 		  ) AS src	ON dest.[machine_id] = src.[machine_id] AND dest.[name] = src.[name] AND dest.[project_id] = @projectID;
 
-	INSERT INTO [dbo].[catalogInstanceNames]([machine_id], [project_id], [name], [version], [edition], [is_clustered], [active], [cluster_node_machine_id], [last_refresh_date_utc]) 
-			SELECT   src.[machine_id], @projectID, src.[name], src.[version], src.[edition], src.[is_clustered]
+	INSERT INTO [dbo].[catalogInstanceNames]([machine_id], [project_id], [name], [version], [edition], [engine], [is_clustered], [active], [cluster_node_machine_id], [last_refresh_date_utc]) 
+			SELECT   src.[machine_id], @projectID, src.[name], src.[version], src.[edition], src.[engine], src.[is_clustered]
 					, CASE WHEN src.[is_clustered]=1
 							THEN CASE	WHEN src.[active]=1 AND src.[machine_id]=src.[cluster_node_machine_id] 
 										THEN 1 
@@ -489,6 +494,7 @@ BEGIN TRY
 						  , cin.[name]	  AS [name]
 						  , cin.[version]
 						  , cin.[edition]
+						  , cin.[engine]
 						  , @isClustered  AS [is_clustered]
 						  , @isActive	  AS [active]
 						  , cmnA.[id]	  AS [cluster_node_machine_id]

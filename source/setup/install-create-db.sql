@@ -7,18 +7,20 @@ GO
 DECLARE   @dataFilePath [nvarchar](260)
         , @logFilePath	[nvarchar](260)
 		, @queryToRun	[nvarchar](4000)
+		, @engineEdition [int]
 
 SET @dataFilePath = '$(data_files_path)'
 SET @logFilePath = '$(data_files_path)'
+SET @engineEdition = CAST(SERVERPROPERTY('EngineEdition') AS [int])
 
 /* try to read default data and log file location from registry */
-IF ISNULL(@dataFilePath, '')=''
+IF ISNULL(@dataFilePath, '')='' AND @engineEdition NOT IN (5, 6, 8)
 	EXEC master.dbo.xp_instance_regread   N'HKEY_LOCAL_MACHINE'
 										, N'Software\Microsoft\MSSQLServer\MSSQLServer'
 										, N'DefaultData'
 										, @dataFilePath output;
 
-IF ISNULL(@logFilePath, '')=''
+IF ISNULL(@logFilePath, '')='' AND @engineEdition NOT IN (5, 6, 8)
 	EXEC master.dbo.xp_instance_regread	  N'HKEY_LOCAL_MACHINE'
 										, N'Software\Microsoft\MSSQLServer\MSSQLServer'
 										, N'DefaultLog'
@@ -27,19 +29,13 @@ IF ISNULL(@logFilePath, '')=''
 IF RIGHT(@dataFilePath, 1)<>'\' SET @dataFilePath = @dataFilePath + '\'
 IF RIGHT(@logFilePath, 1)<>'\'	SET @logFilePath = @logFilePath + '\'
 
-SET @queryToRun = N'CREATE DATABASE [$(dbName)] ON  PRIMARY 
-( NAME = N''Primary'', FILENAME = ''' + @dataFilePath + N'$(dbName)_primary.mdf'' , SIZE = 8MB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024MB ), 
- FILEGROUP [FG_Snapshots_Data] 
-( NAME = N''Snapshots_Data_1'', FILENAME = ''' + @dataFilePath + N'$(dbName)_data_snapshots_1.ndf'' , SIZE = 8MB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024MB ), 
- FILEGROUP [FG_Snapshots_Index] 
-( NAME = N''Snapshots_Index_1'', FILENAME = ''' + @dataFilePath + N'$(dbName)_index_snapshots_1.ndf'' , SIZE = 8MB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024MB ),
- FILEGROUP [FG_Statistics_Data] 
-( NAME = N''Statistics_Data_1'', FILENAME = ''' + @dataFilePath + N'$(dbName)_data_statistics_1.ndf'' , SIZE = 8MB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024MB ), 
- FILEGROUP [FG_Statistics_Index] 
-( NAME = N''Statistics_Index_1'', FILENAME = ''' + @dataFilePath + N'$(dbName)_index_statistics_1.ndf'' , SIZE = 8MB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024MB )
- LOG ON 
-( NAME = N''Log_1'', FILENAME = ''' + @logFilePath + N'$(dbName)_log_1.ldf'' , SIZE = 32MB , MAXSIZE = UNLIMITED , FILEGROWTH = 1024MB)'
-
+IF @engineEdition NOT IN (5, 6, 8)
+	SET @queryToRun = N'CREATE DATABASE [$(dbName)] ON PRIMARY 
+	( NAME = N''$(dbName)_data'', FILENAME = ''' + @dataFilePath + N'$(dbName)_data.mdf'' , SIZE = 32MB , MAXSIZE = UNLIMITED, FILEGROWTH = 256MB )
+	 LOG ON 
+	( NAME = N''$(dbName)_log'', FILENAME = ''' + @logFilePath + N'$(dbName)_log.ldf'' , SIZE = 32MB , MAXSIZE = UNLIMITED , FILEGROWTH = 256MB)'
+ELSE
+	SET @queryToRun = N'CREATE DATABASE [$(dbName)]'
 EXEC sp_executesql @queryToRun
 GO
 

@@ -229,12 +229,14 @@ IF @logFileLocation IS NOT NULL
 		DECLARE	  @serverEdition			[sysname]
 				, @serverVersionStr			[sysname]
 				, @serverVersionNum			[numeric](9,6)
+				, @serverEngine				[int]
 				, @nestedExecutionLevel		[tinyint]
 
 		EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 												@serverEdition			= @serverEdition OUT,
 												@serverVersionStr		= @serverVersionStr OUT,
 												@serverVersionNum		= @serverVersionNum OUT,
+												@serverEngine			= @serverEngine OUT,
 												@executionLevel			= @nestedExecutionLevel,
 												@debugMode				= @debugMode
 

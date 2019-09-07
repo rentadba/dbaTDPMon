@@ -31,6 +31,7 @@ DECLARE   @queryToRun				[nvarchar](1024)
 DECLARE	  @serverEdition			[sysname]
 		, @serverVersionStr			[sysname]
 		, @serverVersionNum			[numeric](9,6)
+		, @serverEngine				[int]
 		, @nestedExecutionLevel		[tinyint]
 		, @warningMessage			[nvarchar](1024)
 		, @runWithxpCreateSubdir	[bit]
@@ -70,6 +71,7 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@serverEdition			= @serverEdition OUT,
 										@serverVersionStr		= @serverVersionStr OUT,
 										@serverVersionNum		= @serverVersionNum OUT,
+										@serverEngine			= @serverEngine OUT,
 										@executionLevel			= @nestedExecutionLevel,
 										@debugMode				= @debugMode
 

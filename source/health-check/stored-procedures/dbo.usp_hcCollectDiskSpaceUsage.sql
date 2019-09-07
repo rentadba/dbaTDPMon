@@ -120,7 +120,7 @@ SET @strMessage='Step 2: Get Instance Details Information....'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		
 DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT	cin.[instance_id], cin.[instance_name], cin.[version], cin.[machine_name],
-																	CASE WHEN [edition] LIKE '%SQL Azure' THEN 1 ELSE 0 END AS [isAzureSQLDatabase]
+																	CASE WHEN cin.[engine] IN (5, 6) THEN 1 ELSE 0 END AS [isAzureSQLDatabase]
 															FROM	[dbo].[vw_catalogInstanceNames] cin
 															WHERE 	cin.[project_id] = @projectID
 																	AND cin.[instance_active]=1
@@ -502,7 +502,7 @@ FROM (
 		FROM [dbo].[vw_catalogInstanceNames] cin
 		INNER JOIN [health-check].[vw_statsDatabaseDetails] sdd ON sdd.[project_id] = cin.[project_id] AND sdd.[instance_id] = cin.[instance_id]
 		LEFT JOIN [health-check].[vw_statsDiskSpaceInfo] sdsi ON sdsi.[project_id] = cin.[project_id] AND sdsi.[instance_id] = cin.[instance_id] AND sdsi.[volume_mount_point] = sdd.volume_mount_point
-		WHERE cin.[edition] LIKE '%SQL Azure%'
+		WHERE cin.[engine] IN (5, 6)
 			AND sdsi.[volume_mount_point] IS NULL
 	)d
 INNER JOIN
@@ -512,7 +512,7 @@ INNER JOIN
 		FROM [dbo].[vw_catalogInstanceNames] cin
 		INNER JOIN [health-check].[vw_statsDatabaseDetails] sdd ON sdd.[project_id] = cin.[project_id] AND sdd.[instance_id] = cin.[instance_id]
 		LEFT JOIN [health-check].[vw_statsDiskSpaceInfo] sdsi ON sdsi.[project_id] = cin.[project_id] AND sdsi.[instance_id] = cin.[instance_id] AND sdsi.[volume_mount_point] = sdd.volume_mount_point
-		WHERE cin.[edition] LIKE '%SQL Azure%'
+		WHERE cin.[engine] IN (5, 6)
 			AND sdsi.[volume_mount_point] IS NOT NULL
 	)s ON d.[project_id] = s.[project_id] AND d.[machine_name] = s.[machine_name] AND d.[volume_mount_point] = s.[volume_mount_point] AND d.[database_name] = s.[database_name]
 GO

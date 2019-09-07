@@ -920,3 +920,8 @@
 #### August 2019 new features & fixes
 20.08.2019
 * health-check: fix issue when computing growth for databases in AG and switching nodes
+
+------------
+#### September 2019 new features & fixes
+07.09.2019
+* add support for Azure SQL Managed Instances

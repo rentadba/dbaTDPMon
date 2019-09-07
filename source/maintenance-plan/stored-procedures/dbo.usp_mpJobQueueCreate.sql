@@ -103,7 +103,7 @@ ORDER BY [id]
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR	SELECT	cin.[instance_id], cin.[instance_name],
-																	CASE WHEN [edition] LIKE '%SQL Azure' THEN 1 ELSE 0 END AS [isAzureSQLDatabase]
+																	CASE WHEN cin.[engine] IN (5, 6) THEN 1 ELSE 0 END AS [isAzureSQLDatabase]
 															FROM	[dbo].[vw_catalogInstanceNames] cin
 															WHERE 	cin.[project_id] = @projectID
 																	AND cin.[instance_active]=1
@@ -165,7 +165,7 @@ WHILE @@FETCH_STATUS=0
 										 AND (
 											  SELECT COUNT(*)
 											  FROM [dbo].[ufn_getTableFromStringList](@skipDatabasesList, ',') X
-											  WHERE jeq.[job_name] LIKE (DB_NAME() + ' - ' + @codeDescriptor + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + REPLACE(@@SERVERNAME, '\', '$') + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
+											  WHERE jeq.[job_name] LIKE (DB_NAME() + ' - ' + @codeDescriptor + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@@SERVERNAME) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@@SERVERNAME), '\', '$') ELSE SUBSTRING(UPPER(@@SERVERNAME), 1, CHARINDEX('.', UPPER(@@SERVERNAME))-1) END + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
 											) = 0
 										)
 									)
@@ -188,7 +188,7 @@ WHILE @@FETCH_STATUS=0
 									AND (
 										SELECT COUNT(*)
 										FROM [dbo].[ufn_getTableFromStringList](@skipDatabasesList, ',') X
-										WHERE jeq.[job_name] LIKE (DB_NAME() + ' - ' + @codeDescriptor + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + REPLACE(@@SERVERNAME, '\', '$') + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
+										WHERE jeq.[job_name] LIKE (DB_NAME() + ' - ' + @codeDescriptor + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@@SERVERNAME) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@@SERVERNAME), '\', '$') ELSE SUBSTRING(UPPER(@@SERVERNAME), 1, CHARINDEX('.', UPPER(@@SERVERNAME))-1) END + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
 									) = 0
 								)
 							)
@@ -206,7 +206,7 @@ WHILE @@FETCH_STATUS=0
 									 AND (
 										  SELECT COUNT(*)
 										  FROM [dbo].[ufn_getTableFromStringList](@skipDatabasesList, ',') X
-										  WHERE jeq.[job_name] LIKE (DB_NAME() + ' - ' + @codeDescriptor + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + REPLACE(@@SERVERNAME, '\', '$') + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
+										  WHERE jeq.[job_name] LIKE (DB_NAME() + ' - ' + @codeDescriptor + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@@SERVERNAME) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@@SERVERNAME), '\', '$') ELSE SUBSTRING(UPPER(@@SERVERNAME), 1, CHARINDEX('.', UPPER(@@SERVERNAME))-1) END + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
 										) = 0
 									)
 								)
@@ -229,7 +229,7 @@ WHILE @@FETCH_STATUS=0
 																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
-										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Database Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
+										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Database Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@forSQLServerName) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@forSQLServerName), '\', '$') ELSE SUBSTRING(UPPER(@forSQLServerName), 1, CHARINDEX('.', UPPER(@forSQLServerName))-1) END + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
 										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName	= ''' + @forSQLServerName + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 1, @flgOptions = 3, @maxDOP = DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
@@ -274,7 +274,7 @@ WHILE @@FETCH_STATUS=0
 																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
-										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Allocation Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
+										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Allocation Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@forSQLServerName) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@forSQLServerName), '\', '$') ELSE SUBSTRING(UPPER(@forSQLServerName), 1, CHARINDEX('.', UPPER(@forSQLServerName))-1) END + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
 										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = ' + CAST(@featureflgActions AS [nvarchar]) + N', @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
@@ -313,7 +313,7 @@ WHILE @@FETCH_STATUS=0
 																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
-										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Tables Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
+										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Tables Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@forSQLServerName) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@forSQLServerName), '\', '$') ELSE SUBSTRING(UPPER(@forSQLServerName), 1, CHARINDEX('.', UPPER(@forSQLServerName))-1) END + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
 										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName	= ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 2, @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
@@ -352,7 +352,7 @@ WHILE @@FETCH_STATUS=0
 																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
-										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Reference Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
+										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Reference Consistency Check' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@forSQLServerName) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@forSQLServerName), '\', '$') ELSE SUBSTRING(UPPER(@forSQLServerName), 1, CHARINDEX('.', UPPER(@forSQLServerName))-1) END + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
 										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 16, @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
@@ -391,7 +391,7 @@ WHILE @@FETCH_STATUS=0
 																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
-										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Perform Correction to Space Usage' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
+										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Perform Correction to Space Usage' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@forSQLServerName) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@forSQLServerName), '\', '$') ELSE SUBSTRING(UPPER(@forSQLServerName), 1, CHARINDEX('.', UPPER(@forSQLServerName))-1) END + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
 										'EXEC [dbo].[usp_mpDatabaseConsistencyCheck] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 64, @flgOptions = DEFAULT, @maxDOP	= DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
@@ -435,7 +435,7 @@ WHILE @@FETCH_STATUS=0
 																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
-										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Rebuild Heap Tables' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
+										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Rebuild Heap Tables' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@forSQLServerName) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@forSQLServerName), '\', '$') ELSE SUBSTRING(UPPER(@forSQLServerName), 1, CHARINDEX('.', UPPER(@forSQLServerName))-1) END + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
 										'EXEC [dbo].[usp_mpDatabaseOptimize] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 16, @flgOptions = DEFAULT, @defragIndexThreshold = DEFAULT, @rebuildIndexThreshold = DEFAULT, @pageThreshold = DEFAULT, @rebuildIndexPageCountLimit = DEFAULT, @maxDOP = DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
@@ -479,7 +479,7 @@ WHILE @@FETCH_STATUS=0
 																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
-										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Rebuild or Reorganize Indexes' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
+										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Rebuild or Reorganize Indexes' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@forSQLServerName) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@forSQLServerName), '\', '$') ELSE SUBSTRING(UPPER(@forSQLServerName), 1, CHARINDEX('.', UPPER(@forSQLServerName))-1) END + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
 										'EXEC [dbo].[usp_mpDatabaseOptimize] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = ' + CAST(@featureflgActions AS [varchar]) + ', @flgOptions = DEFAULT, @defragIndexThreshold = DEFAULT, @rebuildIndexThreshold = DEFAULT, @pageThreshold = DEFAULT, @rebuildIndexPageCountLimit = DEFAULT, @statsSamplePercent = DEFAULT, @statsAgeDays = DEFAULT, @statsChangePercent = DEFAULT, @maxDOP = DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
@@ -518,7 +518,7 @@ WHILE @@FETCH_STATUS=0
 																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
-										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Update Statistics' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
+										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Update Statistics' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@forSQLServerName) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@forSQLServerName), '\', '$') ELSE SUBSTRING(UPPER(@forSQLServerName), 1, CHARINDEX('.', UPPER(@forSQLServerName))-1) END + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
 										'EXEC [dbo].[usp_mpDatabaseOptimize] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @tableSchema = ''%'', @tableName = ''%'', @flgActions = 8, @flgOptions = DEFAULT, @statsSamplePercent = DEFAULT, @statsAgeDays = DEFAULT, @statsChangePercent = DEFAULT, @maxDOP = DEFAULT, @maxRunningTimeInMinutes = DEFAULT, @skipObjectsList = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
@@ -561,7 +561,7 @@ WHILE @@FETCH_STATUS=0
 																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
-										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Shrink Database (TRUNCATEONLY)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
+										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Shrink Database (TRUNCATEONLY)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@forSQLServerName) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@forSQLServerName), '\', '$') ELSE SUBSTRING(UPPER(@forSQLServerName), 1, CHARINDEX('.', UPPER(@forSQLServerName))-1) END + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
 										'EXEC [dbo].[usp_mpDatabaseShrink] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @flgActions = 2, @flgOptions = 1, @debugMode = ' + CAST(@debugMode AS [varchar]),
@@ -600,7 +600,7 @@ WHILE @@FETCH_STATUS=0
 																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
-										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Shrink Log File' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
+										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Shrink Log File' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@forSQLServerName) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@forSQLServerName), '\', '$') ELSE SUBSTRING(UPPER(@forSQLServerName), 1, CHARINDEX('.', UPPER(@forSQLServerName))-1) END + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
 										'EXEC [dbo].[usp_mpDatabaseShrink] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @flgActions = 1, @flgOptions = 0, @debugMode = ' + CAST(@debugMode AS [varchar]),
@@ -645,7 +645,7 @@ WHILE @@FETCH_STATUS=0
 																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
-										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Backup User Databases (diff)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
+										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Backup User Databases (diff)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@forSQLServerName) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@forSQLServerName), '\', '$') ELSE SUBSTRING(UPPER(@forSQLServerName), 1, CHARINDEX('.', UPPER(@forSQLServerName))-1) END + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
 										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 2, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
@@ -683,7 +683,7 @@ WHILE @@FETCH_STATUS=0
 																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
-										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Backup User Databases (full)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
+										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Backup User Databases (full)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@forSQLServerName) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@forSQLServerName), '\', '$') ELSE SUBSTRING(UPPER(@forSQLServerName), 1, CHARINDEX('.', UPPER(@forSQLServerName))-1) END + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
 										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 1, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
@@ -721,7 +721,7 @@ WHILE @@FETCH_STATUS=0
 																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
-										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Backup System Databases (full)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
+										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Backup System Databases (full)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@forSQLServerName) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@forSQLServerName), '\', '$') ELSE SUBSTRING(UPPER(@forSQLServerName), 1, CHARINDEX('.', UPPER(@forSQLServerName))-1) END + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
 										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 1, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
@@ -763,7 +763,7 @@ WHILE @@FETCH_STATUS=0
 																, [job_command], [task_id], [database_name])
 								SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor],
 										@forInstanceID AS [for_instance_id], 
-										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Backup User Databases (log)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + REPLACE(@forSQLServerName, '\', '$') + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
+										SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + ' - Backup User Databases (log)' + CASE WHEN @forSQLServerName <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@forSQLServerName) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@forSQLServerName), '\', '$') ELSE SUBSTRING(UPPER(@forSQLServerName), 1, CHARINDEX('.', UPPER(@forSQLServerName))-1) END + ' ' ELSE ' - ' END + '(dbid=' + CAST(X.[database_id] AS [nvarchar]) + ') - ' + [dbo].[ufn_getObjectQuoteName](X.[database_name], 'quoted'), 1, 128) AS [job_name],
 										'Run'		AS [job_step_name],
 										DB_NAME()	AS [job_database_name],
 										'EXEC [dbo].[usp_mpDatabaseBackup] @sqlServerName = ''' + @forSQLServerName + N''', @dbName = ''' + X.[database_name] + N''', @backupLocation = DEFAULT, @flgActions = 4, @flgOptions = DEFAULT, @retentionDays = DEFAULT, @debugMode = ' + CAST(@debugMode AS [varchar]),
@@ -816,7 +816,7 @@ WHILE @@FETCH_STATUS=0
 													AND (
 														SELECT COUNT(*)
 														FROM [dbo].[ufn_getTableFromStringList](@skipDatabasesList, ',') X
-														WHERE S.[job_name] LIKE (DB_NAME() + ' - ' + S.[descriptor] + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + REPLACE(@@SERVERNAME, '\', '$') + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
+														WHERE S.[job_name] LIKE (DB_NAME() + ' - ' + S.[descriptor] + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@@SERVERNAME) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@@SERVERNAME), '\', '$') ELSE SUBSTRING(UPPER(@@SERVERNAME), 1, CHARINDEX('.', UPPER(@@SERVERNAME))-1) END + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
 													) = 0
 												)
 										  )
@@ -869,7 +869,7 @@ WHILE @@FETCH_STATUS=0
 													AND (
 														SELECT COUNT(*)
 														FROM [dbo].[ufn_getTableFromStringList](@skipDatabasesList, ',') X
-														WHERE S.[job_name] LIKE (DB_NAME() + ' - ' + S.[descriptor] + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + REPLACE(@@SERVERNAME, '\', '$') + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
+														WHERE S.[job_name] LIKE (DB_NAME() + ' - ' + S.[descriptor] + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@@SERVERNAME) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@@SERVERNAME), '\', '$') ELSE SUBSTRING(UPPER(@@SERVERNAME), 1, CHARINDEX('.', UPPER(@@SERVERNAME))-1) END + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
 													) = 0
 												)
 										  )
@@ -896,8 +896,8 @@ WHILE @@FETCH_STATUS=0
 										ROW_NUMBER() OVER (ORDER BY [id]) AS [new_priority]
 								FROM @jobExecutionQueue 
 								) X ON jeqX.[id] = X.[id] 
-
-				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
+								
+					INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
 														, [for_instance_id], [job_name], [job_step_name], [job_database_name]
 														, [job_command], [task_id], [database_name], [priority])
 					SELECT DISTINCT
@@ -924,7 +924,7 @@ WHILE @@FETCH_STATUS=0
 											AND (
 												SELECT COUNT(*)
 												FROM [dbo].[ufn_getTableFromStringList](@skipDatabasesList, ',') X
-												WHERE S.[job_name] LIKE (DB_NAME() + ' - ' + S.[descriptor] + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + REPLACE(@@SERVERNAME, '\', '$') + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
+												WHERE S.[job_name] LIKE (DB_NAME() + ' - ' + S.[descriptor] + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@@SERVERNAME) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@@SERVERNAME), '\', '$') ELSE SUBSTRING(UPPER(@@SERVERNAME), 1, CHARINDEX('.', UPPER(@@SERVERNAME))-1) END + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
 											) = 0
 										)
 									)

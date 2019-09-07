@@ -79,7 +79,7 @@ BEGIN TRANSACTION
 											@notify_level_page=0, 
 											@delete_level=0, 
 											@description=N'SQL Server Agent failed jobs custom monitoring and alarms
-http://dbaTDPMon.codeplex.com', 
+https://github.com/rentadba/dbaTDPMon', 
 											@category_name=N'Database Maintenance', 
 											@owner_login_name=N'sa', 
 											@job_id = @jobId OUTPUT

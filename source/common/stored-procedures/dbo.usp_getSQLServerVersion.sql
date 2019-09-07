@@ -13,6 +13,7 @@ CREATE PROCEDURE [dbo].[usp_getSQLServerVersion]
 		@serverEdition			[sysname]		OUT,
 		@serverVersionStr		[sysname]		OUT,
 		@serverVersionNum		[numeric](9,6)	OUT,
+		@serverEngine			[int]			OUT,
 		@executionLevel			[tinyint] = 0,
 		@debugMode				[bit] = 0
 /* WITH ENCRYPTION */
@@ -37,6 +38,7 @@ BEGIN TRY
 	SELECT    @serverEdition    = [edition]
 			, @serverVersionStr = [version]
 			, @serverVersionNum = SUBSTRING([version], 1, CHARINDEX('.', [version])-1) + '.' + REPLACE(SUBSTRING([version], CHARINDEX('.', [version])+1, LEN([version])), '.', '')
+			, @serverEngine		= [engine]
 	FROM [dbo].[vw_catalogInstanceNames]
 	WHERE [instance_name] = @sqlServerName
 END TRY
@@ -48,10 +50,10 @@ END CATCH
 
 IF @serverEdition IS NULL
 	begin
-
 		SET @queryToRun = N''
 		SET @queryToRun = @queryToRun + 'SELECT CAST(SERVERPROPERTY(''Edition'') AS [sysname]) AS [edition],
-												CAST(SERVERPROPERTY(''ProductVersion'') AS [sysname]) AS [product_version]'
+												CAST(SERVERPROPERTY(''ProductVersion'') AS [sysname]) AS [product_version],
+												CAST(SERVERPROPERTY(''EngineEdition'') AS [int]) AS [engine]'
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
@@ -60,13 +62,15 @@ IF @serverEdition IS NULL
 			(
 				[edition]			[sysname]
 			  , [product_version]	[sysname]
+			  , [engine]			[int]
 			)
 
-		INSERT	INTO #serverProperty([edition], [product_version])
+		INSERT	INTO #serverProperty([edition], [product_version], [engine])
 				EXEC sp_executesql  @queryToRun
 
 		SELECT    @serverEdition = [edition] 
-				, @serverVersionStr = [product_version] 
+				, @serverVersionStr = [product_version]
+				, @serverEngine = [engine]
 		FROM #serverProperty
 
 		SET @serverVersionNum=SUBSTRING(@serverVersionStr, 1, CHARINDEX('.', @serverVersionStr)-1) + '.' + REPLACE(SUBSTRING(@serverVersionStr, CHARINDEX('.', @serverVersionStr)+1, LEN(@serverVersionStr)), '.', '')

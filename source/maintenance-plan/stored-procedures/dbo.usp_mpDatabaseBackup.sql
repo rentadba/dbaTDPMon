@@ -71,6 +71,7 @@ DECLARE		@backupFileName					[nvarchar](1024),
 			@serverEdition					[sysname],
 			@serverVersionStr				[sysname],
 			@serverVersionNum				[numeric](9,6),
+			@serverEngine					[int],
 			@hostPlatform					[sysname],
 			@errorCode						[int],
 			@currentDate					[datetime],
@@ -166,11 +167,12 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName		= @sqlServerName,
 										@serverEdition		= @serverEdition OUT,
 										@serverVersionStr	= @serverVersionStr OUT,
 										@serverVersionNum	= @serverVersionNum OUT,
+										@serverEngine		= @serverEngine OUT,
 										@executionLevel		= @executionLevel,
 										@debugMode			= @debugMode
 
 ---------------------------------------------------------------------------------------------
-SET @isAzureSQLDatabase = CASE WHEN @serverEdition LIKE '%SQL Azure' THEN 1 ELSE 0 END
+SET @isAzureSQLDatabase = CASE WHEN @serverEngine IN (5, 6) THEN 1 ELSE 0 END
 
 -----------------------------------------------------------------------------------------
 --backup to URL pre-requisites
@@ -208,7 +210,7 @@ IF @backupLocation LIKE 'https://%'
 					end
 			end
 		ELSE
-			IF @serverVersionNum < 13
+			IF @serverVersionNum < 13 AND @serverEngine NOT IN (5, 6, 8)
 				begin
 					SET @queryToRun=N'Credential parameter value was not set.' 
 					EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=1
@@ -630,7 +632,7 @@ IF @flgActions & 4 = 4 AND @flgOptions & 8192 = 8192
 
 --check if another backup is needed (full) / partially applicable to AlwaysOn Availability Groups
 SET @optionForceChangeBackupType=0
-IF @flgOptions & 8 = 8 AND (@clusterName IS NULL OR (@clusterName IS NOT NULL AND @agInstanceRoleDesc = 'PRIMARY'))
+IF @flgOptions & 8 = 8 AND (@clusterName IS NULL OR (@clusterName IS NOT NULL AND @agInstanceRoleDesc = 'PRIMARY')) AND @serverEngine NOT IN (5, 6, 8)
 	begin
 		--check for any full database backup (when differential should be made) or any full/incremental database backup (when transaction log should be made)
 		IF @flgActions & 2 = 2 OR @flgActions & 4 = 4

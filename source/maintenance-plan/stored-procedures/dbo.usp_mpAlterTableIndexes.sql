@@ -475,13 +475,15 @@ BEGIN TRY
 										--get destination server running version/edition
 										DECLARE		@serverEdition					[sysname],
 													@serverVersionStr				[sysname],
-													@serverVersionNum				[numeric](9,6)
+													@serverVersionNum				[numeric](9,6),
+													@serverEngine					[int]
 
 										SET @nestedExecutionLevel = @executionLevel + 1
 										EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 																				@serverEdition			= @serverEdition OUT,
 																				@serverVersionStr		= @serverVersionStr OUT,
 																				@serverVersionNum		= @serverVersionNum OUT,
+																				@serverEngine			= @serverEngine OUT,
 																				@executionLevel			= @nestedExecutionLevel,
 																				@debugMode				= @debugMode
 										

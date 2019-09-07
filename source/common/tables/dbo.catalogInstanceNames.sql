@@ -23,6 +23,7 @@ CREATE TABLE [dbo].[catalogInstanceNames]
 	[name]						[sysname]		NOT NULL,
 	[version]					[varchar](30)	NULL,
 	[edition]					[varchar](256)	NULL,
+	[engine]					[int]			NULL,
 	[active]					[bit]			NOT NULL CONSTRAINT [DF_catalogInstanceNames_Active] DEFAULT (1),
 	[is_clustered]				[bit]			NOT NULL CONSTRAINT [DF_catalogInstanceNames_IsClustered] DEFAULT (0),
 	[cluster_node_machine_id]	[smallint]		NULL,
