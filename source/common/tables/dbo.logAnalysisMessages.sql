@@ -27,7 +27,7 @@ CREATE TABLE [dbo].[logAnalysisMessages]
 	(
 		[id],
 		[instance_id]
-	) ON [FG_Statistics_Data],
+	) ,
 	CONSTRAINT [FK_logAnalysisMessages_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
@@ -46,11 +46,11 @@ CREATE TABLE [dbo].[logAnalysisMessages]
 		[id],
 		[project_id]
 	)
-) ON [FG_Statistics_Data]
+) 
 GO
 
-CREATE INDEX [IX_logAnalysisMessages_InstanceID] ON [dbo].[logAnalysisMessages]([instance_id], [project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_logAnalysisMessages_InstanceID] ON [dbo].[logAnalysisMessages]([instance_id], [project_id])
 GO
-CREATE INDEX [IX_logAnalysisMessages_ProjecteID] ON [dbo].[logAnalysisMessages]([project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_logAnalysisMessages_ProjecteID] ON [dbo].[logAnalysisMessages]([project_id])
 GO
 

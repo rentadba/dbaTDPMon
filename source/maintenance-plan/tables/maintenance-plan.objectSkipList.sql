@@ -27,7 +27,7 @@ CREATE TABLE [maintenance-plan].[objectSkipList]
 	CONSTRAINT [PK_objectSkipList] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
-	) ON [PRIMARY],
+	),
 	CONSTRAINT [UK_objectSkipList_Name] UNIQUE  NONCLUSTERED 
 	(
 		[instance_name],
@@ -35,7 +35,7 @@ CREATE TABLE [maintenance-plan].[objectSkipList]
 		[task_id],
 		[schema_name],
 		[object_name]
-	) ON [PRIMARY],
+	),
 	CONSTRAINT [FK_MaintenancePlan_objectSkipList_appInternalTasks] FOREIGN KEY 
 	(
 		[task_id]
@@ -44,10 +44,9 @@ CREATE TABLE [maintenance-plan].[objectSkipList]
 	(
 		[id]
 	)
-)  ON [PRIMARY]
+)
 GO
 
 CREATE INDEX [IX_MaintenancePlan_objectSkipList_TaskID] ON [maintenance-plan].[objectSkipList]
 		([task_id])
-	ON [FG_Statistics_Index]
 GO

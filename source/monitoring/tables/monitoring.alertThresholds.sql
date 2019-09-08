@@ -27,13 +27,13 @@ CREATE TABLE [monitoring].[alertThresholds]
 	CONSTRAINT [PK_alertThresholds] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
-	)  ON [PRIMARY],
+	),
 	CONSTRAINT [UK_alertThresholds_AlertName] UNIQUE
 		(
 			[category]
 		  , [alert_name]
 		) 
-) ON [PRIMARY]
+)
 GO
 
 SET NOCOUNT ON

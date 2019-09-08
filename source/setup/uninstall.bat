@@ -17,10 +17,10 @@ if  !%2==! goto help
 
 set server=%1
 set dbname=%2
-set userid=%5
-set password=%6
+set userid=%3
+set password=%4
 
-if  !%5==! goto trusted_connection
+if  !%3==! goto trusted_connection
 
 set autentif=-U%userid% -P%password%
 
@@ -60,11 +60,10 @@ set doUninstall = "N"
 set /P doUninstall=Continue with uninstall of dbaTDPMon (Y/[N])? 
 if /I "%doUninstall%" neq "Y" goto end
 
-
 echo *-----------------------------------------------------------------------------*
 echo Performing cleanup...
 echo *-----------------------------------------------------------------------------*
-sqlcmd.exe -S%server% %autentif% -i "uninstall-stop-agent-jobs.sql" -d msdb -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "uninstall-stop-agent-jobs.sql" -d master -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
 echo *-----------------------------------------------------------------------------*

@@ -27,15 +27,15 @@ CREATE TABLE [report].[htmlSkipRules]
 	CONSTRAINT [PK_htmlSkipRules] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
-	) ON [PRIMARY],
+	),
 	CONSTRAINT [UK_htmlSkipRules_Name] UNIQUE  NONCLUSTERED 
 	(
 		[module],
 		[rule_id],
 		[skip_value],
 		[skip_value2]
-	) ON [PRIMARY]
-)  ON [PRIMARY]
+	)
+)
 GO
 
 -----------------------------------------------------------------------------------------------------

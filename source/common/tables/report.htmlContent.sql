@@ -34,7 +34,7 @@ CREATE TABLE [report].[htmlContent]
 	CONSTRAINT [PK_htmlContent] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
-	) ON [FG_Statistics_Data],
+	),
 	CONSTRAINT [FK_htmlContent_CatalogProjects] FOREIGN KEY 
 	(
 		[project_id]
@@ -54,11 +54,11 @@ CREATE TABLE [report].[htmlContent]
 		[project_id]
 	)
 
-) ON [FG_Statistics_Data]
+)
 GO
 
 
-CREATE INDEX [IX_htmlContent_ProjecteID] ON [report].[htmlContent]([project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_htmlContent_ProjecteID] ON [report].[htmlContent]([project_id])
 GO
-CREATE INDEX [IX_htmlContent_InstanceID] ON [report].[htmlContent]([instance_id], [project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_htmlContent_InstanceID] ON [report].[htmlContent]([instance_id], [project_id])
 GO

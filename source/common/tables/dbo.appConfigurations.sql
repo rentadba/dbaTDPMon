@@ -23,13 +23,13 @@ CREATE TABLE [dbo].[appConfigurations]
 	CONSTRAINT [PK_appConfigurations] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
-	) ON [PRIMARY],
+	) ,
 	CONSTRAINT [UK_appConfigurations_Name] UNIQUE  NONCLUSTERED 
 	(
 		[module], 
 		[name]
-	) ON [PRIMARY]
-) ON [PRIMARY]
+	) 
+) 
 GO
 
 -----------------------------------------------------------------------------------------------------

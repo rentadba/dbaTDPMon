@@ -48,7 +48,7 @@ SET @databaseName = N'$(dbName)'
 SET @job_name = @databaseName + N' - Monitoring - TransactionStatus'
 SET @logFileLocation = @logFileLocation + N'job-' + @job_name + N'.log'
 SET @logFileLocation = [$(dbName)].[dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, @logFileLocation)
-
+IF CAST(SERVERPROPERTY('EngineEdition') AS [int]) IN (5, 6, 8) SET @logFileLocation = NULL
 
 ---------------------------------------------------------------------------------------------------
 /* dropping job if exists */
@@ -113,7 +113,7 @@ https://github.com/rentadba/dbaTDPMon',
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'
 EXEC [dbo].[usp_sqlAgentJobEmailStatusReport]	@jobName		=''' + @job_name + ''',
-												@logFileLocation=''' + @logFileLocation + ''',
+												@logFileLocation='+ + CASE WHEN CAST(SERVERPROPERTY('EngineEdition') AS [int]) NOT IN (5, 6, 8) THEN '''' + @logFileLocation + '''' ELSE 'null' END + ',
 												@module			=''monitoring'',
 												@sendLogAsAttachment = 1,
 												@eventType		= 2'

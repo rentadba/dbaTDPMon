@@ -24,8 +24,8 @@ CREATE TABLE [report].[htmlGraphics]
 	CONSTRAINT [PK_htmlGraphics] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
-	)  ON [PRIMARY]
-) ON [PRIMARY]
+	)
+)
 GO
 
 -----------------------------------------------------------------------------------------------------

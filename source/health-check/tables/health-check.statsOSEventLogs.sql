@@ -39,7 +39,7 @@ CREATE TABLE [health-check].[statsOSEventLogs]
 	(
 		[id],
 		[instance_id]
-	) ON [FG_Statistics_Data],
+	),
 	CONSTRAINT [FK_statsOSEventLogs_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
@@ -69,12 +69,12 @@ CREATE TABLE [health-check].[statsOSEventLogs]
 		[project_id]
 	)
 
-)ON [FG_Statistics_Data]
+)
 GO
 
-CREATE INDEX [IX_statsOSEventLogs_InstanceID] ON [health-check].[statsOSEventLogs]([instance_id], [project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsOSEventLogs_InstanceID] ON [health-check].[statsOSEventLogs]([instance_id], [project_id])
 GO
-CREATE INDEX [IX_statsOSEventLogs_ProjecteID] ON [health-check].[statsOSEventLogs]([project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsOSEventLogs_ProjecteID] ON [health-check].[statsOSEventLogs]([project_id])
 GO
-CREATE INDEX [IX_statsOSEventLogs_MachineID] ON [health-check].[statsOSEventLogs]([machine_id], [project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsOSEventLogs_MachineID] ON [health-check].[statsOSEventLogs]([machine_id], [project_id])
 GO

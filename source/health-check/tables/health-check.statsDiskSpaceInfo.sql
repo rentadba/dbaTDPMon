@@ -30,7 +30,7 @@ CREATE TABLE [health-check].[statsDiskSpaceInfo]
 	(
 		[id],
 		[instance_id]
-	) ON [FG_Statistics_Data],
+	),
 	CONSTRAINT [FK_statsDiskSpaceInfo_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
@@ -49,10 +49,10 @@ CREATE TABLE [health-check].[statsDiskSpaceInfo]
 		[id],
 		[project_id]
 	)
-)ON [FG_Statistics_Data]
+)
 GO
 
-CREATE INDEX [IX_statsDiskSpaceInfo_InstanceID] ON [health-check].[statsDiskSpaceInfo]([instance_id], [project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsDiskSpaceInfo_InstanceID] ON [health-check].[statsDiskSpaceInfo]([instance_id], [project_id])
 GO
-CREATE INDEX [IX_statsDiskSpaceInfo_ProjecteID] ON [health-check].[statsDiskSpaceInfo]([project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsDiskSpaceInfo_ProjecteID] ON [health-check].[statsDiskSpaceInfo]([project_id])
 GO

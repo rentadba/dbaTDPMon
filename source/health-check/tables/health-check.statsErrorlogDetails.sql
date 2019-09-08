@@ -28,7 +28,7 @@ CREATE TABLE [health-check].[statsErrorlogDetails]
 	(
 		[id],
 		[instance_id]
-	) ON [FG_Statistics_Data],
+	),
 	CONSTRAINT [FK_statsErrorlogDetails_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
@@ -47,12 +47,12 @@ CREATE TABLE [health-check].[statsErrorlogDetails]
 		[id],
 		[project_id]
 	)
-)ON [FG_Statistics_Data]
+)
 GO
 
-CREATE INDEX [IX_statsErrorlogDetails_ProjectID] ON [health-check].[statsErrorlogDetails] ([project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsErrorlogDetails_ProjectID] ON [health-check].[statsErrorlogDetails] ([project_id])
 GO
-CREATE INDEX [IX_statsErrorlogDetails_InstanceID] ON [health-check].[statsErrorlogDetails] ([instance_id], [project_id], [log_date]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsErrorlogDetails_InstanceID] ON [health-check].[statsErrorlogDetails] ([instance_id], [project_id], [log_date])
 GO
-CREATE INDEX [IX_statsErrorlogDetails_LogDate] ON [health-check].[statsErrorlogDetails]([log_date], [instance_id], [project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsErrorlogDetails_LogDate] ON [health-check].[statsErrorlogDetails]([log_date], [instance_id], [project_id])
 GO

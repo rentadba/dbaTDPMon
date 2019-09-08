@@ -31,7 +31,7 @@ CREATE TABLE [health-check].[statsSQLAgentJobsHistory]
 	(
 		[id],
 		[instance_id]
-	) ON [FG_Statistics_Data],
+	),
 	CONSTRAINT [FK_statsSQLAgentJobsHistory_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
@@ -50,10 +50,10 @@ CREATE TABLE [health-check].[statsSQLAgentJobsHistory]
 		[id],
 		[project_id]
 	)
-)ON [FG_Statistics_Data]
+)
 GO
 
-CREATE INDEX [IX_statsSQLAgentJobsHistory_InstanceID] ON [health-check].[statsSQLAgentJobsHistory]([instance_id], [project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsSQLAgentJobsHistory_InstanceID] ON [health-check].[statsSQLAgentJobsHistory]([instance_id], [project_id])
 GO
-CREATE INDEX [IX_statsSQLAgentJobsHistory_ProjecteID] ON [health-check].[statsSQLAgentJobsHistory]([project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsSQLAgentJobsHistory_ProjecteID] ON [health-check].[statsSQLAgentJobsHistory]([project_id])
 GO

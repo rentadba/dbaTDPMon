@@ -27,12 +27,12 @@ CREATE TABLE [maintenance-plan].[internalScheduler]
 	CONSTRAINT [PK_internalScheduler] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
-	) ON [PRIMARY],
+	),
 	CONSTRAINT [UK_internalScheduler] UNIQUE
 	(
 		  [project_id]
 		, [task_id]
-	) ON [PRIMARY],
+	),
 	CONSTRAINT [FK_internalScheduler_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
@@ -49,7 +49,7 @@ CREATE TABLE [maintenance-plan].[internalScheduler]
 	(
 		[id]
 	)	
-) ON [PRIMARY]
+)
 GO
 
 
@@ -57,7 +57,6 @@ CREATE INDEX [IX_MaintenancePlan_internalScheduler_TaskID] ON [maintenance-plan]
 		([task_id], [project_id])
 	INCLUDE
 		([scheduled_weekday], [active])
-	ON [FG_Statistics_Index]
 GO
 
 

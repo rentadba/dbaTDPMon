@@ -33,17 +33,17 @@ CREATE TABLE [dbo].[catalogInstanceNames]
 		[id],
 		[machine_id],
 		[project_id]
-	) ON [PRIMARY],
+	) ,
 	CONSTRAINT [UK_catalogInstanceNames_Name] UNIQUE  NONCLUSTERED 
 	(
 		[name],
 		[machine_id]
-	) ON [PRIMARY],
+	) ,
 	CONSTRAINT [UK_catalogInstanceNames_ID] UNIQUE  NONCLUSTERED 
 	(
 		[id],
 		[project_id]
-	) ON [PRIMARY],	
+	) ,	
 	CONSTRAINT [FK_catalogInstanceNames_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
@@ -72,12 +72,12 @@ CREATE TABLE [dbo].[catalogInstanceNames]
 		[id],
 		[project_id]
 	)
-)  ON [PRIMARY]
+)  
 GO
 
-CREATE INDEX [IX_catalogInstanceNames_ProjectID] ON [dbo].[catalogInstanceNames]([project_id]) ON [PRIMARY]
+CREATE INDEX [IX_catalogInstanceNames_ProjectID] ON [dbo].[catalogInstanceNames]([project_id]) 
 GO
-CREATE INDEX [IX_catalogInstanceNames_MachineID] ON [dbo].[catalogInstanceNames]([machine_id], [project_id]) ON [PRIMARY]
+CREATE INDEX [IX_catalogInstanceNames_MachineID] ON [dbo].[catalogInstanceNames]([machine_id], [project_id]) 
 GO
-CREATE INDEX [IX_catalogInstanceNames_ClusterNodeMachineID] ON [dbo].[catalogInstanceNames]([cluster_node_machine_id], [project_id]) ON [PRIMARY]
+CREATE INDEX [IX_catalogInstanceNames_ClusterNodeMachineID] ON [dbo].[catalogInstanceNames]([cluster_node_machine_id], [project_id]) 
 GO

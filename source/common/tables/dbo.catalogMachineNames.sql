@@ -27,12 +27,12 @@ CREATE TABLE [dbo].[catalogMachineNames]
 	(
 		[id],
 		[project_id]
-	) ON [PRIMARY],
+	) ,
 	CONSTRAINT [UK_catalogMachineNames_Name] UNIQUE  NONCLUSTERED 
 	(
 		[name],
 		[project_id]
-	) ON [PRIMARY],
+	) ,
 	CONSTRAINT [FK_catalogMachineNames_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
@@ -41,9 +41,9 @@ CREATE TABLE [dbo].[catalogMachineNames]
 	(
 		[id]
 	)
-)  ON [PRIMARY]
+)  
 GO
 
-CREATE INDEX [IX_catalogMachineNames_ProjectID] ON [dbo].[catalogMachineNames]([project_id]) ON [PRIMARY]
+CREATE INDEX [IX_catalogMachineNames_ProjectID] ON [dbo].[catalogMachineNames]([project_id]) 
 GO
 

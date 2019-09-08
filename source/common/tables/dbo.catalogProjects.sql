@@ -27,15 +27,15 @@ CREATE TABLE [dbo].[catalogProjects]
 	CONSTRAINT [PK_catalogProjects] PRIMARY KEY  CLUSTERED 
 	(
 		[code]
-	) ON [PRIMARY] ,
+	) ,
 	CONSTRAINT [UK_catalogProjects_Name] UNIQUE  NONCLUSTERED 
 	(
 		[name]
-	) ON [PRIMARY],
+	) ,
 	CONSTRAINT [UK_catalogProjects_ID] UNIQUE  NONCLUSTERED 
 	(
 		[id]
-	) ON [PRIMARY],
+	) ,
 	CONSTRAINT [FK_catalogProjects_catalogSolutions] FOREIGN KEY 
 	(
 		[solution_id]
@@ -44,10 +44,10 @@ CREATE TABLE [dbo].[catalogProjects]
 	(
 		[id]
 	)
-) ON [PRIMARY]
+) 
 GO
 
-CREATE INDEX [IX_catalogProjects_ProjectID_SolutionID] ON [dbo].[catalogProjects]([solution_id]) ON [PRIMARY]
+CREATE INDEX [IX_catalogProjects_ProjectID_SolutionID] ON [dbo].[catalogProjects]([solution_id]) 
 GO
 
 -----------------------------------------------------------------------------------------------------

@@ -39,7 +39,7 @@ CREATE TABLE [monitoring].[statsTransactionsStatus]
 	(
 		[id],
 		[instance_id]
-	) ON [FG_Statistics_Data],
+	),
 	CONSTRAINT [FK_statsTransactionsStatus_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
@@ -58,10 +58,10 @@ CREATE TABLE [monitoring].[statsTransactionsStatus]
 		[id],
 		[project_id]
 	)
-)ON [FG_Statistics_Data]
+)
 GO
 
-CREATE INDEX [IX_statsTransactionsStatus_InstanceID] ON [monitoring].[statsTransactionsStatus]([instance_id], [project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsTransactionsStatus_InstanceID] ON [monitoring].[statsTransactionsStatus]([instance_id], [project_id])
 GO
-CREATE INDEX [IX_statsTransactionsStatus_ProjecteID] ON [monitoring].[statsTransactionsStatus]([project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsTransactionsStatus_ProjecteID] ON [monitoring].[statsTransactionsStatus]([project_id])
 GO

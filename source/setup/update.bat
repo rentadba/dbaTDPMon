@@ -66,105 +66,6 @@ echo *--------------------------------------------------------------------------
 echo Common: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
 
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20160825-patch-upgrade-from-v2016_6-to-v2016_9-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20161119-patch-upgrade-from-v2016_11-to-v2017_4-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20170324-patch-upgrade-from-v2016_11-to-v2017_4-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20170428-patch-upgrade-from-v2017_4-to-v2017_5-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20170509-patch-upgrade-from-v2017_4-to-v2017_5-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20170516-patch-upgrade-from-v2017_4-to-v2017_6-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180112-patch-upgrade-from-v2017_6-to-v2017_12-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180131-patch-upgrade-from-v2017_12-to-v2018_1-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180301-patch-upgrade-from-v2018_1-to-v2018_3-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180405-patch-upgrade-from-v2018_3-to-v2018_4-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180411-patch-upgrade-from-v2018_3-to-v2018_4-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180417-patch-upgrade-from-v2018_3-to-v2018_4-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180420-patch-upgrade-from-v2018_3-to-v2018_4-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180423-patch-upgrade-from-v2018_3-to-v2018_4-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180426-patch-upgrade-from-v2018_3-to-v2018_4-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180501-patch-upgrade-from-v2018_4-to-v2018_5-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180605-patch-upgrade-from-v2018_5-to-v2018_6-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180620-patch-upgrade-from-v2018_5-to-v2018_6-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180628-patch-upgrade-from-v2018_5-to-v2018_6-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180703-patch-upgrade-from-v2018_6-to-v2018_7-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180709-patch-upgrade-from-v2018_6-to-v2018_7-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180711-patch-upgrade-from-v2018_6-to-v2018_7-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180713-patch-upgrade-from-v2018_6-to-v2018_7-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20181010-patch-upgrade-from-v2018_9-to-v2018_10-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20181017-patch-upgrade-from-v2018_9-to-v2018_10-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20181127-patch-upgrade-from-v2018_10-to-v2018_11-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20190109-patch-upgrade-from-v2018_12-to-v2019_01-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20190110-patch-upgrade-from-v2018_12-to-v2019_01-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20190305-patch-upgrade-from-v2019_1-to-v2019_3-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20190311-patch-upgrade-from-v2019_1-to-v2019_3-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20190510-patch-upgrade-from-v2019_3-to-v2019_5-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20190531-patch-upgrade-from-v2019_3-to-v2019_5-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20190613-patch-upgrade-from-v2019_5-to-v2019_6-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20190906-patch-upgrade-from-v2019_6-to-v2019_9-common.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -326,41 +227,6 @@ echo *--------------------------------------------------------------------------
 echo Maintenance Plan: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
 
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20161025-patch-upgrade-from-v2016_9-to-v2016_11-mp.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20170324-patch-upgrade-from-v2016_11-to-v2017_4-mp.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20170520-patch-upgrade-from-v2017_4-to-v2017_6-mp.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180112-patch-upgrade-from-v2017_6-to-v2017_12-mp.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180301-patch-upgrade-from-v2018_1-to-v2018_3-mp.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180411-patch-upgrade-from-v2018_3-to-v2018_4-mp.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180412-patch-upgrade-from-v2018_3-to-v2018_4-mp.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180416-patch-upgrade-from-v2018_3-to-v2018_4-mp.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180818-patch-upgrade-from-v2018_7-to-v2018_8-mp.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180828-patch-upgrade-from-v2018_7-to-v2018_8-mp.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20190311-patch-upgrade-from-v2019_1-to-v2019_3-mp.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20190617-patch-upgrade-from-v2019_5-to-v2019_6-mp.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
 
 
 echo *-----------------------------------------------------------------------------*
@@ -449,35 +315,6 @@ echo *--------------------------------------------------------------------------
 echo Health Check: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
 
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20170324-patch-upgrade-from-v2016_11-to-v2017_4-hc.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20170526-patch-upgrade-from-v2017_4-to-v2017_6-hc.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180411-patch-upgrade-from-v2018_3-to-v2018_4-hc.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180426-patch-upgrade-from-v2018_3-to-v2018_4-hc.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180613-patch-upgrade-from-v2018_5-to-v2018_6-hc.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180619-patch-upgrade-from-v2018_5-to-v2018_6-hc.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180703-patch-upgrade-from-v2018_6-to-v2018_7-hc.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180820-patch-upgrade-from-v2018_7-to-v2018_8-hc.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20190607-patch-upgrade-from-v2019_5-to-v2019_6-hc.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20190617-patch-upgrade-from-v2019_5-to-v2019_6-hc.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
 
 
 echo *-----------------------------------------------------------------------------*
@@ -570,20 +407,6 @@ echo *--------------------------------------------------------------------------
 echo Monitoring: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
 
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20160624-patch-upgrade-from-v2015_12-to-v2016_6-mon.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180128-patch-upgrade-from-v2017_12-to-v2018_1-mon.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180411-patch-upgrade-from-v2018_3-to-v2018_4-mon.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20180418-patch-upgrade-from-v2018_3-to-v2018_4-mon.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20181017-patch-upgrade-from-v2018_9-to-v2018_10-mon.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
 
 
 echo *-----------------------------------------------------------------------------*

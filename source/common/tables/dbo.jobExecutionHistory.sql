@@ -38,7 +38,7 @@ CREATE TABLE [dbo].[jobExecutionHistory]
 	CONSTRAINT [PK_jobExecutionHistory] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
-	) ON [FG_Statistics_Data],
+	) ,
 	CONSTRAINT [FK_jobExecutionHistory_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
@@ -57,16 +57,16 @@ CREATE TABLE [dbo].[jobExecutionHistory]
 		[id],
 		[project_id]
 	)
-)ON [FG_Statistics_Data]
+)
 GO
 
-CREATE INDEX [IX_jobExecutionHistory_InstanceID] ON [dbo].[jobExecutionHistory]([instance_id], [project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_jobExecutionHistory_InstanceID] ON [dbo].[jobExecutionHistory]([instance_id], [project_id]) 
 GO
-CREATE INDEX [IX_jobExecutionHistory_ProjectID] ON [dbo].[jobExecutionHistory] ([project_id], [event_date_utc]) INCLUDE ([instance_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_jobExecutionHistory_ProjectID] ON [dbo].[jobExecutionHistory] ([project_id], [event_date_utc]) INCLUDE ([instance_id]) 
 GO
-CREATE INDEX [IX_jobExecutionHistory_JobName] ON [dbo].[jobExecutionHistory]([job_name], [job_step_name]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_jobExecutionHistory_JobName] ON [dbo].[jobExecutionHistory]([job_name], [job_step_name]) 
 GO
-CREATE INDEX [IX_jobExecutionHistory_Descriptor] ON [dbo].[jobExecutionHistory]([project_id], [status], [module], [descriptor]) INCLUDE ([instance_id], [for_instance_id], [job_name]) ON [FG_Statistics_Index];
+CREATE INDEX [IX_jobExecutionHistory_Descriptor] ON [dbo].[jobExecutionHistory]([project_id], [status], [module], [descriptor]) INCLUDE ([instance_id], [for_instance_id], [job_name]) 
 GO
-CREATE INDEX [IX_jobExecutionHistory] ON [dbo].[jobExecutionHistory] ([module], [for_instance_id], [project_id], [instance_id], [job_name], [job_step_name], [filter]) ON [FG_Statistics_Index];
+CREATE INDEX [IX_jobExecutionHistory] ON [dbo].[jobExecutionHistory] ([module], [for_instance_id], [project_id], [instance_id], [job_name], [job_step_name], [filter]) 
 GO

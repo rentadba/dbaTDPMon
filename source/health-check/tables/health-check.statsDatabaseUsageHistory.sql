@@ -29,7 +29,7 @@ CREATE TABLE [health-check].[statsDatabaseUsageHistory]
 	(
 		[id],
 		[catalog_database_id]
-	) ON [FG_Statistics_Data],
+	) ,
 	CONSTRAINT [FK_statsDatabaseUsageHistory_catalogDatabaseNames] FOREIGN KEY 
 	(
 		  [catalog_database_id]
@@ -40,10 +40,10 @@ CREATE TABLE [health-check].[statsDatabaseUsageHistory]
 		  [id]
 		, [instance_id]
 	)
-)ON [FG_Statistics_Data]
+)
 GO
 
-CREATE INDEX [IX_statsDatabaseUsageHistory_CatalogDatabaseID] ON [health-check].[statsDatabaseUsageHistory]( [catalog_database_id], [instance_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsDatabaseUsageHistory_CatalogDatabaseID] ON [health-check].[statsDatabaseUsageHistory]( [catalog_database_id], [instance_id])
 GO
-CREATE INDEX [IX_statsDatabaseUsageHistory_InstanceID] ON [health-check].[statsDatabaseUsageHistory] ([instance_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsDatabaseUsageHistory_InstanceID] ON [health-check].[statsDatabaseUsageHistory] ([instance_id])
 GO

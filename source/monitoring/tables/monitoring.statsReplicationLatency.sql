@@ -36,7 +36,7 @@ CREATE TABLE [monitoring].[statsReplicationLatency]
 	CONSTRAINT [PK_statsReplicationLatency] PRIMARY KEY CLUSTERED 
 	(
 		[id]
-	)  ON [FG_Statistics_Data],
+	),
 	CONSTRAINT [FK_statsReplicationLatency_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
@@ -45,10 +45,10 @@ CREATE TABLE [monitoring].[statsReplicationLatency]
 	(
 		[id]
 	),
-) ON [FG_Statistics_Data]
+)
 GO
 
-CREATE INDEX [IX_statsReplicationLatency_ProjectID] ON [monitoring].[statsReplicationLatency] ([project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsReplicationLatency_ProjectID] ON [monitoring].[statsReplicationLatency] ([project_id])
 GO
-CREATE INDEX [IX_statsReplicationLatency_PublicationName] ON [monitoring].[statsReplicationLatency]([publication_name], [publisher_server], [publisher_db]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsReplicationLatency_PublicationName] ON [monitoring].[statsReplicationLatency]([publication_name], [publisher_server], [publisher_db])
 GO

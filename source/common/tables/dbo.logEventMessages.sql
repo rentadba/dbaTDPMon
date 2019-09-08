@@ -37,7 +37,7 @@ CREATE TABLE [dbo].[logEventMessages]
 	CONSTRAINT [PK_logEventMessages] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
-	) ON [FG_Statistics_Data],
+	),
 	CONSTRAINT [FK_logEventMessages_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
@@ -57,25 +57,25 @@ CREATE TABLE [dbo].[logEventMessages]
 		[project_id]
 	)
 
-) ON [FG_Statistics_Data]'
+)'
 
 EXEC sp_executesql  @queryToRun
 
-SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_InstanceID] ON [dbo].[logEventMessages]([instance_id], [project_id]) INCLUDE ([remote_event_id]) ON [FG_Statistics_Index]'
+SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_InstanceID] ON [dbo].[logEventMessages]([instance_id], [project_id]) INCLUDE ([remote_event_id]) '
 EXEC sp_executesql  @queryToRun
 
-SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_EventName_EventDate] ON [dbo].[logEventMessages]([event_name], [event_date_utc]) ON [FG_Statistics_Index]'
+SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_EventName_EventDate] ON [dbo].[logEventMessages]([event_name], [event_date_utc]) '
 EXEC sp_executesql  @queryToRun
 
-SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_ObjectName] ON [dbo].[logEventMessages]([object_name], [database_name]) ON [FG_Statistics_Index]'
+SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_ObjectName] ON [dbo].[logEventMessages]([object_name], [database_name]) '
 EXEC sp_executesql  @queryToRun
 
-SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_EventType_EventDateUTC_Instance_ID] ON [dbo].[logEventMessages] ([event_type], [event_date_utc], [instance_id]) ON [FG_Statistics_Index]'
+SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_EventType_EventDateUTC_Instance_ID] ON [dbo].[logEventMessages] ([event_type], [event_date_utc], [instance_id]) '
 EXEC sp_executesql  @queryToRun
 
-SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_Module_EventName] ON [dbo].[logEventMessages] ([project_id], [instance_id], [module], [event_name]) INCLUDE ([parameters], [database_name], [object_name], [child_object_name], [event_date_utc]) ON [FG_Statistics_Index]'
+SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_Module_EventName] ON [dbo].[logEventMessages] ([project_id], [instance_id], [module], [event_name]) INCLUDE ([parameters], [database_name], [object_name], [child_object_name], [event_date_utc]) '
 EXEC sp_executesql  @queryToRun
 
-SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_project_id] ON [dbo].[logEventMessages] ([project_id], [instance_id], [is_email_sent]) INCLUDE ([event_date_utc]) ON [FG_Statistics_Index]'
+SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_project_id] ON [dbo].[logEventMessages] ([project_id], [instance_id], [is_email_sent]) INCLUDE ([event_date_utc]) '
 EXEC sp_executesql  @queryToRun
 GO

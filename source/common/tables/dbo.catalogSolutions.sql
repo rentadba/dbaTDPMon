@@ -23,12 +23,12 @@ CREATE TABLE [dbo].[catalogSolutions]
 	CONSTRAINT [PK_catalogSolutions] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
-	) ON [PRIMARY] ,
+	) ,
 	CONSTRAINT [UK_catalogSolutions_Name] UNIQUE  NONCLUSTERED 
 	(
 		[name]
-	) ON [PRIMARY]
-) ON [PRIMARY]
+	) 
+) 
 GO
 
 -----------------------------------------------------------------------------------------------------

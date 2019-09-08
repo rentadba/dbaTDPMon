@@ -26,7 +26,7 @@ CREATE TABLE [monitoring].[alertAdditionalRecipients]
 	CONSTRAINT [PK_Monitoring_alertAdditionalRecipients] PRIMARY KEY CLUSTERED 
 	(
 		[id]
-	)  ON [FG_Statistics_Data],
+	),
 	CONSTRAINT [FK_Monitoring_alertAdditionalRecipients_catalogInstanceNames] FOREIGN KEY 
 	(
 		[instance_id],
@@ -37,12 +37,12 @@ CREATE TABLE [monitoring].[alertAdditionalRecipients]
 		[id],
 		[project_id]
 	)
-) ON [FG_Statistics_Data]
+)
 GO
 
-CREATE INDEX [IX_Monitoring_alertAdditionalRecipients_ProjectID] ON [monitoring].[alertAdditionalRecipients] ([instance_id], [project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_Monitoring_alertAdditionalRecipients_ProjectID] ON [monitoring].[alertAdditionalRecipients] ([instance_id], [project_id])
 GO
-CREATE INDEX [IX_Monitoring_alertAdditionalRecipients_PublicationName] ON [monitoring].[alertAdditionalRecipients]([event_name], [active], [instance_id], [project_id], [object_name]) INCLUDE ([recipients]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_Monitoring_alertAdditionalRecipients_PublicationName] ON [monitoring].[alertAdditionalRecipients]([event_name], [active], [instance_id], [project_id], [object_name]) INCLUDE ([recipients])
 GO
 
 -----------------------------------------------------------------------------------------------------

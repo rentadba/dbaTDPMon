@@ -75,6 +75,13 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@executionLevel			= @nestedExecutionLevel,
 										@debugMode				= @debugMode
 
+IF @serverEngine IN (5, 6, 8)
+	begin
+		SET @warningMessage = N'Azure managed service (SQL and Managed Instance) does not support OS/file operations.'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @warningMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+		RETURN
+	end
+
 /*-------------------------------------------------------------------------------------------------------------------------------*/
 /* check if folderName exists																									 */
 IF @sqlServerName=@@SERVERNAME

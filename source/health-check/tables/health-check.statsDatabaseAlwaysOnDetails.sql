@@ -30,7 +30,7 @@ CREATE TABLE [health-check].[statsDatabaseAlwaysOnDetails]
 	(
 		[id],
 		[catalog_database_id]
-	) ON [FG_Statistics_Data],
+	),
 	CONSTRAINT [FK_statsDatabaseAlwaysOnDetails_catalogDatabaseNames] FOREIGN KEY 
 	(
 		  [catalog_database_id]
@@ -41,10 +41,10 @@ CREATE TABLE [health-check].[statsDatabaseAlwaysOnDetails]
 		  [id]
 		, [instance_id]
 	)
-)ON [FG_Statistics_Data]
+)
 GO
 
-CREATE INDEX [IX_statsDatabaseAlwaysOnDetails_CatalogDatabaseID] ON [health-check].[statsDatabaseAlwaysOnDetails] ([catalog_database_id], [instance_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsDatabaseAlwaysOnDetails_CatalogDatabaseID] ON [health-check].[statsDatabaseAlwaysOnDetails] ([catalog_database_id], [instance_id]) 
 GO
-CREATE INDEX [IX_statsDatabaseAlwaysOnDetails_InstanceID] ON [health-check].[statsDatabaseAlwaysOnDetails] ([instance_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsDatabaseAlwaysOnDetails_InstanceID] ON [health-check].[statsDatabaseAlwaysOnDetails] ([instance_id]) 
 GO

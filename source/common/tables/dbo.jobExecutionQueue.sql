@@ -39,7 +39,7 @@ CREATE TABLE [dbo].[jobExecutionQueue]
 	CONSTRAINT [PK_jobExecutionQueue] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
-	) ON [FG_Statistics_Data],
+	),
 	CONSTRAINT [UK_jobExecutionQueue] UNIQUE
 	(
 		[module],
@@ -49,7 +49,7 @@ CREATE TABLE [dbo].[jobExecutionQueue]
 		[job_name],
 		[job_step_name],
 		[filter]
-	) ON [FG_Statistics_Data],
+	),
 	CONSTRAINT [FK_jobExecutionQueue_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
@@ -68,16 +68,16 @@ CREATE TABLE [dbo].[jobExecutionQueue]
 		[id],
 		[project_id]
 	)
-)ON [FG_Statistics_Data]
+)
 GO
 
-CREATE INDEX [IX_jobExecutionQueue_InstanceID] ON [dbo].[jobExecutionQueue]([instance_id], [project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_jobExecutionQueue_InstanceID] ON [dbo].[jobExecutionQueue]([instance_id], [project_id]) 
 GO
-CREATE INDEX [IX_jobExecutionQueue_ProjectID] ON [dbo].[jobExecutionQueue] ([project_id], [event_date_utc]) INCLUDE ([instance_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_jobExecutionQueue_ProjectID] ON [dbo].[jobExecutionQueue] ([project_id], [event_date_utc]) INCLUDE ([instance_id]) 
 GO
-CREATE INDEX [IX_jobExecutionQueue_JobName] ON [dbo].[jobExecutionQueue]([job_name], [job_step_name]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_jobExecutionQueue_JobName] ON [dbo].[jobExecutionQueue]([job_name], [job_step_name]) 
 GO
-CREATE INDEX [IX_jobExecutionQueue_Descriptor] ON [dbo].[jobExecutionQueue]([project_id], [status], [module], [descriptor]) INCLUDE ([instance_id], [for_instance_id], [job_name]) ON [FG_Statistics_Index];
+CREATE INDEX [IX_jobExecutionQueue_Descriptor] ON [dbo].[jobExecutionQueue]([project_id], [status], [module], [descriptor]) INCLUDE ([instance_id], [for_instance_id], [job_name]) 
 GO
-CREATE INDEX [IX_jobExecutionQueue_JobQueue] ON [dbo].[jobExecutionQueue]([for_instance_id], [project_id], [task_id], [database_name], [instance_id], [job_name], [module], [descriptor], [job_step_name], [job_database_name]) INCLUDE([status], [event_date_utc], [priority])ON [FG_Statistics_Index]
+CREATE INDEX [IX_jobExecutionQueue_JobQueue] ON [dbo].[jobExecutionQueue]([for_instance_id], [project_id], [task_id], [database_name], [instance_id], [job_name], [module], [descriptor], [job_step_name], [job_database_name]) INCLUDE([status], [event_date_utc], [priority])
 GO

@@ -24,13 +24,13 @@ CREATE TABLE [report].[htmlOptions]
 	CONSTRAINT [PK_htmlOptions] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
-	) ON [PRIMARY],
+	),
 	CONSTRAINT [UK_htmlOptions] UNIQUE 
 	(
 		[name], 
 		[module]
-	) ON [PRIMARY],
-)ON [PRIMARY]
+	)
+)
 GO
 
 -----------------------------------------------------------------------------------------------------

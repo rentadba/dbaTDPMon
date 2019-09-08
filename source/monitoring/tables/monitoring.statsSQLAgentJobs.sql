@@ -29,7 +29,7 @@ CREATE TABLE [monitoring].[statsSQLAgentJobs]
 	(
 		[id],
 		[instance_id]
-	) ON [FG_Statistics_Data],
+	) ,
 	CONSTRAINT [FK_statsSQLAgentJobs_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
@@ -48,10 +48,10 @@ CREATE TABLE [monitoring].[statsSQLAgentJobs]
 		[id],
 		[project_id]
 	)
-)ON [FG_Statistics_Data]
+)
 GO
 
-CREATE INDEX [IX_statsSQLAgentJobs_InstanceID] ON [monitoring].[statsSQLAgentJobs]([instance_id], [project_id]) INCLUDE ([last_completion_time]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsSQLAgentJobs_InstanceID] ON [monitoring].[statsSQLAgentJobs]([instance_id], [project_id]) INCLUDE ([last_completion_time])
 GO
-CREATE INDEX [IX_statsSQLAgentJobs_ProjecteID] ON [monitoring].[statsSQLAgentJobs]([project_id]) ON [FG_Statistics_Index]
+CREATE INDEX [IX_statsSQLAgentJobs_ProjecteID] ON [monitoring].[statsSQLAgentJobs]([project_id])
 GO

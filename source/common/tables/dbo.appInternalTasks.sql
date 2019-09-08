@@ -25,11 +25,11 @@ CREATE TABLE [dbo].[appInternalTasks]
 	CONSTRAINT [PK_appInternalTasks] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
-	) ON [PRIMARY],
+	) ,
 	CONSTRAINT [UK_appInternalTasks] UNIQUE
 	(
 		  [descriptor]
 		, [task_name]
-	) ON [PRIMARY]
-) ON [PRIMARY]
+	) 
+) 
 GO

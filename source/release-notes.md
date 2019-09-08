@@ -925,3 +925,4 @@
 #### September 2019 new features & fixes
 07.09.2019
 * add support for Azure SQL Managed Instances
+* clean update scripts: allow only update from v2019.7 onwards

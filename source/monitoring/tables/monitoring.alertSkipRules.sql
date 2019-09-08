@@ -26,15 +26,15 @@ CREATE TABLE [monitoring].[alertSkipRules]
 	CONSTRAINT [PK_alertSkipRules] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
-	) ON [PRIMARY],
+	),
 	CONSTRAINT [UK_alertSkipRules_Name] UNIQUE  NONCLUSTERED 
 	(
 		[category],
 		[alert_name],
 		[skip_value],
 		[skip_value2]
-	) ON [PRIMARY]
-)  ON [PRIMARY]
+	)
+)
 GO
 
 -----------------------------------------------------------------------------------------------------

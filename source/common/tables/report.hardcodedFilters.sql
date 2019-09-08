@@ -25,14 +25,14 @@ CREATE TABLE [report].[hardcodedFilters]
 	CONSTRAINT [PK_hardcodedFilters] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
-	) ON [PRIMARY],
+	),
 	CONSTRAINT [UK_hardcodedFilters_Name] UNIQUE  NONCLUSTERED 
 	(
 		[module],
 		[object_name],
 		[filter_pattern]
-	) ON [PRIMARY]
-)  ON [PRIMARY]
+	)
+)
 GO
 
 -----------------------------------------------------------------------------------------------------

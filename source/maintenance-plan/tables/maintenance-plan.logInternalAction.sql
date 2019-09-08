@@ -31,18 +31,16 @@ CREATE TABLE [maintenance-plan].[logInternalAction]
 	CONSTRAINT [PK_logInternalAction] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
-	) ON [FG_Statistics_Data]
-) ON [FG_Statistics_Data]
+	)
+)
 GO
 
 CREATE INDEX [IX_logInternalAction_SessionID_Name] ON [maintenance-plan].[logInternalAction]
 		([session_id], [name]) 
 	INCLUDE 
 		([server_name], [database_name]) 
-	ON [FG_Statistics_Index]
 GO
 
 CREATE INDEX [IX_logInternalAction_Name] ON [maintenance-plan].[logInternalAction]
 		([name], [server_name], [database_name])
-	ON [FG_Statistics_Index]
 GO

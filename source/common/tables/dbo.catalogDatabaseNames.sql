@@ -29,7 +29,7 @@ CREATE TABLE [dbo].[catalogDatabaseNames]
 	(
 		[id],
 		[instance_id]
-	) ON [PRIMARY]
+	) 
 	CONSTRAINT [FK_catalogDatabaseNames_catalogProjects] FOREIGN KEY 
 	(
 		[project_id]
@@ -48,12 +48,12 @@ CREATE TABLE [dbo].[catalogDatabaseNames]
 		[id],
 		[project_id]
 	)
-) ON [PRIMARY]
+) 
 GO
 
-CREATE INDEX [IX_catalogDatabaseNames_InstanceID] ON [dbo].[catalogDatabaseNames]([instance_id], [project_id]) ON [PRIMARY]
+CREATE INDEX [IX_catalogDatabaseNames_InstanceID] ON [dbo].[catalogDatabaseNames]([instance_id], [project_id]) 
 GO
-CREATE INDEX [IX_catalogDatabaseNames_ProjecteID] ON [dbo].[catalogDatabaseNames]([project_id]) ON [PRIMARY]
+CREATE INDEX [IX_catalogDatabaseNames_ProjecteID] ON [dbo].[catalogDatabaseNames]([project_id]) 
 GO
 CREATE UNIQUE INDEX [UK_catalogDatabaseNames_Name] ON [dbo].[catalogDatabaseNames]([name], [instance_id]) INCLUDE ([project_id], [active])
 GO
