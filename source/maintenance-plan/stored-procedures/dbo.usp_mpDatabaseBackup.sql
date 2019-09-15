@@ -172,7 +172,38 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName		= @sqlServerName,
 										@debugMode			= @debugMode
 
 ---------------------------------------------------------------------------------------------
-SET @isAzureSQLDatabase = CASE WHEN @serverEngine IN (5, 6) THEN 1 ELSE 0 END
+SET @isAzureSQLDatabase = CASE	WHEN (@serverEngine IN (5, 6)) OR NOT (@serverEngine IN (8) AND @flgActions = 1 AND @flgOptions & 4 = 4)
+								THEN 1 
+								ELSE 0
+						  END
+
+-----------------------------------------------------------------------------------------
+IF @isAzureSQLDatabase = 1
+	begin
+		SELECT @sqlServerName = CASE WHEN ss.[name] IS NOT NULL THEN ss.[name] ELSE NULL END 
+		FROM	[dbo].[vw_catalogDatabaseNames] cdn
+		LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] 
+		WHERE 	cdn.[instance_name] = @sqlServerName
+				AND cdn.[active]=1
+				AND cdn.[database_name] = @dbName
+
+		IF @sqlServerName IS NULL and @serverEngine NOT IN (5, 6, 8)
+			begin
+				SET @queryToRun=N'Could not find a linked server defined for Azure SQL database: [' + @dbName + ']' 
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=1
+			end
+
+		SET @queryToRun=N'Azure provides automated backups for a SQL Database (https://docs.microsoft.com/en-us/azure/sql-database/sql-database-automated-backups).' 
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+		RETURN 0
+	end
+
+--get OS platform
+SELECT	@hostPlatform = [host_platform]
+FROM	[dbo].[vw_catalogInstanceNames]
+WHERE	[instance_name] = @sqlServerName
+
+SET @nestedExecutionLevel = @executionLevel + 1
 
 -----------------------------------------------------------------------------------------
 --backup to URL pre-requisites
@@ -239,35 +270,7 @@ IF @backupLocation LIKE 'https://%'
 				end
 		IF RIGHT(@backupLocation, 1)<>'/' SET @backupLocation = @backupLocation + N'/'
 	end
-
------------------------------------------------------------------------------------------
-IF @isAzureSQLDatabase = 1
-	begin
-		SELECT @sqlServerName = CASE WHEN ss.[name] IS NOT NULL THEN ss.[name] ELSE NULL END 
-		FROM	[dbo].[vw_catalogDatabaseNames] cdn
-		LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] 
-		WHERE 	cdn.[instance_name] = @sqlServerName
-				AND cdn.[active]=1
-				AND cdn.[database_name] = @dbName
-
-		IF @sqlServerName IS NULL
-			begin
-				SET @queryToRun=N'Could not find a linked server defined for Azure SQL database: [' + @dbName + ']' 
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=1
-			end
-
-		SET @queryToRun=N'Azure provides automated backups for a SQL Database (https://docs.microsoft.com/en-us/azure/sql-database/sql-database-automated-backups).' 
-		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-		RETURN 0
-	end
-
---get OS platform
-SELECT	@hostPlatform = [host_platform]
-FROM	[dbo].[vw_catalogInstanceNames]
-WHERE	[instance_name] = @sqlServerName
-
-SET @nestedExecutionLevel = @executionLevel + 1
-
+	
 --------------------------------------------------------------------------------------------------
 --treat exceptions
 IF @dbName='master'

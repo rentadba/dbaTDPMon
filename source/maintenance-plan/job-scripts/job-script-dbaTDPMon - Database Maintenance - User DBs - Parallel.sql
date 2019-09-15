@@ -11,7 +11,6 @@
 -- Description		 : 
 -------------------------------------------------------------------------------
 RAISERROR('Create job: Database Maintenance - User DBs - Parallel', 10, 1) WITH NOWAIT
-GO
 
 DECLARE   @job_name			[sysname]
 		, @logFileLocation	[nvarchar](512)

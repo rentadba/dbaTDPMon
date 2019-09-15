@@ -11,7 +11,6 @@
 -- Description		 : unify code for 2k and 2k+ maintenance
 -------------------------------------------------------------------------------
 RAISERROR('Create job: Database Maintenance - System DBs', 10, 1) WITH NOWAIT
-GO
 
 DECLARE   @job_name			[sysname]
 		, @logFileLocation	[nvarchar](512)

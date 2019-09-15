@@ -10,8 +10,9 @@
 -- Change date		 : 
 -- Description		 : 
 -------------------------------------------------------------------------------
+IF CAST(SERVERPROPERTY('EngineEdition') AS [int]) IN (5, 6, 8) GOTO EndSave;
+
 RAISERROR('Create job: Database Backup - Log', 10, 1) WITH NOWAIT
-GO
 
 DECLARE   @job_name			[sysname]
 		, @logFileLocation	[nvarchar](512)
