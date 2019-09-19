@@ -926,3 +926,6 @@
 07.09.2019
 * add support for Azure SQL Managed Instances
 * clean update scripts: allow only update from v2019.7 onwards
+
+19.09.2019
+* maintenance-plan: fix small bugs when running backup against Azure MI

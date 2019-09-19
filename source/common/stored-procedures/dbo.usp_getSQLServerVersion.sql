@@ -38,7 +38,7 @@ BEGIN TRY
 	SELECT    @serverEdition    = [edition]
 			, @serverVersionStr = [version]
 			, @serverVersionNum = SUBSTRING([version], 1, CHARINDEX('.', [version])-1) + '.' + REPLACE(SUBSTRING([version], CHARINDEX('.', [version])+1, LEN([version])), '.', '')
-			, @serverEngine		= [engine]
+			, @serverEngine		= ISNULL([engine], 3)
 	FROM [dbo].[vw_catalogInstanceNames]
 	WHERE [instance_name] = @sqlServerName
 END TRY

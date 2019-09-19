@@ -172,10 +172,13 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName		= @sqlServerName,
 										@debugMode			= @debugMode
 
 ---------------------------------------------------------------------------------------------
-SET @isAzureSQLDatabase = CASE	WHEN (@serverEngine IN (5, 6)) OR NOT (@serverEngine IN (8) AND @flgActions = 1 AND @flgOptions & 4 = 4)
-								THEN 1 
+SET @isAzureSQLDatabase = CASE WHEN @serverEngine IS NOT NULL
+								THEN  CASE	WHEN (@serverEngine IN (5, 6)) OR (@serverEngine IN (8) AND @flgActions = 1 AND @flgOptions & 4 = 4)
+											THEN 1 
+											ELSE 0
+									  END
 								ELSE 0
-						  END
+						 END
 
 -----------------------------------------------------------------------------------------
 IF @isAzureSQLDatabase = 1
