@@ -929,3 +929,6 @@
 
 19.09.2019
 * maintenance-plan: fix small bugs when running backup against Azure MI
+
+29.09.2019
+* maintenance-plan: add code for data copy between database / tables (dbo.usp_mpTableDataSynchronizeInsert). Add support for on-premise to Azure data copy

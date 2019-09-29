@@ -48,7 +48,7 @@ AS
 --		@partitionNumber- index partition number. default value = 0 (index with no partitions)
 --		@flgAction:		 1	- Rebuild index (default)
 --						 2  - Reorganize indexes
---						 4	- Disable index
+--						 4	- Disable index (if no index id is specified, all non-clustered will be disabled except for the unique/clustered ones)
 --		@flgOptions		 1  - Compact large objects (LOB) when reorganize  (default)
 --						 2  - 
 --						 4  - Rebuild all dependent indexes when rebuild primary indexes
@@ -254,7 +254,11 @@ BEGIN TRY
 																			  ELSE ''
 																		 END
 															END + '
-															AND si.[is_disabled] IN ( ' + CASE WHEN @flgAction IN (2, 4) THEN '0' ELSE '0,1' END + ')
+															AND si.[is_disabled] IN ( ' + CASE WHEN @flgAction IN (2, 4) THEN '0' ELSE '0,1' END + ')' +
+															CASE WHEN @indexID IS NULL AND @flgAction IN (4) 
+																 THEN ' AND si.[type] <> 1 AND si.[is_unique] = 0'
+																 ELSE ''
+															END + '											
 													GROUP BY si.[index_id]
 															, si.[name]
 															, si.[type]

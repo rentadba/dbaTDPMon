@@ -36,15 +36,17 @@ DECLARE @tableRowCount TABLE ([row_count] [int])
 
 
 SET @queryToRun=N''
-SET @queryToRun=@queryToRun + N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + '; 
+SET @queryToRun = N''
+SET @queryToRun = @queryToRun + 
+					CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; ' ELSE N'' END + N'
 								SELECT rc.[row_count]
-								FROM [sys].[objects] so
-								INNER JOIN [sys].[schemas] sch ON sch.[schema_id] = so.[schema_id]
+								FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'.' ELSE N'' END + N'[sys].[objects] so
+								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'.' ELSE N'' END + N'[sys].[schemas] sch ON sch.[schema_id] = so.[schema_id]
 								LEFT JOIN
 										(
 											SELECT   ps.[object_id]
 													, SUM (CASE WHEN (ps.[index_id] < 2) THEN [row_count] ELSE 0 END) AS [row_count]
-											FROM sys.dm_db_partition_stats ps with (readpast)
+											FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'.' ELSE N'' END + N'sys.dm_db_partition_stats ps with (readpast)
 											GROUP BY ps.[object_id]
 										) AS rc ON rc.[object_id] = so.[object_id]
 								WHERE so.[name]=''' + [dbo].[ufn_getObjectQuoteName](@tableName, 'sql') + N'''
