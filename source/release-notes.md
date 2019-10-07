@@ -932,3 +932,9 @@
 
 29.09.2019
 * maintenance-plan: add code for data copy between database / tables (dbo.usp_mpTableDataSynchronizeInsert). Add support for on-premise to Azure data copy
+
+------------
+#### October 2019 new features & fixes
+07.10.2019
+* improved performance for internal log messaging by running some heavy queries only if an email must be sent
+* maintenance-plan: fix issue when calling maintenance code for objects having . (dot) in their name (reported by George Talaba)
