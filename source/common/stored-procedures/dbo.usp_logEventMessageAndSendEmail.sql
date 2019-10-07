@@ -198,359 +198,9 @@ IF @alertSent < @maxAlertCountPer5Min
 	end
 
 -----------------------------------------------------------------------------------------------------
---processing the xml message
------------------------------------------------------------------------------------------------------
-SET @eventMessageXML = CAST(@eventMessage AS [xml])
-SET @HTMLBody = N''
-
------------------------------------------------------------------------------------------------------
---alert details
-IF @eventType=1	AND @eventMessageXML IS NOT NULL
-	begin
-		EXEC @PrepareXmlStatus= sp_xml_preparedocument @handle OUTPUT, @eventMessageXML  
-
-		SET @HTMLBody =@HTMLBody + COALESCE(
-								CAST ( ( 
-										SELECT	li = 'error number: ' + CAST([error_code] AS [nvarchar](32)), '',
-												li = [error_string], '',
-												li = [query_executed], '',
-												li = 'duration: ' + CAST([duration_seconds] AS [nvarchar](32)) + ' seconds', '',
-												li = 'event-date (utc): ' + CAST([event_date_utc] AS [varchar](32)), ''
-										FROM (
-												SELECT  *
-												FROM    OPENXML(@handle, '/alert/detail', 2)  
-														WITH (
-																[error_code]		[int],
-																[error_string]		[nvarchar](max),
-																[query_executed]	[nvarchar](max),
-																[duration_seconds]	[bigint],
-																[event_date_utc]	[sysname]
-															)  
-											)x
-										FOR XML PATH('ul'), TYPE 
-							) AS NVARCHAR(MAX) )
-							, '') ;
-			
-		SELECT	@errorCode = [error_code]
-		FROM (
-				SELECT  *
-				FROM    OPENXML(@handle, '/alert/detail', 2)  
-						WITH (
-								[error_code]		[int],
-								[error_string]		[nvarchar](max),
-								[query_executed]	[nvarchar](max),
-								[duration_seconds]	[bigint]
-							)  
-			)x
-		EXEC sp_xml_removedocument @handle 
-	end
-
------------------------------------------------------------------------------------------------------
---alert details
-IF @eventType=6	AND @eventMessageXML IS NOT NULL
-	begin
-		SET @HTMLBody = @HTMLBody + REPLACE(REPLACE(REPLACE(REPLACE(CAST(@eventMessageXML AS [nvarchar](max)), '<alert><detail>', '<ul>'), '</detail></alert>', '</ul>'), '><', '><li><'), '<li></ul>','</ul>')
-
-		DECLARE @strPos		[int],
-				@strPos2	[int]
-
-		SET @strPos = CHARINDEX('</', @HTMLBody)
-		WHILE @strPos <> 0
-			BEGIN
-				SET @strPos2 = CHARINDEX('><', @HTMLBody, @strPos)
-				SET @HTMLBody = SUBSTRING(@HTMLBody, 1, @strPos+1) + SUBSTRING(@HTMLBody, @strPos2, LEN(@HTMLBody))
-	
-				SET @strPos = CHARINDEX('</', @HTMLBody, @strPos2)
-			END
-		SET @HTMLBody = REPLACE(@HTMLBody, '</>', '')
-		SET @HTMLBody = REPLACE(@HTMLBody, '><', '>')
-		SET @HTMLBody = REPLACE(@HTMLBody, '>', ': ')
-		SET @HTMLBody = REPLACE(@HTMLBody, '<li: ', '<li>')
-		SET @HTMLBody = REPLACE(@HTMLBody, '<ul: li: ', '<ul><li>')
-		SET @HTMLBody = REPLACE(@HTMLBody, '</ul: ', '</ul>')
-	end
-
------------------------------------------------------------------------------------------------------
---job-status details
-IF @eventType IN (2, 5)	AND @eventMessageXML IS NOT NULL
-	begin
-		EXEC @PrepareXmlStatus= sp_xml_preparedocument @handle OUTPUT, @eventMessageXML  
-
-		SET @HTMLBody =@HTMLBody + COALESCE(
-							N'<TABLE BORDER="1">' +
-							N'<TR>' +
-								N'<TH>Step ID</TH>
-									<TH>Step Name</TH>
-									<TH>Run Status</TH>
-									<TH>Run Date</TH>
-									<TH>Run Time</TH>
-									<TH>Run Duration</TH>
-									<TH >Message</TH>' +
-								CAST ( ( 
-										SELECT	TD = [step_id], '',
-												TD = [step_name], '',
-												TD = [run_status], '',
-												TD = [run_date], '',
-												TD = [run_time], '',
-												TD = [duration], '',
-												TD = [message], ''
-										FROM (
-												SELECT  *
-												FROM    OPENXML(@handle, '/job-history/job-step', 2)  
-														WITH (
-																[step_id]		[int],
-																[step_name]		[sysname],
-																[run_status]	[nvarchar](32),
-																[run_date]		[nvarchar](32),
-																[run_time]		[nvarchar](32),
-																[duration]		[nvarchar](32),
-																[message]		[nvarchar](max)
-															)  
-											)x
-										FOR XML PATH('TR'), TYPE 
-							) AS NVARCHAR(MAX) ) +
-							N'</TABLE>', '') ;
-
-		EXEC sp_xml_removedocument @handle 
-
-		-- go out in style
-		SET @HTMLBody = N'
-						<style>
-							body {
-								/*background-color: #F0F8FF;*/
-								font-family: Arial, Tahoma;
-							}
-							h1 {
-								font-size: 20px;
-								font-weight: bold;
-							}
-							table {
-								border-color: #ccc;
-								border-collapse: collapse;
-							}
-							th {
-								font-size: 12px;
-								font-weight: bold;
-								font-color: #000000;
-								border-spacing: 2px;
-								border-style: solid;
-								border-width: 1px;
-								border-color: #ccc;
-								background-color: #00AEEF;
-								padding: 4px;
-							}
-							td {
-								font-size: 12px;
-								border-spacing: 2px;
-								border-style: solid;
-								border-width: 1px;
-								border-color: #ccc;
-								background-color: #EDF8FE;
-								padding: 4px;
-								white-space: nowrap;
-							}
-						</style>' + @HTMLBody
-	end
-
------------------------------------------------------------------------------------------------------
---report details
-IF @eventType=3	AND @eventMessageXML IS NOT NULL
-	begin
-		EXEC @PrepareXmlStatus= sp_xml_preparedocument @handle OUTPUT, @eventMessageXML  
-
-		DECLARE @xmlMessage			[nvarchar](max),
-				@xmlFileName		[nvarchar](max),
-				@xmlHTTPAddress		[nvarchar](max),
-				@xmlRelativePath	[nvarchar](max)
-
-		SELECT TOP 1 @xmlMessage = [message],
-						@xmlFileName = [file_name],
-						@xmlHTTPAddress = [http_address],
-						@xmlRelativePath = [relative_path]
-		FROM    OPENXML(@handle, '/report-html/detail', 2)  
-				WITH (
-						[message]		[nvarchar](max),
-						[file_name]		[nvarchar](max),
-						[http_address]	[nvarchar](max),
-						[relative_path]	[nvarchar](max)
-					)  
-
-		EXEC sp_xml_removedocument @handle 
-
-		SET @HTMLBody =@HTMLBody + @xmlMessage + N'<br>File name: <b>' + @xmlFileName + N'</b><br>'
-	
-		IF @xmlHTTPAddress IS NOT NULL				
-			begin
-				SET @HTMLBody = @HTMLBody + N'Full report file is available for download <A HREF="' + @xmlHTTPAddress + @xmlRelativePath + @xmlFileName + '">here</A><br>'
-				SET @HTMLBody = @HTMLBody + N'Browser support: IE 8, Firefox 3.5 and Google Chrome 7 (on lower versions, some features may be missing).<br>'
-			end
-	end
-
-
------------------------------------------------------------------------------------------------------
---backup-job-status details
-IF @eventType IN (5) AND @eventMessageXML IS NOT NULL
-	begin
-		DECLARE   @jobStartTime [datetime]
-
-		EXEC @PrepareXmlStatus= sp_xml_preparedocument @handle OUTPUT, @eventMessageXML  
-			
-		SELECT    @jobStartTime = MIN([job_step_start_time])
-		FROM	(
-					SELECT CASE WHEN [run_date] IS NOT NULL AND [run_time] IS NOT NULL
-								THEN CONVERT([datetime], ([run_date] + ' ' + [run_time]), 120) 
-								ELSE GETDATE()
-							END AS [job_step_start_time]
-					FROM (
-							SELECT  *
-							FROM    OPENXML(@handle, '/job-history/job-step', 2)  
-									WITH (
-											[step_id]		[int],
-											[step_name]		[sysname],
-											[run_status]	[nvarchar](32),
-											[run_date]		[nvarchar](32),
-											[run_time]		[nvarchar](32),
-											[duration]		[nvarchar](32)
-										)  
-						)x
-				)y
-
-		EXEC sp_xml_removedocument @handle 
-
-		DECLARE @xmlBackupSet TABLE
-			(
-				  [database_name]	[sysname]
-				, [type]			[nvarchar](32)
-				, [start_date]		[nvarchar](32)
-				, [duration]		[nvarchar](32)
-				, [size]			[nvarchar](32)
-				, [size_bytes]		[bigint]
-				, [verified]		[nvarchar](8)
-				, [file_name]		[nvarchar](512)
-				, [error_code]		[int]
-			)
-
-
-		DECLARE @xmlSkippedActions TABLE
-			(
-				  [database_name]	[sysname]
-				, [backup_type]		[nvarchar](32)
-				, [date]			[nvarchar](32)
-				, [reason]			[nvarchar](512)
-			)
-
-		INSERT	INTO @xmlBackupSet([database_name], [type], [start_date], [duration], [size], [size_bytes], [verified], [file_name], [error_code])
-				SELECT [database_name], [type], [start_date], [duration], [size], [size_bytes], [verified], [file_name], [error_code]
-				FROM (
-						SELECT	  ref.value ('database_name[1]', 'sysname') as [database_name]
-								, ref.value ('type[1]', 'nvarchar(32)') as [type]
-								, ref.value ('start_date[1]', '[datetime]') as [start_date]
-								, ref.value ('duration[1]', 'nvarchar(32)') as [duration]
-								, ref.value ('size[1]', 'nvarchar(32)') as [size]
-								, ref.value ('size_bytes[1]', 'bigint') as [size_bytes]
-								, ref.value ('verified[1]', 'nvarchar(8)') as [verified]
-								, ref.value ('file_name[1]', 'nvarchar(512)') as [file_name]
-								, ref.value ('error_code[1]', 'int') as [error_code]
-						FROM (
-								SELECT	CAST([message] AS [xml]) AS [message_xml]
-								FROM	[dbo].[logEventMessages]
-								WHERE	[message] LIKE '<backupset>%'
-										AND ISNULL([project_id], 0) = ISNULL(@projectID, 0)
-										AND ISNULL([instance_id], 0) = ISNULL(@instanceID, 0)
-										AND [event_type]=0
-							)x CROSS APPLY [message_xml].nodes ('//backupset/detail') R(ref)								
-					)bs
-				WHERE [start_date] BETWEEN @jobStartTime AND GETDATE()
-
-
-		INSERT	INTO @xmlSkippedActions ([database_name], [backup_type], [date], [reason])
-				SELECT [database_name], [backup_type], [date], [reason]
-				FROM (
-						SELECT	  ref.value ('affected_object[1]', 'sysname') as [database_name]
-								, ref.value ('type[1]', 'nvarchar(32)') as [backup_type]
-								, ref.value ('date[1]', '[datetime]') as [date]
-								, ref.value ('reason[1]', 'nvarchar(512)') as [reason]
-						FROM (
-								SELECT	CAST([message] AS [xml]) AS [message_xml]
-								FROM	[dbo].[logEventMessages]
-								WHERE	[message] LIKE '<skipaction>%'
-										AND ISNULL([project_id], 0) = ISNULL(@projectID, 0)
-										AND ISNULL([instance_id], 0) = ISNULL(@instanceID, 0)
-										AND [event_type]=0
-										AND [event_name] = 'database backup'
-							)x CROSS APPLY [message_xml].nodes ('//skipaction/detail') R(ref)	
-					) sa
-				WHERE [date] BETWEEN @jobStartTime AND GETDATE()
-
-
-		SET @HTMLBody =@HTMLBody + N'<br><br>'
-		SET @HTMLBody =@HTMLBody + COALESCE(
-							N'<TABLE BORDER="1">' +
-							N'<TR>' +
-								N'	<TH>Database Name</TH>
-									<TH>Backup Type</TH>
-									<TH>Start Time</TH>
-									<TH>Run Duration</TH>
-									<TH>Size</TH>
-									<TH>Verified</TH>
-									<TH>File Name</TH>
-									<TH>Error Code</TH>' +
-								CAST ( ( 
-										SELECT	TD = [database_name], '',
-												TD = [type], '',
-												TD = [start_date], '',
-												TD = [duration], '',
-												TD = [size], '',
-												TD = [verified], '',
-												TD = [file_name], '',
-												TD = [error_code], ''
-										FROM (
-												SELECT	TOP (100) PERCENT *
-												FROM @xmlBackupSet							
-												ORDER BY [database_name]
-											)x
-										FOR XML PATH('TR'), TYPE 
-							) AS NVARCHAR(MAX) ) +
-							N'</TABLE>', '') ;
-
-		IF (SELECT COUNT(*) FROM @xmlSkippedActions)>0
-			begin
-				SET @HTMLBody =@HTMLBody + N'<br><br>'
-				SET @HTMLBody =@HTMLBody + COALESCE(
-									N'<TABLE BORDER="1">' +
-									N'<TR>' +
-										N'	<TH>Database Name</TH>
-											<TH>Backup Type</TH>
-											<TH>Date</TH>
-											<TH>Reason</TH>' +
-										CAST ( ( 
-												SELECT	TD = [database_name], '',
-														TD = [backup_type], '',
-														TD = [date], '',
-														TD = [reason], ''
-												FROM (
-														SELECT	TOP (100) PERCENT *
-														FROM @xmlSkippedActions							
-														ORDER BY [database_name]
-													)x
-												FOR XML PATH('TR'), TYPE 
-									) AS NVARCHAR(MAX) ) +
-									N'</TABLE>', '') ;
-			end
-
-		--if any of the backups had failed, send notification
-		IF @additionalOption=0
-			SELECT @additionalOption = COUNT(*)
-			FROM @xmlBackupSet
-			WHERE [error_code]<>0
-	end
-
-SET @HTMLBody = [dbo].[ufn_getObjectQuoteName](@HTMLBody, 'undo-xml')
-
-
------------------------------------------------------------------------------------------------------
 --get notification status
 -----------------------------------------------------------------------------------------------------
+SET @isFloodControl	= 0
 IF @eventType IN (2, 5)
 	begin
 		DECLARE @notifyOnlyFailedJobs [nvarchar](32)
@@ -573,12 +223,362 @@ IF     (@eventType IN (1) AND ((@ignoreAlertsForError1222=1 AND @errorCode=1222)
 		SET @recipientsList=NULL
 	end
 
+-----------------------------------------------------------------------------------------------------
+--processing the xml message
+-----------------------------------------------------------------------------------------------------
+SET @eventMessageXML = CAST(@eventMessage AS [xml])
+SET @HTMLBody = N''
+
+-----------------------------------------------------------------------------------------------------
+--alert details
+IF @eventMessageXML IS NOT NULL AND (@alertSent=0 AND @recipientsList IS NOT NULL AND @dbMailProfileName IS NOT NULL)
+	begin
+		IF @eventType=1
+			begin
+				EXEC @PrepareXmlStatus= sp_xml_preparedocument @handle OUTPUT, @eventMessageXML  
+
+				SET @HTMLBody =@HTMLBody + COALESCE(
+										CAST ( ( 
+												SELECT	li = 'error number: ' + CAST([error_code] AS [nvarchar](32)), '',
+														li = [error_string], '',
+														li = [query_executed], '',
+														li = 'duration: ' + CAST([duration_seconds] AS [nvarchar](32)) + ' seconds', '',
+														li = 'event-date (utc): ' + CAST([event_date_utc] AS [varchar](32)), ''
+												FROM (
+														SELECT  *
+														FROM    OPENXML(@handle, '/alert/detail', 2)  
+																WITH (
+																		[error_code]		[int],
+																		[error_string]		[nvarchar](max),
+																		[query_executed]	[nvarchar](max),
+																		[duration_seconds]	[bigint],
+																		[event_date_utc]	[sysname]
+																	)  
+													)x
+												FOR XML PATH('ul'), TYPE 
+									) AS NVARCHAR(MAX) )
+									, '') ;
+			
+				SELECT	@errorCode = [error_code]
+				FROM (
+						SELECT  *
+						FROM    OPENXML(@handle, '/alert/detail', 2)  
+								WITH (
+										[error_code]		[int],
+										[error_string]		[nvarchar](max),
+										[query_executed]	[nvarchar](max),
+										[duration_seconds]	[bigint]
+									)  
+					)x
+				EXEC sp_xml_removedocument @handle 
+			end
+
+		-----------------------------------------------------------------------------------------------------
+		--alert details
+		IF @eventType=6
+			begin
+				SET @HTMLBody = @HTMLBody + REPLACE(REPLACE(REPLACE(REPLACE(CAST(@eventMessageXML AS [nvarchar](max)), '<alert><detail>', '<ul>'), '</detail></alert>', '</ul>'), '><', '><li><'), '<li></ul>','</ul>')
+
+				DECLARE @strPos		[int],
+						@strPos2	[int]
+
+				SET @strPos = CHARINDEX('</', @HTMLBody)
+				WHILE @strPos <> 0
+					BEGIN
+						SET @strPos2 = CHARINDEX('><', @HTMLBody, @strPos)
+						SET @HTMLBody = SUBSTRING(@HTMLBody, 1, @strPos+1) + SUBSTRING(@HTMLBody, @strPos2, LEN(@HTMLBody))
+	
+						SET @strPos = CHARINDEX('</', @HTMLBody, @strPos2)
+					END
+				SET @HTMLBody = REPLACE(@HTMLBody, '</>', '')
+				SET @HTMLBody = REPLACE(@HTMLBody, '><', '>')
+				SET @HTMLBody = REPLACE(@HTMLBody, '>', ': ')
+				SET @HTMLBody = REPLACE(@HTMLBody, '<li: ', '<li>')
+				SET @HTMLBody = REPLACE(@HTMLBody, '<ul: li: ', '<ul><li>')
+				SET @HTMLBody = REPLACE(@HTMLBody, '</ul: ', '</ul>')
+			end
+
+		-----------------------------------------------------------------------------------------------------
+		--job-status details
+		IF @eventType IN (2, 5)
+			begin
+				EXEC @PrepareXmlStatus= sp_xml_preparedocument @handle OUTPUT, @eventMessageXML  
+
+				SET @HTMLBody =@HTMLBody + COALESCE(
+									N'<TABLE BORDER="1">' +
+									N'<TR>' +
+										N'<TH>Step ID</TH>
+											<TH>Step Name</TH>
+											<TH>Run Status</TH>
+											<TH>Run Date</TH>
+											<TH>Run Time</TH>
+											<TH>Run Duration</TH>
+											<TH >Message</TH>' +
+										CAST ( ( 
+												SELECT	TD = [step_id], '',
+														TD = [step_name], '',
+														TD = [run_status], '',
+														TD = [run_date], '',
+														TD = [run_time], '',
+														TD = [duration], '',
+														TD = [message], ''
+												FROM (
+														SELECT  *
+														FROM    OPENXML(@handle, '/job-history/job-step', 2)  
+																WITH (
+																		[step_id]		[int],
+																		[step_name]		[sysname],
+																		[run_status]	[nvarchar](32),
+																		[run_date]		[nvarchar](32),
+																		[run_time]		[nvarchar](32),
+																		[duration]		[nvarchar](32),
+																		[message]		[nvarchar](max)
+																	)  
+													)x
+												FOR XML PATH('TR'), TYPE 
+									) AS NVARCHAR(MAX) ) +
+									N'</TABLE>', '') ;
+
+				EXEC sp_xml_removedocument @handle 
+
+				-- go out in style
+				SET @HTMLBody = N'
+								<style>
+									body {
+										/*background-color: #F0F8FF;*/
+										font-family: Arial, Tahoma;
+									}
+									h1 {
+										font-size: 20px;
+										font-weight: bold;
+									}
+									table {
+										border-color: #ccc;
+										border-collapse: collapse;
+									}
+									th {
+										font-size: 12px;
+										font-weight: bold;
+										font-color: #000000;
+										border-spacing: 2px;
+										border-style: solid;
+										border-width: 1px;
+										border-color: #ccc;
+										background-color: #00AEEF;
+										padding: 4px;
+									}
+									td {
+										font-size: 12px;
+										border-spacing: 2px;
+										border-style: solid;
+										border-width: 1px;
+										border-color: #ccc;
+										background-color: #EDF8FE;
+										padding: 4px;
+										white-space: nowrap;
+									}
+								</style>' + @HTMLBody
+			end
+
+		-----------------------------------------------------------------------------------------------------
+		--report details
+		IF @eventType=3
+			begin
+				EXEC @PrepareXmlStatus= sp_xml_preparedocument @handle OUTPUT, @eventMessageXML  
+
+				DECLARE @xmlMessage			[nvarchar](max),
+						@xmlFileName		[nvarchar](max),
+						@xmlHTTPAddress		[nvarchar](max),
+						@xmlRelativePath	[nvarchar](max)
+
+				SELECT TOP 1 @xmlMessage = [message],
+								@xmlFileName = [file_name],
+								@xmlHTTPAddress = [http_address],
+								@xmlRelativePath = [relative_path]
+				FROM    OPENXML(@handle, '/report-html/detail', 2)  
+						WITH (
+								[message]		[nvarchar](max),
+								[file_name]		[nvarchar](max),
+								[http_address]	[nvarchar](max),
+								[relative_path]	[nvarchar](max)
+							)  
+
+				EXEC sp_xml_removedocument @handle 
+
+				SET @HTMLBody =@HTMLBody + @xmlMessage + N'<br>File name: <b>' + @xmlFileName + N'</b><br>'
+	
+				IF @xmlHTTPAddress IS NOT NULL				
+					begin
+						SET @HTMLBody = @HTMLBody + N'Full report file is available for download <A HREF="' + @xmlHTTPAddress + @xmlRelativePath + @xmlFileName + '">here</A><br>'
+						SET @HTMLBody = @HTMLBody + N'Browser support: IE 8, Firefox 3.5 and Google Chrome 7 (on lower versions, some features may be missing).<br>'
+					end
+			end
+
+
+		-----------------------------------------------------------------------------------------------------
+		--backup-job-status details
+		IF @eventType IN (5)
+			begin
+				DECLARE   @jobStartTime [datetime]
+
+				EXEC @PrepareXmlStatus= sp_xml_preparedocument @handle OUTPUT, @eventMessageXML  
+			
+				SELECT    @jobStartTime = MIN([job_step_start_time])
+				FROM	(
+							SELECT CASE WHEN [run_date] IS NOT NULL AND [run_time] IS NOT NULL
+										THEN CONVERT([datetime], ([run_date] + ' ' + [run_time]), 120) 
+										ELSE GETDATE()
+									END AS [job_step_start_time]
+							FROM (
+									SELECT  *
+									FROM    OPENXML(@handle, '/job-history/job-step', 2)  
+											WITH (
+													[step_id]		[int],
+													[step_name]		[sysname],
+													[run_status]	[nvarchar](32),
+													[run_date]		[nvarchar](32),
+													[run_time]		[nvarchar](32),
+													[duration]		[nvarchar](32)
+												)  
+								)x
+						)y
+
+				EXEC sp_xml_removedocument @handle 
+
+				DECLARE @xmlBackupSet TABLE
+					(
+						  [database_name]	[sysname]
+						, [type]			[nvarchar](32)
+						, [start_date]		[nvarchar](32)
+						, [duration]		[nvarchar](32)
+						, [size]			[nvarchar](32)
+						, [size_bytes]		[bigint]
+						, [verified]		[nvarchar](8)
+						, [file_name]		[nvarchar](512)
+						, [error_code]		[int]
+					)
+
+
+				DECLARE @xmlSkippedActions TABLE
+					(
+						  [database_name]	[sysname]
+						, [backup_type]		[nvarchar](32)
+						, [date]			[nvarchar](32)
+						, [reason]			[nvarchar](512)
+					)
+
+				INSERT	INTO @xmlBackupSet([database_name], [type], [start_date], [duration], [size], [size_bytes], [verified], [file_name], [error_code])
+						SELECT [database_name], [type], [start_date], [duration], [size], [size_bytes], [verified], [file_name], [error_code]
+						FROM (
+								SELECT	  ref.value ('database_name[1]', 'sysname') as [database_name]
+										, ref.value ('type[1]', 'nvarchar(32)') as [type]
+										, ref.value ('start_date[1]', '[datetime]') as [start_date]
+										, ref.value ('duration[1]', 'nvarchar(32)') as [duration]
+										, ref.value ('size[1]', 'nvarchar(32)') as [size]
+										, ref.value ('size_bytes[1]', 'bigint') as [size_bytes]
+										, ref.value ('verified[1]', 'nvarchar(8)') as [verified]
+										, ref.value ('file_name[1]', 'nvarchar(512)') as [file_name]
+										, ref.value ('error_code[1]', 'int') as [error_code]
+								FROM (
+										SELECT	CAST([message] AS [xml]) AS [message_xml]
+										FROM	[dbo].[logEventMessages]
+										WHERE	[message] LIKE '<backupset>%'
+												AND ISNULL([project_id], 0) = ISNULL(@projectID, 0)
+												AND ISNULL([instance_id], 0) = ISNULL(@instanceID, 0)
+												AND [event_type]=0
+									)x CROSS APPLY [message_xml].nodes ('//backupset/detail') R(ref)								
+							)bs
+						WHERE [start_date] BETWEEN @jobStartTime AND GETDATE()
+
+
+				INSERT	INTO @xmlSkippedActions ([database_name], [backup_type], [date], [reason])
+						SELECT [database_name], [backup_type], [date], [reason]
+						FROM (
+								SELECT	  ref.value ('affected_object[1]', 'sysname') as [database_name]
+										, ref.value ('type[1]', 'nvarchar(32)') as [backup_type]
+										, ref.value ('date[1]', '[datetime]') as [date]
+										, ref.value ('reason[1]', 'nvarchar(512)') as [reason]
+								FROM (
+										SELECT	CAST([message] AS [xml]) AS [message_xml]
+										FROM	[dbo].[logEventMessages]
+										WHERE	[message] LIKE '<skipaction>%'
+												AND ISNULL([project_id], 0) = ISNULL(@projectID, 0)
+												AND ISNULL([instance_id], 0) = ISNULL(@instanceID, 0)
+												AND [event_type]=0
+												AND [event_name] = 'database backup'
+									)x CROSS APPLY [message_xml].nodes ('//skipaction/detail') R(ref)	
+							) sa
+						WHERE [date] BETWEEN @jobStartTime AND GETDATE()
+
+
+				SET @HTMLBody =@HTMLBody + N'<br><br>'
+				SET @HTMLBody =@HTMLBody + COALESCE(
+									N'<TABLE BORDER="1">' +
+									N'<TR>' +
+										N'	<TH>Database Name</TH>
+											<TH>Backup Type</TH>
+											<TH>Start Time</TH>
+											<TH>Run Duration</TH>
+											<TH>Size</TH>
+											<TH>Verified</TH>
+											<TH>File Name</TH>
+											<TH>Error Code</TH>' +
+										CAST ( ( 
+												SELECT	TD = [database_name], '',
+														TD = [type], '',
+														TD = [start_date], '',
+														TD = [duration], '',
+														TD = [size], '',
+														TD = [verified], '',
+														TD = [file_name], '',
+														TD = [error_code], ''
+												FROM (
+														SELECT	TOP (100) PERCENT *
+														FROM @xmlBackupSet							
+														ORDER BY [database_name]
+													)x
+												FOR XML PATH('TR'), TYPE 
+									) AS NVARCHAR(MAX) ) +
+									N'</TABLE>', '') ;
+
+				IF (SELECT COUNT(*) FROM @xmlSkippedActions)>0
+					begin
+						SET @HTMLBody =@HTMLBody + N'<br><br>'
+						SET @HTMLBody =@HTMLBody + COALESCE(
+											N'<TABLE BORDER="1">' +
+											N'<TR>' +
+												N'	<TH>Database Name</TH>
+													<TH>Backup Type</TH>
+													<TH>Date</TH>
+													<TH>Reason</TH>' +
+												CAST ( ( 
+														SELECT	TD = [database_name], '',
+																TD = [backup_type], '',
+																TD = [date], '',
+																TD = [reason], ''
+														FROM (
+																SELECT	TOP (100) PERCENT *
+																FROM @xmlSkippedActions							
+																ORDER BY [database_name]
+															)x
+														FOR XML PATH('TR'), TYPE 
+											) AS NVARCHAR(MAX) ) +
+											N'</TABLE>', '') ;
+					end
+
+				--if any of the backups had failed, send notification
+				IF @additionalOption=0
+					SELECT @additionalOption = COUNT(*)
+					FROM @xmlBackupSet
+					WHERE [error_code]<>0
+			end
+	end
+SET @HTMLBody = [dbo].[ufn_getObjectQuoteName](@HTMLBody, 'undo-xml')
 
 -----------------------------------------------------------------------------------------------------
 --
 -----------------------------------------------------------------------------------------------------
 SET @isEmailSent	= 0 
-SET @isFloodControl	= 0
 
 IF @alertSent=0
 	begin
@@ -652,7 +652,6 @@ EXEC [dbo].[usp_logEventMessage]	@projectCode			= @projectCode,
 									@recipientsList			= @recipientsList,
 									@isEmailSent			= @isEmailSent,
 									@isFloodControl			= @isFloodControl
-
 
 RETURN @ReturnValue
 GO
