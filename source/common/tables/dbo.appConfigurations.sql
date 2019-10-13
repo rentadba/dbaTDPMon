@@ -107,9 +107,11 @@ EXEC master.dbo.xp_instance_regread N'HKEY_LOCAL_MACHINE',N'Software\Microsoft\M
 
 IF @defaultBackupDirectory IS NOT NULL
 	begin
+		IF RIGHT(@defaultBackupDirectory, 1) NOT IN ('\', '/')
+			SET @defaultBackupDirectory = @defaultBackupDirectory + '\'
 		UPDATE [dbo].[appConfigurations] SET [value] = @defaultBackupDirectory WHERE [module] = 'maintenance-plan' AND [name] = 'Default backup location'
-		UPDATE [dbo].[appConfigurations] SET [value] = @defaultBackupDirectory + '\html-reports' WHERE [module] = 'common' AND [name] = 'Local storage path for HTML reports'
-		UPDATE [dbo].[appConfigurations] SET [value] = @defaultBackupDirectory + '\job-logs' WHERE [module] = 'common' AND [name] = 'Default folder for logs'
+		UPDATE [dbo].[appConfigurations] SET [value] = @defaultBackupDirectory + 'html-reports\' WHERE [module] = 'common' AND [name] = 'Local storage path for HTML reports'
+		UPDATE [dbo].[appConfigurations] SET [value] = @defaultBackupDirectory + 'job-logs\' WHERE [module] = 'common' AND [name] = 'Default folder for logs'
 	end
 GO
 

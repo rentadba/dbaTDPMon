@@ -41,7 +41,7 @@ DECLARE	  @serverEdition			[sysname]
 		, @serverVersionStr			[sysname]
 		, @serverVersionNum			[numeric](9,6)
 		, @serverEngine				[int]
-
+		, @flgContinue				[bit]
 
 -----------------------------------------------------------------------------------------------------
 IF object_id('#serverPropertyConfig') IS NOT NULL DROP TABLE #serverPropertyConfig
@@ -64,6 +64,49 @@ EXEC [dbo].[usp_getSQLServerVersion]	@sqlServerName			= @sqlServerName,
 										@serverEngine			= @serverEngine OUT,
 										@executionLevel			= @nestedExecutionLevel,
 										@debugMode				= @debugMode
+
+-----------------------------------------------------------------------------------------
+/* quick linux version check and exit */
+IF @serverVersionNum > 14 
+	AND @configOptionName = 'xp_cmdshell'
+	begin
+		SET @flgContinue = 1
+		IF EXISTS(SELECT * FROM dbo.vw_catalogInstanceNames WHERE [instance_name] = @sqlServerName AND [host_platform] = 'linux')
+			SET @flgContinue = 0
+		ELSE
+			begin
+				SET @queryToRun = N''
+				SET @queryToRun = @queryToRun + N'SELECT [host_platform] FROM sys.dm_os_host_info WITH (NOLOCK)'
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+				IF object_id('tempdb..#hostPlatform') IS NOT NULL DROP TABLE #hostPlatform
+				CREATE TABLE #hostPlatform
+					(
+						[output]	[nvarchar](max)			NULL
+					)
+				BEGIN TRY
+					TRUNCATE TABLE #hostPlatform
+					INSERT	INTO #hostPlatform([output])
+							EXEC sp_executesql @queryToRun
+
+					IF (SELECT LOWER([output]) FROM #hostPlatform)='linux'
+						SET @flgContinue = 0
+				END TRY
+				BEGIN CATCH
+					SET @queryToRun = ERROR_MESSAGE()
+					EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+				END CATCH
+			end
+
+		IF @flgContinue = 0
+			begin
+				SET @queryToRun = 'WARNING: xp_cmdshell is not enabled on SQL Server Linux based distribution.'
+				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+				RETURN
+			end
+	end
 
 -----------------------------------------------------------------------------------------
 SET @optionCurrentValue=0
