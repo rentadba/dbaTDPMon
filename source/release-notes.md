@@ -938,3 +938,6 @@
 07.10.2019
 * improved performance for internal log messaging by running some heavy queries only if an email must be sent
 * maintenance-plan: fix issue when calling maintenance code for objects having . (dot) in their name (reported by George Talaba)
+
+13.10.2019
+* monitoring: improved performance for transaction status; include the actual SQL code in the collected data / alerts sent

@@ -236,6 +236,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<instance_name>' + [dbo].[ufn_getObjectQuoteName](cin.[instance_name], 'xml') + '</instance_name>' + 
 																				'<counter_name>running transaction</counter_name>' + 
 																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<request_id>' + ISNULL(CAST(sts.[request_id] AS [nvarchar]), '0') +'</request_id>' + 
 																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
 																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
 																				'<databases>' + [dbo].[ufn_getObjectQuoteName](db.[database_name], 'xml') + '</databases>' + 
@@ -249,6 +250,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdWarningRunningTransactions*1000) + '</threshold_value>' + 
 																				'<measure_unit>sec</measure_unit>' + 
 																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'<sql_text>' + [dbo].[ufn_getObjectQuoteName](sts.[sql_text], 'xml') + '</sql_text>' + 
 																				'</detail></alert>' AS [event_message]
 																	FROM [dbo].[vw_catalogInstanceNames]  cin
 																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
@@ -317,6 +319,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<instance_name>' + [dbo].[ufn_getObjectQuoteName](cin.[instance_name], 'xml') + '</instance_name>' + 
 																				'<counter_name>running transaction</counter_name>' + 
 																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<request_id>' + ISNULL(CAST(sts.[request_id] AS [nvarchar]), '0') +'</request_id>' + 
 																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
 																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
 																				'<databases>' + [dbo].[ufn_getObjectQuoteName](db.[database_name], 'xml') + '</databases>' + 
@@ -330,6 +333,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdCriticalRunningTransactions*1000) + '</threshold_value>' + 
 																				'<measure_unit>sec</measure_unit>' + 
 																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'<sql_text>' + [dbo].[ufn_getObjectQuoteName](sts.[sql_text], 'xml') + '</sql_text>' + 
 																				'</detail></alert>' AS [event_message]
 																	FROM [dbo].[vw_catalogInstanceNames]  cin
 																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
@@ -396,6 +400,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<instance_name>' + [dbo].[ufn_getObjectQuoteName](cin.[instance_name], 'xml') + '</instance_name>' + 
 																				'<counter_name>uncommitted transaction</counter_name>' + 
 																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<request_id>' + ISNULL(CAST(sts.[request_id] AS [nvarchar]), '0') +'</request_id>' + 
 																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
 																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
 																				'<databases>' + [dbo].[ufn_getObjectQuoteName](db.[database_name], 'xml') + '</databases>' + 
@@ -409,6 +414,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdWarningUncommitted*1000) + '</threshold_value>' + 
 																				'<measure_unit>sec</measure_unit>' + 
 																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'<sql_text>' + [dbo].[ufn_getObjectQuoteName](sts.[sql_text], 'xml') + '</sql_text>' + 
 																				'</detail></alert>' AS [event_message]
 																	FROM [dbo].[vw_catalogInstanceNames]  cin
 																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
@@ -476,6 +482,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<instance_name>' + [dbo].[ufn_getObjectQuoteName](cin.[instance_name], 'xml') + '</instance_name>' + 
 																				'<counter_name>uncommitted transaction</counter_name>' + 
 																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<request_id>' + ISNULL(CAST(sts.[request_id] AS [nvarchar]), '0') +'</request_id>' + 
 																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
 																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
 																				'<databases>' + [dbo].[ufn_getObjectQuoteName](db.[database_name], 'xml') + '</databases>' + 
@@ -489,6 +496,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdCriticalUncommitted*1000) + '</threshold_value>' + 
 																				'<measure_unit>sec</measure_unit>' + 
 																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'<sql_text>' + [dbo].[ufn_getObjectQuoteName](sts.[sql_text], 'xml') + '</sql_text>' + 
 																				'</detail></alert>' AS [event_message]
 																	FROM [dbo].[vw_catalogInstanceNames]  cin
 																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
@@ -555,6 +563,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<instance_name>' + [dbo].[ufn_getObjectQuoteName](cin.[instance_name], 'xml') + '</instance_name>' + 
 																				'<counter_name>blocked transaction</counter_name>' + 
 																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<request_id>' + ISNULL(CAST(sts.[request_id] AS [nvarchar]), '0') +'</request_id>' + 
 																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
 																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
 																				'<databases>' + [dbo].[ufn_getObjectQuoteName](db.[database_name], 'xml') + '</databases>' + 
@@ -568,6 +577,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdWarningBlocking*1000) + '</threshold_value>' + 
 																				'<measure_unit>sec</measure_unit>' + 
 																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'<sql_text>' + [dbo].[ufn_getObjectQuoteName](sts.[sql_text], 'xml') + '</sql_text>' + 
 																				'</detail></alert>' AS [event_message]
 																	FROM [dbo].[vw_catalogInstanceNames]  cin
 																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
@@ -635,6 +645,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<instance_name>' + [dbo].[ufn_getObjectQuoteName](cin.[instance_name], 'xml') + '</instance_name>' + 
 																				'<counter_name>blocked transaction</counter_name>' + 
 																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<request_id>' + ISNULL(CAST(sts.[request_id] AS [nvarchar]), '0') +'</request_id>' + 
 																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
 																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
 																				'<databases>' + [dbo].[ufn_getObjectQuoteName](db.[database_name], 'xml') + '</databases>' + 
@@ -648,6 +659,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdCriticalBlocking*1000) + '</threshold_value>' + 
 																				'<measure_unit>sec</measure_unit>' + 
 																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'<sql_text>' + [dbo].[ufn_getObjectQuoteName](sts.[sql_text], 'xml') + '</sql_text>' + 
 																				'</detail></alert>' AS [event_message]
 																	FROM [dbo].[vw_catalogInstanceNames]  cin
 																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
@@ -714,6 +726,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<instance_name>' + [dbo].[ufn_getObjectQuoteName](cin.[instance_name], 'xml') + '</instance_name>' + 
 																				'<counter_name>tempdb space</counter_name>' + 
 																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<request_id>' + ISNULL(CAST(sts.[request_id] AS [nvarchar]), '0') +'</request_id>' + 
 																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
 																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
 																				'<databases>' + [dbo].[ufn_getObjectQuoteName](db.[database_name], 'xml') + '</databases>' + 
@@ -727,6 +740,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<threshold_value>' + CAST(@alertThresholdWarningTempdb AS [nvarchar]) + '</threshold_value>' + 
 																				'<measure_unit>mb</measure_unit>' + 
 																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'<sql_text>' + [dbo].[ufn_getObjectQuoteName](sts.[sql_text], 'xml') + '</sql_text>' + 
 																				'</detail></alert>' AS [event_message]
 																	FROM [dbo].[vw_catalogInstanceNames]  cin
 																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
@@ -793,6 +807,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<instance_name>' + [dbo].[ufn_getObjectQuoteName](cin.[instance_name], 'xml') + '</instance_name>' + 
 																				'<counter_name>tempdb space</counter_name>' + 
 																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<request_id>' + ISNULL(CAST(sts.[request_id] AS [nvarchar]), '0') +'</request_id>' + 
 																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
 																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
 																				'<databases>' + [dbo].[ufn_getObjectQuoteName](db.[database_name], 'xml') + '</databases>' + 
@@ -806,6 +821,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<threshold_value>' + CAST(@alertThresholdCriticalTempdb AS [nvarchar]) + '</threshold_value>' + 
 																				'<measure_unit>mb</measure_unit>' + 
 																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'<sql_text>' + [dbo].[ufn_getObjectQuoteName](sts.[sql_text], 'xml') + '</sql_text>' + 
 																				'</detail></alert>' AS [event_message]
 																	FROM [dbo].[vw_catalogInstanceNames]  cin
 																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
@@ -871,6 +887,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<instance_name>' + [dbo].[ufn_getObjectQuoteName](cin.[instance_name], 'xml') + '</instance_name>' + 
 																				'<counter_name>long session request</counter_name>' + 
 																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<request_id>' + ISNULL(CAST(sts.[request_id] AS [nvarchar]), '0') +'</request_id>' + 
 																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
 																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
 																				'<databases>' + ISNULL([dbo].[ufn_getObjectQuoteName](db.[database_name], 'xml'), N'') + '</databases>' + 
@@ -882,6 +899,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdWarningActiveRequest*1000) + '</threshold_value>' + 
 																				'<measure_unit>sec</measure_unit>' + 
 																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'<sql_text>' + [dbo].[ufn_getObjectQuoteName](sts.[sql_text], 'xml') + '</sql_text>' + 
 																				'</detail></alert>' AS [event_message]
 																	FROM [dbo].[vw_catalogInstanceNames]  cin
 																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]
@@ -950,6 +968,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<instance_name>' + [dbo].[ufn_getObjectQuoteName](cin.[instance_name], 'xml') + '</instance_name>' + 
 																				'<counter_name>long session request</counter_name>' + 
 																				'<session_id>' + ISNULL(CAST(sts.[session_id] AS [nvarchar]), '0') +'</session_id>' + 
+																				'<request_id>' + ISNULL(CAST(sts.[request_id] AS [nvarchar]), '0') +'</request_id>' + 
 																				'<is_session_blocked>' + CASE WHEN ISNULL(sts.[is_session_blocked], 0)=1 THEN N'Yes' ELSE N'No' END +'</is_session_blocked>' + 
 																				'<sessions_blocked>' + ISNULL(CAST(sts.[sessions_blocked] AS [nvarchar]), '0') +'</sessions_blocked>' + 
 																				'<databases>' + ISNULL([dbo].[ufn_getObjectQuoteName](db.[database_name], 'xml'), N'')  + '</databases>' + 
@@ -961,6 +980,7 @@ DECLARE crsTransactionStatusAlarms CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINC
 																				'<threshold_value>' + [dbo].[ufn_reportHTMLFormatTimeValue](@alertThresholdCriticalActiveRequest*1000) + '</threshold_value>' + 
 																				'<measure_unit>sec</measure_unit>' + 
 																				'<event_date_utc>' + CONVERT([varchar](20), sts.[event_date_utc], 120) + '</event_date_utc>' + 
+																				'<sql_text>' + [dbo].[ufn_getObjectQuoteName](sts.[sql_text], 'xml') + '</sql_text>' + 
 																				'</detail></alert>' AS [event_message]
 																	FROM [dbo].[vw_catalogInstanceNames]  cin
 																	INNER JOIN [monitoring].[statsTransactionsStatus] sts ON sts.[project_id] = cin.[project_id] AND sts.[instance_id] = cin.[instance_id]

@@ -407,6 +407,8 @@ echo *--------------------------------------------------------------------------
 echo Monitoring: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
 
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20191013-patch-upgrade-from-v2019_9-to-v2019_10-mon.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
 
 
 echo *-----------------------------------------------------------------------------*
@@ -459,7 +461,7 @@ if errorlevel 1 goto install_err
 
 
 :done
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2019.10.07' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
+if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2019.10.13' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err  
 
 echo *-----------------------------------------------------------------------------*

@@ -22,6 +22,7 @@ CREATE TABLE [monitoring].[statsTransactionsStatus]
 	[event_date_utc]					[datetime]		NOT NULL,
 	[database_name]						[sysname],
 	[session_id]						[smallint],
+	[request_id]						[int],
 	[transaction_begin_time]			[datetime],
 	[host_name]							[sysname],
 	[program_name]						[sysname],
@@ -35,6 +36,7 @@ CREATE TABLE [monitoring].[statsTransactionsStatus]
 	[wait_duration_sec]					[int],
 	[wait_type]							[nvarchar](60),
 	[tempdb_space_used_mb]				[int],
+	[sql_text]							[nvarchar](max)
 	CONSTRAINT [PK_statsTransactionsStatus] PRIMARY KEY  CLUSTERED 
 	(
 		[id],

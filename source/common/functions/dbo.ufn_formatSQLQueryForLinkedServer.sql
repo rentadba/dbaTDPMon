@@ -7,9 +7,9 @@ GO
 CREATE FUNCTION [dbo].[ufn_formatSQLQueryForLinkedServer]
 (		
 	@sqlServerName		[sysname],
-	@sqlText			[nvarchar] (4000)
+	@sqlText			[nvarchar] (max)
 )
-RETURNS [nvarchar](4000)
+RETURNS [nvarchar](max)
 /* WITH ENCRYPTION */
 AS
 
@@ -33,7 +33,7 @@ AS
 -- { sql_statement | statement_block }
 
 begin
-	DECLARE @SQLStatement [nvarchar] (4000)
+	DECLARE @SQLStatement [nvarchar] (max)
 
 	SET @SQLStatement = N''
 
