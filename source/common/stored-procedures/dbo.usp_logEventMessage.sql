@@ -18,7 +18,7 @@ CREATE PROCEDURE [dbo].[usp_logEventMessage]
 		@module					[sysname],
 		@eventName				[nvarchar](256) = NULL,
 		@parameters				[nvarchar](512) = NULL,			/* may contain the attach file name */
-		@eventMessage			[varchar](8000) = NULL,
+		@eventMessage			[varchar](max) = NULL,
 		@eventType				[smallint]=1,	/*	0 - info
 													1 - alert 
 													2 - job-history

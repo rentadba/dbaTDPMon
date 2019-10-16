@@ -19,7 +19,7 @@ CREATE PROCEDURE [dbo].[usp_logEventMessageAndSendEmail]
 		@module					[sysname],
 		@eventName				[nvarchar](256) = NULL,
 		@parameters				[nvarchar](512) = NULL,			/* may contain the attach file name */
-		@eventMessage			[varchar](8000) = NULL,
+		@eventMessage			[varchar](max) = NULL,
 		@dbMailProfileName		[sysname] = NULL,
 		@recipientsList			[nvarchar](1024) = NULL,
 		@eventType				[smallint]=1,	/*	0 - info
@@ -56,7 +56,6 @@ DECLARE @projectID						[smallint],
 		@emailSubject					[nvarchar](256),
 		@ReturnValue					[int],
 		@clientName						[nvarchar](260),
-		@eventData						[varchar](8000),
 		@ignoreAlertsForError1222		[bit],
 		@ignoreAlertsForError15281		[bit],
 		@ignoreAlertsForError1927		[bit],
@@ -638,7 +637,6 @@ ELSE
 		SET @isFloodControl=1
 	end
 
-SET @eventData = SUBSTRING(@eventMessage, 1, 8000)
 EXEC [dbo].[usp_logEventMessage]	@projectCode			= @projectCode,
 									@sqlServerName			= @sqlServerName,
 									@dbName					= @dbName,
@@ -647,7 +645,7 @@ EXEC [dbo].[usp_logEventMessage]	@projectCode			= @projectCode,
 									@module					= @module,
 									@eventName				= @eventName,
 									@parameters				= @parameters,
-									@eventMessage			= @eventData,
+									@eventMessage			= @eventMessage,
 									@eventType				= @eventType,
 									@recipientsList			= @recipientsList,
 									@isEmailSent			= @isEmailSent,
