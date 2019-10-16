@@ -11,6 +11,7 @@ GO
 CREATE PROCEDURE [dbo].[usp_removeFromCatalog]
 		@projectCode		[varchar](32)=NULL,
 		@sqlServerName		[sysname],
+		@databaseNameFilter	[sysname] = '%',
 		@debugMode			[bit] = 0
 /* WITH ENCRYPTION */
 AS
@@ -67,44 +68,59 @@ BEGIN TRY
 		-----------------------------------------------------------------------------------------------------
 		DELETE jeq
 		FROM dbo.jobExecutionHistory jeq
-		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = jeq.[project_id] AND cin.[id] = jeq.[instance_id]
-		WHERE cin.[project_id] = @projectID
-				AND cin.[name] = @sqlServerName
+		WHERE jeq.[project_id] = @projectID
+				AND jeq.[instance_id] = @instanceID
+				AND (	@databaseNameFilter IS NULL
+					 OR @databaseNameFilter = '%'
+					 OR (@databaseNameFilter IS NOT NULL AND @databaseNameFilter <> '%' AND jeq.[database_name] LIKE @databaseNameFilter)
+					)
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE jeq
 		FROM dbo.jobExecutionHistory jeq
-		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = jeq.[project_id] AND cin.[id] = jeq.[for_instance_id]
-		WHERE cin.[project_id] = @projectID
-				AND cin.[name] = @sqlServerName
+		WHERE jeq.[project_id] = @projectID
+				AND jeq.[for_instance_id] = @instanceID
+				AND (	@databaseNameFilter IS NULL
+					 OR @databaseNameFilter = '%'
+					 OR (@databaseNameFilter IS NOT NULL AND @databaseNameFilter <> '%' AND jeq.[database_name] LIKE @databaseNameFilter)
+					)
 	
 		-----------------------------------------------------------------------------------------------------
 		DELETE jeq
 		FROM dbo.jobExecutionQueue jeq
-		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = jeq.[project_id] AND cin.[id] = jeq.[instance_id]
-		WHERE cin.[project_id] = @projectID
-				AND cin.[name] = @sqlServerName
+		WHERE jeq.[project_id] = @projectID
+				AND jeq.[instance_id] = @instanceID
+				AND (	@databaseNameFilter IS NULL
+					 OR @databaseNameFilter = '%'
+					 OR (@databaseNameFilter IS NOT NULL AND @databaseNameFilter <> '%' AND jeq.[database_name] LIKE @databaseNameFilter)
+					)
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE jeq
 		FROM dbo.jobExecutionQueue jeq
-		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = jeq.[project_id] AND cin.[id] = jeq.[for_instance_id]
-		WHERE cin.[project_id] = @projectID
-				AND cin.[name] = @sqlServerName
-	
+		WHERE jeq.[project_id] = @projectID
+				AND jeq.[for_instance_id] = @instanceID
+				AND (	@databaseNameFilter IS NULL
+					 OR @databaseNameFilter = '%'
+					 OR (@databaseNameFilter IS NOT NULL AND @databaseNameFilter <> '%' AND jeq.[database_name] LIKE @databaseNameFilter)
+					)
+
 		-----------------------------------------------------------------------------------------------------
 		DELETE jesh
 		FROM dbo.jobExecutionStatisticsHistory jesh
-		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = jesh.[project_id] AND cin.[id] = jesh.[instance_id]
-		WHERE cin.[project_id] = @projectID
-				AND cin.[name] = @sqlServerName
+		WHERE jesh.[project_id] = @projectID
+				AND jesh.[instance_id] = @instanceID
+				AND (@databaseNameFilter = '%' OR @databaseNameFilter IS NULL)
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE lem
 		FROM dbo.logEventMessages lem
-		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = lem.[project_id] AND cin.[id] = lem.[instance_id]
-		WHERE cin.[project_id] = @projectID
-				AND cin.[name] = @sqlServerName
+		WHERE lem.[project_id] = @projectID
+				AND lem.[instance_id] = @instanceID
+				AND (	@databaseNameFilter IS NULL
+					 OR @databaseNameFilter = '%'
+					 OR (@databaseNameFilter IS NOT NULL AND @databaseNameFilter <> '%' AND lem.[database_name] LIKE @databaseNameFilter)
+					)
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE lsam
@@ -112,6 +128,7 @@ BEGIN TRY
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = lsam.[project_id] AND cin.[id] = lsam.[instance_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[name] = @sqlServerName
+				AND (@databaseNameFilter = '%' OR @databaseNameFilter IS NULL)
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE sosel
@@ -119,6 +136,7 @@ BEGIN TRY
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = sosel.[project_id] AND cin.[id] = sosel.[instance_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[name] = @sqlServerName
+				AND (@databaseNameFilter = '%' OR @databaseNameFilter IS NULL)
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE sseld
@@ -126,6 +144,7 @@ BEGIN TRY
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = sseld.[project_id] AND cin.[id] = sseld.[instance_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[name] = @sqlServerName
+				AND (@databaseNameFilter = '%' OR @databaseNameFilter IS NULL)
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE ssajh
@@ -133,6 +152,7 @@ BEGIN TRY
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = ssajh.[project_id] AND cin.[id] = ssajh.[instance_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[name] = @sqlServerName
+				AND (@databaseNameFilter = '%' OR @databaseNameFilter IS NULL)
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE shcdsi
@@ -140,6 +160,7 @@ BEGIN TRY
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = shcdsi.[project_id] AND cin.[id] = shcdsi.[instance_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[name] = @sqlServerName
+				AND (@databaseNameFilter = '%' OR @databaseNameFilter IS NULL)
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE shcdd
@@ -148,6 +169,10 @@ BEGIN TRY
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[id] = cdb.[instance_id] AND cin.[project_id] = cdb.[project_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[name] = @sqlServerName
+				AND (	@databaseNameFilter IS NULL
+					 OR @databaseNameFilter = '%'
+					 OR (@databaseNameFilter IS NOT NULL AND @databaseNameFilter <> '%' AND cdb.[name] LIKE @databaseNameFilter)
+					)
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE sduh
@@ -156,6 +181,10 @@ BEGIN TRY
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[id] = cdb.[instance_id] AND cin.[project_id] = cdb.[project_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[name] = @sqlServerName
+				AND (	@databaseNameFilter IS NULL
+					 OR @databaseNameFilter = '%'
+					 OR (@databaseNameFilter IS NOT NULL AND @databaseNameFilter <> '%' AND cdb.[name] LIKE @databaseNameFilter)
+					)
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE sdaod
@@ -164,56 +193,77 @@ BEGIN TRY
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[id] = cdb.[instance_id] AND cin.[project_id] = cdb.[project_id]
 		WHERE cin.[project_id] = @projectID
 				AND cin.[name] = @sqlServerName
+				AND (	@databaseNameFilter IS NULL
+					 OR @databaseNameFilter = '%'
+					 OR (@databaseNameFilter IS NOT NULL AND @databaseNameFilter <> '%' AND cdb.[name] LIKE @databaseNameFilter)
+					)
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE aar
 		FROM [monitoring].[alertAdditionalRecipients] aar
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = aar.[project_id] AND cin.[id] = aar.[instance_id]
 		WHERE cin.[project_id] = @projectID
-				AND cin.[name] = @sqlServerName				
+				AND cin.[name] = @sqlServerName	
+				AND (@databaseNameFilter = '%' OR @databaseNameFilter IS NULL)
 
 		DELETE srl
 		FROM [monitoring].[statsReplicationLatency] srl
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = srl.[project_id] AND cin.[name] = srl.[publisher_server]
 		WHERE cin.[project_id] = @projectID
-				AND cin.[name] = @sqlServerName				
+				AND cin.[name] = @sqlServerName	
+				AND (	@databaseNameFilter IS NULL
+					 OR @databaseNameFilter = '%'
+					 OR (@databaseNameFilter IS NOT NULL AND @databaseNameFilter <> '%' AND srl.[publisher_db] LIKE @databaseNameFilter)
+					)
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE ssaj
 		FROM [monitoring].statsSQLAgentJobs ssaj
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = ssaj.[project_id] AND cin.[id] = ssaj.[instance_id]
 		WHERE cin.[project_id] = @projectID
-				AND cin.[name] = @sqlServerName				
+				AND cin.[name] = @sqlServerName	
+				AND (@databaseNameFilter = '%' OR @databaseNameFilter IS NULL)
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE sts
 		FROM [monitoring].statsTransactionsStatus sts
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = sts.[project_id] AND cin.[id] = sts.[instance_id]
 		WHERE cin.[project_id] = @projectID
-				AND cin.[name] = @sqlServerName				
-								
+				AND cin.[name] = @sqlServerName	
+				AND (	@databaseNameFilter IS NULL
+					 OR @databaseNameFilter = '%'
+					 OR (@databaseNameFilter IS NOT NULL AND @databaseNameFilter <> '%' AND sts.[database_name] LIKE @databaseNameFilter)
+					)				
+			
 		-----------------------------------------------------------------------------------------------------
 		DELETE cdn
 		FROM  dbo.catalogDatabaseNames cdn
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = cdn.[project_id] AND cin.[id] = cdn.[instance_id]
 		WHERE cin.[project_id] = @projectID
-				AND cin.[name] = @sqlServerName				
+				AND cin.[name] = @sqlServerName
+				AND (	@databaseNameFilter IS NULL
+					 OR @databaseNameFilter = '%'
+					 OR (@databaseNameFilter IS NOT NULL AND @databaseNameFilter <> '%' AND cdn.[name] LIKE @databaseNameFilter)
+					)
 
 		-----------------------------------------------------------------------------------------------------
 		DELETE FROM  dbo.catalogInstanceNames
 		WHERE [project_id] = @projectID
 				AND [name] = @sqlServerName
+				AND (@databaseNameFilter = '%' OR @databaseNameFilter IS NULL)
 
 		-----------------------------------------------------------------------------------------------------
 		IF NOT EXISTS(	SELECT * FROM dbo.catalogInstanceNames
 						WHERE [project_id] = @projectID
 							AND [machine_id] = @machineID
+							AND (@databaseNameFilter = '%' OR @databaseNameFilter IS NULL)
 					)
 			DELETE cmn 
 			FROM  dbo.catalogMachineNames cmn
 			INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = cmn.[project_id] AND cin.[machine_id] = cmn.[id] 
 			WHERE cin.[project_id] = @projectID
 					AND cin.[name] = @sqlServerName
+					AND (@databaseNameFilter = '%' OR @databaseNameFilter IS NULL)
 
 	COMMIT
 END TRY

@@ -12,6 +12,7 @@ CREATE PROCEDURE [dbo].[usp_refreshMachineCatalogs]
 		@projectCode				[varchar](32)=NULL,
 		@sqlServerName				[sysname],
 		@addNewDatabasesToProject	[bit] = 1,
+		@databaseNameFilter			[sysname] = '%',
 		@debugMode					[bit] = 0
 /* WITH ENCRYPTION */
 AS
@@ -142,6 +143,9 @@ BEGIN TRY
 		end
 
 	IF ISNULL(@dbFilter, '')='' SET @dbFilter = '%'
+
+	IF @databaseNameFilter IS NOT NULL AND @databaseNameFilter <> '%'
+		SET @dbFilter = @databaseNameFilter
 		
 	-----------------------------------------------------------------------------------------------------
 	--check if the connection to machine can be made & discover instance name
@@ -272,18 +276,15 @@ BEGIN TRY
 								FROM sys.databases sdb WITH (NOLOCK)
 								WHERE	[is_read_only] = 0 
 										AND [is_in_standby] = 0
-										/* AND sdb.[name] LIKE ''' + @dbFilter + ''' */
 								UNION ALL
 								SELECT sdb.[database_id], sdb.[name], sdb.[state], ''READ ONLY''
 								FROM sys.databases sdb WITH (NOLOCK)
 								WHERE	[is_read_only] = 1
 										AND [is_in_standby] = 0
-										/* AND sdb.[name] LIKE ''' + @dbFilter + ''' */
 								UNION ALL
 								SELECT sdb.[database_id], sdb.[name], sdb.[state], ''STANDBY''
 								FROM sys.databases sdb WITH (NOLOCK)
-								WHERE	[is_in_standby] = 1
-										/* AND sdb.[name] LIKE ''' + @dbFilter + ''' */'
+								WHERE	[is_in_standby] = 1'
 			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 			IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
@@ -537,7 +538,6 @@ BEGIN TRY
 			INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[name] = srcIN.[name] AND cin.[machine_id] = cmn.[id]
 			WHERE cin.[project_id] = @projectID
 		  ) AS src ON dest.[instance_id] = src.[instance_id] AND dest.[name] = src.[name] AND dest.[project_id] = @projectID;;
-
 
 	IF @addNewDatabasesToProject = 1
 		/* add only databases not allocated to other projects */

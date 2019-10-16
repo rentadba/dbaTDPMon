@@ -657,7 +657,7 @@ WHILE @@FETCH_STATUS=0
 						, X.[readable_secondary_replica]
 						, GETUTCDATE()
 				FROM #statsDatabaseAlwaysOnDetails X
-				INNER JOIN dbo.catalogMachineNames cmn ON cmn.[name] = X.[host_name]
+				INNER JOIN dbo.catalogMachineNames cmn ON cmn.[name] = X.[host_name] COLLATE SQL_Latin1_General_CP1_CI_AS
 				INNER JOIN dbo.catalogInstanceNames cin ON cin.[name] = X.[instance_name] AND cin.[project_id] = cmn.[project_id]  AND cin.[machine_id] = cmn.[id]
 				INNER JOIN dbo.catalogDatabaseNames cdn ON cdn.[name] = X.[database_name] AND cdn.[project_id] = cmn.[project_id]  AND cdn.[instance_id] = cin.[id]
 				LEFT JOIN [health-check].[statsDatabaseAlwaysOnDetails] sdaod ON sdaod.[catalog_database_id] = cdn.[id] AND sdaod.[instance_id] = cin.[id] 
