@@ -942,3 +942,6 @@
 13.10.2019
 * monitoring: improved performance for transaction status; include the actual SQL code in the collected data / alerts sent
 * option to add/remove databases from a project using name filters
+
+22.10.2019
+* health-check: incremental read for errorlog files (read only new events)

@@ -46,7 +46,8 @@ DECLARE @SQLMajorVersion		[int],
 		@sqlServerVersion		[sysname],
 		@configErrorlogFileNo	[int],
 		@errorlogFileNo			[int], 
-		@isAzureSQLDatabase		[bit]
+		@isAzureSQLDatabase		[bit],
+		@lastCollectedEventTime [datetime]
 
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
@@ -98,12 +99,6 @@ SET @configErrorlogFileNo = ISNULL(@configErrorlogFileNo, 1)
 SET @strMessage= 'Step 1: Delete existing information...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 0, @stopExecution=0
 
-DELETE eld
-FROM [health-check].[statsErrorlogDetails]	eld
-INNER JOIN [dbo].[catalogInstanceNames]		cin ON cin.[id] = eld.[instance_id] AND cin.[project_id] = eld.[project_id]
-WHERE cin.[project_id] = @projectID
-		AND cin.[name] LIKE @sqlServerNameFilter
-
 DELETE lsam
 FROM [dbo].[logAnalysisMessages]	lsam
 INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = lsam.[instance_id] AND cin.[project_id] = lsam.[project_id]
@@ -128,6 +123,13 @@ WHILE @@FETCH_STATUS=0
 	begin
 		SET @strMessage= 'Analyzing server: ' + @sqlServerName
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+		-------------------------------------------------------------------------------------------------------------------------
+		/* get last event already saved */
+		SELECT @lastCollectedEventTime = MAX(eld.[log_date])
+		FROM [health-check].[statsErrorlogDetails]	eld
+		WHERE	eld.[project_id] = @projectID
+				AND eld.[instance_id] = @instanceID
 
 		-------------------------------------------------------------------------------------------------------------------------
 		/* get local time to UTC offset */
@@ -158,12 +160,12 @@ WHILE @@FETCH_STATUS=0
 						IF @sqlServerName <> @@SERVERNAME
 							begin
 								IF @SQLMajorVersion < 11
-									SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar]) + ''')x'
+									SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; DECLARE @startTime [datetime]; SET @startTime = ''''' + CONVERT([varchar](20), @lastCollectedEventTime, 120) + '''''; EXEC xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar]) + ', 1, NULL, NULL, @startTime, NULL'')x'
 								ELSE
-									SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar]) + ' WITH RESULT SETS(([log_date] [datetime] NULL, [process_info] [sysname] NULL, [text] [varchar](max) NULL))'')x'
+									SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; DECLARE @startTime [datetime]; SET @startTime = ''''' + CONVERT([varchar](20), @lastCollectedEventTime, 120) + '''''; EXEC xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar]) + ', 1, NULL, NULL, @startTime, NULL WITH RESULT SETS(([log_date] [datetime] NULL, [process_info] [sysname] NULL, [text] [varchar](max) NULL))'')x'
 							end
 						ELSE
-							SET @queryToRun = N'xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar])
+							SET @queryToRun = N'xp_readerrorlog ' + CAST((@errorlogFileNo-1) AS [nvarchar]) + N', 1, NULL, NULL, ''' + CONVERT([varchar](20), @lastCollectedEventTime, 120) + N''', NULL'
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 						BEGIN TRY
@@ -201,7 +203,8 @@ WHILE @@FETCH_STATUS=0
 						SET @queryToRun = @queryToRun + N'SELECT @@SERVERNAME AS [machine_name], [start_time], [event_category], [database_name],
 																''{"database_name":"'' + [database_name] + ''","event_type":"'' + [event_type] + ''","event_subtype":"'' + 
 																	[event_subtype_desc] + ''","description":"'' + [description] + ''","occurrences":'' + CAST([event_count] AS [nvarchar]) + ''}'' AS [text]
-															FROM sys.event_log'
+															FROM sys.event_log
+															WHERE [start_time] > ''' + CONVERT([varchar](20), @lastCollectedEventTime, 120) + N''''
 						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 						SET @queryToRun = N'SELECT [start_time], [event_category], [text]
 										FROM (' + @queryToRun + N')x
