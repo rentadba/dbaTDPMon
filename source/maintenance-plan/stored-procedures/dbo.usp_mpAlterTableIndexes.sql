@@ -136,7 +136,7 @@ INSERT	INTO #runtimeProperty([value])
 IF (SELECT CAST([value] AS [int]) FROM #runtimeProperty) > 0
 	begin
 		SET @queryToRun='A shrink operation is in progress for the current database. Index operations cannot run.'
-		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		SET @eventName = CASE @flgAction  WHEN 1 THEN 'database maintenance - rebuilding index'
 										  WHEN 2 THEN 'database maintenance - reorganize index'

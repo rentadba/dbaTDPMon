@@ -565,7 +565,7 @@ IF @flgActions & 32 = 32 AND (GETDATE() <= @stopTimeLimit)
 					OR @databaseStatus = 0
 					begin
 						SET @queryToRun='Current database state does not allow running DBCC CHECKIDENT. It will be skipped.'
-						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 						SET @runCheck = 0
 					end
 				end

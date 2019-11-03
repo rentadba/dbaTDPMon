@@ -331,7 +331,7 @@ SET @databaseStateDesc = ISNULL(@databaseStateDesc, 'NULL')
 IF @dbIsReadOnly = 1
 begin
 	SET @queryToRun='Current database state (' + @databaseStateDesc + ') does not allow writing / maintenance.'
-	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 	SET @eventData='<skipaction><detail>' + 
 						'<name>database maintenance</name>' + 
@@ -686,7 +686,6 @@ IF (@flgActions & 16 = 16) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly =
 		WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 			begin
 				SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'quoted')
-				--EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 		   		SET @queryToRun=@objectName + ' => ' + CASE WHEN @isPartitioned = 1 THEN 'partition: ' + CAST(@partitionNumber AS [varchar](32)) + N' / ' ELSE N'' END + N'current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density deviation = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar])
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
