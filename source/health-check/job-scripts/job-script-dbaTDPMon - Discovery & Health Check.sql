@@ -168,6 +168,7 @@ https://github.com/rentadba/dbaTDPMon',
 
 	---------------------------------------------------------------------------------------------------
 	SET @queryToRun = N'EXEC  [dbo].[usp_reportHTMLBuildHealthCheck]	@projectCode		= ''' + @projectCode + ''',
+							@sqlServerNameFilter = DEFAULT,
 							@flgActions		= DEFAULT,	
 							@flgOptions		= DEFAULT,
 							@reportDescription		= NULL,

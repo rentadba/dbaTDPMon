@@ -12,6 +12,7 @@ SET QUOTED_IDENTIFIER ON
 GO
 CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 		@projectCode			[varchar](32)=NULL,
+		@sqlServerNameFilter	[sysname]='%',
 		@flgActions				[int]			= 63,		/*	1 - Instance Availability 
 																2 - Databases status
 																4 - SQL Server Agent Job status
@@ -1211,7 +1212,8 @@ BEGIN TRY
 														AND rsr.[active] = 1
 														AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 			WHERE	cin.[instance_active]=1
-					AND cin.[project_id] = @projectID																							
+					AND cin.[project_id] = @projectID
+					AND cin.[instance_name] LIKE @sqlServerNameFilter
 					AND (   (eld.[log_date_utc] IS NOT NULL AND eld.[log_date_utc] >= @dateTimeLowerLimitUTC)
 						 OR (eld.[log_date_utc] IS NULL     AND eld.[log_date] >= @dateTimeLowerLimit)
 						)
@@ -1251,7 +1253,8 @@ BEGIN TRY
 														AND rsr.[active] = 1
 														AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 			WHERE	cin.[instance_active]=1
-					AND cin.[project_id] = @projectID																							
+					AND cin.[project_id] = @projectID
+					AND cin.[instance_name] LIKE @sqlServerNameFilter
 					AND (   (eld.[log_date_utc] IS NOT NULL AND eld.[log_date_utc] >= @dateTimeLowerLimitUTC)
 						 OR (eld.[log_date_utc] IS NULL     AND eld.[log_date] >= @dateTimeLowerLimit)
 						)
@@ -1305,6 +1308,7 @@ BEGIN TRY
 														AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 			WHERE	cin.[instance_active]=1
 					AND cin.[project_id] = @projectID
+					AND cin.[instance_name] LIKE @sqlServerNameFilter
 					AND (   (oel.[time_created_utc] IS NOT NULL AND oel.[time_created_utc] >= @dateTimeLowerLimitUTC)
 						 OR (oel.[time_created_utc] IS NULL     AND CONVERT([datetime], oel.[time_created]) >= @dateTimeLowerLimit)
 						)
@@ -1367,6 +1371,7 @@ BEGIN TRY
 																													AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																		WHERE	cin.[instance_active]=0
 																				AND cin.[project_id] = @projectID
+																				AND cin.[instance_name] LIKE @sqlServerNameFilter
 																				AND lsam.[descriptor] IN (N'dbo.usp_refreshMachineCatalogs - Offline')
 																				AND rsr.[id] IS NULL
 
@@ -1463,6 +1468,7 @@ BEGIN TRY
 																													AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																		WHERE cin.[instance_active]=1
 																				AND cin.[project_id] = @projectID
+																				AND cin.[instance_name] LIKE @sqlServerNameFilter
 																				AND rsr.[id] IS NULL
 																		GROUP BY  cin.[machine_name], cin.[instance_name]
 																				, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -1593,6 +1599,7 @@ BEGIN TRY
 																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																						WHERE	cin.[instance_active]=1
 																								AND cin.[project_id] = @projectID
+																								AND cin.[instance_name] LIKE @sqlServerNameFilter
 																								AND lsam.descriptor IN (N'dbo.usp_hcCollectDatabaseDetails')
 																								AND rsr.[id] IS NULL
 																						GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -1667,6 +1674,7 @@ BEGIN TRY
 														AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 			WHERE	cin.[instance_active]=1
 					AND cin.[project_id] = @projectID
+					AND cin.[instance_name] LIKE @sqlServerNameFilter
 					AND lsam.descriptor IN (N'dbo.usp_hcCollectDatabaseDetails')
 					AND rsr.[id] IS NULL
 
@@ -1717,6 +1725,7 @@ BEGIN TRY
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
 																							AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																							AND cin.[instance_name] LIKE @sqlServerNameFilter
 																							AND CHARINDEX(cdn.[state_desc], @reportOptionDatabaseAdmittedState)=0
 																							AND rsr.[id] IS NULL
 																					ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
@@ -1789,6 +1798,7 @@ BEGIN TRY
 																																			AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																								WHERE	cin.[instance_active]=1
 																										AND cin.[project_id] = @projectID
+																										AND cin.[instance_name] LIKE @sqlServerNameFilter
 																										AND lsam.descriptor IN (N'dbo.usp_hcCollectSQLServerAgentJobsStatus')
 																										AND rsr.[id] IS NULL
 																								GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
@@ -1870,7 +1880,8 @@ BEGIN TRY
 																																			AND rsr.[rule_id] = 16
 																																			AND rsr.[active] = 1
 																																			AND (rsr.[skip_value]=ssajh.[instance_name])
-																								WHERE	ssajh.[project_id]=@projectID
+																								WHERE	cin.[project_id]=@projectID
+																										AND cin.[instance_name] LIKE @sqlServerNameFilter
 																										AND cin.[instance_active]=1
 																										AND ssajh.[last_execution_status] IN (0, 2, 3) /* 0 = Failed; 2 = Retry; 3 = Canceled */
 																										AND (   (ssajh.[last_execution_utc] IS NOT NULL AND ssajh.[last_execution_utc] >= @dateTimeLowerLimitUTC)
@@ -1968,7 +1979,8 @@ BEGIN TRY
 																																		AND (    rsr.[skip_value]=ssajh.[instance_name]
 																																			 AND ISNULL(rsr.[skip_value2], '') = ISNULL(ssajh.[job_name], '') 
 																																			)
-																							WHERE	ssajh.[project_id]=@projectID
+																							WHERE	cin.[project_id]=@projectID
+																									AND cin.[instance_name] LIKE @sqlServerNameFilter
 																									AND cin.[instance_active]=1
 																									AND ssajh.[last_execution_status] = 4
 																									AND ssajh.[last_execution_date] IS NOT NULL
@@ -2125,6 +2137,7 @@ BEGIN TRY
 														AND (rsr.[skip_value]=iff.[instance_name])
 			WHERE cin.[instance_active] = 1
 				 AND cin.[project_id] = @projectID
+				 AND cin.[instance_name] LIKE @sqlServerNameFilter
 				 AND iff.[page_count] >= @minimumIndexSizeInPages
 				 AND iff.[fill_factor] >= @minimumIndexFillFactor
 
@@ -2359,6 +2372,7 @@ BEGIN TRY
 																							WHERE cin.[instance_active]=1
 																									AND cdn.[active]=1
 																									AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																									AND cin.[instance_name] LIKE @sqlServerNameFilter
 																									AND CHARINDEX(cdn.[state_desc], @reportOptionDatabaseAdmittedState) <> 0
 																									AND rsr.[id] IS NULL
 																									AND (   (@reportOptionSkipDatabaseSnapshots = 0)
@@ -2464,6 +2478,7 @@ BEGIN TRY
 																							WHERE cin.[instance_active]=1
 																									AND cdn.[active]=1
 																									AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																									AND cin.[instance_name] LIKE @sqlServerNameFilter
 																									AND (
 																											(    cdn.[database_name] NOT IN ('master', 'model', 'msdb', 'distribution') 
 																												AND DATEDIFF(dd, shcdd.[last_dbcc checkdb_time], GETDATE()) > @reportOptionUserDBCCCHECKDBAgeDays
@@ -2561,6 +2576,7 @@ BEGIN TRY
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
 																							AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																							AND cin.[instance_name] LIKE @sqlServerNameFilter
 																							AND (shcdd.[is_auto_close]=1 OR shcdd.[is_auto_shrink]=1)
 																							AND rsr.[id] IS NULL
 																					ORDER BY cin.[instance_name], cin.[machine_name], cdn.[database_name]
@@ -2643,6 +2659,7 @@ BEGIN TRY
 																						WHERE cin.[instance_active]=1
 																								AND cdn.[active]=1
 																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																								AND cin.[instance_name] LIKE @sqlServerNameFilter
 																								AND cdn.[database_name] NOT IN ('tempdb')
 																								AND (   
 																										(     shcdd.[page_verify_option_desc] <> 'CHECKSUM'
@@ -2733,6 +2750,7 @@ BEGIN TRY
 																				WHERE	cin.[instance_active]=1
 																						AND cdn.[active]=1
 																						AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																						AND cin.[instance_name] LIKE @sqlServerNameFilter
 																						AND shcdd.[is_growth_limited]=1
 																						AND rsr.[id] IS NULL
 																				ORDER BY cdn.[database_name]
@@ -2809,6 +2827,7 @@ BEGIN TRY
 																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																							WHERE	cin.[instance_active]=1
 																									AND cin.[project_id] = @projectID
+																									AND cin.[instance_name] LIKE @sqlServerNameFilter
 																									AND lsam.descriptor IN (N'dbo.usp_hcCollectDiskSpaceUsage')
 																									AND rsr.[id] IS NULL
 																							GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -2880,6 +2899,7 @@ BEGIN TRY
 			INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
 			WHERE	cin.[instance_active]=1
 					AND cin.[project_id] = @projectID
+					AND cin.[instance_name] LIKE @sqlServerNameFilter
 					AND lsam.descriptor IN (N'dbo.usp_hcCollectDiskSpaceUsage')
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{DiskSpaceInformationPermissionErrorsCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
@@ -2938,6 +2958,7 @@ BEGIN TRY
 																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																							WHERE cin.[instance_active]=1
 																									AND cin.[project_id] = @projectID
+																									AND cin.[instance_name] LIKE @sqlServerNameFilter
 																									AND (    (	  dsi.[percent_available] IS NOT NULL 
 																												AND dsi.[percent_available] < @reportOptionFreeDiskMinPercent 
 																												)
@@ -3031,6 +3052,7 @@ BEGIN TRY
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
 																							AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																							AND cin.[instance_name] LIKE @sqlServerNameFilter
 																							AND (   (cdn.[database_name]='master' AND shcdd.[size_mb] >= @reportOptionDatabaseMaxSizeMaster AND @reportOptionDatabaseMaxSizeMaster<>0)
 																								 OR (cdn.[database_name]='msdb'   AND shcdd.[size_mb] >= @reportOptionDatabaseMaxSizeMSDB   AND @reportOptionDatabaseMaxSizeMSDB<>0)
 																								)
@@ -3117,6 +3139,7 @@ BEGIN TRY
 																						WHERE cin.[instance_active]=1
 																								AND cdn.[active]=1
 																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																								AND cin.[instance_name] LIKE @sqlServerNameFilter
 																								AND shcdd.[log_size_mb] >= @reportOptionLogMaxSize 
 																								AND rsr.[id] IS NULL
 																						ORDER BY cin.[instance_name], cin.[machine_name], [reclaimable_space_mb] DESC, cdn.[database_name]
@@ -3205,6 +3228,7 @@ BEGIN TRY
 																						WHERE cin.[instance_active]=1
 																								AND cdn.[active]=1
 																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																								AND cin.[instance_name] LIKE @sqlServerNameFilter
 																								AND shcdd.[size_mb]>=@reportOptionDBMinSizeForAnalysis 
 																								AND shcdd.[data_space_used_percent] <= @reportOptionDataSpaceMinPercent 
 																								AND @reportOptionDataSpaceMinPercent<>0
@@ -3296,6 +3320,7 @@ BEGIN TRY
 																						WHERE cin.[instance_active]=1
 																								AND cdn.[active]=1
 																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																								AND cin.[instance_name] LIKE @sqlServerNameFilter
 																								AND shcdd.[size_mb]>=@reportOptionDBMinSizeForAnalysis 
 																								AND shcdd.[log_space_used_percent] >= @reportOptionLogSpaceMaxPercent 
 																								AND @reportOptionLogSpaceMaxPercent<>0
@@ -3391,6 +3416,7 @@ BEGIN TRY
 																									WHERE cin.[instance_active]=1
 																											AND cdn.[active]=1
 																											AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																											AND cin.[instance_name] LIKE @sqlServerNameFilter
 																											AND shcdd.[data_size_mb] <> 0
 																											AND (shcdd.[log_size_mb] / shcdd.[data_size_mb] * 100.) > @reportOptionLogVsDataPercent
 																											AND shcdd.[size_mb]>=@reportOptionDBMinSizeForAnalysis 
@@ -3471,6 +3497,7 @@ BEGIN TRY
 																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																						WHERE	cin.[instance_active]=1
 																								AND cin.[project_id] = @projectID
+																								AND cin.[instance_name] LIKE @sqlServerNameFilter
 																								AND lsam.descriptor IN (N'dbo.usp_hcCollectErrorlogMessages')
 																								AND rsr.[id] IS NULL
 																						GROUP BY cin.[machine_name], cin.[instance_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
@@ -3636,6 +3663,7 @@ BEGIN TRY
 																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																						WHERE	cin.[instance_active]=1
 																								AND cin.[project_id] = @projectID
+																								AND cin.[instance_name] LIKE @sqlServerNameFilter
 																								AND lsam.descriptor IN (N'dbo.usp_hcCollectOSEventLogs')
 																								AND rsr.[id] IS NULL
 																						GROUP BY cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name], lsam.[message]
@@ -3812,6 +3840,7 @@ BEGIN TRY
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
 																							AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																							AND cin.[instance_name] LIKE @sqlServerNameFilter
 																							AND rsr.[id] IS NULL
 																					GROUP BY cin.[machine_name], cin.[instance_name]
 																							, cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -3918,7 +3947,8 @@ BEGIN TRY
 																																AND rsr.[rule_id] = 32
 																																AND rsr.[active] = 1
 																																AND (rsr.[skip_value]=ssajh.[instance_name])
-																					WHERE	ssajh.[project_id]=@projectID
+																					WHERE	cin.[project_id]=@projectID
+																							AND cin.[instance_name] LIKE @sqlServerNameFilter
 																							AND cin.[instance_active]=1
 																							AND rsr.[id] IS NULL
 																					GROUP BY ssajh.[instance_name]
@@ -4039,6 +4069,7 @@ BEGIN TRY
 																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																						WHERE cin.[instance_active]=1
 																								AND cin.[project_id] = @projectID
+																								AND cin.[instance_name] LIKE @sqlServerNameFilter
 																								AND rsr.[id] IS NULL	
 																						GROUP BY cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name]
 																						ORDER BY cin.[machine_name]

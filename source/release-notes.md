@@ -951,3 +951,4 @@
 03.11.2019
 * monitoring: fix small bug when detecting active/running sessions
 * maintenance-plan: fix small bugs when displaying messages during maintenance run time
+* health-check: add option to run the daily report for a single instance 
