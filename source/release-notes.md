@@ -945,3 +945,8 @@
 
 22.10.2019
 * health-check: incremental read for errorlog files (read only new events)
+
+------------
+#### November 2019 new features & fixes
+03.11.2019
+* monitoring: fix small bug when detecting active/running sessions

@@ -221,7 +221,7 @@ WHILE @@FETCH_STATUS=0
 													, es.[host_name]
 													, es.[program_name]
 													, es.[login_name] 
-													, DATEDIFF(ss, es.[last_request_start_time], GETDATE()) AS [last_request_elapsed_time_seconds]
+													, DATEDIFF(ss, COALESCE(er.[start_time], es.[last_request_start_time]), GETDATE()) AS [last_request_elapsed_time_seconds]
 													, er.[sql_handle]
 													, er.[statement_start_offset]
 													, er.[statement_end_offset]
