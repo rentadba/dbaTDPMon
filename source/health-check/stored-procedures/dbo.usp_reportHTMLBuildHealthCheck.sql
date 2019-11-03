@@ -20,7 +20,7 @@ CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 															   16 - Errorlog messages
 															   32 - OS Event messages
 															*/
-		@flgOptions				[int]			= 803209215,/*	 1 - Instances - Offline
+		@flgOptions				[bigint]		= 1876951039,/*	 1 - Instances - Offline
 																 2 - Instances - Online
 																 4 - Databases Status - Issues Detected
 																 8 - Databases Status - Complete Details
@@ -50,6 +50,7 @@ CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 														 134217728 - OS Event messages - Issues Detected
 														 268435456 - do not consider @projectCode when filtering database information
 														 536870912 - Failed Login Attempts - Issues Detected
+														1073741824 - Database Growth Information - Issues Detected
 															*/
 		@reportDescription		[nvarchar](256) = NULL,
 		@reportFileName			[nvarchar](max) = NULL,	/* if file name is null, than the name will be generated */
@@ -116,6 +117,9 @@ DECLARE   @databaseName								[sysname]
 		, @reportOptionMinSpaceToReclaim			[int]
 		, @reportOptionSkipDatabaseSnapshots		[bit]
 		, @reportOptionGetBackupSizeLastDays		[smallint]
+		, @reportOptionGetDBGrowthLastDays			[smallint]
+		, @reportOptionDBGrowthMinPercentForAnalysis[int]
+		, @reportOptionDBGrowthMinSizeMBForAnalysis	[int]
 		, @configOSEventMessageLastHours			[int]
 		, @configOSEventGetInformationEvent			[bit]
 		, @configOSEventGetWarningsEvent			[bit]
@@ -509,6 +513,41 @@ BEGIN TRY
 	END CATCH
 	SET @reportOptionGetBackupSizeLastDays = ISNULL(@reportOptionGetBackupSizeLastDays, 7)
 	
+	-----------------------------------------------------------------------------------------------------
+	BEGIN TRY
+		SELECT	@reportOptionGetDBGrowthLastDays = [value]
+		FROM	[report].[htmlOptions]
+		WHERE	[name] = N'Analyze database(s) growth in the last days'
+				AND [module] = 'health-check'
+	END TRY
+	BEGIN CATCH
+		SET @reportOptionGetDBGrowthLastDays = 30
+	END CATCH
+	SET @reportOptionGetDBGrowthLastDays = ISNULL(@reportOptionGetDBGrowthLastDays, 30)
+	
+	-----------------------------------------------------------------------------------------------------
+	BEGIN TRY
+		SELECT	@reportOptionDBGrowthMinPercentForAnalysis = [value]
+		FROM	[report].[htmlOptions]
+		WHERE	[name] = N'Minimum database(s) growth percent'
+				AND [module] = 'health-check'
+	END TRY
+	BEGIN CATCH
+		SET @reportOptionDBGrowthMinPercentForAnalysis = 10
+	END CATCH
+	SET @reportOptionDBGrowthMinPercentForAnalysis = ISNULL(@reportOptionDBGrowthMinPercentForAnalysis, 10)
+	
+	-----------------------------------------------------------------------------------------------------
+	BEGIN TRY
+		SELECT	@reportOptionDBGrowthMinSizeMBForAnalysis = [value]
+		FROM	[report].[htmlOptions]
+		WHERE	[name] = N'Minimum database(s) growth size (mb)'
+				AND [module] = 'health-check'
+	END TRY
+	BEGIN CATCH
+		SET @reportOptionDBGrowthMinSizeMBForAnalysis = 32768
+	END CATCH
+	SET @reportOptionDBGrowthMinSizeMBForAnalysis = ISNULL(@reportOptionDBGrowthMinSizeMBForAnalysis, 32768)
 
 	------------------------------------------------------------------------------------------------------------------------------------------
 	--option for timeout when fetching OS events
@@ -1143,6 +1182,16 @@ BEGIN TRY
 					END + N'
 					</TD>
 				</TR>
+				<TR VALIGN="TOP" class="color-1">
+					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
+					CASE WHEN (@flgActions & 2 = 2) AND (@flgOptions & 1073741824 = 1073741824)
+						  THEN N'<A HREF="#DatabaseGrowthIssuesDetected" class="summary-style color-1">Database(s) Growth {DatabaseGrowthIssuesDetectedCount}</A>'
+						  ELSE N'Database(s) Growth (N/A)'
+					END + N'
+					</TD>
+					<TD ALIGN=LEFT class="summary-style add-border color-1">&nbsp;
+					</TD>
+				</TR>
 			</table>
 
 		</TD>
@@ -1150,16 +1199,15 @@ BEGIN TRY
 	</TABLE>			
 	<HR WIDTH="1130px" ALIGN=LEFT><br>'
 
-
 	-----------------------------------------------------------------------------------------------------
 	--prepare data for the report. apply filters where needed. build temporary tables
 	-----------------------------------------------------------------------------------------------------
+	DECLARE @tmpProjectFilter [varchar](32)
+	
 	IF (@flgActions & 1 = 1) AND (@flgOptions & 2 = 2)
 		begin
 			SET @ErrMessage = 'analyzing database details - size and backup info'
 			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
-
-			DECLARE @tmpProjectFilter [varchar](32)
 
 			IF @reportOptionGetProjectDBSize = 1
 				SET @tmpProjectFilter = @projectCode
@@ -1185,8 +1233,41 @@ BEGIN TRY
 			INSERT INTO #hcReportCapacityDatabaseBackups([instance_name], [solution_name], [is_production], [database_count], [database_size_gb], 
 														 [backup_size_gb], [backup_files_count], [full_backup_gb], [diff_backup_gb], [log_backup_gb])
 			EXEC [dbo].[usp_hcReportCapacityDatabaseBackups]	@projectCode		= @tmpProjectFilter,
-																@sqlServerNameFilter= '%',
+																@sqlServerNameFilter= @sqlServerNameFilter,
 																@daysToAnalyze		= @reportOptionGetBackupSizeLastDays
+		end
+
+	IF (@flgActions & 2 = 2) AND (@flgOptions & 1073741824 = 1073741824)
+		begin
+			SET @ErrMessage = 'analyzing database details - growth'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
+
+			IF @reportOptionGetProjectDBSize = 1
+				SET @tmpProjectFilter = @projectCode
+			ELSE
+				IF @reportOptionGetProjectDBSize = 0 OR (@flgOptions & 268435456 = 268435456)
+					SET @tmpProjectFilter = '%'
+
+			IF OBJECT_ID('tempdb..#hcReportCapacityDatabaseGrowth') IS NOT NULL DROP TABLE #hcReportCapacityDatabaseGrowth
+			CREATE TABLE #hcReportCapacityDatabaseGrowth
+				(
+					  [instance_name]			[sysname]
+					, [database_name]			[sysname]
+					, [current_size_mb]			[numeric](18,3)
+					, [old_size_mb]				[numeric](18,3)
+					, [current_data_size_mb]	[numeric](18,3)
+					, [old_data_size_mb]		[numeric](18,3)
+					, [current_log_size_mb]		[numeric](18,3)
+					, [old_log_size_mb]			[numeric](18,3)
+					, [growth_size_mb]			[numeric](18,3)
+					, [data_growth_percent]		[numeric](18,3)
+				)			
+
+			INSERT	INTO #hcReportCapacityDatabaseGrowth([instance_name], [database_name], [current_size_mb], [old_size_mb], [current_data_size_mb], [old_data_size_mb],
+														 [current_log_size_mb], [old_log_size_mb], [growth_size_mb], [data_growth_percent])
+					EXEC [dbo].[usp_hcReportCapacityDatabaseGrowth]	@projectCode		 = @tmpProjectFilter,
+																	@sqlServerNameFilter = @sqlServerNameFilter,
+																	@daysToAnalyze		 = @reportOptionGetDBGrowthLastDays
 		end
 
 	IF (@flgActions & 16 = 16) AND (@flgOptions & 1048576 = 1048576)
@@ -2933,8 +3014,8 @@ BEGIN TRY
 											<TH WIDTH="100px" class="details-bold">Logical Drive</TH>
 											<TH WIDTH="230px" class="details-bold" nowrap>Volume Mount Point</TH>
 											<TH WIDTH="120px" class="details-bold">Total Size (GB)</TH>
-											<TH WIDTH="120px" class="details-bold">Available Space (GB)</TH>
-											<TH WIDTH="120px" class="details-bold">Percent Available (%)</TH>'
+											<TH WIDTH="120px" class="details-bold" wrap>Available Space (GB)</TH>
+											<TH WIDTH="120px" class="details-bold" wrap>Percent Available (%)</TH>'
 
 			SET @idx=1		
 
@@ -3459,6 +3540,102 @@ BEGIN TRY
 		end
 	ELSE
 		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseLogVsDataSizeIssuesDetectedCount}', '(N/A)')	
+
+
+	-----------------------------------------------------------------------------------------------------
+	--Databases(s) Growth - Issues Detected
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 2 = 2) AND (@flgOptions & 1073741824 = 1073741824)
+		begin
+			DECLARE   @oldDBSize			[numeric](18,3)
+					, @oldDataSizeMB		[numeric](18,3)
+					, @oldLogSizeMB			[numeric](18,3)
+					, @growthSizeMB			[numeric](18,3)
+					, @dataGrowthPercent	[numeric](18,3)
+
+			SET @ErrMessage = 'Build Report: Databases(s) Growth - Issues Detected'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea = @HTMLReportArea + 
+							N'<A NAME="DatabaseGrowthIssuesDetected" class="category-style">Databases(s) Growth - Issues Detected</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="8">database growth size (MB) &ge; ' + CAST(@reportOptionDBGrowthMinSizeMBForAnalysis  AS [nvarchar](32)) + N' OR data growth (%) &ge; ' + CAST(@reportOptionDBGrowthMinPercentForAnalysis AS [nvarchar](32)) + N'</TD>
+							</TR>
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="180px" class="details-bold" nowrap>Instance Name</TH>
+											<TH WIDTH="310px" class="details-bold">Database Name</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Current Size (MB)</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Old Size (MB)</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Current Data Size (MB)</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Old Data Size (MB)</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Current Log Size (MB)</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Old Log Size (MB)</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Growth Size (MB)</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Data Growth (%)</TH>'
+
+			SET @idx=1		
+
+			DECLARE crsDatabaseLogVsDataSizeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    hcdg.[instance_name], hcdg.[database_name], hcdg.[current_size_mb], hcdg.[old_size_mb]
+																									, hcdg.[current_data_size_mb], hcdg.[old_data_size_mb], hcdg.[current_log_size_mb], hcdg.[old_log_size_mb]
+																									, hcdg.[growth_size_mb], hcdg.[data_growth_percent]
+																							FROM #hcReportCapacityDatabaseGrowth		hcdg
+																							INNER JOIN [dbo].[vw_catalogInstanceNames]  cin ON hcdg.[instance_name] = cin.[instance_name]
+																							INNER JOIN [dbo].[vw_catalogDatabaseNames]	cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id] AND cdn.[database_name] = hcdg.[database_name] 
+																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																		AND rsr.[rule_id] = 1073741824
+																																		AND rsr.[active] = 1
+																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																							WHERE cin.[instance_active]=1
+																									AND cdn.[active]=1
+																									AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																									AND cin.[instance_name] LIKE @sqlServerNameFilter
+																									AND (   hcdg.[data_growth_percent] >= @reportOptionDBGrowthMinPercentForAnalysis
+																										 OR hcdg.[growth_size_mb] >= @reportOptionDBGrowthMinSizeMBForAnalysis
+																										)
+																									AND rsr.[id] IS NULL
+																							ORDER BY [instance_name], [growth_size_mb] DESC, [database_name]
+			OPEN crsDatabaseLogVsDataSizeIssuesDetected
+			FETCH NEXT FROM crsDatabaseLogVsDataSizeIssuesDetected INTO @instanceName, @databaseName, @dbSize, @oldDBSize, @dataSizeMB, @oldDataSizeMB, @logSizeMB, @oldLogSizeMB, @growthSizeMB, @dataGrowthPercent
+			WHILE @@FETCH_STATUS=0
+				begin
+					SET @HTMLReportArea = @HTMLReportArea + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="190px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
+										N'<TD WIDTH="310px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@oldDBSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dataSizeMB AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@oldDataSizeMB AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@logSizeMB AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@oldLogSizeMB AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@growthSizeMB AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dataGrowthPercent AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+									N'</TR>'
+					SET @idx=@idx+1
+
+					FETCH NEXT FROM crsDatabaseLogVsDataSizeIssuesDetected INTO @instanceName, @databaseName, @dbSize, @oldDBSize, @dataSizeMB, @oldDataSizeMB, @logSizeMB, @oldLogSizeMB, @growthSizeMB, @dataGrowthPercent
+				end
+
+			CLOSE crsDatabaseLogVsDataSizeIssuesDetected
+			DEALLOCATE crsDatabaseLogVsDataSizeIssuesDetected
+
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
+								</TD>
+							</TR>
+						</TABLE>'
+
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
+
+			SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseGrowthIssuesDetectedCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
+		end
+	ELSE
+		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseGrowthIssuesDetectedCount}', '(N/A)')	
 
 
 	-----------------------------------------------------------------------------------------------------

@@ -68,5 +68,8 @@ INSERT	INTO [report].[htmlOptions] ([module], [name], [value], [description])
 		  SELECT 'health-check' AS [module], N'Minimum Failed Login Attempts'					AS [name], '50'					AS [value], 'minimum failed login attempts per interval to be reported'					AS [description] UNION ALL
 		  SELECT 'health-check' AS [module], N'Minimum Disk space to reclaim (mb)'				AS [name], '10240'				AS [value], 'minimum disk space to reclaim when reporting data and log space available'	AS [description] UNION ALL
 		  SELECT 'health-check' AS [module], N'Exclude Database Snapshots for Backup/DBCC checks'AS [name], 'true'				AS [value], 'do not check for outdated backups/dbcc for database snapshot(s)'			AS [description] UNION ALL
-		  SELECT 'health-check' AS [module], N'Analyze backup size (GB) in the last days'		AS [name], '7'					AS [value], 'analyze the size used by backups taken with this utility (full/diff/log) in the last X days' AS [description]
+		  SELECT 'health-check' AS [module], N'Analyze backup size (GB) in the last days'		AS [name], '7'					AS [value], 'analyze the size used by backups taken with this utility (full/diff/log) in the last X days' AS [description] UNION ALL
+		  SELECT 'health-check' AS [module], N'Analyze database(s) growth in the last days'		AS [name], '30'					AS [value], 'analyze the database growth in the last X days' AS [description] UNION ALL
+		  SELECT 'health-check' AS [module], N'Minimum database(s) growth percent'				AS [name], '10'					AS [value], 'report only databases having growth in the last X days at least Y percentage' AS [description] UNION ALL
+		  SELECT 'health-check' AS [module], N'Minimum database(s) growth size (mb)'			AS [name], '32768'				AS [value], 'report only databases having growth in the last X days at least Y MB' AS [description]
 GO

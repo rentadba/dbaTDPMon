@@ -72,5 +72,6 @@ INSERT	INTO [report].[htmlSkipRules] ([module], [rule_id], [rule_name], [skip_va
 		SELECT 'health-check',  33554432, 'SQL Server Agent Jobs - Long Running SQL Agent Jobs', NULL, 0 UNION ALL
 		SELECT 'health-check',  67108864, 'OS Event messages - Permission errors', NULL, 0 UNION ALL
 		SELECT 'health-check', 134217728, 'OS Event messages - Complete Details', NULL, 0 UNION ALL
-		SELECT 'health-check', 536870912, 'Failed Login Attempts - Issues Detected', NULL, 0
+		SELECT 'health-check', 536870912, 'Failed Login Attempts - Issues Detected', NULL, 0 UNION ALL
+		SELECT 'health-check',1073741824, 'Databases(s) Growth - Issues Detected', NULL, 0 
 GO

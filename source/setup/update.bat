@@ -315,6 +315,8 @@ echo *--------------------------------------------------------------------------
 echo Health Check: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
 
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20191103-patch-upgrade-from-v2019_10-to-v2019_11-hc.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
 
 
 echo *-----------------------------------------------------------------------------*

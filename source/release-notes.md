@@ -952,3 +952,4 @@
 * monitoring: fix small bug when detecting active/running sessions
 * maintenance-plan: fix small bugs when displaying messages during maintenance run time
 * health-check: add option to run the daily report for a single instance 
+* health-check: add database(s) growth information for the last X days to the daily report
