@@ -3681,7 +3681,8 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsDatabaseLogVsDataSizeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    hcdb.[instance_name], hcdb.[solution_name], hcdb.[is_production], hcdb.[database_count]
+			DECLARE crsDatabaseLogVsDataSizeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT  DISTINCT
+																									  hcdb.[instance_name], hcdb.[solution_name], hcdb.[is_production], hcdb.[database_count]
 																									, hcdb.[database_size_gb], hcdb.[backup_size_gb], hcdb.[backup_files_count]
 																									, hcdb.[full_backup_gb], hcdb.[diff_backup_gb], hcdb.[log_backup_gb]
 																							FROM #hcReportCapacityDatabaseBackups		hcdb
