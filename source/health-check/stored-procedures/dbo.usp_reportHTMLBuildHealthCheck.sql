@@ -1189,7 +1189,11 @@ BEGIN TRY
 						  ELSE N'Database(s) Growth (N/A)'
 					END + N'
 					</TD>
-					<TD ALIGN=LEFT class="summary-style add-border color-1">&nbsp;
+					<TD ALIGN=LEFT class="summary-style add-border color-1">' +
+					CASE WHEN (@flgActions & 2 = 2)
+						  THEN N'<A HREF="#BackupSizeDetails" class="summary-style color-1">Backup(s) Size Details</A>'
+						  ELSE N'Backup(s) Size Details (N/A)'
+					END + N'
 					</TD>
 				</TR>
 			</table>
@@ -3561,7 +3565,7 @@ BEGIN TRY
 							N'<A NAME="DatabaseGrowthIssuesDetected" class="category-style">Databases(s) Growth - Issues Detected</A><br>
 							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
 							<TR VALIGN=TOP>
-								<TD class="small-size" COLLSPAN="8">database growth size (MB) &ge; ' + CAST(@reportOptionDBGrowthMinSizeMBForAnalysis  AS [nvarchar](32)) + N' OR data growth (%) &ge; ' + CAST(@reportOptionDBGrowthMinPercentForAnalysis AS [nvarchar](32)) + N'</TD>
+								<TD class="small-size" COLLSPAN="8">database growth within last ' + CAST(@reportOptionGetDBGrowthLastDays AS [nvarchar](32)) + N' days AND (growth size (MB) &ge; ' + CAST(@reportOptionDBGrowthMinSizeMBForAnalysis  AS [nvarchar](32)) + N' OR data growth (%) &ge; ' + CAST(@reportOptionDBGrowthMinPercentForAnalysis AS [nvarchar](32)) + N')</TD>
 							</TR>
 							<TR VALIGN=TOP>
 								<TD WIDTH="1130px">
@@ -3637,7 +3641,97 @@ BEGIN TRY
 	ELSE
 		SET @HTMLReport = REPLACE(@HTMLReport, '{DatabaseGrowthIssuesDetectedCount}', '(N/A)')	
 
+	-----------------------------------------------------------------------------------------------------
+	--Backup Size Details
+	-----------------------------------------------------------------------------------------------------
+	IF (@flgActions & 2 = 2)
+		begin
+			DECLARE   @solutionName			[nvarchar](128)
+					, @isProduction			[bit]
+					, @backupSize			[numeric](18,3)
+					, @backupFilesCount		[int]
+					, @fullBackupSize		[numeric](18,3)
+					, @diffBackupSize		[numeric](18,3)
+					, @logBackupSize		[numeric](18,3)
 
+			SET @ErrMessage = 'Build Report: Backup(s) Size Details'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+			SET @HTMLReportArea=N''
+			SET @HTMLReportArea = @HTMLReportArea + 
+							N'<A NAME="BackupSizeDetails" class="category-style">Backup(s) Size Details</A><br>
+							<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+							<TR VALIGN=TOP>
+								<TD class="small-size" COLLSPAN="8">database(s) backup size within last ' + CAST(@reportOptionGetBackupSizeLastDays AS [nvarchar](32)) + N' days</TD>
+							</TR>
+							<TR VALIGN=TOP>
+								<TD WIDTH="1130px">
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+										N'<TR class="color-3">
+											<TH WIDTH="180px" class="details-bold" nowrap>Instance Name</TH>
+											<TH WIDTH="310px" class="details-bold">Solution Name</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Is Production</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Database Count</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Database Size (GB)</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Backup Size (GB)</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Backup Files Count</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Full Backup(s) (GB)</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>Diff Backup(s) (GB)</TH>
+											<TH WIDTH="80px" class="details-bold" nowrap>TLog Backup(s) (GB)</TH>'
+
+			SET @idx=1		
+
+			DECLARE crsDatabaseLogVsDataSizeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    hcdb.[instance_name], hcdb.[solution_name], hcdb.[is_production], hcdb.[database_count]
+																									, hcdb.[database_size_gb], hcdb.[backup_size_gb], hcdb.[backup_files_count]
+																									, hcdb.[full_backup_gb], hcdb.[diff_backup_gb], hcdb.[log_backup_gb]
+																							FROM #hcReportCapacityDatabaseBackups		hcdb
+																							INNER JOIN [dbo].[vw_catalogInstanceNames]  cin ON hcdb.[instance_name] = cin.[instance_name]
+																							INNER JOIN [dbo].[vw_catalogProjects]		cp	ON cp.[project_id] = cin.[project_id] AND cp.[solution_name] = hcdb.[solution_name] 
+																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																																		AND rsr.[rule_id] = 1073741824
+																																		AND rsr.[active] = 1
+																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																							WHERE cin.[instance_active]=1
+																									AND cp.[active]=1
+																									AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																									AND cin.[instance_name] LIKE @sqlServerNameFilter
+																									AND rsr.[id] IS NULL
+																							ORDER BY [instance_name], [solution_name], [is_production]
+			OPEN crsDatabaseLogVsDataSizeIssuesDetected
+			FETCH NEXT FROM crsDatabaseLogVsDataSizeIssuesDetected INTO @instanceName, @solutionName, @isProduction, @dbCount, @dbSize, @backupSize, @backupFilesCount, @fullBackupSize, @diffBackupSize, @logBackupSize
+			WHILE @@FETCH_STATUS=0
+				begin
+					SET @HTMLReportArea = @HTMLReportArea + 
+								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+										N'<TD WIDTH="190px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
+										N'<TD WIDTH="310px" class="details" ALIGN="LEFT">' + ISNULL(@solutionName, N'&nbsp;') + N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isProduction=0 THEN N'No' ELSE N'Yes' END + N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbCount AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@backupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@backupFilesCount AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@fullBackupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@diffBackupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@logBackupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+									N'</TR>'
+					SET @idx=@idx+1
+
+					FETCH NEXT FROM crsDatabaseLogVsDataSizeIssuesDetected INTO @instanceName, @solutionName, @isProduction, @dbCount, @dbSize, @backupSize, @backupFilesCount, @fullBackupSize, @diffBackupSize, @logBackupSize
+				end
+
+			CLOSE crsDatabaseLogVsDataSizeIssuesDetected
+			DEALLOCATE crsDatabaseLogVsDataSizeIssuesDetected
+
+			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
+								</TD>
+							</TR>
+						</TABLE>'
+
+			SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
+
+		end
+		
 	-----------------------------------------------------------------------------------------------------
 	--Errorlog Messages - Permission Errors
 	-----------------------------------------------------------------------------------------------------
