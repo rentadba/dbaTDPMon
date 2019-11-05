@@ -142,7 +142,7 @@ DECLARE   @databaseName								[sysname]
 		, @diskPercentAvailable					[numeric](6,2)
 		, @dateTimeLowerLimit					[datetime]
 		, @dateTimeLowerLimitUTC				[datetime]
-		, @dbCount								[smallint]
+		, @dbCount								[int]
 
 		, @messageCount							[int]
 		, @issuesDetectedCount					[int]
@@ -1225,7 +1225,7 @@ BEGIN TRY
 				[instance_name]			[sysname]		NULL,
 				[solution_name]			[nvarchar](128)	NULL,
 				[is_production]			[bit]			NULL,
-				[database_count]		[smallint]		NULL,
+				[database_count]		[int]			NULL,
 				[database_size_gb]		[numeric](18,3)	NULL,
 				[backup_size_gb]		[numeric](18,3)	NULL,
 				[backup_files_count]	[int]			NULL,
@@ -3646,9 +3646,7 @@ BEGIN TRY
 	-----------------------------------------------------------------------------------------------------
 	IF (@flgActions & 2 = 2)
 		begin
-			DECLARE   @solutionName			[nvarchar](128)
-					, @isProduction			[bit]
-					, @backupSize			[numeric](18,3)
+			DECLARE   @backupSize			[numeric](18,3)
 					, @backupFilesCount		[int]
 					, @fullBackupSize		[numeric](18,3)
 					, @diffBackupSize		[numeric](18,3)
@@ -3668,56 +3666,61 @@ BEGIN TRY
 								<TD WIDTH="1130px">
 									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
 										N'<TR class="color-3">
-											<TH WIDTH="180px" class="details-bold" nowrap>Instance Name</TH>
-											<TH WIDTH="310px" class="details-bold">Solution Name</TH>
-											<TH WIDTH="80px" class="details-bold" nowrap>Is Production</TH>
-											<TH WIDTH="80px" class="details-bold" nowrap>Database Count</TH>
-											<TH WIDTH="80px" class="details-bold" nowrap>Database Size (GB)</TH>
-											<TH WIDTH="80px" class="details-bold" nowrap>Backup Size (GB)</TH>
-											<TH WIDTH="80px" class="details-bold" nowrap>Backup Files Count</TH>
-											<TH WIDTH="80px" class="details-bold" nowrap>Full Backup(s) (GB)</TH>
-											<TH WIDTH="80px" class="details-bold" nowrap>Diff Backup(s) (GB)</TH>
-											<TH WIDTH="80px" class="details-bold" nowrap>TLog Backup(s) (GB)</TH>'
+											<TH WIDTH="325px" class="details-bold" nowrap>Instance Name</TH>
+											<TH WIDTH="115px" class="details-bold" nowrap>Database Count</TH>
+											<TH WIDTH="115px" class="details-bold" nowrap>Database Size (GB)</TH>
+											<TH WIDTH="115px" class="details-bold" nowrap>Backup Size (GB)</TH>
+											<TH WIDTH="115px" class="details-bold" nowrap>Backup Files Count</TH>
+											<TH WIDTH="115px" class="details-bold" nowrap>Full Backup(s) (GB)</TH>
+											<TH WIDTH="115px" class="details-bold" nowrap>Diff Backup(s) (GB)</TH>
+											<TH WIDTH="115px" class="details-bold" nowrap>TLog Backup(s) (GB)</TH>'
 
 			SET @idx=1		
 
 			DECLARE crsDatabaseLogVsDataSizeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT  DISTINCT
-																									  hcdb.[instance_name], hcdb.[solution_name], hcdb.[is_production], hcdb.[database_count]
-																									, hcdb.[database_size_gb], hcdb.[backup_size_gb], hcdb.[backup_files_count]
-																									, hcdb.[full_backup_gb], hcdb.[diff_backup_gb], hcdb.[log_backup_gb]
-																							FROM #hcReportCapacityDatabaseBackups		hcdb
+																									  hcdb.[instance_name], [database_count], [database_size_gb], [backup_size_gb]
+																									, [backup_files_count], [full_backup_gb], [diff_backup_gb], [log_backup_gb]
+																							FROM 
+																								(
+																									SELECT    hcdb.[instance_name]
+																											, SUM(hcdb.[database_count])	AS [database_count]
+																											, SUM(hcdb.[database_size_gb])	AS [database_size_gb]
+																											, SUM(hcdb.[backup_size_gb])	AS [backup_size_gb]
+																											, SUM(hcdb.[backup_files_count]) AS [backup_files_count]
+																											, SUM(hcdb.[full_backup_gb])	AS [full_backup_gb]
+																											, SUM(hcdb.[diff_backup_gb])	AS [diff_backup_gb]
+																											, SUM(hcdb.[log_backup_gb])		AS [log_backup_gb]
+																									FROM #hcReportCapacityDatabaseBackups		hcdb
+																									GROUP BY hcdb.[instance_name]
+																								) hcdb
 																							INNER JOIN [dbo].[vw_catalogInstanceNames]  cin ON hcdb.[instance_name] = cin.[instance_name]
-																							INNER JOIN [dbo].[vw_catalogProjects]		cp	ON cp.[project_id] = cin.[project_id] AND cp.[solution_name] = hcdb.[solution_name] 
 																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																		AND rsr.[rule_id] = 1073741824
 																																		AND rsr.[active] = 1
 																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																							WHERE cin.[instance_active]=1
-																									AND cp.[active]=1
 																									AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																									AND cin.[instance_name] LIKE @sqlServerNameFilter
-																									AND rsr.[id] IS NULL
-																							ORDER BY [instance_name], [solution_name], [is_production]
+																									AND rsr.[id] IS NULL																						
+																							ORDER BY [instance_name]
 			OPEN crsDatabaseLogVsDataSizeIssuesDetected
-			FETCH NEXT FROM crsDatabaseLogVsDataSizeIssuesDetected INTO @instanceName, @solutionName, @isProduction, @dbCount, @dbSize, @backupSize, @backupFilesCount, @fullBackupSize, @diffBackupSize, @logBackupSize
+			FETCH NEXT FROM crsDatabaseLogVsDataSizeIssuesDetected INTO @instanceName, @dbCount, @dbSize, @backupSize, @backupFilesCount, @fullBackupSize, @diffBackupSize, @logBackupSize
 			WHILE @@FETCH_STATUS=0
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="190px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
-										N'<TD WIDTH="310px" class="details" ALIGN="LEFT">' + ISNULL(@solutionName, N'&nbsp;') + N'</TD>' + 
-										N'<TD WIDTH="80px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isProduction=0 THEN N'No' ELSE N'Yes' END + N'</TD>' + 
-										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbCount AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@backupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@backupFilesCount AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@fullBackupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@diffBackupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="80px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@logBackupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="325px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
+										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbCount AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@backupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@backupFilesCount AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@fullBackupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@diffBackupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@logBackupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
 									N'</TR>'
 					SET @idx=@idx+1
 
-					FETCH NEXT FROM crsDatabaseLogVsDataSizeIssuesDetected INTO @instanceName, @solutionName, @isProduction, @dbCount, @dbSize, @backupSize, @backupFilesCount, @fullBackupSize, @diffBackupSize, @logBackupSize
+					FETCH NEXT FROM crsDatabaseLogVsDataSizeIssuesDetected INTO @instanceName, @dbCount, @dbSize, @backupSize, @backupFilesCount, @fullBackupSize, @diffBackupSize, @logBackupSize
 				end
 
 			CLOSE crsDatabaseLogVsDataSizeIssuesDetected
