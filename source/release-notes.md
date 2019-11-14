@@ -956,3 +956,6 @@
 
 05.11.2019
 * health-check: add database(s) backup size information for the last X days to the daily report
+
+14.11.2019
+* fix small performance issue on saving internal job execution statistics
