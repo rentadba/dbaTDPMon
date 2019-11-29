@@ -959,3 +959,6 @@
 
 14.11.2019
 * fix small performance issue on saving internal job execution statistics
+
+29.11.2019
+* maintenance-plan: do not create jobs for databases on an AlwaysOn Availability Group Non-Readable Secondary Replica setup if denied by dbo.appConfigurations

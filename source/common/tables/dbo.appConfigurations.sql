@@ -77,6 +77,7 @@ INSERT	INTO [dbo].[appConfigurations] ([module], [name], [value])
 		  SELECT 'maintenance-plan' AS [module], 'SMART default changes threshold'												AS [name], '50'			AS [value]		UNION ALL
 		  SELECT 'maintenance-plan' AS [module], 'Do not run maintenance for indexes not used in the last N days (0=disabled)'	AS [name], '30'			AS [value]		UNION ALL
 		  SELECT 'maintenance-plan' AS [module], 'Allow DBCC operations on non-readable secondary replicas (AlwaysOn)'			AS [name], 'false'		AS [value]		UNION ALL
+		  SELECT 'maintenance-plan' AS [module], 'Do not create SQL Agent jobs for non-readable secondary replicas (AlwaysOn)'	AS [name], 'true'		AS [value]		UNION ALL
 
 		  SELECT 'health-check'		AS [module], 'Collect SQL Agent jobs step details'											AS [name], 'false'		AS [value]		UNION ALL
 		  SELECT 'health-check'		AS [module], 'Collect SQL Errorlog last files'												AS [name], '1'			AS [value]		UNION ALL

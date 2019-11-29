@@ -61,6 +61,8 @@ DECLARE   @codeDescriptor		[varchar](260)
 		, @maxPriorityValue		[int]
 		, @retryAttempts		[tinyint]
 		, @isAzureSQLDatabase	[bit]
+		, @addNewDatabasesToProject [bit]
+		, @queryToRun			[nvarchar](1024)
 
 DECLARE @jobExecutionQueue TABLE
 		(
@@ -79,6 +81,12 @@ DECLARE @jobExecutionQueue TABLE
 			[priority]				[int]			NULL
 		)
 
+DECLARE @agNonReadableSecondaryReplicaDatabases TABLE
+	(
+		[project_id]		[smallint]	NOT NULL,
+		[instance_id]		[smallint]	NOT NULL,
+		[database_name]		[sysname]	NOT NULL
+	)
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default projectCode
 IF @projectCode IS NULL
@@ -116,9 +124,13 @@ WHILE @@FETCH_STATUS=0
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 		--refresh current server information on internal metadata tables
+		SET @addNewDatabasesToProject = 0
+		IF @forSQLServerName = @@SERVERNAME AND NOT EXISTS (SELECT [name] FROM sys.schemas WHERE [name]='health-check')
+			SET @addNewDatabasesToProject = 1
+
 		EXEC [dbo].[usp_refreshMachineCatalogs]	@projectCode	= @projectCode,
 												@sqlServerName	= @forSQLServerName,
-												@addNewDatabasesToProject = 0,
+												@addNewDatabasesToProject = @addNewDatabasesToProject,
 												@debugMode		= @debugMode
 
 		DECLARE crsCollectorDescriptor CURSOR LOCAL FAST_FORWARD FOR	SELECT [descriptor]
@@ -791,6 +803,46 @@ WHILE @@FETCH_STATUS=0
 						end
 
 				------------------------------------------------------------------------------------------------------------------------------------------
+				/* not allowing jobs to run on a Non-Readable Secondary Replica in an AlwaysOn Availability Group setup if denied by appConfigurations */
+				IF		(	SELECT	[value] 
+							FROM	[dbo].[appConfigurations] 
+							WHERE	[name] = 'Do not create SQL Agent jobs for non-readable secondary replicas (AlwaysOn)' 
+									AND [module] = 'maintenance-plan'
+						) = 'true'						  
+					AND EXISTS 
+						(	SELECT	[name] FROM sys.schemas 
+							WHERE	[name]='health-check' 
+									AND EXISTS(SELECT * FROM sys.objects WHERE [name]='vw_statsDatabaseAlwaysOnDetails')
+						)
+					begin
+						DELETE FROM @agNonReadableSecondaryReplicaDatabases
+						
+						/* only if health-check data was updated in the last 24 hours */
+						SET @queryToRun = N'SELECT	[project_id], [instance_id], [database_name]
+											FROM	[health-check].[vw_statsDatabaseAlwaysOnDetails]
+											WHERE	[role_desc] = ''SECONDARY''
+													AND [readable_secondary_replica] = ''NO''
+													AND (
+															/* operations on secondary node are restricted by config values */
+															SELECT [value]
+															FROM [dbo].[appConfigurations] 
+															WHERE [module] = ''maintenance-plan''
+																AND [name] = ''Allow DBCC operations on non-readable secondary replicas (AlwaysOn)''
+														) = ''false''
+													AND [event_date_utc] >= DATEADD(hour, -24, GETUTCDATE())'
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+						INSERT	INTO @agNonReadableSecondaryReplicaDatabases([project_id], [instance_id], [database_name])
+								EXEC sp_executesql @queryToRun
+
+						DELETE jeq
+						FROM @jobExecutionQueue jeq
+						INNER JOIN @agNonReadableSecondaryReplicaDatabases exAG ON	exAG.[project_id] = jeq.[project_id]
+																					AND exAG.[instance_id] = jeq.[for_instance_id]
+																					AND exAG.[database_name] = jeq.[database_name]
+					end
+
+				------------------------------------------------------------------------------------------------------------------------------------------
 				IF @recreateMode = 0
 					begin
 						/* preserve any unfinished job and increase its priority */
@@ -940,4 +992,3 @@ WHILE @@FETCH_STATUS=0
 CLOSE crsActiveInstances
 DEALLOCATE crsActiveInstances
 GO
-
