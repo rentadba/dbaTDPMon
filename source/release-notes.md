@@ -962,3 +962,8 @@
 
 29.11.2019
 * maintenance-plan: do not create jobs for databases on an AlwaysOn Availability Group Non-Readable Secondary Replica setup if denied by dbo.appConfigurations
+
+------------
+#### December 2019 new features & fixes
+03.12.2019
+* project removal when removing the last instance assigned

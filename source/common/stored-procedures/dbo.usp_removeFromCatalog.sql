@@ -9,8 +9,8 @@ DROP PROCEDURE [dbo].[usp_removeFromCatalog]
 GO
 
 CREATE PROCEDURE [dbo].[usp_removeFromCatalog]
-		@projectCode		[varchar](32)=NULL,
-		@sqlServerName		[sysname],
+		@projectCode		[varchar](32) = NULL,
+		@sqlServerName		[sysname] = NULL,
 		@databaseNameFilter	[sysname] = '%',
 		@debugMode			[bit] = 0
 /* WITH ENCRYPTION */
@@ -52,16 +52,19 @@ BEGIN TRY
 			EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 		end
 
-	SELECT   @instanceID = [id]
-		   , @machineID = [machine_id]
-	FROM [dbo].[catalogInstanceNames]
-	WHERE [project_id] = @projectID
-		AND [name] = @sqlServerName
-
-	IF @instanceID IS NULL
+	IF @sqlServerName IS NOT NULL
 		begin
-			SET @errMessage=N'The value specifief for SQL Server Instance Name is not valid.'
-			EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+			SELECT   @instanceID = [id]
+				   , @machineID = [machine_id]
+			FROM [dbo].[catalogInstanceNames]
+			WHERE [project_id] = @projectID
+				AND [name] = @sqlServerName
+
+			IF @instanceID IS NULL
+				begin
+					SET @errMessage=N'The value specifief for SQL Server Instance Name is not valid.'
+					EXEC [dbo].[usp_logPrintMessage] @customMessage = @errMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+				end
 		end
 
 	BEGIN TRANSACTION
@@ -236,6 +239,13 @@ BEGIN TRY
 					)				
 			
 		-----------------------------------------------------------------------------------------------------
+		DELETE hc
+		FROM [report].htmlContent hc
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = hc.[project_id] AND cin.[id] = hc.[instance_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[name] = @sqlServerName
+
+		-----------------------------------------------------------------------------------------------------
 		DELETE cdn
 		FROM  dbo.catalogDatabaseNames cdn
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = cdn.[project_id] AND cin.[id] = cdn.[instance_id]
@@ -260,11 +270,39 @@ BEGIN TRY
 					)
 			DELETE cmn 
 			FROM  dbo.catalogMachineNames cmn
-			INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = cmn.[project_id] AND cin.[machine_id] = cmn.[id] 
-			WHERE cin.[project_id] = @projectID
-					AND cin.[name] = @sqlServerName
+			WHERE cmn.[project_id] = @projectID
+					AND cmn.[id] = @machineID
 					AND (@databaseNameFilter = '%' OR @databaseNameFilter IS NULL)
 
+		-----------------------------------------------------------------------------------------------------
+		IF @sqlServerName IS NULL
+				DELETE cmn 
+				FROM  dbo.catalogMachineNames cmn
+				LEFT JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = cmn.[project_id] AND cin.[machine_id] = cmn.[id]
+				WHERE cmn.[project_id] = @projectID	
+						AND cin.[id] IS NULL
+
+		-----------------------------------------------------------------------------------------------------
+		IF NOT EXISTS(	SELECT [id] FROM dbo.catalogMachineNames
+						WHERE [project_id] = @projectID
+						UNION ALL
+						SELECT [id] FROM dbo.catalogInstanceNames
+						WHERE [project_id] = @projectID
+					)
+			AND (@databaseNameFilter = '%' OR @databaseNameFilter IS NULL)
+			begin
+				DELETE hc
+				FROM [report].[htmlContent] hc
+				WHERE [project_id] = @projectID
+
+				DELETE isch
+				FROM [maintenance-plan].[internalScheduler] isch
+				WHERE [project_id] = @projectID
+						
+				DELETE cp
+				FROM [dbo].[catalogProjects] cp
+				WHERE [id] = @projectID
+			end
 	COMMIT
 END TRY
 
@@ -318,4 +356,3 @@ END CATCH
 
 RETURN @returnValue
 GO
-
