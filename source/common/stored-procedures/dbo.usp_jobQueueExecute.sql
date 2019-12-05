@@ -139,6 +139,24 @@ IF @serialExecutionMode = 1
 		SET @serialExecutionUsingJobs = ISNULL(@serialExecutionUsingJobs, 1)		
 	end
 	
+
+------------------------------------------------------------------------------------------------------------------------------------------
+--check if SQL Agent service is started
+IF @serialExecutionMode = 0
+	begin
+		IF NOT EXISTS(
+						SELECT TOP(1) 1 AS [status] 
+						FROM master.sys.dm_exec_sessions 
+						WHERE[program_name] in ('SQLAgent - Job invocation engine', 'SQLAgent - Generic Refresher')
+					 )
+		begin
+			SET @strMessage='ERROR: SQL Server Agent service is not started. Cannot continue the execution using parallel mode. Please start SQL Agent service.'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
+			
+			RETURN
+		end
+	end
+
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get the number of retries in case of a failure
 BEGIN TRY

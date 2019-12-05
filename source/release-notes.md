@@ -967,3 +967,7 @@
 #### December 2019 new features & fixes
 03.12.2019
 * project removal when removing the last instance assigned
+* health-check: collect also internal job execution history from "monitored" instances (dbo.jobExecutionHistory)
+
+05.12.2019
+* add check for SQL Agent service before starting executing jobs in parallel mode
