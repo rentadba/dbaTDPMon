@@ -16,7 +16,7 @@ DROP TABLE [dbo].[jobExecutionHistory]
 GO
 CREATE TABLE [dbo].[jobExecutionHistory]
 (
-	[id]					[int]	 IDENTITY (1, 1)	NOT NULL,
+	[id]					[bigint]		IDENTITY (1, 1)	NOT NULL,
 	[instance_id]			[smallint]		NOT NULL,
 	[project_id]			[smallint]		NOT NULL,
 	[module]				[varchar](32)	NOT NULL,
@@ -35,6 +35,7 @@ CREATE TABLE [dbo].[jobExecutionHistory]
 	[log_message]			[nvarchar](max) NULL,
 	[status]				[smallint]		NOT NULL CONSTRAINT [DF_jobExecutionHistory_Status] DEFAULT (-1),
 	[event_date_utc]		[datetime]		NOT NULL CONSTRAINT [DF_jobExecutionHistory_EventDateUTC] DEFAULT (GETUTCDATE()),
+	[remote_id]				[bigint]		NULL,
 	CONSTRAINT [PK_jobExecutionHistory] PRIMARY KEY  CLUSTERED 
 	(
 		[id]
@@ -47,9 +48,9 @@ CREATE TABLE [dbo].[jobExecutionHistory]
 	(
 		[id]
 	),
-	CONSTRAINT [FK_jobExecutionHistory_ForInstanceID_catalogInstanceNames] FOREIGN KEY 
+	CONSTRAINT [FK_jobExecutionHistory_InstanceID_catalogInstanceNames] FOREIGN KEY 
 	(
-		[for_instance_id],
+		[instance_id],
 		[project_id]
 	) 
 	REFERENCES [dbo].[catalogInstanceNames] 
@@ -69,4 +70,6 @@ GO
 CREATE INDEX [IX_jobExecutionHistory_Descriptor] ON [dbo].[jobExecutionHistory]([project_id], [status], [module], [descriptor]) INCLUDE ([instance_id], [for_instance_id], [job_name]) 
 GO
 CREATE INDEX [IX_jobExecutionHistory] ON [dbo].[jobExecutionHistory] ([module], [for_instance_id], [project_id], [instance_id], [job_name], [job_step_name], [filter]) 
+GO
+CREATE INDEX [IX_jobExecutionHistory_RemoteID] ON [dbo].[jobExecutionHistory]([remote_id], [instance_id], [project_id]) 
 GO

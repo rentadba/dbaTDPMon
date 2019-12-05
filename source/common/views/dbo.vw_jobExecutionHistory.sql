@@ -50,9 +50,10 @@ SELECT    jeq.[id]
 			END AS [status_desc]
 		, jeq.[log_message]
 		, jeq.[event_date_utc]
+		, jeq.[remote_id]
 FROM [dbo].[jobExecutionHistory]		 jeq
 INNER JOIN [dbo].[catalogInstanceNames]	 cin	ON cin.[id] = jeq.[instance_id] --AND cin.[project_id] = jeq.[project_id]
-INNER JOIN [dbo].[catalogInstanceNames]	 cinF	ON cinF.[id] = jeq.[for_instance_id] AND cinF.[project_id] = jeq.[project_id]
+LEFT  JOIN [dbo].[catalogInstanceNames]	 cinF	ON cinF.[id] = jeq.[for_instance_id] AND cinF.[project_id] = jeq.[project_id]
 INNER JOIN [dbo].[catalogProjects]		 cp		ON cp.[id] = jeq.[project_id]
 
 UNION ALL
@@ -88,6 +89,7 @@ SELECT    jeq.[id]
 			END AS [status_desc]
 		, jeq.[log_message]
 		, jeq.[event_date_utc]
+		, NULL AS [remote_id]
 FROM [dbo].[jobExecutionQueue]		jeq
 INNER JOIN [dbo].[catalogInstanceNames]	 cin	ON cin.[id] = jeq.[instance_id] --AND cin.[project_id] = jeq.[project_id]
 INNER JOIN [dbo].[catalogInstanceNames]	 cinF	ON cinF.[id] = jeq.[for_instance_id] AND cinF.[project_id] = jeq.[project_id]
