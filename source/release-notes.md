@@ -971,3 +971,7 @@
 
 05.12.2019
 * add check for SQL Agent service before starting executing jobs in parallel mode
+
+10.12.2019
+* add code for detecting databases not managed by dbaTDPMon utility
+* release of dbaTDPMon - v2019.12

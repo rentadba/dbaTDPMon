@@ -27,30 +27,11 @@ CREATE TABLE [dbo].[logAnalysisMessages]
 	(
 		[id],
 		[instance_id]
-	) ,
-	CONSTRAINT [FK_logAnalysisMessages_catalogProjects] FOREIGN KEY 
-	(
-		[project_id]
 	) 
-	REFERENCES [dbo].[catalogProjects] 
-	(
-		[id]
-	),
-	CONSTRAINT [FK_logAnalysisMessages_catalogInstanceNames] FOREIGN KEY 
-	(
-		[instance_id],
-		[project_id]
-	) 
-	REFERENCES [dbo].[catalogInstanceNames] 
-	(
-		[id],
-		[project_id]
-	)
 ) 
 GO
 
 CREATE INDEX [IX_logAnalysisMessages_InstanceID] ON [dbo].[logAnalysisMessages]([instance_id], [project_id])
 GO
-CREATE INDEX [IX_logAnalysisMessages_ProjecteID] ON [dbo].[logAnalysisMessages]([project_id])
-GO
+
 
