@@ -48,10 +48,4 @@ begin
 end
 GO
 
-IF NOT EXISTS(SELECT * FROM sys.foreign_keys WHERE [name]='FK_jobExecutionHistory_InstanceID_catalogInstanceNames' AND [parent_object_id] = OBJECT_ID('dbo.jobExecutionHistory'))
-begin
-	EXEC ('ALTER TABLE [dbo].[jobExecutionHistory] ADD CONSTRAINT [FK_jobExecutionHistory_InstanceID_catalogInstanceNames] FOREIGN KEY ([instance_id], [project_id]) REFERENCES [dbo].[catalogInstanceNames] ([id], [project_id])');
-end
-GO
-
 
