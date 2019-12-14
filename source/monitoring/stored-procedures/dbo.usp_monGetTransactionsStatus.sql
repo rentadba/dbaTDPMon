@@ -147,20 +147,20 @@ WHERE cin.[project_id] = @projectID
 SET @strMessage='Step 2: Get Instance Details Information...'
 EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 		
-DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT DISTINCT [instance_id], [linked_server_name], [database_name]
+DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR 	SELECT DISTINCT [instance_id], [linked_server_name], [database_name] 
 															FROM (
 																	SELECT	cdn.[instance_id], 
 																			CASE WHEN cin.[engine] NOT IN (5, 6)
 																				 THEN 'master'
 																				 ELSE cdn.[database_name]
-																			END AS [database_name],
+																			END COLLATE SQL_Latin1_General_CP1_CI_AS AS [database_name] ,
 																			CASE WHEN cin.[engine] NOT IN (5, 6) 
 																					THEN cdn.[instance_name]
-																					ELSE CASE WHEN ss.[name] IS NOT NULL AND LOWER(ss.[catalog]) <> 'master' THEN ss.[name] ELSE NULL END
+																					ELSE CASE WHEN ss.[name] IS NOT NULL AND LOWER(ss.[catalog] COLLATE SQL_Latin1_General_CP1_CI_AS) <> 'master' THEN ss.[name] COLLATE SQL_Latin1_General_CP1_CI_AS ELSE NULL END
 																			END [linked_server_name]
 																	FROM	[dbo].[vw_catalogDatabaseNames] cdn
 																	INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[project_id] = cdn.[project_id] AND cin.[instance_id] = cdn.[instance_id]
-																	LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] 
+																	LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] COLLATE SQL_Latin1_General_CP1_CI_AS
 																	WHERE 	cdn.[project_id] = @projectID
 																			and cdn.[active] = 1
 																			AND cin.[instance_active] = 1

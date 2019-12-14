@@ -975,3 +975,7 @@
 10.12.2019
 * add code for detecting databases not managed by dbaTDPMon utility
 * release of dbaTDPMon - v2019.12
+
+14.12.2019
+* maintenance-plan: stored procedure for defining default parallel maintenance jobs for a project (dbo.usp_mpJobProjectDefaultPlanCreate)
+* fix update failures when running on a different database collate vs. the server one

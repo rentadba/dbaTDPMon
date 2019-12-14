@@ -109,6 +109,8 @@ WHERE [name] = @@SERVERNAME
 		--AND [project_id] = @projectID
 ORDER BY [id]
 
+IF @skipDatabasesList ='' SET @skipDatabasesList=NULL
+
 ------------------------------------------------------------------------------------------------------------------------------------------
 DECLARE crsActiveInstances CURSOR LOCAL FAST_FORWARD FOR	SELECT	cin.[instance_id], cin.[instance_name],
 																	CASE WHEN cin.[engine] IN (5, 6) THEN 1 ELSE 0 END AS [isAzureSQLDatabase]
@@ -261,7 +263,7 @@ WHILE @@FETCH_STATUS=0
 														 AND EXISTS (
 																	 SELECT 1
 																	 FROM sys.servers ss
-																	 WHERE ss.[catalog] = cdn.[name]
+																	 WHERE ss.[catalog] = cdn.[name] COLLATE SQL_Latin1_General_CP1_CI_AS
 																	)
 														)
 													)
@@ -306,7 +308,7 @@ WHILE @@FETCH_STATUS=0
 														 AND EXISTS (
 																	 SELECT 1
 																	 FROM sys.servers ss
-																	 WHERE ss.[catalog] = cdn.[name]
+																	 WHERE ss.[catalog] = cdn.[name] COLLATE SQL_Latin1_General_CP1_CI_AS
 																	)
 														)
 													)
@@ -345,7 +347,7 @@ WHILE @@FETCH_STATUS=0
 														 AND EXISTS (
 																	 SELECT 1
 																	 FROM sys.servers ss
-																	 WHERE ss.[catalog] = cdn.[name]
+																	 WHERE ss.[catalog] = cdn.[name] COLLATE SQL_Latin1_General_CP1_CI_AS
 																	)
 														)
 													)
@@ -384,7 +386,7 @@ WHILE @@FETCH_STATUS=0
 														 AND EXISTS (
 																	 SELECT 1
 																	 FROM sys.servers ss
-																	 WHERE ss.[catalog] = cdn.[name]
+																	 WHERE ss.[catalog] = cdn.[name] COLLATE SQL_Latin1_General_CP1_CI_AS
 																	)
 														)
 													)
@@ -423,7 +425,7 @@ WHILE @@FETCH_STATUS=0
 														 AND EXISTS (
 																	 SELECT 1
 																	 FROM sys.servers ss
-																	 WHERE ss.[catalog] = cdn.[name]
+																	 WHERE ss.[catalog] = cdn.[name] COLLATE SQL_Latin1_General_CP1_CI_AS
 																	)
 														)
 													)
@@ -467,7 +469,7 @@ WHILE @@FETCH_STATUS=0
 														 AND EXISTS (
 																	 SELECT 1
 																	 FROM sys.servers ss
-																	 WHERE ss.[catalog] = cdn.[name]
+																	 WHERE ss.[catalog] = cdn.[name] COLLATE SQL_Latin1_General_CP1_CI_AS
 																	)
 														)
 													)
@@ -511,7 +513,7 @@ WHILE @@FETCH_STATUS=0
 														 AND EXISTS (
 																	 SELECT 1
 																	 FROM sys.servers ss
-																	 WHERE ss.[catalog] = cdn.[name]
+																	 WHERE ss.[catalog] = cdn.[name] COLLATE SQL_Latin1_General_CP1_CI_AS
 																	)
 														)
 													)
@@ -550,7 +552,7 @@ WHILE @@FETCH_STATUS=0
 														 AND EXISTS (
 																	 SELECT 1
 																	 FROM sys.servers ss
-																	 WHERE ss.[catalog] = cdn.[name]
+																	 WHERE ss.[catalog] = cdn.[name] COLLATE SQL_Latin1_General_CP1_CI_AS
 																	)
 														)
 													)
@@ -593,7 +595,7 @@ WHILE @@FETCH_STATUS=0
 														 AND EXISTS (
 																	 SELECT 1
 																	 FROM sys.servers ss
-																	 WHERE ss.[catalog] = cdn.[name]
+																	 WHERE ss.[catalog] = cdn.[name] COLLATE SQL_Latin1_General_CP1_CI_AS
 																	)
 														)
 													)
@@ -632,7 +634,7 @@ WHILE @@FETCH_STATUS=0
 														 AND EXISTS (
 																	 SELECT 1
 																	 FROM sys.servers ss
-																	 WHERE ss.[catalog] = cdn.[name]
+																	 WHERE ss.[catalog] = cdn.[name] COLLATE SQL_Latin1_General_CP1_CI_AS
 																	)
 														)
 													)
@@ -676,7 +678,7 @@ WHILE @@FETCH_STATUS=0
 														 AND EXISTS (
 																	 SELECT 1
 																	 FROM sys.servers ss
-																	 WHERE ss.[catalog] = cdn.[name]
+																	 WHERE ss.[catalog] = cdn.[name] COLLATE SQL_Latin1_General_CP1_CI_AS
 																	)
 														)
 													)
@@ -714,7 +716,7 @@ WHILE @@FETCH_STATUS=0
 														 AND EXISTS (
 																	 SELECT 1
 																	 FROM sys.servers ss
-																	 WHERE ss.[catalog] = cdn.[name]
+																	 WHERE ss.[catalog] = cdn.[name] COLLATE SQL_Latin1_General_CP1_CI_AS
 																	)
 														)
 													)
@@ -752,7 +754,7 @@ WHILE @@FETCH_STATUS=0
 														 AND EXISTS (
 																	 SELECT 1
 																	 FROM sys.servers ss
-																	 WHERE ss.[catalog] = cdn.[name]
+																	 WHERE ss.[catalog] = cdn.[name] COLLATE SQL_Latin1_General_CP1_CI_AS
 																	)
 														)
 													)
@@ -794,7 +796,7 @@ WHILE @@FETCH_STATUS=0
 														 AND EXISTS (
 																	 SELECT 1
 																	 FROM sys.servers ss
-																	 WHERE ss.[catalog] = cdn.[name]
+																	 WHERE ss.[catalog] = cdn.[name] COLLATE SQL_Latin1_General_CP1_CI_AS
 																	)
 														)
 													)

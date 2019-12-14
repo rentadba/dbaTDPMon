@@ -206,7 +206,7 @@ WHILE @@FETCH_STATUS=0
 																						 ELSE CASE WHEN ss.[name] IS NOT NULL THEN ss.[name] ELSE NULL END
 																					END [linked_server_name]
 																			FROM	[dbo].[vw_catalogDatabaseNames] cdn
-																			LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] 
+																			LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] COLLATE SQL_Latin1_General_CP1_CI_AS
 																			WHERE 	cdn.[project_id] = @projectID
 																					AND cdn.[instance_id] = @instanceID
 																					AND cdn.[active]=1

@@ -217,7 +217,7 @@ IF @isAzureSQLDatabase = 1
 	begin
 		SELECT @sqlServerName = CASE WHEN ss.[name] IS NOT NULL THEN ss.[name] ELSE NULL END 
 		FROM	[dbo].[vw_catalogDatabaseNames] cdn
-		LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] 
+		LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] COLLATE SQL_Latin1_General_CP1_CI_AS
 		WHERE 	cdn.[instance_name] = @sqlServerName
 				AND cdn.[active]=1
 				AND cdn.[database_name] = @dbName

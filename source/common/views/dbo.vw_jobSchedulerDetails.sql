@@ -92,6 +92,6 @@ INNER JOIN
 		UNION ALL
 		SELECT	NULL AS [job_id], [job_name]
 		FROM	[dbo].[vw_jobExecutionQueue]
-	) as jeq ON	   (jeq.[job_name] = sj.[name] AND jeq.[job_name] IS NOT NULL)
+	) as jeq ON	   (jeq.[job_name] = sj.[name] COLLATE SQL_Latin1_General_CP1_CI_AS AND jeq.[job_name] IS NOT NULL)
 				OR (jeq.[job_id] = sj.[job_id] AND jeq.[job_id] IS NOT NULL)
 GO

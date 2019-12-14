@@ -60,15 +60,6 @@ del /F /Q install-get-instance-info.out
 
 echo Detected SQL Server version %product_version%
 
-set run2kmode=false
-if "%engine_version%"=="8" (
-	set run2kmode=true
-	if not "%module%" == "maintenance-plan" (
-		echo Only maintenance-plan module is supported on SQL Server 2000. Will install it.
-		SET module=maintenance-plan
-		)
-	)
-
 if "%module%"=="all" goto common
 if "%module%"=="health-check" goto common
 if "%module%"=="maintenance-plan" goto common
@@ -101,7 +92,7 @@ echo *--------------------------------------------------------------------------
 echo Common: Creating Table / Views and Indexes...
 echo *-----------------------------------------------------------------------------*
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\schema\create-schema-report.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\schema\create-schema-report.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.appConfigurations.sql" -d %dbname% -v projectCode=%project% -b -r 1
@@ -119,7 +110,7 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.catalogInstanceNames.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.catalogDatabaseNames.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.catalogDatabaseNames.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.appInternalTasks.sql" -d %dbname% 
@@ -128,31 +119,31 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.logEventMessages.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.jobExecutionQueue.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.jobExecutionQueue.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.jobExecutionHistory.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.jobExecutionHistory.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.jobExecutionStatisticsHistory.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.jobExecutionStatisticsHistory.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.logAnalysisMessages.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\tables\dbo.logAnalysisMessages.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\report.hardcodedFilters.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\tables\report.hardcodedFilters.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\report.htmlGraphics.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\tables\report.htmlGraphics.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\report.htmlOptions.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\tables\report.htmlOptions.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\report.htmlSkipRules.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\tables\report.htmlSkipRules.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\tables\report.htmlContent.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\tables\report.htmlContent.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_getObjectQuoteName.sql" -d %dbname%  -b -r 1
@@ -164,31 +155,31 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_formatPlatformSpecificPath.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_catalogProjects.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_catalogProjects.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_catalogDatabaseNames.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_catalogDatabaseNames.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_logEventMessages.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_logEventMessages.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_logAnalysisMessages.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_logAnalysisMessages.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionQueue.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionQueue.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionHistory.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionHistory.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionStatistics.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionStatistics.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionStatisticsHistory.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobExecutionStatisticsHistory.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobSchedulerDetails.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\views\dbo.vw_jobSchedulerDetails.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 
@@ -196,41 +187,41 @@ echo *--------------------------------------------------------------------------
 echo Common: Creating Functions / Stored Procedures
 echo *-----------------------------------------------------------------------------*
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_checkIP4Address.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_checkIP4Address.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_formatSQLQueryForLinkedServer.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_getTableFromStringList.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_getTableFromStringList.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_getMilisecondsBetweenDates.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_getMilisecondsBetweenDates.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_convertLSNToNumeric.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_convertLSNToNumeric.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_reportHTMLFomatTimeValue.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_reportHTMLFomatTimeValue.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_reportHTMLGetAnchorName.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_reportHTMLGetAnchorName.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_reportHTMLGetClusterNodeNames.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_reportHTMLGetClusterNodeNames.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_reportHTMLGetImage.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_reportHTMLGetImage.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_reportHTMLPrepareText.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_reportHTMLPrepareText.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_getProjectCode.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\functions\dbo.ufn_getProjectCode.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_addLinkedSQLServer.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_addLinkedSQLServer.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_logPrintMessage.sql" -d %dbname%  -b -r 1
@@ -239,7 +230,7 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_logEventMessage.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_logEventMessageAndSendEmail.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_logEventMessageAndSendEmail.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_getSQLServerVersion.sql" -d %dbname%  -b -r 1
@@ -257,40 +248,40 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_createFolderOnDisk.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_sqlAgentJobEmailStatusReport.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_sqlAgentJobEmailStatusReport.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_tableGetRowCount.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_tableGetRowCount.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_sqlAgentJobCheckStatus.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_sqlAgentJobCheckStatus.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_sqlAgentJob.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_sqlAgentJob.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_sqlAgentJobStartAndWatch.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_sqlAgentJobStartAndWatch.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_jobQueueGetStatus.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_jobQueueGetStatus.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_jobExecutionSaveStatistics.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_jobExecutionSaveStatistics.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_jobQueueExecute.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_jobQueueExecute.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_refreshMachineCatalogs.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_refreshMachineCatalogs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_removeFromCatalog.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_removeFromCatalog.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_refreshProjectCatalogsAndDiscovery.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_refreshProjectCatalogsAndDiscovery.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_reportHTMLGetStorageFolder.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_reportHTMLGetStorageFolder.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_purgeHistoryData.sql" -d %dbname%  -b -r 1
@@ -299,16 +290,16 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\common\stored-procedures\dbo.usp_getUnmonitoredDatabases.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "EXEC dbo.usp_refreshMachineCatalogs DEFAULT, @@SERVERNAME;" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -Q "EXEC dbo.usp_refreshMachineCatalogs DEFAULT, @@SERVERNAME;" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = [dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, [value]) WHERE [name] = 'Local storage path for HTML reports' AND [module] = 'common';" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = [dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, [value]) WHERE [name] = 'Local storage path for HTML reports' AND [module] = 'common';" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = [dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, [value]) WHERE [name] = 'Default folder for logs' AND [module] = 'common';" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = [dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, [value]) WHERE [name] = 'Default folder for logs' AND [module] = 'common';" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = [dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, [value]) WHERE [name] = 'Default backup location' AND [module] = 'maintenance-plan';" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = [dbo].[ufn_formatPlatformSpecificPath](@@SERVERNAME, [value]) WHERE [name] = 'Default backup location' AND [module] = 'maintenance-plan';" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 	
@@ -324,25 +315,25 @@ echo *--------------------------------------------------------------------------
 echo Maintenance Plan: Creating Table / Views and Indexes...
 echo *-----------------------------------------------------------------------------*
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\schema\create-schema-maintenance-plan.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\schema\create-schema-maintenance-plan.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\insert-into-dbo.appInternalTasks.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\insert-into-dbo.appInternalTasks.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.logInternalAction.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.logInternalAction.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.internalScheduler.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.internalScheduler.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.objectSkipList.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\tables\maintenance-plan.objectSkipList.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\views\maintenance-plan.vw_internalScheduler.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\views\maintenance-plan.vw_internalScheduler.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\views\maintenance-plan.vw_objectsSkipList.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\views\maintenance-plan.vw_objectsSkipList.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 
@@ -356,31 +347,31 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\functions\dbo.ufn_mpCheckTaskSchedulerForDate.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpCheckIndexOnlineOperation.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpCheckIndexOnlineOperation.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpCheckAvailabilityGroupLimitations.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpCheckAvailabilityGroupLimitations.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpMarkInternalAction.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpMarkInternalAction.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpGetIndexCreationScript.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpGetIndexCreationScript.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpAlterTableForeignKeys.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpAlterTableForeignKeys.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpAlterTableTriggers.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpAlterTableTriggers.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpAlterTableIndexes.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpAlterTableIndexes.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpCheckAndRevertInternalActions.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpCheckAndRevertInternalActions.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDatabaseKillConnections.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDatabaseKillConnections.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDatabaseConsistencyCheck.sql" -d %dbname%  -b -r 1
@@ -389,10 +380,10 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDatabaseShrink.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpTableDataSynchronizeInsert.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpTableDataSynchronizeInsert.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpAlterTableRebuildHeap.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpAlterTableRebuildHeap.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDeleteFileOnDisk.sql" -d %dbname%  -b -r 1
@@ -407,7 +398,13 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDatabaseOptimize.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpJobQueueCreate.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpJobQueueCreate.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpJobSQLAgentCreate.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpJobProjectDefaultPlanCreate.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 
@@ -421,19 +418,13 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Maintenance - User DBs.sql" -d msdb -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Maintenance - User DBs - Parallel.sql" -d msdb -v dbName=%dbname% -b -r 1
-if errorlevel 1 goto install_err
-
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Full and Diff.sql" -d msdb -v dbName=%dbname% -b -r 1
-if errorlevel 1 goto install_err
-
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Full and Diff - Parallel.sql" -d msdb -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Log.sql" -d msdb -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Backup - Log - Parallel.sql" -d msdb -v dbName=%dbname% -b -r 1
+sqlcmd.exe -S%server% %autentif% -Q "EXEC [dbo].[usp_mpJobProjectDefaultPlanCreate] @projectCode = '%project%', @sqlServerNameFilter = @@SERVERNAME;" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 if "%module%"=="all" goto hc
@@ -673,7 +664,7 @@ goto done
 
 
 :done
-if "%run2kmode%"=="false" sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2019.12.10' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2019.12.14' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err  
 
 echo *-----------------------------------------------------------------------------*
