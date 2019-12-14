@@ -22,6 +22,7 @@ CREATE TABLE [dbo].[appInternalTasks]
 	[task_name]				[varchar](256)	NOT NULL,
 	[flg_actions]			[smallint]		NULL,
 	[is_resource_intensive]	[bit]			NOT NULL CONSTRAINT [DF_appInternalTasks_flg_resource_intensive] DEFAULT (0),
+	[priority]				[tinyint]		NULL,
 	CONSTRAINT [PK_appInternalTasks] PRIMARY KEY  CLUSTERED 
 	(
 		[id]

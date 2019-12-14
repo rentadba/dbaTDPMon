@@ -72,6 +72,8 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20191210-patch-upgrade-from-v2019_11-to-v2019_12-common.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20191212-patch-upgrade-from-v2019_12-to-v2020_01-common.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
 
 echo *-----------------------------------------------------------------------------*
 echo Common: Creating Views ...
@@ -232,6 +234,9 @@ if "%schema_installed%" == "0" goto hc
 echo *-----------------------------------------------------------------------------*
 echo Maintenance Plan: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
+
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\msdb-create-custom-indexes.sql" -d msdb -v dbName=%dbname% -b -r 1
+if errorlevel 1 goto install_err
 
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20191129-patch-upgrade-from-v2019_10-to-v2019_11-mp.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err

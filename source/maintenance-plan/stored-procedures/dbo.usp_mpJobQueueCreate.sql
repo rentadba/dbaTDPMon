@@ -87,6 +87,21 @@ DECLARE @agNonReadableSecondaryReplicaDatabases TABLE
 		[instance_id]		[smallint]	NOT NULL,
 		[database_name]		[sysname]	NOT NULL
 	)
+
+DECLARE @mpCodeDescriptors TABLE
+	(
+		[descriptor]		[varchar](256)	NOT NULL,
+		[priority]			[tinyint]		NOT NULL
+	)
+
+------------------------------------------------------------------------------------------------------------------------------------------
+INSERT	INTO @mpCodeDescriptors([descriptor], [priority])
+		SELECT 'dbo.usp_mpDatabaseBackup(Data)' AS [descriptor], 1 AS [priority] UNION ALL
+		SELECT 'dbo.usp_mpDatabaseConsistencyCheck' AS [descriptor], 2 AS [priority] UNION ALL
+		SELECT 'dbo.usp_mpDatabaseOptimize' AS [descriptor], 3 AS [priority] UNION ALL
+		SELECT 'dbo.usp_mpDatabaseBackup(Log)' AS [descriptor], 4 AS [priority] UNION ALL
+		SELECT 'dbo.usp_mpDatabaseShrink' AS [descriptor], 5 AS [priority]
+
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default projectCode
 IF @projectCode IS NULL
@@ -136,17 +151,11 @@ WHILE @@FETCH_STATUS=0
 												@debugMode		= @debugMode
 
 		DECLARE crsCollectorDescriptor CURSOR LOCAL FAST_FORWARD FOR	SELECT [descriptor]
-																		FROM
-																			(
-																				SELECT 'dbo.usp_mpDatabaseConsistencyCheck' AS [descriptor] UNION ALL
-																				SELECT 'dbo.usp_mpDatabaseOptimize' AS [descriptor] UNION ALL
-																				SELECT 'dbo.usp_mpDatabaseShrink' AS [descriptor] UNION ALL
-																				SELECT 'dbo.usp_mpDatabaseBackup(Data)' AS [descriptor] UNION ALL
-																				SELECT 'dbo.usp_mpDatabaseBackup(Log)' AS [descriptor]
-																			)x
+																		FROM @mpCodeDescriptors x
 																		WHERE (   [descriptor] LIKE @jobDescriptor
 																				OR ISNULL(CHARINDEX([descriptor], @jobDescriptor), 0) <> 0
-																				)			
+																				)	
+																		ORDER BY [priority]
 
 		OPEN crsCollectorDescriptor
 		FETCH NEXT FROM crsCollectorDescriptor INTO @codeDescriptor
@@ -853,7 +862,7 @@ WHILE @@FETCH_STATUS=0
 						FROM  @jobExecutionQueue jeqX
 						INNER JOIN (
 									SELECT	S.[id], 
-											ROW_NUMBER() OVER (ORDER BY jeq.[id]) AS [new_priority]
+											ROW_NUMBER() OVER (ORDER BY jeq.[priority], jeq.[id]) AS [new_priority]
 									FROM [dbo].[jobExecutionQueue] jeq WITH (INDEX([IX_jobExecutionQueue_JobQueue]))
 									INNER JOIN @jobExecutionQueue S ON		jeq.[for_instance_id] = S.[for_instance_id]
 																		AND jeq.[project_id] = S.[project_id]
@@ -864,7 +873,7 @@ WHILE @@FETCH_STATUS=0
 																		AND jeq.[descriptor] = S.[descriptor]
 																		AND (jeq.[job_name] = S.[job_name] OR jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_'))
 																		AND jeq.[job_step_name] = S.[job_step_name]
-																		AND jeq.[job_database_name] = S.[job_database_name]		
+																		AND jeq.[job_database_name] = S.[job_database_name]	
 									WHERE (     @skipDatabasesList IS NULL
 											OR (    @skipDatabasesList IS NOT NULL	
 													AND (
@@ -887,11 +896,16 @@ WHILE @@FETCH_STATUS=0
 							SET jeqX.[priority] = X.[new_priority]
 						FROM  @jobExecutionQueue jeqX
 						INNER JOIN (
-									SELECT	[id], 
-											@maxPriorityValue + ROW_NUMBER() OVER (ORDER BY [id]) AS [new_priority]
-									FROM @jobExecutionQueue 
-									WHERE [priority] IS NULL
+									SELECT	S.[id], 
+											@maxPriorityValue + ROW_NUMBER() OVER (ORDER BY S.[id]) AS [new_priority]
+									FROM @jobExecutionQueue S
+									WHERE S.[priority] IS NULL
 								   ) X ON jeqX.[id] = X.[id] 
+
+						UPDATE jeqX
+							SET jeqX.[priority] = ait.[priority] * 1000000 + jeqX.[priority]
+						FROM @jobExecutionQueue jeqX
+						INNER JOIN [dbo].[appInternalTasks] ait ON jeqX.[task_id] = ait.[id]
 
 						/* reset current jobs state */
 						SET @retryAttempts = 1
@@ -942,52 +956,58 @@ WHILE @@FETCH_STATUS=0
 				------------------------------------------------------------------------------------------------------------------------------------------
 				/* if recreate mode = 1, set default priority */
 				IF @recreateMode = 1
-					UPDATE jeqX
-							SET jeqX.[priority] = X.[new_priority]
-					FROM  @jobExecutionQueue jeqX
-					INNER JOIN (
-								SELECT	[id], 
-										ROW_NUMBER() OVER (ORDER BY [id]) AS [new_priority]
-								FROM @jobExecutionQueue 
-								) X ON jeqX.[id] = X.[id] 
-								
-					INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
-														, [for_instance_id], [job_name], [job_step_name], [job_database_name]
-														, [job_command], [task_id], [database_name], [priority])
-					SELECT DISTINCT
-								S.[instance_id], S.[project_id], S.[module], S.[descriptor]
-							, S.[for_instance_id]
-							, REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_')	/* manage special characters in job names */
-							, S.[job_step_name], S.[job_database_name]
-							, S.[job_command]
-							, S.[task_id], S.[database_name], S.[priority]
-					FROM @jobExecutionQueue S
-					LEFT JOIN [dbo].[jobExecutionQueue] jeq ON		jeq.[for_instance_id] = S.[for_instance_id]
-																AND jeq.[project_id] = S.[project_id]
-																AND jeq.[task_id] = S.[task_id]
-																AND jeq.[database_name] = S.[database_name]
-																AND jeq.[instance_id] = S.[instance_id]
-																AND jeq.[module] = S.[module]
-																AND jeq.[descriptor] = S.[descriptor]
-																AND (jeq.[job_name] = S.[job_name] OR jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_'))
-																AND jeq.[job_step_name] = S.[job_step_name]
-																AND jeq.[job_database_name] = S.[job_database_name]
-					WHERE	jeq.[job_name] IS NULL
-							AND (     @skipDatabasesList IS NULL
-									OR (    @skipDatabasesList IS NOT NULL	
-											AND (
-												SELECT COUNT(*)
-												FROM [dbo].[ufn_getTableFromStringList](@skipDatabasesList, ',') X
-												WHERE S.[job_name] LIKE (DB_NAME() + ' - ' + S.[descriptor] + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@@SERVERNAME) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@@SERVERNAME), '\', '$') ELSE SUBSTRING(UPPER(@@SERVERNAME), 1, CHARINDEX('.', UPPER(@@SERVERNAME))-1) END + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
-											) = 0
-										)
+					begin
+						UPDATE jeqX
+								SET jeqX.[priority] = X.[new_priority]
+						FROM  @jobExecutionQueue jeqX
+						INNER JOIN (
+									SELECT	S.[id], 
+											ROW_NUMBER() OVER (ORDER BY S.[id]) AS [new_priority]
+									FROM @jobExecutionQueue S
+									) X ON jeqX.[id] = X.[id] 
+
+						UPDATE jeqX
+							SET jeqX.[priority] = ait.[priority] * 1000000 + jeqX.[priority]
+						FROM @jobExecutionQueue jeqX
+						INNER JOIN [dbo].[appInternalTasks] ait ON jeqX.[task_id] = ait.[id]
+					end
+					
+				INSERT	INTO [dbo].[jobExecutionQueue](  [instance_id], [project_id], [module], [descriptor]
+													, [for_instance_id], [job_name], [job_step_name], [job_database_name]
+													, [job_command], [task_id], [database_name], [priority])
+				SELECT DISTINCT
+							S.[instance_id], S.[project_id], S.[module], S.[descriptor]
+						, S.[for_instance_id]
+						, REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_')	/* manage special characters in job names */
+						, S.[job_step_name], S.[job_database_name]
+						, S.[job_command]
+						, S.[task_id], S.[database_name], S.[priority]
+				FROM @jobExecutionQueue S
+				LEFT JOIN [dbo].[jobExecutionQueue] jeq ON		jeq.[for_instance_id] = S.[for_instance_id]
+															AND jeq.[project_id] = S.[project_id]
+															AND jeq.[task_id] = S.[task_id]
+															AND jeq.[database_name] = S.[database_name]
+															AND jeq.[instance_id] = S.[instance_id]
+															AND jeq.[module] = S.[module]
+															AND jeq.[descriptor] = S.[descriptor]
+															AND (jeq.[job_name] = S.[job_name] OR jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_'))
+															AND jeq.[job_step_name] = S.[job_step_name]
+															AND jeq.[job_database_name] = S.[job_database_name]
+				WHERE	jeq.[job_name] IS NULL
+						AND (     @skipDatabasesList IS NULL
+								OR (    @skipDatabasesList IS NOT NULL	
+										AND (
+											SELECT COUNT(*)
+											FROM [dbo].[ufn_getTableFromStringList](@skipDatabasesList, ',') X
+											WHERE S.[job_name] LIKE (DB_NAME() + ' - ' + S.[descriptor] + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@@SERVERNAME) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@@SERVERNAME), '\', '$') ELSE SUBSTRING(UPPER(@@SERVERNAME), 1, CHARINDEX('.', UPPER(@@SERVERNAME))-1) END + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
+										) = 0
 									)
+								)
 
 				FETCH NEXT FROM crsCollectorDescriptor INTO @codeDescriptor
 			end
 		CLOSE crsCollectorDescriptor
 		DEALLOCATE crsCollectorDescriptor
-										
 
 		FETCH NEXT FROM crsActiveInstances INTO @forInstanceID, @forSQLServerName, @isAzureSQLDatabase
 	end

@@ -412,6 +412,9 @@ echo *--------------------------------------------------------------------------
 echo Maintenance Plan: Creating SQL Server Agent Jobs
 echo *-----------------------------------------------------------------------------*
 
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\msdb-create-custom-indexes.sql" -d msdb -v dbName=%dbname% -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\job-script-dbaTDPMon - Database Maintenance - System DBs.sql" -d msdb -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
