@@ -310,7 +310,7 @@ ELSE
 						IF @sqlServerName <> @@SERVERNAME
 							begin
 								SET @queryToRun = REPLACE(@queryToRun, '@jobID', '''' + @jobID + N'''');
-								SET @queryToRun = REPLACE(@queryToRun, '@JobSessionID ', CAST(@JobSessionID  AS [sysname]));
+								SET @queryToRun = REPLACE(@queryToRun, '@JobSessionID', CAST(@JobSessionID  AS [sysname]));
 								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 							end
 						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
