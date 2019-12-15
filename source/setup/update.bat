@@ -75,6 +75,10 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\patches\20191212-patch-upgrade-from-v2019_12-to-v2020_01-common.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20191215-patch-upgrade-from-v2019_12-to-v2020_01-common.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+
 echo *-----------------------------------------------------------------------------*
 echo Common: Creating Views ...
 echo *-----------------------------------------------------------------------------*
@@ -482,7 +486,7 @@ if errorlevel 1 goto install_err
 
 
 :done
-sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2019.12.14' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2019.12.15' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err  
 
 echo *-----------------------------------------------------------------------------*

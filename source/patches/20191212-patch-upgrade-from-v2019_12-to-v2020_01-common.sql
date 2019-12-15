@@ -4,7 +4,7 @@ SET NOCOUNT ON
 * dbaTDPMon (Troubleshoot Database Performance / Monitoring)                  *
 * https://github.com/rentadba/dbaTDPMon, under GNU (GPLv3) licence model      *
 *-----------------------------------------------------------------------------*
-* Patch script: from version 2019.12 to 2020.01 (2019.12.14)				  *
+* Patch script: from version 2019.12 to 2020.01 (2019.12.12)				  *
 *-----------------------------------------------------------------------------*
 */
 

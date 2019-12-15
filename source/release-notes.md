@@ -980,3 +980,6 @@
 * maintenance-plan: stored procedure for defining default parallel maintenance jobs for a project (dbo.usp_mpJobProjectDefaultPlanCreate)
 * fix update failures when running on a different database collate vs. the server one
 * maintenance-plan: enhance mechanism for defining internal jobs execution order
+
+15.12.2019
+* add a non zero retry value for own SQL Agent jobs steps
