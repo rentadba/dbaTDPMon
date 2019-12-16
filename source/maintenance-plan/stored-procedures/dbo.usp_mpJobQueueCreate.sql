@@ -814,46 +814,6 @@ WHILE @@FETCH_STATUS=0
 						end
 
 				------------------------------------------------------------------------------------------------------------------------------------------
-				/* not allowing jobs to run on a Non-Readable Secondary Replica in an AlwaysOn Availability Group setup if denied by appConfigurations */
-				IF		(	SELECT	[value] 
-							FROM	[dbo].[appConfigurations] 
-							WHERE	[name] = 'Do not create SQL Agent jobs for non-readable secondary replicas (AlwaysOn)' 
-									AND [module] = 'maintenance-plan'
-						) = 'true'						  
-					AND EXISTS 
-						(	SELECT	[name] FROM sys.schemas 
-							WHERE	[name]='health-check' 
-									AND EXISTS(SELECT * FROM sys.objects WHERE [name]='vw_statsDatabaseAlwaysOnDetails')
-						)
-					begin
-						DELETE FROM @agNonReadableSecondaryReplicaDatabases
-						
-						/* only if health-check data was updated in the last 24 hours */
-						SET @queryToRun = N'SELECT	[project_id], [instance_id], [database_name]
-											FROM	[health-check].[vw_statsDatabaseAlwaysOnDetails]
-											WHERE	[role_desc] = ''SECONDARY''
-													AND [readable_secondary_replica] = ''NO''
-													AND (
-															/* operations on secondary node are restricted by config values */
-															SELECT [value]
-															FROM [dbo].[appConfigurations] 
-															WHERE [module] = ''maintenance-plan''
-																AND [name] = ''Allow DBCC operations on non-readable secondary replicas (AlwaysOn)''
-														) = ''false''
-													AND [event_date_utc] >= DATEADD(hour, -24, GETUTCDATE())'
-						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
-						INSERT	INTO @agNonReadableSecondaryReplicaDatabases([project_id], [instance_id], [database_name])
-								EXEC sp_executesql @queryToRun
-
-						DELETE jeq
-						FROM @jobExecutionQueue jeq
-						INNER JOIN @agNonReadableSecondaryReplicaDatabases exAG ON	exAG.[project_id] = jeq.[project_id]
-																					AND exAG.[instance_id] = jeq.[for_instance_id]
-																					AND exAG.[database_name] = jeq.[database_name]
-					end
-
-				------------------------------------------------------------------------------------------------------------------------------------------
 				IF @recreateMode = 0
 					begin
 						/* preserve any unfinished job and increase its priority */
@@ -1003,6 +963,88 @@ WHILE @@FETCH_STATUS=0
 										) = 0
 									)
 								)
+
+				------------------------------------------------------------------------------------------------------------------------------------------
+				/* not allowing jobs to run on a Non-Readable Secondary Replica in an AlwaysOn Availability Group setup if denied by appConfigurations */
+				IF		(	SELECT	[value] 
+							FROM	[dbo].[appConfigurations] 
+							WHERE	[name] = 'Do not create SQL Agent jobs for non-readable secondary replicas (AlwaysOn)' 
+									AND [module] = 'maintenance-plan'
+						) = 'true'						  
+					AND EXISTS 
+						(	SELECT	[name] FROM sys.schemas 
+							WHERE	[name]='health-check' 
+									AND EXISTS(SELECT * FROM sys.objects WHERE [name]='vw_statsDatabaseAlwaysOnDetails')
+						)
+					begin
+						DELETE FROM @agNonReadableSecondaryReplicaDatabases
+						
+						/* only if health-check data was updated in the last 24 hours */
+						SET @queryToRun = N'SELECT	[project_id], [instance_id], [database_name]
+											FROM	[health-check].[vw_statsDatabaseAlwaysOnDetails]
+											WHERE	[role_desc] = ''SECONDARY''
+													AND [readable_secondary_replica] = ''NO''
+													AND (
+															/* operations on secondary node are restricted by config values */
+															SELECT [value]
+															FROM [dbo].[appConfigurations] 
+															WHERE [module] = ''maintenance-plan''
+																AND [name] = ''Allow DBCC operations on non-readable secondary replicas (AlwaysOn)''
+														) = ''false''
+													AND [event_date_utc] >= DATEADD(hour, -24, GETUTCDATE())'
+						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+						INSERT	INTO @agNonReadableSecondaryReplicaDatabases([project_id], [instance_id], [database_name])
+								EXEC sp_executesql @queryToRun
+
+						/* reset current jobs state */
+						SET @retryAttempts = 1
+						WHILE @retryAttempts <= 3
+							begin
+								BEGIN TRY
+									UPDATE jeq
+										SET   jeq.[execution_date] = NULL
+											, jeq.[running_time_sec] = 0
+											, jeq.[log_message] = NULL
+											, jeq.[status] = 1
+											, jeq.[priority] = S.[priority]
+											, jeq.[job_id] = NULL
+											, jeq.[event_date_utc] = GETUTCDATE()
+									FROM [dbo].[jobExecutionQueue] jeq WITH (INDEX([IX_jobExecutionQueue_JobQueue]))
+									INNER JOIN @jobExecutionQueue S ON		jeq.[for_instance_id] = S.[for_instance_id]
+																		AND jeq.[project_id] = S.[project_id]
+																		AND jeq.[task_id] = S.[task_id]
+																		AND jeq.[database_name] = S.[database_name]
+																		AND jeq.[instance_id] = S.[instance_id]
+																		AND jeq.[module] = S.[module]
+																		AND jeq.[descriptor] = S.[descriptor]
+																		AND (jeq.[job_name] = S.[job_name] OR jeq.[job_name] = REPLACE(REPLACE(S.[job_name], '%', '_'), '''', '_'))
+																		AND jeq.[job_step_name] = S.[job_step_name]
+																					AND jeq.[job_database_name] = S.[job_database_name]																		
+									INNER JOIN @agNonReadableSecondaryReplicaDatabases exAG ON	exAG.[project_id] = S.[project_id]
+																								AND exAG.[instance_id] = S.[for_instance_id]
+																								AND exAG.[database_name] = S.[database_name]
+									WHERE (     @skipDatabasesList IS NULL
+											OR (    @skipDatabasesList IS NOT NULL	
+													AND (
+														SELECT COUNT(*)
+														FROM [dbo].[ufn_getTableFromStringList](@skipDatabasesList, ',') X
+														WHERE S.[job_name] LIKE (DB_NAME() + ' - ' + S.[descriptor] + '%' + CASE WHEN @@SERVERNAME <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(@@SERVERNAME) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(@@SERVERNAME), '\', '$') ELSE SUBSTRING(UPPER(@@SERVERNAME), 1, CHARINDEX('.', UPPER(@@SERVERNAME))-1) END + ' ' ELSE ' - ' END + '%' + X.[value] + ']')
+													) = 0
+												)
+										  )
+
+									SET @retryAttempts = 4
+								END TRY
+								BEGIN CATCH
+									SET @strMessage=ERROR_MESSAGE()
+									EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0							
+
+									SET @retryAttempts = @retryAttempts + 1
+									WAITFOR DELAY '00:00:01'
+								END CATCH
+							end
+					end
 
 				FETCH NEXT FROM crsCollectorDescriptor INTO @codeDescriptor
 			end

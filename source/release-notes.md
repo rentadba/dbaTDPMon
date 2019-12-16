@@ -983,3 +983,6 @@
 
 15.12.2019
 * add a non zero retry value for own SQL Agent jobs steps
+
+16.12.2019
+* maintenance-plan: fix job execution statistics view (issue reported by Handerson Dutra)
