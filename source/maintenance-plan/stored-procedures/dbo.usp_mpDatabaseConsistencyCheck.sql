@@ -76,7 +76,7 @@ AS
 												@debugMode				= DEFAULT
 */
 
-DECLARE		@queryToRun  					[nvarchar](2048),
+DECLARE		@queryToRun  					[nvarchar](max),
 			@queryParameters				[nvarchar](512),
 			@CurrentTableSchema				[sysname],
 			@CurrentTableName 				[sysname],
