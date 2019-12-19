@@ -383,6 +383,7 @@ WHILE @@FETCH_STATUS=0
 				original code source:
 				Name:       dba_replicationLatencyGet_sp
 				Author:     Michelle F. Ufford
+				http://sqlfool.com/2008/11/checking-replication-latency-with-t-sql/
 			*/
 			SET NOCOUNT ON
 			DECLARE   @currentIteration [int]
