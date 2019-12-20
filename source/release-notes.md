@@ -986,3 +986,4 @@
 
 16.12.2019
 * maintenance-plan: fix job execution statistics view (issue reported by Handerson Dutra)
+

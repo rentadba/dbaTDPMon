@@ -7,7 +7,7 @@
 -- Change date		 : 
 -- Description		 : 
 -------------------------------------------------------------------------------
-RAISERROR('Create job: dbaTDPMon - Database Maintenance - DBCC CHECKDB - Parallel', 10, 1) WITH NOWAIT
+RAISERROR('Create job: $(dbName) - Database Maintenance - DBCC CHECKDB - Parallel', 10, 1) WITH NOWAIT
 GO
 
 DECLARE   @job_name			[sysname]
@@ -83,13 +83,17 @@ https://github.com/rentadba/dbaTDPMon',
 	IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
 	
 	---------------------------------------------------------------------------------------------------
-	SET @queryToRun=N'EXEC [dbo].[usp_runDatabaseCheckDBForAllSkippedWithinLastXDays]	@sqlServerNameFilter	= ''%'',
-								@dbccCheckDBAgeDays	= 7,
-								@maxDOP		= 1,
-								@waitForDelay		= ''00:00:05'',
-								@parallelJobs		= 2,
-								@maxRunningTimeInMinutes	= 360,
-								@debugMode		= 0'
+	SET @queryToRun=N'EXEC [dbo].[usp_runDatabaseCheckDBForAllSkippedWithinLastXDays]	
+								@sqlServerNameFilter	= ''%'',
+								@dbccCheckDBAgeDays		= 7,
+								@maxDOP					= 1,
+								@waitForDelay			= ''00:00:05'',
+								@parallelJobs			= 2,
+								@maxRunningTimeInMinutes= 360,
+								@skipObjectsList		= NULL,
+								@executeProjectBased	= 0,
+								@onlyForProduction		= 1,
+								@debugMode				= 0'
 
 	EXEC @ReturnCode = msdb.dbo.sp_add_jobstep	@job_id=@jobId, 
 												@step_name=N'Run', 

@@ -1672,7 +1672,7 @@ BEGIN TRY
 											<TH WIDTH="540px" class="details-bold">Message</TH>'
 
 			SET @idx=1		
-			
+																					
 			DECLARE crsDatabasesStatusPermissionErrors CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																								, cin.[is_clustered], cin.[cluster_node_machine_name]
 																								, COUNT(DISTINCT lsam.[message]) AS [message_count]
@@ -1683,7 +1683,7 @@ BEGIN TRY
 																																	AND rsr.[active] = 1
 																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																						WHERE	cin.[instance_active]=1
-																								AND cin.[project_id] = @projectID
+																								AND (cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 																								AND cin.[instance_name] LIKE @sqlServerNameFilter
 																								AND lsam.descriptor IN (N'dbo.usp_hcCollectDatabaseDetails')
 																								AND rsr.[id] IS NULL
@@ -1718,7 +1718,7 @@ BEGIN TRY
 															FROM [dbo].[vw_catalogInstanceNames]  cin
 															INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
 															WHERE	cin.[instance_active]=1
-																	AND cin.[project_id] = @projectID	
+																	AND (cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 																	AND cin.[instance_name] = @instanceName
 																	AND cin.[machine_name] = @machineName
 																	AND lsam.descriptor IN (N'dbo.usp_hcCollectDatabaseDetails')
@@ -1758,7 +1758,7 @@ BEGIN TRY
 														AND rsr.[active] = 1
 														AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 			WHERE	cin.[instance_active]=1
-					AND cin.[project_id] = @projectID
+					AND (cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 					AND cin.[instance_name] LIKE @sqlServerNameFilter
 					AND lsam.descriptor IN (N'dbo.usp_hcCollectDatabaseDetails')
 					AND rsr.[id] IS NULL

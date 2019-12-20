@@ -37,13 +37,16 @@ AS
 
 /*
 --sample call
-EXEC [dbo].[usp_runDatabaseCheckDBForAllSkippedWithinLastXDays]	@sqlServerNameFilter		= '%',
-																@dbccCheckDBAgeDays			= 0,
-																@maxDOP						= 2,
-																@waitForDelay				= '00:00:05',
-																@parallelJobs				= 2,
-																@maxRunningTimeInMinutes	= 10,
-																@debugMode					= 0
+EXEC [dbo].[usp_runDatabaseCheckDBForAllSkippedWithinLastXDays]	@sqlServerNameFilter	= '%',
+																@dbccCheckDBAgeDays		= 0,
+																@maxDOP					= 1,
+																@waitForDelay			= '00:00:05',
+																@parallelJobs			= 2,
+																@maxRunningTimeInMinutes= 360,
+																@skipObjectsList		= NULL,
+																@executeProjectBased	= 0,
+																@onlyForProduction		= 1,
+																@debugMode				= 0
 */
 SET NOCOUNT ON
 
