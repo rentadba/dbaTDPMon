@@ -987,3 +987,5 @@
 16.12.2019
 * maintenance-plan: fix job execution statistics view (issue reported by Handerson Dutra)
 
+20.12.2019
+* small fixes on health-check, maintenance-plan and integration modules

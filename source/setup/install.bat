@@ -660,8 +660,6 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\integrations\stored-procedures\dbo.usp_runDatabaseCheckDBForAllSkippedWithinLastXDays.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
-
-
 if "%module%"=="all" goto done
 goto done
 
