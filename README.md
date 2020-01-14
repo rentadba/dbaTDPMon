@@ -8,7 +8,7 @@ Maintenance-plan, health-check and monitoring modules can be used as “agentles
 
 **Why dbaTDPMon?**
 * implement database maintenance best practices (including system databases)
-* support for parallel database maintenance (multiple databases at once)
+* parallel database(s) maintenance (multiple databases at once)
 * automate daily health checks / HTML reporting
 * can be used to administrate multiple instances from a central point
 * fully customization / various options / time limit / email alerting
