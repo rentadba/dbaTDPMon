@@ -989,3 +989,9 @@
 
 20.12.2019
 * small fixes on health-check, maintenance-plan and integration modules
+
+------------
+#### January 2020 new features & fixes
+14.01.2020
+* release of dbaTDPMon - v2020.01
+* change license type from GPL-v3 to MIT. My gift to the community. Enjoy it!
