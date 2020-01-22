@@ -998,3 +998,4 @@
 
 22.01.2010
 * fix installation issue when placing project_code parameter between quotes (reported by Razvan Puscasu)
+* health-check: fix small bug on replacing the html report file path space with underscore (reported by Razvan Puscasu)

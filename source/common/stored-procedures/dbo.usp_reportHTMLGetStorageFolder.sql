@@ -97,7 +97,7 @@ BEGIN TRY
 														CAST(DATEPART(M, ISNULL(@StopDate, GETUTCDATE())) AS [nvarchar]) + '. ' + 
 														DATENAME(M, ISNULL(@StopDate, GETUTCDATE())) + '\'
 
-	SET @localStoragePath = REPLACE(@localStoragePath, ' ', '_')		
+	--SET @localStoragePath = REPLACE(@localStoragePath, ' ', '_')		
 	SET @localStoragePath = @localStoragePath + CASE WHEN RIGHT(@localStoragePath, 1) <> '\' THEN N'\' ELSE N'' END
 	SET @localStoragePath = @localStoragePath + @relativeStoragePath
 	
