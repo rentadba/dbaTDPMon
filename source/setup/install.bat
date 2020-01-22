@@ -26,6 +26,7 @@ set userid=%7
 set password=%8
 
 set module=%module:"=%
+set project=%project:"=%
 
 if !%4==! set project="DEFAULT"
 if !%5==! set data_files_path=""

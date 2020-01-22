@@ -995,3 +995,6 @@
 14.01.2020
 * release of dbaTDPMon - v2020.01
 * change license type from GPL-v3 to MIT. My gift to the community. Enjoy it!
+
+22.01.2010
+* fix installation issue when placing project_code parameter between quotes (reported by Razvan Puscasu)
