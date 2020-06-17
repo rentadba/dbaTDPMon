@@ -174,7 +174,7 @@ WHILE @@FETCH_STATUS=0
 		SET @strMessage='Analyzing server: ' + @sqlServerName
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-		TRUNCATE TABLE #monTransactionsStatus
+		DELETE FROM #monTransactionsStatus
 
 		SET @queryToRun = N''
 		SET @queryToRun = @queryToRun + N'

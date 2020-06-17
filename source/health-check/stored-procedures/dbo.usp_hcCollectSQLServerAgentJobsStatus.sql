@@ -131,7 +131,7 @@ WHILE @@FETCH_STATUS=0
 		EXEC sp_executesql @queryToRun, @queryParam, @hoursOffsetToUTC = @hoursOffsetToUTC OUT
 
 		-------------------------------------------------------------------------------------------------------------------------
-		TRUNCATE TABLE #msdbSysJobs
+		DELETE FROM #msdbSysJobs
 		BEGIN TRY
 			SET @queryToRun='SELECT [name] FROM [msdb].[dbo].[sysjobs] WITH (NOLOCK) WHERE [name] LIKE ''' + @jobNameFilter + ''''
 			SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)

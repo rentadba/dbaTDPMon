@@ -121,7 +121,7 @@ BEGIN TRY
 						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
-						TRUNCATE TABLE #tmpTableToAlterTriggers
+						DELETE FROM #tmpTableToAlterTriggers
 						INSERT	INTO #tmpTableToAlterTriggers([TriggerName])
 								EXEC sp_executesql  @queryToRun
 								

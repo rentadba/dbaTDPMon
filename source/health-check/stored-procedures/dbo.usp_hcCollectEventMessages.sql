@@ -102,7 +102,7 @@ WHILE @@FETCH_STATUS=0
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 		BEGIN TRY
-			TRUNCATE TABLE #checkIfObjectExists
+			DELETE FROM #checkIfObjectExists
 			INSERT	INTO #checkIfObjectExists([object_id])
 					EXEC sp_executesql  @queryToRun
 		END TRY
@@ -170,7 +170,7 @@ WHILE @@FETCH_STATUS=0
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 		BEGIN TRY
-			TRUNCATE TABLE #checkIfObjectExists
+			DELETE FROM #checkIfObjectExists
 			INSERT	INTO #checkIfObjectExists([object_id])
 					EXEC sp_executesql  @queryToRun
 		END TRY

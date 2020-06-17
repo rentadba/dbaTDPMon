@@ -336,7 +336,7 @@ IF @flgActions & 1 = 1 AND @flgOptions & 1 = 0 AND @isAzureSQLDatabase = 0
 
 		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 				
-		TRUNCATE TABLE #dbi_dbccFlags
+		DELETE FROM #dbi_dbccFlags
 		INSERT	INTO #dbi_dbccFlags([Value])
 				EXEC sp_executesql @queryToRun
 

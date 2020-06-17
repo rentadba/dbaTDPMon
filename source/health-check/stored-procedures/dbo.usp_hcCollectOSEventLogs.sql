@@ -315,7 +315,7 @@ WHILE @@FETCH_STATUS=0
 				SET @queryToRun = dbo.ufn_formatSQLQueryForLinkedServer(@instanceName, @queryToRun)
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
 
-				TRUNCATE TABLE #psOutput
+				DELETE FROM #psOutput
 				BEGIN TRY
 					INSERT	INTO #psOutput([xml])
 							EXEC sp_executesql  @queryToRun
@@ -396,7 +396,7 @@ WHILE @@FETCH_STATUS=0
 						SET @queryToRun='master.dbo.xp_cmdshell N''@PowerShell -File "' + [dbo].[ufn_getObjectQuoteName](@psFileLocation + @psFileName, 'sql') + '"'''
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
 
-						TRUNCATE TABLE #psOutput
+						DELETE FROM #psOutput
 						BEGIN TRY
 							INSERT	INTO #psOutput([xml])
 									EXEC sp_executesql  @queryToRun

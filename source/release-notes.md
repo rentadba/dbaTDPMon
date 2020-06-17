@@ -996,6 +996,17 @@
 * release of dbaTDPMon - v2020.01
 * change license type from GPL-v3 to MIT. My gift to the community. Enjoy it!
 
-22.01.2010
+22.01.2020
 * fix installation issue when placing project_code parameter between quotes (reported by Razvan Puscasu)
 * health-check: fix small bug on replacing the html report file path space with underscore (reported by Razvan Puscasu)
+
+------------
+#### February 2020 new features & fixes
+28.02.2020
+* fix issue on checking existence / creating network folder
+
+------------
+#### June 2020 new features & fixes
+17.06.2020
+* reduce tempdb metadata contention (replace truncate on temp tables with delete)
+

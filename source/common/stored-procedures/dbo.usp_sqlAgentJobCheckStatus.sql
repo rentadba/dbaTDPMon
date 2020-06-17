@@ -90,7 +90,7 @@ IF LEN(@jobName)=0 OR ISNULL(@jobName, '')=''
 IF @sqlServerName != @@SERVERNAME
 	begin
 		SET @queryToRun=N'SELECT [srvid] FROM master.dbo.sysservers WHERE [srvname]=''' + @sqlServerName + ''''
-		TRUNCATE TABLE #tmpCheck
+		DELETE FROM #tmpCheck
 		INSERT INTO #tmpCheck EXEC sp_executesql  @queryToRun
 		IF (SELECT count(*) FROM #tmpCheck)=0
 			begin
@@ -119,7 +119,7 @@ IF @jobID IS NULL
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-		TRUNCATE TABLE #tmpCheck
+		DELETE FROM #tmpCheck
 		INSERT INTO #tmpCheck EXEC sp_executesql  @queryToRun
 		SELECT TOP 1 @jobID = ISNULL(Result,'') FROM #tmpCheck
 	end
@@ -129,7 +129,7 @@ ELSE
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-		TRUNCATE TABLE #tmpCheck
+		DELETE FROM #tmpCheck
 		INSERT INTO #tmpCheck EXEC sp_executesql  @queryToRun
 		SET @jobID = NULL
 		SELECT TOP 1 @jobID = ISNULL(Result,'') FROM #tmpCheck
@@ -415,7 +415,7 @@ ELSE
 					end
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-				TRUNCATE TABLE #jobLastRunDetails
+				DELETE FROM #jobLastRunDetails
 				INSERT	INTO #jobLastRunDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
 						EXEC sp_executesql  @queryToRun, @queryParams, @jobID = @jobID
 				
@@ -447,7 +447,7 @@ ELSE
 							end
 						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-						TRUNCATE TABLE #jobLastRunDetails
+						DELETE FROM #jobLastRunDetails
 						INSERT	INTO #jobLastRunDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
 								EXEC sp_executesql  @queryToRun, @queryParams, @jobID = @jobID
 
@@ -492,7 +492,7 @@ ELSE
 							end
 						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-						TRUNCATE TABLE #jobLastRunDetails
+						DELETE FROM #jobLastRunDetails
 						INSERT	INTO #jobLastRunDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
 								EXEC sp_executesql  @queryToRun, @queryParams, @jobID = @jobID
 
@@ -620,7 +620,7 @@ ELSE
 						end
 					IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-					TRUNCATE TABLE #jobRunStepDetails
+					DELETE FROM #jobRunStepDetails
 					INSERT	INTO #jobRunStepDetails ([message], [step_id], [step_name], [run_status], [run_date], [run_time], [run_duration], [event_time])
 							EXEC sp_executesql  @queryToRun, @queryParams, @jobID = @jobID
 						

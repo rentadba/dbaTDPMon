@@ -86,7 +86,7 @@ IF @serverVersionNum > 14
 						[output]	[nvarchar](max)			NULL
 					)
 				BEGIN TRY
-					TRUNCATE TABLE #hostPlatform
+					DELETE FROM #hostPlatform
 					INSERT	INTO #hostPlatform([output])
 							EXEC sp_executesql @queryToRun
 

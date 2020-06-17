@@ -110,7 +110,7 @@ WHILE @@FETCH_STATUS=0
 
 		SET @maxJobCompletionTime = ISNULL(@maxJobCompletionTime, CONVERT([datetime], CONVERT([varchar](10), GETDATE(), 120), 120))
 
-		TRUNCATE TABLE #statsSQLAgentJobs
+		DELETE FROM #statsSQLAgentJobs
 		
 		/* get failed jobs */
 		SET @queryToRun = N''

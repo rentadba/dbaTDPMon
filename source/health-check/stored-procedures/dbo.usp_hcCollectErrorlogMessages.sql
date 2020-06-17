@@ -149,7 +149,7 @@ WHILE @@FETCH_STATUS=0
 			SET @SQLMajorVersion = 9
 		END CATCH
 
-		TRUNCATE TABLE #xpReadErrorLog
+		DELETE FROM #xpReadErrorLog
 		
 		IF @isAzureSQLDatabase = 0
 			begin

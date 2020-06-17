@@ -129,11 +129,26 @@ ELSE
 				/*-------------------------------------------------------------------------------------------------------------------------------*/
 				SET @queryToRun = N'[' + @sqlServerName + '].master.sys.xp_create_subdir N''' + @folderName + ''''
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-				EXEC sp_executesql @queryToRun
+				BEGIN TRY
+					EXEC sp_executesql @queryToRun
 				
-				IF @@ERROR=0
-					SET @runWithxpCreateSubdir=1
-				ELSE
+					IF @@ERROR=0
+						SET @runWithxpCreateSubdir=1
+					ELSE
+						begin
+							/* enable xp_cmdshell configuration option */
+							EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
+																			, @flgAction	 = 1			-- 1=enable | 0=disable
+																			, @optionXPValue = @optionXPValue OUTPUT
+																			, @debugMode	 = @debugMode
+
+							IF @optionXPValue = 0
+								begin
+									RETURN 1
+								end		
+						end
+				END TRY
+				BEGIN CATCH
 					begin
 						/* enable xp_cmdshell configuration option */
 						EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
@@ -146,6 +161,7 @@ ELSE
 								RETURN 1
 							end		
 					end
+				END CATCH
 
 				/*-------------------------------------------------------------------------------------------------------------------------------*/
 				/* creating folder   																											 */
@@ -226,4 +242,3 @@ ELSE
 
 RETURN 0
 GO
-

@@ -76,7 +76,7 @@ IF LEN(@jobName)=0 OR ISNULL(@jobName, '')=''
 SET @queryToRun='SELECT [srvid] FROM master.dbo.sysservers WHERE [srvname]=''' + @sqlServerName + ''''
 IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-TRUNCATE TABLE #tmpCheckParameters
+DELETE FROM #tmpCheckParameters
 INSERT INTO #tmpCheckParameters EXEC sp_executesql @queryToRun
 IF (SELECT count(*) FROM #tmpCheckParameters)=0
 	begin
@@ -92,7 +92,7 @@ IF @sqlServerName <> @@SERVERNAME
 		IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		SET @tmpServer='[' + @sqlServerName + '].master.dbo.sp_executesql'
 
-		TRUNCATE TABLE #tmpCheckParameters
+		DELETE FROM #tmpCheckParameters
 		INSERT INTO #tmpCheckParameters EXEC sp_executesql @queryToRun
 		IF (SELECT count(*) FROM #tmpCheckParameters)=0
 			begin
@@ -214,7 +214,7 @@ IF @startJob=1
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-				TRUNCATE TABLE #tmpCheckParameters
+				DELETE FROM #tmpCheckParameters
 				INSERT INTO #tmpCheckParameters EXEC sp_executesql @queryToRun
 
 				SET @jobID=NULL

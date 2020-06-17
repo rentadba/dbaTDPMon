@@ -189,7 +189,7 @@ WHILE @@FETCH_STATUS=0
 		SET @strMessage='Analyzing server: ' + @sqlServerName
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 
-		TRUNCATE TABLE #statsDatabaseDetails
+		DELETE FROM #statsDatabaseDetails
 
 		BEGIN TRY
 			SET @serverVersionNum=SUBSTRING(@sqlServerVersion, 1, CHARINDEX('.', @sqlServerVersion)-1) + '.' + REPLACE(SUBSTRING(@sqlServerVersion, CHARINDEX('.', @sqlServerVersion)+1, LEN(@sqlServerVersion)), '.', '')
@@ -334,7 +334,7 @@ WHILE @@FETCH_STATUS=0
 						end
 
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-				TRUNCATE TABLE #databaseSpaceInfo
+				DELETE FROM #databaseSpaceInfo
 				BEGIN TRY
 						INSERT	INTO #databaseSpaceInfo([volume_mount_point], [is_log_file], [size_mb], [space_used_mb], [is_growth_limited])
 							EXEC sp_executesql @queryToRun
@@ -389,7 +389,7 @@ WHILE @@FETCH_STATUS=0
 
 						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 				
-						TRUNCATE TABLE #dbccLastKnownGood
+						DELETE FROM #dbccLastKnownGood
 						BEGIN TRY
 							INSERT	INTO #dbccLastKnownGood([Value])
 									EXEC sp_executesql @queryToRun

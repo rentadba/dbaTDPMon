@@ -133,9 +133,9 @@ WHILE @@FETCH_STATUS=0
 		SET @strMessage='Analyzing server: ' + @sqlServerName
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 1, @stopExecution=0
 
-		TRUNCATE TABLE #diskSpaceInfo
-		TRUNCATE TABLE #xp_cmdshell
-		TRUNCATE TABLE #xpCMDShellOutput
+		DELETE FROM #diskSpaceInfo
+		DELETE FROM #xp_cmdshell
+		DELETE FROM #xpCMDShellOutput
 
 		BEGIN TRY
 			SELECT @SQLMajorVersion = REPLACE(LEFT(ISNULL(@sqlServerVersion, ''), 2), '.', '') 
@@ -178,7 +178,7 @@ WHILE @@FETCH_STATUS=0
 								SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + '], ''SET FMTONLY OFF; EXEC (''''' + REPLACE(@queryToRun, '''', '''''''''') + ''''') WITH RESULT SETS(([Output] [nvarchar](max)))'')'
 						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-						TRUNCATE TABLE #xpCMDShellOutput
+						DELETE FROM #xpCMDShellOutput
 						BEGIN TRY
 							INSERT	INTO #xpCMDShellOutput([output])
 									EXEC sp_executesql @queryToRun
@@ -226,7 +226,7 @@ WHILE @@FETCH_STATUS=0
 								SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-								TRUNCATE TABLE #diskSpaceInfo
+								DELETE FROM #diskSpaceInfo
 								BEGIN TRY
 										INSERT	INTO #diskSpaceInfo([logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [percent_available])
 											EXEC sp_executesql @queryToRun
@@ -341,7 +341,7 @@ WHILE @@FETCH_STATUS=0
 
 								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
-								TRUNCATE TABLE #diskSpaceInfo
+								DELETE FROM #diskSpaceInfo
 								BEGIN TRY
 										INSERT	INTO #diskSpaceInfo([logical_drive], [available_space_mb])
 											EXEC sp_executesql @queryToRun
@@ -428,7 +428,7 @@ WHILE @@FETCH_STATUS=0
 						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 				
-						TRUNCATE TABLE #diskSpaceInfo
+						DELETE FROM #diskSpaceInfo
 						BEGIN TRY
 								INSERT	INTO #diskSpaceInfo([logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [percent_available])
 									EXEC sp_executesql @queryToRun

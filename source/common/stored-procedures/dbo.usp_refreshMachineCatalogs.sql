@@ -377,7 +377,7 @@ BEGIN TRY
 					IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
 					BEGIN TRY
-						TRUNCATE TABLE #xpCMDShellOutput
+						DELETE FROM #xpCMDShellOutput
 						INSERT	INTO #xpCMDShellOutput([output])
 								EXEC sp_executesql @queryToRun
 
