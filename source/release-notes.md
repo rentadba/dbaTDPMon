@@ -1010,3 +1010,5 @@
 17.06.2020
 * reduce tempdb metadata contention (replace truncate on temp tables with delete)
 
+19.06.2020
+* fix infinit loop execution in dbo.usp_jobQueueGetStatus (reported by Razvan Puscasu)

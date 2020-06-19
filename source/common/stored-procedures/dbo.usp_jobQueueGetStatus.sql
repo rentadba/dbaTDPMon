@@ -159,8 +159,17 @@ WHILE (@runningJobs >= @minJobToRunBeforeExit AND @minJobToRunBeforeExit <> 0) O
 					end
 				ELSE
 					begin
-					--IF @currentRunning <> 0
-						SET @runningJobs = @runningJobs + 1
+						IF @currentRunning = 0 AND @lastExecutionStatus=5
+							begin
+								/* job is not running and last execution status could not be retrieved. Job may also not be defined on the server */								
+								UPDATE [dbo].[jobExecutionQueue]
+								SET [status] = 1, /* default = successful */
+									[running_time_sec] = 0,
+									[log_message] = @strMessage
+								WHERE [id] = @jobQueueID
+							end
+						ELSE
+							SET @runningJobs = @runningJobs + 1
 					end
 
 				FETCH NEXT FROM crsRunningJobs INTO @jobQueueID, @sqlServerName, @jobName, @jobID
