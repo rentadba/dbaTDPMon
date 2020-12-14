@@ -326,7 +326,7 @@ WHILE @@FETCH_STATUS=0
 																, MAX(dsi.[volume_mount_point])	AS [volume_mount_point]
 																, MAX([is_growth_limited])		AS [is_growth_limited]
 														FROM ' + @queryToRun + N' df
-														LEFT JOIN [dbaTDPMon].[health-check].[vw_statsDiskSpaceInfo] dsi ON CHARINDEX(dsi.[volume_mount_point] COLLATE SQL_Latin1_General_CP1_CI_AS, df.[physical_name] COLLATE SQL_Latin1_General_CP1_CI_AS) > 0 
+														LEFT JOIN [' + DB_NAME() + N'].[health-check].[vw_statsDiskSpaceInfo] dsi ON CHARINDEX(dsi.[volume_mount_point] COLLATE SQL_Latin1_General_CP1_CI_AS, df.[physical_name] COLLATE SQL_Latin1_General_CP1_CI_AS) > 0 
 																															AND dsi.[instance_name] = ''' + @sqlServerName + N'''
 														GROUP BY [name], [is_logfile]
 													)sf

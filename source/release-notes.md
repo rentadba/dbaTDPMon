@@ -1012,3 +1012,8 @@
 
 19.06.2020
 * fix infinit loop execution in dbo.usp_jobQueueGetStatus (reported by Razvan Puscasu)
+
+------------
+#### December 2020 new features & fixes
+14.12.2020
+* fix bug on processing database details, health-check module (reported by George Talaba)
