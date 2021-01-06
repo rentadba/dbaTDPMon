@@ -1017,3 +1017,8 @@
 #### December 2020 new features & fixes
 14.12.2020
 * fix bug on processing database details, health-check module (reported by George Talaba)
+
+------------
+#### January 2021 new features & fixes
+06.01.2021
+* fix bug on cleansing/deleting intermediate SQL Agent jobs created for parallel execution
