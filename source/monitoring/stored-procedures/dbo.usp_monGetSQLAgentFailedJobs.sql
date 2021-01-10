@@ -172,7 +172,7 @@ WHILE @@FETCH_STATUS=0
 																FROM #statsSQLAgentJobs j
 																LEFT JOIN [monitoring].[statsSQLAgentJobs] saj ON	saj.[project_id] = @projectID
 																													AND saj.[instance_id] = @instanceID
-																													AND saj.[job_name] = j.[job_name]
+																													AND saj.[job_name] = j.[job_name] COLLATE DATABASE_DEFAULT
 																													AND saj.[last_completion_time] = j.[last_completion_time]
 																WHERE saj.[job_name] IS NULL
 		OPEN crsFailedJobs
@@ -207,7 +207,7 @@ WHILE @@FETCH_STATUS=0
 				FROM #statsSQLAgentJobs j
 				LEFT JOIN [monitoring].[statsSQLAgentJobs] saj ON	saj.[project_id] = @projectID
 																	AND saj.[instance_id] = @instanceID
-																	AND saj.[job_name] = j.[job_name]
+																	AND saj.[job_name] = j.[job_name] COLLATE DATABASE_DEFAULT
 																	AND saj.[last_completion_time] = j.[last_completion_time]
 				WHERE saj.[job_name] IS NULL
 								

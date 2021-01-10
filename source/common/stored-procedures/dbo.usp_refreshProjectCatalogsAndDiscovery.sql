@@ -125,10 +125,10 @@ IF @runDiscovery=1
 																														AND cmn.[project_id] = cin.[project_id]
 																			INNER JOIN [dbo].[catalogProjects]		cp	ON	cp.[id] = cin.[project_id] 
 																			WHERE cp.[code] = @projectCode
-																		)cat ON	cat.[instance_name] = xp.[instance_name] 
-																				OR cat.[machine_name] = xp.[instance_name]
-																				OR cat.[machine_name] = xp.[machine_name]
-																	LEFT  JOIN sys.servers					ss	ON	ss.[name] = xp.[instance_name]
+																		)cat ON	cat.[instance_name] = xp.[instance_name] COLLATE DATABASE_DEFAULT
+																				OR cat.[machine_name] = xp.[instance_name] COLLATE DATABASE_DEFAULT
+																				OR cat.[machine_name] = xp.[machine_name] COLLATE DATABASE_DEFAULT
+																	LEFT  JOIN sys.servers	ss	ON	ss.[name] = xp.[instance_name] COLLATE DATABASE_DEFAULT
 																	WHERE cat.[instance_name] IS NULL AND cat.[machine_name] IS NULL
 		OPEN crsDiscoveredServer
 		FETCH NEXT FROM crsDiscoveredServer INTO @sqlServerName, @existingServerID
@@ -171,9 +171,9 @@ DECLARE crsDiscoveredServer CURSOR LOCAL FAST_FORWARD FOR	SELECT cin.[name], ss.
 															INNER JOIN [dbo].[catalogProjects]		cp	ON	cp.[id] = cin.[project_id] 
 															INNER JOIN [dbo].[catalogMachineNames]  cmn ON	cmn.[id] = cin.[machine_id] 
 																											AND cmn.[project_id] = cin.[project_id]
-															LEFT  JOIN #xp_cmdshell					xp  ON	cin.[name] = xp.[output] 
-																											OR cmn.[name] = xp.[output] 
-															LEFT  JOIN sys.servers					ss	ON	ss.[name] = cin.[name]
+															LEFT  JOIN #xp_cmdshell					xp  ON	cin.[name] = xp.[output] COLLATE DATABASE_DEFAULT
+																											OR cmn.[name] = xp.[output] COLLATE DATABASE_DEFAULT
+															LEFT  JOIN sys.servers					ss	ON	ss.[name] = cin.[name] COLLATE DATABASE_DEFAULT
 															WHERE	cp.[code] = @projectCode
 																	AND xp.[output] IS NULL
 															ORDER BY cin.[name]

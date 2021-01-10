@@ -181,8 +181,8 @@ INSERT	INTO [monitoring].[statsReplicationLatency]([project_id], [distributor_se
 		SELECT    cdn.[project_id], srl.[distributor_server], srl.[publication_name], srl.[publication_type], srl.[publisher_server], srl.[publisher_db]
 				, srl.[subscriber_server], srl.[subscriber_db], srl.[subscription_status], srl.[subscription_type], srl.[subscription_articles]
 		FROM #statsReplicationLatency srl
-		INNER JOIN [dbo].[vw_catalogDatabaseNames] cdn ON	cdn.[instance_name] = srl.[publisher_server] 
-													AND cdn.[database_name] = srl.[publisher_db]
+		INNER JOIN [dbo].[vw_catalogDatabaseNames] cdn ON	cdn.[instance_name] = srl.[publisher_server] COLLATE DATABASE_DEFAULT
+													AND cdn.[database_name] = srl.[publisher_db] COLLATE DATABASE_DEFAULT
 		WHERE cdn.[project_id] = @projectID
 			AND cdn.[instance_name] LIKE @sqlServerNameFilter
 

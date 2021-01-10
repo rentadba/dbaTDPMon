@@ -1546,7 +1546,7 @@ BEGIN TRY
 																						SUM([database_size_gb]) AS [db_size_gb]
 																				FROM #hcReportCapacityDatabaseBackups
 																				GROUP BY [instance_name]
-																			) shcdd ON	shcdd.[instance_name] = cin.[instance_name] 
+																			) shcdd ON	shcdd.[instance_name] = cin.[instance_name] COLLATE DATABASE_DEFAULT
 																		LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																													AND rsr.[rule_id] = 2
 																													AND rsr.[active] = 1
@@ -3588,8 +3588,10 @@ BEGIN TRY
 																									, hcdg.[current_data_size_mb], hcdg.[old_data_size_mb], hcdg.[current_log_size_mb], hcdg.[old_log_size_mb]
 																									, hcdg.[growth_size_mb], hcdg.[data_growth_percent]
 																							FROM #hcReportCapacityDatabaseGrowth		hcdg
-																							INNER JOIN [dbo].[vw_catalogInstanceNames]  cin ON hcdg.[instance_name] = cin.[instance_name]
-																							INNER JOIN [dbo].[vw_catalogDatabaseNames]	cdn	ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[instance_id] AND cdn.[database_name] = hcdg.[database_name] 
+																							INNER JOIN [dbo].[vw_catalogInstanceNames]  cin ON	hcdg.[instance_name] = cin.[instance_name] COLLATE DATABASE_DEFAULT
+																							INNER JOIN [dbo].[vw_catalogDatabaseNames]	cdn	ON	cdn.[project_id] = cin.[project_id] 
+																																				AND cdn.[instance_id] = cin.[instance_id] 
+																																				AND cdn.[database_name] = hcdg.[database_name] COLLATE DATABASE_DEFAULT
 																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																		AND rsr.[rule_id] = 1073741824
 																																		AND rsr.[active] = 1
@@ -3693,7 +3695,7 @@ BEGIN TRY
 																									FROM #hcReportCapacityDatabaseBackups		hcdb
 																									GROUP BY hcdb.[instance_name]
 																								) hcdb
-																							INNER JOIN [dbo].[vw_catalogInstanceNames]  cin ON hcdb.[instance_name] = cin.[instance_name]
+																							INNER JOIN [dbo].[vw_catalogInstanceNames]  cin ON hcdb.[instance_name] = cin.[instance_name] COLLATE DATABASE_DEFAULT
 																							LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																		AND rsr.[rule_id] = 1073741824
 																																		AND rsr.[active] = 1

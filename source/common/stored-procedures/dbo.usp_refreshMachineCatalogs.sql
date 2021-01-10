@@ -433,7 +433,8 @@ BEGIN TRY
 			(	
 			 SELECT [name], [domain], [host_platform]
 			 FROM #catalogMachineNames
-			) src ON dest.[name] = src.[name] AND dest.[project_id] = @projectID;
+			) src ON	dest.[name] = src.[name] COLLATE DATABASE_DEFAULT 
+					AND dest.[project_id] = @projectID;
 
 	INSERT	INTO [dbo].[catalogMachineNames] ([project_id], [name], [domain], [host_platform]) 
 			SELECT @projectID, src.[name], src.[domain], src.[host_platform]
@@ -442,7 +443,8 @@ BEGIN TRY
 					 SELECT [name], [domain], [host_platform]
 					 FROM #catalogMachineNames
 				) src 
-			LEFT JOIN [dbo].[catalogMachineNames] AS dest ON dest.[name] = src.[name] AND dest.[project_id] = @projectID			
+			LEFT JOIN [dbo].[catalogMachineNames] AS dest ON dest.[name] = src.[name] COLLATE DATABASE_DEFAULT 
+														 AND dest.[project_id] = @projectID			
 			WHERE dest.[name] IS NULL;
 
 	UPDATE dest
@@ -472,12 +474,14 @@ BEGIN TRY
 				  , cmnA.[id]	  AS [cluster_node_machine_id]
 			FROM #catalogInstanceNames cin
 			INNER JOIN #catalogMachineNames src ON 1=1
-			INNER JOIN [dbo].[catalogMachineNames] cmn ON		cmn.[name] = src.[name] 
-															AND cmn.[project_id]=@projectID
-			LEFT  JOIN [dbo].[catalogMachineNames] cmnA ON		cmnA.[name] = cin.[machine_name] 
-															AND cmnA.[project_id]=@projectID 
-															AND @isClustered=1
-		  ) AS src	ON dest.[machine_id] = src.[machine_id] AND dest.[name] = src.[name] AND dest.[project_id] = @projectID;
+			INNER JOIN [dbo].[catalogMachineNames] cmn ON	cmn.[name] = src.[name] COLLATE DATABASE_DEFAULT 
+														AND cmn.[project_id]=@projectID
+			LEFT  JOIN [dbo].[catalogMachineNames] cmnA ON	cmnA.[name] = cin.[machine_name] COLLATE DATABASE_DEFAULT 
+														AND cmnA.[project_id]=@projectID 
+														AND @isClustered=1
+		  ) AS src	ON		dest.[machine_id] = src.[machine_id] 
+						AND dest.[name] = src.[name] COLLATE DATABASE_DEFAULT 
+						AND dest.[project_id] = @projectID;
 
 	INSERT INTO [dbo].[catalogInstanceNames]([machine_id], [project_id], [name], [version], [edition], [engine], [is_clustered], [active], [cluster_node_machine_id], [last_refresh_date_utc]) 
 			SELECT   src.[machine_id], @projectID, src.[name], src.[version], src.[edition], src.[engine], src.[is_clustered]
@@ -501,13 +505,15 @@ BEGIN TRY
 						  , cmnA.[id]	  AS [cluster_node_machine_id]
 					FROM #catalogInstanceNames cin
 					INNER JOIN #catalogMachineNames src ON 1=1
-					INNER JOIN [dbo].[catalogMachineNames] cmn ON		cmn.[name] = src.[name] 
-																	AND cmn.[project_id]=@projectID
-					LEFT  JOIN [dbo].[catalogMachineNames] cmnA ON		cmnA.[name] = cin.[machine_name] 
-																	AND cmnA.[project_id]=@projectID 
-																	AND @isClustered=1
+					INNER JOIN [dbo].[catalogMachineNames] cmn  ON  cmn.[name] = src.[name] COLLATE DATABASE_DEFAULT 
+																AND cmn.[project_id]=@projectID
+					LEFT  JOIN [dbo].[catalogMachineNames] cmnA ON  cmnA.[name] = cin.[machine_name] COLLATE DATABASE_DEFAULT 
+																AND cmnA.[project_id]=@projectID 
+																AND @isClustered=1
 				  ) AS src
-			LEFT JOIN [dbo].[catalogInstanceNames] AS dest ON dest.[machine_id] = src.[machine_id] AND dest.[name] = src.[name] AND dest.[project_id] = @projectID
+			LEFT JOIN [dbo].[catalogInstanceNames] AS dest ON	dest.[machine_id] = src.[machine_id] 
+															AND dest.[name] = src.[name] COLLATE DATABASE_DEFAULT 
+															AND dest.[project_id] = @projectID
 			WHERE dest.[machine_id] IS NULL;
 
 
@@ -515,7 +521,7 @@ BEGIN TRY
 		SET cdn.[active] = 0
 	FROM [dbo].[catalogDatabaseNames] cdn
 	INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[id] = cdn.[instance_id] AND cin.[project_id] = cdn.[project_id]
-	INNER JOIN #catalogInstanceNames	srcIN ON cin.[name] = srcIN.[name]
+	INNER JOIN #catalogInstanceNames	srcIN ON cin.[name] = srcIN.[name] COLLATE DATABASE_DEFAULT
 	WHERE cin.[project_id] = @projectID
 
 	UPDATE dest
@@ -534,10 +540,14 @@ BEGIN TRY
 			FROM  #catalogDatabaseNames src
 			INNER JOIN #catalogMachineNames srcMn ON 1=1
 			INNER JOIN #catalogInstanceNames srcIN ON 1=1
-			INNER JOIN [dbo].[catalogMachineNames] cmn ON cmn.[name] = srcMn.[name] AND cmn.[project_id]=@projectID
-			INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[name] = srcIN.[name] AND cin.[machine_id] = cmn.[id]
+			INNER JOIN [dbo].[catalogMachineNames] cmn ON	cmn.[name] = srcMn.[name] COLLATE DATABASE_DEFAULT
+															AND cmn.[project_id]=@projectID
+			INNER JOIN [dbo].[catalogInstanceNames] cin ON	cin.[name] = srcIN.[name] COLLATE DATABASE_DEFAULT
+															AND cin.[machine_id] = cmn.[id]
 			WHERE cin.[project_id] = @projectID
-		  ) AS src ON dest.[instance_id] = src.[instance_id] AND dest.[name] = src.[name] AND dest.[project_id] = @projectID;;
+		  ) AS src ON	dest.[instance_id] = src.[instance_id] 
+						AND dest.[name] = src.[name] COLLATE DATABASE_DEFAULT
+						AND dest.[project_id] = @projectID;;
 
 	IF @addNewDatabasesToProject = 1
 		/* add only databases not allocated to other projects */
@@ -553,9 +563,11 @@ BEGIN TRY
 						FROM  #catalogDatabaseNames src
 						INNER JOIN #catalogMachineNames srcMn ON 1=1
 						INNER JOIN #catalogInstanceNames srcIN ON 1=1
-						INNER JOIN [dbo].[catalogMachineNames] cmn ON cmn.[name] = srcMn.[name] AND cmn.[project_id]=@projectID
-						INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[name] = srcIN.[name] AND cin.[machine_id] = cmn.[id]
-						WHERE src.[name] LIKE @dbFilter
+						INNER JOIN [dbo].[catalogMachineNames] cmn ON   cmn.[name] = srcMn.[name] COLLATE DATABASE_DEFAULT 
+																	AND cmn.[project_id]=@projectID
+						INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[name] = srcIN.[name] COLLATE DATABASE_DEFAULT 
+																	AND cin.[machine_id] = cmn.[id]
+						WHERE src.[name] LIKE @dbFilter COLLATE DATABASE_DEFAULT
 								AND cin.[project_id] = @projectID
 					  ) AS src
 				LEFT JOIN 
@@ -563,14 +575,17 @@ BEGIN TRY
 							SELECT cin.[project_id], cin.[name] AS [instance_name], cdn.[name] AS [database_name]
 							FROM [dbo].[catalogDatabaseNames] cdn
 							INNER JOIN [dbo].[catalogInstanceNames] cin ON cdn.[project_id] = cin.[project_id] AND cdn.[instance_id] = cin.[id]
-						) AS dest ON dest.[instance_name] = src.[instance_name] AND dest.[database_name] = src.[database_name]
+						) AS dest ON dest.[instance_name] = src.[instance_name] COLLATE DATABASE_DEFAULT
+								 AND dest.[database_name] = src.[database_name] COLLATE DATABASE_DEFAULT
 				WHERE dest.[project_id] IS NULL;
 
 	SELECT TOP 1 @instanceID = cin.[id]
 	FROM  #catalogMachineNames srcMn
 	INNER JOIN #catalogInstanceNames srcIN ON 1=1
-	INNER JOIN [dbo].[catalogMachineNames] cmn ON cmn.[name] = srcMn.[name] AND cmn.[project_id]=@projectID
-	INNER JOIN [dbo].[catalogInstanceNames] cin ON cin.[name] = srcIN.[name] AND cin.[machine_id] = cmn.[id]
+	INNER JOIN [dbo].[catalogMachineNames] cmn ON   cmn.[name] = srcMn.[name] COLLATE DATABASE_DEFAULT 
+												AND cmn.[project_id]=@projectID
+	INNER JOIN [dbo].[catalogInstanceNames] cin ON  cin.[name] = srcIN.[name] COLLATE DATABASE_DEFAULT 
+												AND cin.[machine_id] = cmn.[id]
 
 	IF @errMessage IS NOT NULL AND @errMessage<>''
 		INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])

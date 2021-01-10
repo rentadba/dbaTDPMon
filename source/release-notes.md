@@ -1022,3 +1022,8 @@
 #### January 2021 new features & fixes
 06.01.2021
 * fix bug on cleansing/deleting intermediate SQL Agent jobs created for parallel execution
+
+10.01.2021
+* allow installation/objects creation into an existing database / do not force "own" database (reported by Alexey Sviridov)
+* fix minor bugs related to upgrade from previous versions
+* fix issues when destination database collation was different from the server one

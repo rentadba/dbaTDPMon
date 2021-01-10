@@ -555,8 +555,8 @@ IF (@flgActions & 16 = 16) AND (GETDATE() <= @stopTimeLimit)
 		SET @queryToRun = @queryToRun + N'
 						DELETE dtl
 						FROM #databaseObjectsWithIndexList dtl
-						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																				AND dtl.[table_name] = osl.[object_name]
+						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] COLLATE DATABASE_DEFAULT
+																				AND dtl.[table_name] = osl.[object_name] COLLATE DATABASE_DEFAULT
 						WHERE osl.[instance_name] = @sqlServerName
 								AND osl.[database_name] = @dbName
 								AND osl.[active] = 1
@@ -570,8 +570,8 @@ IF (@flgActions & 16 = 16) AND (GETDATE() <= @stopTimeLimit)
 		SET @queryToRun = @queryToRun + N'
 						DELETE dtl
 						FROM #databaseObjectsWithIndexList dtl
-						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																				AND dtl.[index_name] = osl.[object_name]
+						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] COLLATE DATABASE_DEFAULT
+																				AND dtl.[index_name] = osl.[object_name] COLLATE DATABASE_DEFAULT
 						WHERE osl.[instance_name] = @sqlServerName
 								AND osl.[database_name] = @dbName
 								AND osl.[active] = 1
@@ -806,8 +806,8 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 		SET @queryToRun = @queryToRun + N'
 						DELETE dtl
 						FROM #databaseObjectsWithIndexList dtl
-						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																				AND dtl.[table_name] = osl.[object_name]
+						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] COLLATE DATABASE_DEFAULT
+																				AND dtl.[table_name] = osl.[object_name] COLLATE DATABASE_DEFAULT
 						WHERE osl.[instance_name] = @sqlServerName
 								AND osl.[database_name] = @dbName
 								AND osl.[active] = 1
@@ -821,8 +821,8 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND
 		SET @queryToRun = @queryToRun + N'
 						DELETE dtl
 						FROM #databaseObjectsWithIndexList dtl
-						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																				AND dtl.[index_name] = osl.[object_name]
+						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] COLLATE DATABASE_DEFAULT
+																				AND dtl.[index_name] = osl.[object_name] COLLATE DATABASE_DEFAULT
 						WHERE osl.[instance_name] = @sqlServerName
 								AND osl.[database_name] = @dbName
 								AND osl.[active] = 1
@@ -1148,8 +1148,8 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 		SET @queryToRun = @queryToRun + N'
 						DELETE dtl
 						FROM #databaseObjectsWithStatisticsList dtl
-						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																				AND dtl.[table_name] = osl.[object_name]
+						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] COLLATE DATABASE_DEFAULT
+																				AND dtl.[table_name] = osl.[object_name] COLLATE DATABASE_DEFAULT
 						WHERE osl.[instance_name] = @sqlServerName
 								AND osl.[database_name] = @dbName
 								AND osl.[active] = 1
@@ -1163,8 +1163,8 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit)
 		SET @queryToRun = @queryToRun + N'
 						DELETE dtl
 						FROM #databaseObjectsWithStatisticsList dtl
-						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																				AND dtl.[stats_name] = osl.[object_name]
+						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] COLLATE DATABASE_DEFAULT
+																				AND dtl.[stats_name] = osl.[object_name] COLLATE DATABASE_DEFAULT
 						WHERE osl.[instance_name] = @sqlServerName
 								AND osl.[database_name] = @dbName
 								AND osl.[active] = 1

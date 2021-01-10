@@ -285,8 +285,8 @@ INNER JOIN
 		SET @queryToRun = @queryToRun + N'
 						DELETE dtl
 						FROM #databaseTableList dtl
-						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																				AND dtl.[table_name] = osl.[object_name]
+						INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] COLLATE DATABASE_DEFAULT
+																				AND dtl.[table_name] = osl.[object_name] COLLATE DATABASE_DEFAULT
 						WHERE	@flgActions & osl.[flg_actions] = osl.[flg_actions]
 								AND osl.[active] = 1'
 		SET @queryParameters = '@flgActions [int]'
@@ -636,8 +636,8 @@ IF @flgActions & 32 = 32 AND (GETDATE() <= @stopTimeLimit)
 				SET @queryToRun = @queryToRun + N'
 								DELETE dtl
 								FROM #databaseTableListIdent dtl
-								INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] 
-																						AND dtl.[table_name] = osl.[object_name]
+								INNER JOIN [maintenance-plan].[vw_objectSkipList] osl ON dtl.[table_schema] = osl.[schema_name] COLLATE DATABASE_DEFAULT
+																						AND dtl.[table_name] = osl.[object_name] COLLATE DATABASE_DEFAULT
 								WHERE	@flgActions & osl.[flg_actions] = osl.[flg_actions]
 										AND osl.[active] = 1'
 				SET @queryParameters = '@flgActions [int]'

@@ -219,7 +219,7 @@ IF @minJobToRunBeforeExit=0
 				SET @runningJobs = 0
 				DECLARE crsRunningJobs CURSOR LOCAL FAST_FORWARD FOR	SELECT  jeq.[id], jeq.[instance_name], jeq.[job_name], jeq.[job_id]
 																		FROM [dbo].[vw_jobExecutionQueue] jeq
-																		INNER JOIN #existingSQLAgentJobs esaj ON esaj.[job_name] = jeq.[job_name]
+																		INNER JOIN #existingSQLAgentJobs esaj ON esaj.[job_name] = jeq.[job_name] COLLATE DATABASE_DEFAULT
 																		WHERE  (jeq.[project_id] = @projectID OR @projectID IS NULL)
 																				AND jeq.[module] LIKE @moduleFilter
 																				AND (    [descriptor] LIKE @descriptorFilter
