@@ -375,6 +375,8 @@ WHILE @@FETCH_STATUS=0
 							WHERE [status] = -1 /* previosly not completed jobs */
 							) X ON jeqX.[id] = X.[id]
 
+				UPDATE @jobExecutionQueue SET [priority] = 0 WHERE [priority] IS NULL;
+
 				SELECT @maxPriorityValue = MAX([priority])	
 				FROM @jobExecutionQueue
 						

@@ -846,6 +846,8 @@ WHILE @@FETCH_STATUS=0
 										  AND [status] = -1 /* previosly not completed jobs */
 								   ) X ON jeqX.[id] = X.[id]
 
+						UPDATE @jobExecutionQueue SET [priority] = 0 WHERE [priority] IS NULL;
+
 						SELECT @maxPriorityValue = MAX([priority])	
 						FROM @jobExecutionQueue
 						
@@ -866,6 +868,7 @@ WHILE @@FETCH_STATUS=0
 							SET jeqX.[priority] = ait.[priority] * 1000000 + jeqX.[priority]
 						FROM @jobExecutionQueue jeqX
 						INNER JOIN [dbo].[appInternalTasks] ait ON jeqX.[task_id] = ait.[id]
+
 
 						/* reset current jobs state */
 						SET @retryAttempts = 1

@@ -1028,3 +1028,4 @@
 * fix minor bugs related to upgrade from previous versions
 * fix issues when destination database collation was different from the server one
 * health-check: fix table format on backup size details report section 
+* fix "Warning: Null value is eliminated by an aggregate or other SET operation." messages in the execution logs
