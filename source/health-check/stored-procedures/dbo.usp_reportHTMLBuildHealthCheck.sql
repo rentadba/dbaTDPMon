@@ -3670,12 +3670,12 @@ BEGIN TRY
 										N'<TR class="color-3">
 											<TH WIDTH="325px" class="details-bold" nowrap>Instance Name</TH>
 											<TH WIDTH="115px" class="details-bold" nowrap>Database Count</TH>
-											<TH WIDTH="115px" class="details-bold" nowrap>Database Size (GB)</TH>
-											<TH WIDTH="115px" class="details-bold" nowrap>Backup Size (GB)</TH>
-											<TH WIDTH="115px" class="details-bold" nowrap>Backup Files Count</TH>
-											<TH WIDTH="115px" class="details-bold" nowrap>Full Backup(s) (GB)</TH>
-											<TH WIDTH="115px" class="details-bold" nowrap>Diff Backup(s) (GB)</TH>
-											<TH WIDTH="115px" class="details-bold" nowrap>TLog Backup(s) (GB)</TH>'
+											<TH WIDTH="115px" class="details-bold">Database Size (GB)</TH>
+											<TH WIDTH="115px" class="details-bold">Backup Size (GB)</TH>
+											<TH WIDTH="115px" class="details-bold">Backup Files Count</TH>
+											<TH WIDTH="115px" class="details-bold">Full Backup(s) (GB)</TH>
+											<TH WIDTH="115px" class="details-bold">Diff Backup(s) (GB)</TH>
+											<TH WIDTH="115px" class="details-bold">TLog Backup(s) (GB)</TH>'
 
 			SET @idx=1		
 
@@ -3713,12 +3713,12 @@ BEGIN TRY
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
 										N'<TD WIDTH="325px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbCount AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@dbSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@backupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@backupFilesCount AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@fullBackupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@diffBackupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
-										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT" nowrap>' + ISNULL(CAST(@logBackupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT">' + ISNULL(CAST(@dbSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT">' + ISNULL(CAST(@backupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT">' + ISNULL(CAST(@backupFilesCount AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT">' + ISNULL(CAST(@fullBackupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT">' + ISNULL(CAST(@diffBackupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
+										N'<TD WIDTH="115px" class="details" ALIGN="RIGHT">' + ISNULL(CAST(@logBackupSize AS [nvarchar](64)), N'&nbsp;')+ N'</TD>' + 
 									N'</TR>'
 					SET @idx=@idx+1
 

@@ -1027,3 +1027,4 @@
 * allow installation/objects creation into an existing database / do not force "own" database (reported by Alexey Sviridov)
 * fix minor bugs related to upgrade from previous versions
 * fix issues when destination database collation was different from the server one
+* health-check: fix table format on backup size details report section 
