@@ -77,12 +77,6 @@ sqlcmd.exe -S%server% %autentif% -i "uninstall-stop-agent-jobs.sql" -d master -v
 if errorlevel 1 goto install_err
 
 echo *-----------------------------------------------------------------------------*
-echo Dropping database...
-echo *-----------------------------------------------------------------------------*
-sqlcmd.exe -S%server% %autentif% -i "uninstall-drop-db.sql" -d master -v dbName=%dbname% -b -r 1
-if errorlevel 1 goto install_err
-
-echo *-----------------------------------------------------------------------------*
 echo Creating database...
 echo *-----------------------------------------------------------------------------*
 sqlcmd.exe -S%server% %autentif% -i "install-create-db.sql" -d master -v dbName=%dbname% data_files_path=%data_files_path% log_files_path=%log_files_path% -b -r 1
@@ -666,7 +660,7 @@ goto done
 
 
 :done
-sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2021.01.06' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2021.01.10' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err  
 
 echo *-----------------------------------------------------------------------------*

@@ -52,12 +52,9 @@ del /F /Q install-get-instance-info.out
 
 echo Detected SQL Server version %product_version%
 
-sqlcmd.exe -S%server% %autentif% -i "detect-version.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
 :prompt
 set doUninstall = "N"
-set /P doUninstall=Continue with uninstall of dbaTDPMon (Y/[N])? 
+set /P doUninstall=Continue with uninstall of dbaTDPMon / dropping database "%dbname%" (Y/[N])? 
 if /I "%doUninstall%" neq "Y" goto end
 
 echo *-----------------------------------------------------------------------------*
