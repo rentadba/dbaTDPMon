@@ -494,7 +494,7 @@ WHILE @@FETCH_STATUS=0
 			end
 		CLOSE crsActiveDatabases
 		DEALLOCATE crsActiveDatabases
-		
+
 		/* get last date for backup and other database flags / options */
 		IF @isAzureSQLDatabase = 0
 			begin
@@ -514,7 +514,7 @@ WHILE @@FETCH_STATUS=0
 													, sdb.[page_verify_option]
 													, sdb.[compatibility_level] ' +
 													CASE WHEN @isAzureSQLDatabase = 0 
-														 THEN N', MAX(bs.[backup_finish_date])'
+														 THEN N', MAX(ISNULL(bs.[backup_finish_date], CONVERT([datetime], ''1900-01-01'', 120)))'
 														 ELSE N', NULL'
 													END + N' AS [last_backup_time]
 													, CASE WHEN sdb.[source_database_id] IS NULL THEN 0 ELSE 1 END AS [is_snapshot]
@@ -545,6 +545,7 @@ WHILE @@FETCH_STATUS=0
 									, @strMessage
 				END CATCH
 			end
+
 
 		/* check for AlwaysOn Availability Groups configuration */
 		IF @serverVersionNum >= 12 AND @isAzureSQLDatabase = 0 

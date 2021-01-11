@@ -124,6 +124,7 @@ WHILE @@FETCH_STATUS=0
 				FROM	[dbo].[logEventMessages]
 				WHERE	[project_id] = @projectID
 						AND [instance_id] = @instanceID
+						AND [remote_event_id] IS NOT NULL
 
 				SET @maxRemoteEventID = ISNULL(@maxRemoteEventID, 0)
 
