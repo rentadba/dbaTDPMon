@@ -490,8 +490,7 @@ IF @flgActions & 4 = 4
 	
 --------------------------------------------------------------------------------------------------
 SET @maxPATHLength = 259
---as XP is not yet available on Linux, custom folder structure creation won't be possible
-IF NOT (@serverVersionNum >= 14 AND @hostPlatform='linux' ) AND NOT (@backupToURL=1)
+IF NOT (@backupToURL=1)
 	begin
 		--create destination path: <@backupLocation>\@sqlServerName\@dbName
 		IF RIGHT(@backupLocation, 1)<>'\' SET @backupLocation = @backupLocation + N'\'
