@@ -1032,3 +1032,6 @@
 
 14.01.2021
 * maintenance-plan: fix backup directory creation when running under Linux
+
+21.01.2021
+* release of dbaTDPMon - v2021.01
