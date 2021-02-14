@@ -388,7 +388,7 @@ WHILE @@FETCH_STATUS=0
 							end
 
 						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-				
+
 						DELETE FROM #dbccLastKnownGood
 						BEGIN TRY
 							INSERT	INTO #dbccLastKnownGood([Value])
@@ -430,7 +430,7 @@ WHILE @@FETCH_STATUS=0
 										, SUM(CASE WHEN [is_log_file] = 0 THEN dsi.[space_used_mb] ELSE 0 END) 	AS [data_space_used_mb]
 										, SUM(CASE WHEN [is_log_file] = 1 THEN dsi.[size_mb] ELSE 0 END) 		AS [log_size_mb]
 										, SUM(CASE WHEN [is_log_file] = 1 THEN dsi.[space_used_mb] ELSE 0 END) 	AS [log_space_used_mb]
-										, MAX(x.[volume_mount_points]) [volume_mount_point]
+										, MAX(ISNULL(x.[volume_mount_points], '')) [volume_mount_point]
 										, MAX(CAST([is_growth_limited] AS [tinyint])) [is_growth_limited]
 								FROM #databaseSpaceInfo dsi
 								CROSS APPLY(
