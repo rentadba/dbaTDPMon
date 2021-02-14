@@ -529,7 +529,7 @@ BEGIN TRY
 			, dest.[state] = src.[state]
 			, dest.[state_desc] = src.[state_desc]
 			, dest.[active] = 1
-	FROM [dbo].[catalogDatabaseNames] AS dest
+	FROM [dbo].[catalogDatabaseNames] AS dest WITH (INDEX(UK_catalogDatabaseNames_Name))
 	INNER JOIN
 		 (	
 			SELECT  cin.[id] AS [instance_id]
