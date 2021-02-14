@@ -1035,3 +1035,9 @@
 
 21.01.2021
 * release of dbaTDPMon - v2021.01
+
+------------
+#### February 2021 new features & fixes
+14.02.2021
+* fix deadlock occurring when generating queues for running multiple parallel jobs
+* fix issue related to replication monitoring when running in single thread mode

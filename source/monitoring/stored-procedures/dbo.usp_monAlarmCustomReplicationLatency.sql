@@ -409,7 +409,7 @@ WHILE @@FETCH_STATUS=0
 			ELSE
 				DELETE FROM [dbo].[replicationTokenResults] WHERE [publication] = @publicationName AND [publisher_db] = @publisherDB
 
-			DECLARE @temptokenresult TABLE 
+			DECLARE @tempTokenResult TABLE 
 				(
 					  [tracer_id]			[int] NULL
 					, [distributor_latency] [int] NULL
@@ -425,7 +425,7 @@ WHILE @@FETCH_STATUS=0
 			WHILE @currentIteration <= 2
 				begin
 					/* Insert a new tracer token in the publication database */
-					SET @queryToRun = N''EXECUTE ['' + @publisherDB + N''].sys.sp_postTracerToken @publication = @publicationName, @tracer_token_id = @tokenID OUTPUT''
+					SET @queryToRun = N''EXECUTE ['' + @publisherDB + N''].sys.sp_posttracertoken @publication = @publicationName, @tracer_token_id = @tokenID OUTPUT''
 					SET @queryParam = N''@publicationName [sysname], @tokenID [bigint] OUTPUT''
 					
 					PRINT @queryToRun
@@ -439,20 +439,20 @@ WHILE @@FETCH_STATUS=0
 							/* Give a few seconds to allow the record to reach the subscriber */
 							WAITFOR DELAY @operationDelay
 
-							SET @queryToRun = N''EXECUTE ['' + @publisherDB + N''].sys.sp_helpTracerTokenHistory @publicationName, @tokenID'' 
+							SET @queryToRun = N''EXECUTE ['' + @publisherDB + N''].sys.sp_helptracertokenhistory @publicationName, @tokenID'' 
 							PRINT @queryToRun
 
 							/* Store our results in a temp table for retrieval later */
-							INSERT	INTO @temptokenResult ([distributor_latency], [subscriber], [subscriber_db], [subscriber_latency], [overall_latency])
+							INSERT	INTO @tempTokenResult ([distributor_latency], [subscriber], [subscriber_db], [subscriber_latency], [overall_latency])
 									EXEC sp_executesql @queryToRun, @queryParam , @publicationName = @publicationName
 																				, @tokenID = @tokenID
 
-							IF NOT EXISTS(	SELECT * FROM @temptokenResult 
+							IF NOT EXISTS(	SELECT * FROM @tempTokenResult 
 											WHERE [subscriber_latency] IS NULL OR [overall_latency] IS NULL OR [distributor_latency] IS NULL
 										 )													
 								BREAK
 							ELSE
-								DELETE FROM @temptokenResult							
+								DELETE FROM @tempTokenResult							
 						end										
 
 					INSERT	[dbo].[replicationTokenResults] ([publisher_db], [publication], [distributor_latency], [subscriber], [subscriber_db], [subscriber_latency], [overall_latency])
@@ -463,7 +463,7 @@ WHILE @@FETCH_STATUS=0
 									, subscriber_db
 									, subscriber_latency
 									, overall_latency
-							FROM @temptokenResult
+							FROM @tempTokenResult
 
 					/* Assign the iteration and token id to the results for easier investigation */
 					UPDATE [dbo].[replicationTokenResults]
@@ -471,7 +471,7 @@ WHILE @@FETCH_STATUS=0
 						, [tracer_id] = @tokenID
 					WHERE [iteration] IS NULL;
 
-					DELETE FROM @temptokenresult		
+					DELETE FROM @tempTokenResult		
 					
 					/* add retry mechanism for 1st iteration */
 					IF	@currentIteration=1
@@ -490,7 +490,7 @@ WHILE @@FETCH_STATUS=0
 				end;
 
 			/* perform cleanup */
-			SET @queryToRun = N''EXECUTE ['' + @publisherDB + N''].sys.sp_deleteTracerTokenHistory @publication = @publicationName, @cutoff_date = @currentDateTime''
+			SET @queryToRun = N''EXECUTE ['' + @publisherDB + N''].sys.sp_deletetracertokenhistory @publication = @publicationName, @cutoff_date = @currentDateTime''
 			SET @queryParam = N''@publicationName [sysname], @currentDateTime [datetime]''
 			PRINT @queryToRun
 
@@ -592,7 +592,7 @@ WHILE @@FETCH_STATUS=0
 			begin
 
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'SELECT * FROM sys.databases WHERE name=''' + [dbo].[ufn_getObjectQuoteName](@publisherDB, 'sql') + N''' AND state_desc=''ONLINE'''
+				SET @queryToRun = @queryToRun + N'SELECT * FROM sys.databases WHERE name=''' + [dbo].[ufn_getObjectQuoteName](@publisherDB, 'sql') + N''' AND state_desc=''ONLINE'' AND 1=1'
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@publicationServer, @queryToRun)
 
 				SET @queryToRun = N'IF EXISTS(' + @queryToRun + N')

@@ -314,7 +314,8 @@ SET @runningJobs  = 0
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 DECLARE crsJobQueue CURSOR LOCAL FAST_FORWARD FOR	SELECT    [id], [project_id], [instance_name]
-															, [job_name], [job_step_name], [job_database_name], REPLACE([job_command], '''', '''''') AS [job_command]
+															, [job_name], [job_step_name], [job_database_name]
+															, [job_command]
 															, [database_name], [event_date_utc]
 													FROM [dbo].[vw_jobExecutionQueue]
 													WHERE  ([project_id] = @projectID OR @projectID IS NULL)
@@ -370,10 +371,8 @@ WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 						-- start the job
 						BEGIN TRY
 							SET @strMessage='Executing command : ' + @jobCommand
+							
 							EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 2, @stopExecution=0
-							SET @jobCommand = REPLACE(@jobCommand, '''''', '''')	
-							SET @jobCommand = REPLACE(@jobCommand, 'EXEC ', '')	
-								
 							EXEC sp_executesql @jobCommand
 							SET @endTime = GETDATE();
 							SET @runningTimeSec = DATEDIFF(second, @startTime, @endTime) 
@@ -505,6 +504,7 @@ WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 														@debugMode		= @debugMode
 
 						SET @jobID = NULL
+						SET @jobCommand = REPLACE(@jobCommand, '''', '''''')
 						EXEC [dbo].[usp_sqlAgentJob]	@sqlServerName	= @sqlServerName,
 														@jobName		= @jobName,
 														@jobID			= @jobID OUTPUT,
