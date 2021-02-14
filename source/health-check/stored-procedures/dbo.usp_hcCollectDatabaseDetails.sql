@@ -313,7 +313,7 @@ WHILE @@FETCH_STATUS=0
 											   THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N';' 
 											   ELSE N'' 
 										  END + N'
-												SELECT    [volume_mount_point]
+												SELECT    CASE WHEN [volume_mount_point] = '''' THEN NULL ELSE [volume_mount_point] END [volume_mount_point]
 														, CAST([is_logfile]		AS [bit]) AS [is_logfile]
 														, SUM([size_mb])		AS [size_mb]
 														, SUM([space_used_mb])	AS [space_used_mb]
@@ -321,9 +321,9 @@ WHILE @@FETCH_STATUS=0
 												FROM (		
 														SELECT    [name]
 																, [is_logfile]
-																, MAX([size_mb])				AS [size_mb]
-																, MAX([space_used_mb])			AS [space_used_mb]
-																, MAX(dsi.[volume_mount_point])	AS [volume_mount_point]
+																, MAX(ISNULL([size_mb], 0))					AS [size_mb]
+																, MAX(ISNULL([space_used_mb], 0))			AS [space_used_mb]
+																, MAX(ISNULL(dsi.[volume_mount_point], ''''))	AS [volume_mount_point]
 																, MAX([is_growth_limited])		AS [is_growth_limited]
 														FROM ' + @queryToRun + N' df
 														LEFT JOIN [' + DB_NAME() + N'].[health-check].[vw_statsDiskSpaceInfo] dsi ON CHARINDEX(dsi.[volume_mount_point] COLLATE SQL_Latin1_General_CP1_CI_AS, df.[physical_name] COLLATE SQL_Latin1_General_CP1_CI_AS) > 0 
@@ -335,7 +335,7 @@ WHILE @@FETCH_STATUS=0
 
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 				DELETE FROM #databaseSpaceInfo
-				BEGIN TRY
+				BEGIN TRY				
 						INSERT	INTO #databaseSpaceInfo([volume_mount_point], [is_log_file], [size_mb], [space_used_mb], [is_growth_limited])
 							EXEC sp_executesql @queryToRun
 				END TRY
