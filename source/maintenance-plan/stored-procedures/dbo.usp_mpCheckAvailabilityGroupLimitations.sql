@@ -466,32 +466,19 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL AND ISNULL(@agSynchronizatio
 		/* database consistency check - allowed actions on a secondary replica */
 		IF @actionName = 'database consistency check' AND UPPER(@agInstanceRoleDesc) = 'SECONDARY' 
 			begin
-				IF @agReadableSecondary='NO' AND @allowDBCCOnNonReadSecondary = 0
-					begin								
-						SET @queryToRun=N'Availability Group: Operation is not allowed on a non-readable secondary replica.'
-						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-						SET @eventData='<skipaction><detail>' + 
-											'<name>' + @actionName + '</name>' + 
-											'<type>' + @actionType + '</type>' + 
-											'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</affected_object>' + 
-											'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
-											'<reason>' + @queryToRun + '</reason>' + 
-										'</detail></skipaction>'
-
-						EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
-															@dbName			= @dbName,
-															@module			= 'dbo.usp_mpCheckAvailabilityGroupLimitations',
-															@eventName		= @actionName,
-															@eventMessage	= @eventData,
-															@eventType		= 0 /* info */
-
-						RETURN 1
-					end
-			
-				IF @agReadableSecondary='NO' AND (@flgActions & 2 = 2 OR @flgActions & 16 = 16)
+				SET @queryToRun = NULL
+				IF     (@agReadableSecondary='NO' AND @allowDBCCOnNonReadSecondary = 0)
+					OR (@agReadableSecondary='NO' AND (@flgActions & 2 = 2 OR @flgActions & 16 = 16))
 					begin
-						SET @queryToRun=N'Availability Group: Operation is not supported on a non-readable secondary replica.'
+						SET @queryToRun=N'Availability Group: Operation is not allowed on a non-readable secondary replica.'
+					end
+				IF 	(@flgActions & 8 = 8)
+					begin
+						SET @queryToRun=N'Availability Group: Operation is not supported on a secondary replica.'
+					end
+
+				IF @queryToRun IS NOT NULL
+					begin								
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 						SET @eventData='<skipaction><detail>' + 

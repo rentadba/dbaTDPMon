@@ -1045,3 +1045,6 @@
 16.02.2021
 * fix issue with "Invalid object name '##tdp_xp_cmdshell_requests'" when running in high concurrency / parallel jobs
 * create a new log table "[dbo].[logInternalConfigurationChanges]" to list temporary changes to instance options, when performed
+
+19.02.2021
+* fix error 3906: Failed to update database "%" because the database is read-only"; do not allow DBCC CHECKCATALOG to be executed on secondary AG replicas 
