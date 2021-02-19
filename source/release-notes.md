@@ -1041,3 +1041,7 @@
 14.02.2021
 * fix deadlock occurring when generating queues for running multiple parallel jobs
 * fix issue related to replication monitoring when running in single thread mode
+
+16.02.2021
+* fix issue with "Invalid object name '##tdp_xp_cmdshell_requests'" when running in high concurrency / parallel jobs
+* create a new log table "[dbo].[logInternalConfigurationChanges]" to list temporary changes to instance options, when performed

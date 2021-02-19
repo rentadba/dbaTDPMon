@@ -191,6 +191,12 @@ WHILE @@FETCH_STATUS=0
 								end
 						END CATCH
 
+						/* disable xp_cmdshell configuration option */
+						EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
+																		, @flgAction	 = 0			-- 1=enable | 0=disable
+																		, @optionXPValue = @optionXPValue OUTPUT
+																		, @debugMode	 = @debugMode
+
 						--script to retrieve the values in MB from PS Script output
 						INSERT	INTO #diskSpaceInfo([logical_drive], [volume_mount_point], [total_size_mb], [available_space_mb], [percent_available])
 						SELECT    UPPER(SUBSTRING([volume_mount_point], 1, 1)) [logical_drive]

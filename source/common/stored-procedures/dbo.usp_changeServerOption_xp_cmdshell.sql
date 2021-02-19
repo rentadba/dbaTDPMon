@@ -34,7 +34,6 @@ DECLARE @queryToRun					[nvarchar](1024),
 		@optionAdvancedIsAvailable	[bit],
 		@optionAdvancedValue		[int],
 		@optionAdvancedHasChanged	[bit],
-		@currentSPIDCounterValue	[int],
 		@currentAllCounterValue		[int]
 
 SET NOCOUNT ON
@@ -46,116 +45,80 @@ SELECT  @optionXPIsAvailable		= 0,
 		@optionAdvancedIsAvailable	= 0,
 		@optionAdvancedValue		= 0,
 		@optionAdvancedHasChanged	= 0,
-		@currentSPIDCounterValue	= 0,
 		@currentAllCounterValue		= 0
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
 BEGIN TRY
 	IF @flgAction = 1
 		begin
-			IF OBJECT_ID('tempdb..##tdp_xp_cmdshell_requests') IS NULL
-				CREATE TABLE ##tdp_xp_cmdshell_requests
-					(
-						  [spid]						[smallint]	NOT NULL
-						, [option_xp_changed]			[bit]		NOT NULL DEFAULT (0)
-						, [option_advanced_changed]		[bit]		NOT NULL DEFAULT (0)
-						, [counter]						[int]		NOT NULL DEFAULT (0)
-					)
+			/* enable xp_cmdshell configuration option */
+			EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @serverToRun,
+																@configOptionName	= 'xp_cmdshell',
+																@configOptionValue	= 1,
+																@optionIsAvailable	= @optionXPIsAvailable OUT,
+																@optionCurrentValue	= @optionXPValue OUT,
+																@optionHasChanged	= @optionXPHasChanged OUT,
+																@executionLevel		= 0,
+																@debugMode			= @debugMode
 
-			/* try to update counter value */
-			UPDATE ##tdp_xp_cmdshell_requests 
-				SET [counter] = [counter] + 1
-			WHERE [spid] = @@SPID
-
-			/* current session did not requested xp_cmdshell enable, yet */
-			IF @@ROWCOUNT = 0 
+			IF @optionXPIsAvailable = 0
 				begin
-					/* if no other session turned the option on, will enable it */
-					IF NOT EXISTS (
-									SELECT *
-									FROM ##tdp_xp_cmdshell_requests
-									WHERE [counter] > 0
-								  )
-						begin
-							/* enable xp_cmdshell configuration option */
-							EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @serverToRun,
-																				@configOptionName	= 'xp_cmdshell',
-																				@configOptionValue	= 1,
-																				@optionIsAvailable	= @optionXPIsAvailable OUT,
-																				@optionCurrentValue	= @optionXPValue OUT,
-																				@optionHasChanged	= @optionXPHasChanged OUT,
-																				@executionLevel		= 0,
-																				@debugMode			= @debugMode
+					/* enable show advanced options configuration option */
+					EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @serverToRun,
+																		@configOptionName	= 'show advanced options',
+																		@configOptionValue	= 1,
+																		@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
+																		@optionCurrentValue	= @optionAdvancedValue OUT,
+																		@optionHasChanged	= @optionAdvancedHasChanged OUT,
+																		@executionLevel		= 0,
+																		@debugMode			= @debugMode
 
-							IF @optionXPIsAvailable = 0
-								begin
-									/* enable show advanced options configuration option */
-									EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @serverToRun,
-																						@configOptionName	= 'show advanced options',
-																						@configOptionValue	= 1,
-																						@optionIsAvailable	= @optionAdvancedIsAvailable OUT,
-																						@optionCurrentValue	= @optionAdvancedValue OUT,
-																						@optionHasChanged	= @optionAdvancedHasChanged OUT,
-																						@executionLevel		= 0,
-																						@debugMode			= @debugMode
-
-									IF @optionAdvancedIsAvailable = 1 AND (@optionAdvancedValue=1 OR @optionAdvancedHasChanged=1)
-										EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @serverToRun,
-																							@configOptionName	= 'xp_cmdshell',
-																							@configOptionValue	= 1,
-																							@optionIsAvailable	= @optionXPIsAvailable OUT,
-																							@optionCurrentValue	= @optionXPValue OUT,
-																							@optionHasChanged	= @optionXPHasChanged OUT,
-																							@executionLevel		= 0,
-																							@debugMode			= @debugMode
-								end
-
-							IF @optionXPIsAvailable=0 OR @optionXPValue=0
-								begin
-									set @queryToRun='xp_cmdshell component is turned off. Cannot continue.'
-									EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
-									RETURN 1
-								end		
-							ELSE
-								begin
-									--mark the xp_cmdshell enable request
-									INSERT	INTO ##tdp_xp_cmdshell_requests([spid], [option_xp_changed], [option_advanced_changed], [counter])
-											SELECT @@SPID, @optionXPHasChanged, @optionAdvancedHasChanged, 1
-								end
-						end
-					ELSE
-						begin
-							/* preserve old flags, for current session */
-							SELECT   @optionXPHasChanged = MAX(CAST([option_xp_changed] AS [tinyint]))
-								   , @optionAdvancedHasChanged = MAX(CAST([option_advanced_changed] AS [tinyint]))
-							FROM ##tdp_xp_cmdshell_requests
-
-							--mark the xp_cmdshell enable request
-							INSERT	INTO ##tdp_xp_cmdshell_requests([spid], [option_xp_changed], [option_advanced_changed], [counter])
-									SELECT @@SPID, @optionXPHasChanged, @optionAdvancedHasChanged, 1
-						end
+					IF @optionAdvancedIsAvailable = 1 AND (@optionAdvancedValue=1 OR @optionAdvancedHasChanged=1)
+						EXEC [dbo].[usp_changeServerConfigurationOption]	@sqlServerName		= @serverToRun,
+																			@configOptionName	= 'xp_cmdshell',
+																			@configOptionValue	= 1,
+																			@optionIsAvailable	= @optionXPIsAvailable OUT,
+																			@optionCurrentValue	= @optionXPValue OUT,
+																			@optionHasChanged	= @optionXPHasChanged OUT,
+																			@executionLevel		= 0,
+																			@debugMode			= @debugMode
 				end
+
+			IF @optionXPIsAvailable=0 OR @optionXPValue=0
+				begin
+					SET @queryToRun='xp_cmdshell component is turned off. Cannot continue.'
+					EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+					RETURN 1
+				end		
 			ELSE
-				SET @optionXPValue = 1
+				begin
+					/* mark the xp_cmdshell enable request */
+					IF @optionXPHasChanged = 1
+						INSERT	INTO [dbo].[logInternalConfigurationChanges]([instance_name], [spid], [option_xp_changed], [option_advanced_changed], [counter], [event_start_date_utc])
+								SELECT @serverToRun, @@SPID, @optionXPHasChanged, @optionAdvancedHasChanged, 1, GETUTCDATE()
+					ELSE
+						UPDATE [dbo].[logInternalConfigurationChanges]
+							SET [counter] = [counter] + 1
+						WHERE	[instance_name] = @serverToRun
+							AND [event_end_date_utc] IS NULL
+				end
 		end
 
 
 	/*-------------------------------------------------------------------------------------------------------------------------------*/
-	IF @flgAction = 0 AND OBJECT_ID('tempdb..##tdp_xp_cmdshell_requests') IS NOT NULL
+	IF @flgAction = 0
 		begin
 			/* get current session counter value */
-			SELECT  @currentSPIDCounterValue  = [counter]
+			SELECT  TOP 1 
+					@currentAllCounterValue   = [counter]
 				  , @optionXPHasChanged		  = [option_xp_changed]
 				  , @optionAdvancedHasChanged = [option_advanced_changed]
-			FROM ##tdp_xp_cmdshell_requests 
-			WHERE [spid] = @@SPID
+			FROM [dbo].[logInternalConfigurationChanges] 
+			WHERE	[instance_name] = @serverToRun
+				AND [event_end_date_utc] IS NULL
 
-			/* get all sessions counter value */
-			SELECT @currentAllCounterValue  = SUM([counter])
-			FROM ##tdp_xp_cmdshell_requests 
-
-			IF @currentAllCounterValue = 1
+			IF ISNULL(@currentAllCounterValue, 0) = 1
 				begin
 					/* disable xp_cmdshell configuration option */
 					IF @optionXPHasChanged = 1
@@ -178,23 +141,23 @@ BEGIN TRY
 																				@optionHasChanged	= @optionAdvancedHasChanged OUT,
 																				@executionLevel		= 0,
 																				@debugMode			= @debugMode
+
+					UPDATE [dbo].[logInternalConfigurationChanges] 
+						SET   [event_end_date_utc] = GETUTCDATE()
+							, [counter] = 0
+					WHERE	[instance_name] = @serverToRun
+						AND [event_end_date_utc] IS NULL
+				end
+
+			IF ISNULL(@currentAllCounterValue, 0) > 0
+				begin
+					UPDATE [dbo].[logInternalConfigurationChanges]
+						SET [counter] = [counter] - 1
+					WHERE	[instance_name] = @serverToRun
+						AND [event_end_date_utc] IS NULL
 				end
 			ELSE
 				SET @optionXPValue = 1
-
-			/* decrement counter value. when 0, remove the entry */
-			SET @currentSPIDCounterValue = @currentSPIDCounterValue - 1
-		
-			IF @currentSPIDCounterValue = 0
-				DELETE FROM ##tdp_xp_cmdshell_requests 
-				WHERE [spid] = @@SPID
-			ELSE
-				UPDATE ##tdp_xp_cmdshell_requests
-					SET [counter] = @currentSPIDCounterValue
-				WHERE [spid] = @@SPID
-
-			IF @currentAllCounterValue = 1 AND OBJECT_ID('tempdb..##tdp_xp_cmdshell_requests') IS NOT NULL
-				DROP TABLE ##tdp_xp_cmdshell_requests
 		end
 END TRY
 BEGIN CATCH

@@ -355,11 +355,11 @@ BEGIN TRY
 						UPDATE #catalogMachineNames SET [domain] = @domainName
 					end
 
-					/* disable xp_cmdshell configuration option */
-					EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
-																	, @flgAction	 = 0			-- 1=enable | 0=disable
-																	, @optionXPValue = @optionXPValue OUTPUT
-																	, @debugMode	 = @debugMode
+				/* disable xp_cmdshell configuration option */
+				EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @sqlServerName
+																, @flgAction	 = 0			-- 1=enable | 0=disable
+																, @optionXPValue = @optionXPValue OUTPUT
+																, @debugMode	 = @debugMode
 			END TRY
 			BEGIN CATCH
 				SET @errMessage = ERROR_MESSAGE()

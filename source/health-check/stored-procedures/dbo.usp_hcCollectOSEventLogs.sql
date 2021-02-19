@@ -555,10 +555,12 @@ WHERE cin.[project_id] = @projectID
 
 /*-------------------------------------------------------------------------------------------------------------------------------*/
 /* disable xp_cmdshell configuration option */
-EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @@SERVERNAME
-												, @flgAction	 = 0			-- 1=enable | 0=disable
-												, @optionXPValue = @optionXPValue OUTPUT
-												, @debugMode	 = @debugMode
-
+IF @enableXPCMDSHELL=1
+	begin
+		EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @@SERVERNAME
+														, @flgAction	 = 0			-- 1=enable | 0=disable
+														, @optionXPValue = @optionXPValue OUTPUT
+														, @debugMode	 = @debugMode
+	end
 /*-------------------------------------------------------------------------------------------------------------------------------*/
 GO
