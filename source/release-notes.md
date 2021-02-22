@@ -1048,3 +1048,6 @@
 
 19.02.2021
 * fix error 3906: Failed to update database "%" because the database is read-only"; do not allow DBCC CHECKCATALOG to be executed on secondary AG replicas 
+
+22.02.2021
+* health-check: fix small issues on information displayed within the HTML report

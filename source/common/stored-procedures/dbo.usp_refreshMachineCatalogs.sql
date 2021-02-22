@@ -27,8 +27,6 @@ AS
 -- Change Date: 2015.04.03 / Andrei STEFAN
 -- Description: add domain name to machine information
 -----------------------------------------------------------------------------------------
-
-
 SET NOCOUNT ON
 
 DECLARE   @returnValue			[smallint]

@@ -909,7 +909,7 @@ BEGIN TRY
 					<TD WIDTH="260px" ALIGN=CENTER><P class="title2-style" ALIGN=CENTER>dbaTDPMon<br>Daily Health Check Report</P></TD>
 				</TR>
 				<TR VALIGN=TOP>
-					<TD  COLSPAN="2" ALIGN=RIGHT><P class="disclaimer"><BR><A TARGET="_blank" HREF="https://github.com/rentadba/dbaTDPMon">https://github.com/rentadba/dbaTDPMon</A>, under GNU (GPLv3) licence model
+					<TD  COLSPAN="2" ALIGN=RIGHT><P class="disclaimer"><BR><A TARGET="_blank" HREF="https://github.com/rentadba/dbaTDPMon">https://github.com/rentadba/dbaTDPMon</A>, under  MIT License model
 																		<BR>version ' + @HTMLReportArea + N'
 																	</P></TD>
 				</TR>

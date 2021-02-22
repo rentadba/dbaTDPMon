@@ -163,10 +163,11 @@ IF @runDiscovery=1
 		DEALLOCATE crsDiscoveredServer
 	end
 
+
 /*-------------------------------------------------------------------------------------------------------------------------------*/
 /* check status / update catalog for previous discovered serverd																 */
 /*-------------------------------------------------------------------------------------------------------------------------------*/
-DECLARE crsDiscoveredServer CURSOR LOCAL FAST_FORWARD FOR	SELECT cin.[name], ss.[server_id]
+DECLARE crsDiscoveredServer CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT cin.[name], ss.[server_id]
 															FROM [dbo].[catalogInstanceNames] cin 
 															INNER JOIN [dbo].[catalogProjects]		cp	ON	cp.[id] = cin.[project_id] 
 															INNER JOIN [dbo].[catalogMachineNames]  cmn ON	cmn.[id] = cin.[machine_id] 
