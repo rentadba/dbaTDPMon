@@ -1051,3 +1051,8 @@
 
 22.02.2021
 * health-check: fix small issues on information displayed within the HTML report
+
+------------
+#### January 2022 new features & fixes
+31.01.2021
+* health-check: add more details for AlwaysOn Availability Group collected information

@@ -107,8 +107,13 @@ CREATE TABLE #statsDatabaseAlwaysOnDetails
 	[instance_name]					[sysname]		NOT NULL,
 	[database_name]					[sysname]		NOT NULL,
 	[role_desc]						[nvarchar](60)	NULL,
+	[replica_join_state_desc]		[nvarchar](60)	NULL,
+	[replica_connected_state_desc]	[nvarchar](60)	NULL,
+	[failover_mode_desc]			[nvarchar](60)	NULL,
+	[availability_mode_desc]		[nvarchar](60)	NULL,
 	[synchronization_health_desc]	[nvarchar](60)	NULL,
 	[synchronization_state_desc]	[nvarchar](60)	NULL,
+	[suspend_reason_desc]			[nvarchar](60)	NULL,
 	[readable_secondary_replica]	[nvarchar](60)	NULL
 )
 
@@ -556,6 +561,11 @@ WHILE @@FETCH_STATUS=0
 											, arcn.[replica_server_name] AS [instance_name]
 											, adc.[database_name]
 											, ars.[role_desc]
+											, rcs.[join_state_desc] AS [replica_join_state_desc]
+											, ars.[connected_state_desc] AS [replica_connected_state_desc]
+											, ar.[failover_mode_desc]
+											, ar.[availability_mode_desc]
+											, hdrs.[suspend_reason_desc]
 											, ars.[synchronization_health_desc]
 											, hdrs.[synchronization_state_desc]
 											, ar.[secondary_role_allow_connections_desc]
@@ -567,13 +577,16 @@ WHILE @@FETCH_STATUS=0
 									INNER JOIN sys.availability_databases_cluster adc ON adc.[group_id]=hdrs.[group_id] AND adc.[group_database_id]=hdrs.[group_database_id]
 									INNER JOIN sys.dm_hadr_instance_node_map hinm ON hinm.[ag_resource_id] = ag.[resource_id] AND hinm.[instance_name] = arcn.[replica_server_name]
 									INNER JOIN sys.dm_hadr_cluster hc ON 1=1
-									WHERE arcn.[replica_server_name] = ''' + @sqlServerName + ''''
+									INNER JOIN sys.dm_hadr_availability_replica_cluster_states rcs on rcs.replica_id=ar.replica_id and rcs.group_id=hdrs.group_id
+									/* WHERE arcn.[replica_server_name] = ''' + @sqlServerName + ''' */'
 
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 		
 				BEGIN TRY
-					INSERT	INTO #statsDatabaseAlwaysOnDetails([cluster_name], [ag_name], [host_name], [instance_name], [database_name], [role_desc], [synchronization_health_desc], [synchronization_state_desc], [readable_secondary_replica])
+					INSERT	INTO #statsDatabaseAlwaysOnDetails(	[cluster_name], [ag_name], [host_name], [instance_name], [database_name], [role_desc], 
+																[replica_join_state_desc], [replica_connected_state_desc], [failover_mode_desc], [availability_mode_desc], [suspend_reason_desc],
+																[synchronization_health_desc], [synchronization_state_desc], [readable_secondary_replica])
 							EXEC sp_executesql @queryToRun
 				END TRY
 				BEGIN CATCH
@@ -588,7 +601,6 @@ WHILE @@FETCH_STATUS=0
 									, @strMessage
 				END CATCH
 			end
-
 
 
 		/* save results to stats table */
@@ -646,13 +658,20 @@ WHILE @@FETCH_STATUS=0
 															AND cdn.[instance_id] = @instanceID 
 															AND cdn.[project_id] = @projectID
 
-		INSERT	INTO [health-check].[statsDatabaseAlwaysOnDetails]([catalog_database_id], [instance_id], [cluster_name], [ag_name]
-																	, [role_desc], [synchronization_health_desc], [synchronization_state_desc], [readable_secondary_replica], [event_date_utc])
-				SELECT    cdn.[id] AS [catalog_database_id]
+		INSERT	INTO [health-check].[statsDatabaseAlwaysOnDetails](	[catalog_database_id], [instance_id], [cluster_name], [ag_name], [role_desc], 
+																	[replica_join_state_desc], [replica_connected_state_desc], [failover_mode_desc], [availability_mode_desc], [suspend_reason_desc],
+																	[synchronization_health_desc], [synchronization_state_desc], [readable_secondary_replica], [event_date_utc])
+				SELECT  DISTINCT
+						  cdn.[id] AS [catalog_database_id]
 						, cin.[id] AS [instance_id]
 						, X.[cluster_name]
 						, X.[ag_name]
 						, X.[role_desc]
+						, X.[replica_join_state_desc]
+						, X.[replica_connected_state_desc]
+						, X.[failover_mode_desc]
+						, X.[availability_mode_desc]
+						, X.[suspend_reason_desc]
 						, X.[synchronization_health_desc]
 						, X.[synchronization_state_desc]
 						, X.[readable_secondary_replica]

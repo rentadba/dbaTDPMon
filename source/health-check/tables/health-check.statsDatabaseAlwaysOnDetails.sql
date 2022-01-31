@@ -22,9 +22,14 @@ CREATE TABLE [health-check].[statsDatabaseAlwaysOnDetails]
 	[cluster_name]					[sysname]		NOT NULL,
 	[ag_name]						[sysname]		NOT NULL,
 	[role_desc]						[nvarchar](60)	NULL,
+	[replica_join_state_desc]		[nvarchar](60)	NULL,
+	[replica_connected_state_desc]	[nvarchar](60)	NULL,
+	[failover_mode_desc]			[nvarchar](60)	NULL,
+	[availability_mode_desc]		[nvarchar](60)	NULL,
 	[synchronization_health_desc]	[nvarchar](60)	NULL,
 	[synchronization_state_desc]	[nvarchar](60)	NULL,
 	[readable_secondary_replica]	[nvarchar](60)	NULL,
+	[suspend_reason_desc]			[nvarchar](60)	NULL,
 	[event_date_utc]				[datetime]		NOT NULL,
 	CONSTRAINT [PK_statsDatabaseAlwaysOnDetails] PRIMARY KEY  CLUSTERED 
 	(
