@@ -1533,7 +1533,7 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsInstancesOffline CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
+			DECLARE crsInstancesOnline CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
 																				, cin.[is_clustered], cin.[cluster_node_machine_name]
 																				, cin.[version], cin.[edition], cin.[last_refresh_date_utc]	
 																				, SUM(shcdd.[database_count])   AS [database_count]
@@ -1559,8 +1559,8 @@ BEGIN TRY
 																				, cin.[is_clustered], cin.[cluster_node_machine_name]
 																				, cin.[version], cin.[edition], cin.[last_refresh_date_utc]	
 																		ORDER BY cin.[instance_name], cin.[machine_name]
-			OPEN crsInstancesOffline
-			FETCH NEXT FROM crsInstancesOffline INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @version, @edition, @lastRefreshDate, @dbCount, @dbSize
+			OPEN crsInstancesOnline
+			FETCH NEXT FROM crsInstancesOnline INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @version, @edition, @lastRefreshDate, @dbCount, @dbSize
 			WHILE @@FETCH_STATUS=0
 				begin
 					SET @hasDatabaseDetails = 0
@@ -1628,10 +1628,10 @@ BEGIN TRY
 									N'</TR>'
 					SET @idx=@idx+1
 
-					FETCH NEXT FROM crsInstancesOffline INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @version, @edition, @lastRefreshDate, @dbCount, @dbSize
+					FETCH NEXT FROM crsInstancesOnline INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @version, @edition, @lastRefreshDate, @dbCount, @dbSize
 				end
-			CLOSE crsInstancesOffline
-			DEALLOCATE crsInstancesOffline
+			CLOSE crsInstancesOnline
+			DEALLOCATE crsInstancesOnline
 
 			SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
 								</TD>
@@ -1642,6 +1642,129 @@ BEGIN TRY
 			SET @HTMLReport = @HTMLReport + @HTMLReportArea					
 
 			SET @HTMLReport = REPLACE(@HTMLReport, '{InstancesOnlineCount}', '(' + CAST((@idx-1) AS [nvarchar]) + ')')
+
+			/* AlwaysOn Availability Group details*/
+			SET @ErrMessage = 'Build Report: Instance Availability - Online - AG details'
+			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+			
+			IF EXISTS(	SELECT	  sdad.[cluster_name], sdad.[ag_name], sdad.[instance_name]
+								, sdad.[replica_connected_state_desc], sdad.[replica_join_state_desc], sdad.[role_desc]
+								, sdad.[failover_mode_desc], sdad.[availability_mode_desc], sdad.[readable_secondary_replica], sdad.[synchronization_health_desc]
+								, sdad.[database_name], sdad.[synchronization_state_desc], sdad.[suspend_reason_desc]
+						FROM [health-check].[vw_statsDatabaseAlwaysOnDetails] sdad
+						LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																AND rsr.[rule_id] = 2
+																AND rsr.[active] = 1
+																AND (rsr.[skip_value] = sdad.[machine_name] OR rsr.[skip_value]=sdad.[instance_name])
+						WHERE sdad.[instance_active]=1
+								AND sdad.[project_id] = @projectID
+								AND sdad.[instance_name] LIKE @sqlServerNameFilter
+								AND rsr.[id] IS NULL
+					 ) 
+				begin
+					SET @HTMLReportArea=N''
+					SET @HTMLReportArea = @HTMLReportArea + 
+									N'<A NAME="AlwaysOnAvailabilityGroupsDetails" class="category-style">AlwaysOn Availability Groups Details</A><br>
+									<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="0px" class="no-border">
+									<TR VALIGN=TOP>
+										<TD WIDTH="1130px">
+											<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px" class="with-border">' +
+												N'<TR class="color-3">
+													<TH WIDTH="120px" class="details-bold" nowrap>Cluster Name</TH>
+													<TH WIDTH="120px" class="details-bold">AG Name</TH>
+													<TH WIDTH="150px" class="details-bold">Instance Name</TH>
+													<TH WIDTH=" 80px" class="details-bold">Replica Role</TH>
+													<TH WIDTH="220px" class="details-bold" nowrap >Properties</TH>
+													<TH WIDTH="180px" class="details-bold">Database Name</TH>
+													<TH WIDTH= 120px" class="details-bold" nowrap>Status</TH>
+													<TH WIDTH="140px" class="details-bold" nowrap>Refresh Date (UTC)</TH>'
+		
+					DECLARE   @clusterName		[varchar](256)
+							, @agName			[varchar](256)
+							, @roleDesc			[sysname]
+							, @agProperties		[nvarchar](max)
+							, @counter			[int]
+							, @dbName			[sysname]
+							, @syncStatus		[varchar](256)
+
+					SET @idx=1		
+
+					DECLARE crsAGDetails CURSOR LOCAL FAST_FORWARD FOR	SELECT [cluster_name], [ag_name], [instance_name], [role_desc], [properties], COUNT(*) cnt
+																		FROM (
+																				SELECT	  sdad.[cluster_name]
+																							, sdad.[ag_name]
+																							, sdad.[instance_name]
+																							, sdad.[role_desc]
+																							, N'connected state: ' + sdad.[replica_connected_state_desc] + N'<br>' + 
+																							  N'join state: ' + sdad.[replica_join_state_desc] + N'<br>' + 
+																							  N'failover mode: ' + sdad.[failover_mode_desc] + N'<br>' + 
+																							  N'availability mode: ' + sdad.[availability_mode_desc] + N'<br>' + 
+																							  N'readable secondary: ' + sdad.[readable_secondary_replica] + N'<br>' + 
+																							  N'synchronization health: ' + sdad.[synchronization_health_desc] + N'<br>' AS [properties]
+																					FROM [health-check].[vw_statsDatabaseAlwaysOnDetails] sdad
+																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
+																															AND rsr.[rule_id] = 2
+																															AND rsr.[active] = 1
+																															AND (rsr.[skip_value] = sdad.[machine_name] OR rsr.[skip_value]=sdad.[instance_name])
+																					WHERE	sdad.[project_id] = @projectID
+																							AND sdad.[instance_name] LIKE @sqlServerNameFilter
+																							AND rsr.[id] IS NULL
+																				)X
+																		GROUP BY [cluster_name], [ag_name], [instance_name], [role_desc], [properties]
+																		ORDER BY [cluster_name], [ag_name], [role_desc], [instance_name]
+					OPEN crsAGDetails
+					FETCH NEXT FROM crsAGDetails INTO @clusterName, @agName, @instanceName, @roleDesc, @agProperties, @counter
+					WHILE @@FETCH_STATUS=0
+						begin
+							SET @HTMLReportArea = @HTMLReportArea + 
+										N'<TR VALIGN="CENTER" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
+												N'<TD WIDTH="120px" class="details" ALIGN="LEFT" ROWSPAN="' + CAST(@counter AS [nvarchar](64)) + N'">' + @clusterName + N'</TD>' + 
+												N'<TD WIDTH="120px" class="details" ALIGN="LEFT" ROWSPAN="' + CAST(@counter AS [nvarchar](64)) + N'">' + @agName + N'</TD>' + 
+												N'<TD WIDTH="180px" class="details" ALIGN="LEFT" ROWSPAN="' + CAST(@counter AS [nvarchar](64)) + N'">' + @instanceName + N'</TD>' + 
+												N'<TD WIDTH=" 80px" class="details" ALIGN="LEFT" ROWSPAN="' + CAST(@counter AS [nvarchar](64)) + N'">' + @roleDesc + N'</TD>' + 
+												N'<TD WIDTH="220px" class="details" ALIGN="LEFT" ROWSPAN="' + CAST(@counter AS [nvarchar](64)) + N'">' + @agProperties + N'</TD>'
+
+							SET @tmpHTMLReport=N''
+							SELECT @tmpHTMLReport=((
+											SELECT	N'<TD WIDTH="180px" class="details" ALIGN="LEFT">' + [database_name] + N'</TD>' + 
+													N'<TD WIDTH="120px" class="details" ALIGN="LEFT">' + [synchronization_state_desc] + N'</TD>' + 
+													N'<TD WIDTH="140px" class="details" ALIGN="LEFT" nowrap>' + ISNULL(CONVERT([nvarchar](24), [event_date_utc], 121), N'&nbsp;') + N'</TD>' + 
+												N'</TR>'+ 
+													CASE WHEN [row_count] > [row_no]
+														 THEN N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">'
+														 ELSE N''
+													END
+											FROM (
+													SELECT    [event_date_utc], [database_name]
+															, [synchronization_state_desc] + CASE WHEN [suspend_reason_desc] IS NOT NULL THEN N' (' + [suspend_reason_desc] + N')' ELSE N'' END [synchronization_state_desc]
+															, ROW_NUMBER() OVER(ORDER BY [cluster_name], [ag_name], [instance_name]) [row_no]
+															, SUM(1) OVER() AS [row_count]
+													FROM	[health-check].[vw_statsDatabaseAlwaysOnDetails] sdad
+													WHERE	[cluster_name] = @clusterName
+														AND [ag_name] = @agName
+														AND [instance_name] = @instanceName
+														AND [role_desc] = @roleDesc
+												)X
+											ORDER BY [database_name]
+											FOR XML PATH(''), TYPE
+											).value('.', 'nvarchar(max)'))
+
+							SET @idx=@idx+1
+							SET @HTMLReportArea = @HTMLReportArea + COALESCE(@tmpHTMLReport, '')
+
+							FETCH NEXT FROM crsAGDetails INTO @clusterName, @agName, @instanceName, @roleDesc, @agProperties, @counter
+						end
+					CLOSE crsAGDetails
+					DEALLOCATE crsAGDetails
+
+					SET @HTMLReportArea = @HTMLReportArea + N'</TABLE>
+										</TD>
+									</TR>
+								</TABLE>'
+
+					SET @HTMLReportArea = @HTMLReportArea + N'<TABLE WIDTH="1130px" CELLSPACING=0 CELLPADDING="3px"><TR><TD WIDTH="1130px" ALIGN=RIGHT><A HREF="#Home" class="normal">Go Up</A></TD></TR></TABLE>'	
+					SET @HTMLReport = @HTMLReport + @HTMLReportArea					
+				end
 		end
 	ELSE
 		SET @HTMLReport = REPLACE(@HTMLReport, '{InstancesOnlineCount}', '(N/A)')
