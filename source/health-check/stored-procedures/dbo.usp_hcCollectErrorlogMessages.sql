@@ -130,6 +130,8 @@ WHILE @@FETCH_STATUS=0
 		FROM [health-check].[statsErrorlogDetails]	eld
 		WHERE	eld.[project_id] = @projectID
 				AND eld.[instance_id] = @instanceID
+		
+		SET @lastCollectedEventTime = ISNULL(@lastCollectedEventTime, '2021-01-01')
 
 		-------------------------------------------------------------------------------------------------------------------------
 		/* get local time to UTC offset */

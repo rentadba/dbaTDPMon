@@ -339,8 +339,7 @@ WHILE @@FETCH_STATUS=0
 						#-- Create date		 : 20.11.2014
 						#-- Module			 : Database Analysis & Performance health-check
 						#-- Description		 : read OS event logs: Application, System, Setup
-						#-- ============================================================================
-
+						#-- ============================================================================					
 						$timeoutSeconds = ' + CAST(@configEventsTimeOutSeconds AS [nvarchar]) + N'
 						$code = {
 									$ErrorActionPreference = "SilentlyContinue"
@@ -393,7 +392,7 @@ WHILE @@FETCH_STATUS=0
 						SET @strMessage=N'running powershell script - get OS events...'
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
 
-						SET @queryToRun='master.dbo.xp_cmdshell N''@PowerShell -File "' + [dbo].[ufn_getObjectQuoteName](@psFileLocation + @psFileName, 'sql') + '"'''
+						SET @queryToRun='master.dbo.xp_cmdshell N''@PowerShell -ExecutionPolicy Bypass -File "' + [dbo].[ufn_getObjectQuoteName](@psFileLocation + @psFileName, 'sql') + '"'''
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 4, @stopExecution=0
 
 						DELETE FROM #psOutput
