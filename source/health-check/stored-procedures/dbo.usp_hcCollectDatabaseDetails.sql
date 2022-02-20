@@ -117,6 +117,18 @@ CREATE TABLE #statsDatabaseAlwaysOnDetails
 	[readable_secondary_replica]	[nvarchar](60)	NULL
 )
 
+/*-------------------------------------------------------------------------------------------------------------------------------*/
+IF object_id('#msdbBackupHistory') IS NOT NULL DROP TABLE #msdbBackupHistory
+CREATE TABLE #msdbBackupHistory
+(
+	[database_name]			[sysname]		NOT NULL,
+	[backup_type]			[nvarchar](60)	NULL,
+	[backup_start_date]		[datetime]		NULL,
+	[duration_sec]			[int]			NULL,
+	[size_bytes]			[bigint]		NULL,
+	[file_name]				[nvarchar](256)	NULL
+)
+
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default projectCode
 IF @projectCode IS NULL
@@ -132,6 +144,24 @@ IF @projectID IS NULL
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 	end
 
+-----------------------------------------------------------------------------------------------------
+DECLARE @reportOptionGetBackupSizeLastDays [int]
+BEGIN TRY
+	SELECT	@reportOptionGetBackupSizeLastDays = [value]
+	FROM	[report].[htmlOptions]
+	WHERE	[name] = N'Analyze backup size (GB) in the last days'
+			AND [module] = 'health-check'
+END TRY
+BEGIN CATCH
+	SET @reportOptionGetBackupSizeLastDays = 7
+END CATCH
+SET @reportOptionGetBackupSizeLastDays = ISNULL(@reportOptionGetBackupSizeLastDays, 7)
+
+		
+DECLARE   @startEvent		[datetime]
+
+SET @startEvent = DATEADD(day, -@reportOptionGetBackupSizeLastDays, GETUTCDATE())
+SET @startEvent = CONVERT([datetime], CONVERT([varchar](10), @startEvent, 120), 120);
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --A. get databases informations
@@ -167,14 +197,19 @@ WHERE cin.[project_id] = @projectID
 		AND cin.[name] LIKE @sqlServerNameFilter
 		AND lsam.[descriptor]='dbo.usp_hcCollectDatabaseDetails'
 
-
-DELETE sdaod
-FROM [health-check].[statsDatabaseAlwaysOnDetails] sdaod
-INNER JOIN [dbo].[catalogDatabaseNames]			cdb ON cdb.[id] = sdaod.[catalog_database_id] AND cdb.[instance_id] = sdaod.[instance_id]
-INNER JOIN [dbo].[catalogInstanceNames]			cin ON cin.[id] = cdb.[instance_id] AND cin.[project_id] = cdb.[project_id]
-WHERE cin.[project_id] = @projectID
-		AND cin.[name] LIKE @sqlServerNameFilter
-		AND cdb.[name] LIKE @databaseNameFilter
+DELETE sdaodM
+FROM [health-check].[statsDatabaseAlwaysOnDetails] sdaodM
+INNER JOIN 
+	(
+		SELECT sdaod.[cluster_name], sdaod.[ag_name]
+		FROM [health-check].[statsDatabaseAlwaysOnDetails] sdaod
+		INNER JOIN [dbo].[catalogDatabaseNames]			cdb ON cdb.[id] = sdaod.[catalog_database_id] AND cdb.[instance_id] = sdaod.[instance_id]
+		INNER JOIN [dbo].[catalogInstanceNames]			cin ON cin.[id] = cdb.[instance_id] AND cin.[project_id] = cdb.[project_id]
+		WHERE	cin.[project_id] = @projectID
+				AND cin.[name] LIKE @sqlServerNameFilter
+				AND cdb.[name] LIKE @databaseNameFilter
+				AND sdaod.[role_desc] = 'PRIMARY'
+	)X ON sdaodM.[cluster_name] = X.[cluster_name] AND sdaodM.[ag_name] = X.[ag_name]
 
 -------------------------------------------------------------------------------------------------------------------------
 SET @strMessage='Step 2: Get Database Details Information....'
@@ -549,6 +584,39 @@ WHILE @@FETCH_STATUS=0
 									, 'dbo.usp_hcCollectDatabaseDetails'
 									, @strMessage
 				END CATCH
+
+				/* get msdb backup files history */
+				TRUNCATE TABLE #msdbBackupHistory;
+				SET @queryToRun = N'SELECT	  bs.[database_name]
+											, CASE bs.[type] WHEN ''D'' THEN ''full'' WHEN ''I'' THEN ''diff'' WHEN ''L'' THEN ''log'' END AS [backup_type]
+											, bs.[backup_start_date]
+											, DATEDIFF(ss, bs.[backup_start_date], bs.[backup_finish_date]) AS [duration_sec]
+											, ' + CASE WHEN @serverVersionNum > 10 
+														THEN N'bs.[compressed_backup_size]'
+														ELSE N'bs.[backup_size]'
+												  END + N' AS [size_bytes]
+											, REPLACE(bmf.[physical_device_name], REVERSE(SUBSTRING(REVERSE(bmf.[physical_device_name]), CHARINDEX(''\'', REVERSE(bmf.[physical_device_name])), LEN(REVERSE(bmf.[physical_device_name])))), '''') AS [file_name]
+									FROM msdb.dbo.backupset bs
+									INNER JOIN msdb.dbo.backupmediafamily bmf on bs.[media_set_id] = bmf.[media_set_id]
+									WHERE	bs.[backup_start_date] >= DATEADD(hour, DATEDIFF(hour, GETUTCDATE(), GETDATE()), CONVERT([datetime], CONVERT([varchar](10), DATEADD(day, -' + CAST(@reportOptionGetBackupSizeLastDays AS [nvarchar]) + N', GETUTCDATE()), 120), 120))'
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+				BEGIN TRY
+					INSERT	INTO #msdbBackupHistory([database_name], [backup_type], [backup_start_date], [duration_sec], [size_bytes], [file_name])
+							EXEC sp_executesql @queryToRun
+				END TRY
+				BEGIN CATCH
+					SET @strMessage = ERROR_MESSAGE()
+					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+					
+					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+							SELECT  @instanceID
+									, @projectID
+									, GETUTCDATE()
+									, 'dbo.usp_hcCollectDatabaseDetails'
+									, @strMessage
+				END CATCH
 			end
 
 
@@ -577,8 +645,7 @@ WHILE @@FETCH_STATUS=0
 									INNER JOIN sys.availability_databases_cluster adc ON adc.[group_id]=hdrs.[group_id] AND adc.[group_database_id]=hdrs.[group_database_id]
 									INNER JOIN sys.dm_hadr_instance_node_map hinm ON hinm.[ag_resource_id] = ag.[resource_id] AND hinm.[instance_name] = arcn.[replica_server_name]
 									INNER JOIN sys.dm_hadr_cluster hc ON 1=1
-									INNER JOIN sys.dm_hadr_availability_replica_cluster_states rcs on rcs.replica_id=ar.replica_id and rcs.group_id=hdrs.group_id
-									/* WHERE arcn.[replica_server_name] = ''' + @sqlServerName + ''' */'
+									INNER JOIN sys.dm_hadr_availability_replica_cluster_states rcs on rcs.replica_id=ar.replica_id and rcs.group_id=hdrs.group_id'
 
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
@@ -691,6 +758,55 @@ WHILE @@FETCH_STATUS=0
 				WHERE cin.[project_id] = @projectID
 						AND sdaod.[id] IS NULL
 		
+		/* extract backupset information - include backup details not made using this utility */
+		;WITH tdpBackups AS
+		(
+			SELECT	  lem.[project_id], lem.[instance_id], lem.[instance_name], lem.[database_name]
+					, info.value ('size_bytes[1]', 'bigint') as [size_bytes]
+					, info.value ('file_name[1]', 'sysname') as [file_name]
+					, info.value ('type[1]', 'nvarchar(16)') as [backup_type]
+					, lem.[event_date_utc]
+					, lem.[message_xml]
+			FROM (
+					SELECT l.[project_id], l.[instance_id], l.[instance_name], l.[database_name], l.[message_xml], l.[event_date_utc]
+					FROM [dbo].[vw_logEventMessages] l
+					INNER JOIN [dbo].[vw_catalogProjects] p ON l.[project_id] = p.[project_id]
+					WHERE l.[module]='dbo.usp_mpDatabaseBackup'
+						AND l.[event_name]='database backup'
+						AND l.[event_type]=0
+						AND l.[message] LIKE '<backupset>%'
+						AND l.[event_date_utc] >= @startEvent
+						AND p.[project_code] LIKE @projectCode
+						AND l.[instance_name] LIKE @sqlServerNameFilter
+				) lem
+			CROSS APPLY [message_xml].nodes('//backupset/detail') M(info)
+		)
+		INSERT	INTO [dbo].[logEventMessages]([project_id], [instance_id], [event_date_utc], [module], [event_name], [database_name], [message], [event_type])
+		SELECT	@projectID, @instanceID, GETUTCDATE()
+				, 'dbo.usp_mpDatabaseBackup' AS [module]
+				, 'database backup' AS [event_name]
+				, bs.[database_name]
+				, '<backupset><detail>' + 
+						'<database_name>' + [dbo].[ufn_getObjectQuoteName](bs.[database_name], 'xml') + '</database_name>' + 
+						'<type>' + bs.[backup_type] + '</type>' + 
+						'<start_date>' + CONVERT([varchar](24), ISNULL([backup_start_date], GETDATE()), 121) + '</start_date>' + 
+						'<duration>' + REPLICATE('0', 2-LEN(CAST([duration_sec] / 3600 AS [varchar]))) + CAST([duration_sec] / 3600 AS [varchar]) + 'h'
+											+ ' ' + REPLICATE('0', 2-LEN(CAST(([duration_sec] / 60) % 60 AS [varchar]))) + CAST(([duration_sec] / 60) % 60 AS [varchar]) + 'm'
+											+ ' ' + REPLICATE('0', 2-LEN(CAST([duration_sec] % 60 AS [varchar]))) + CAST([duration_sec] % 60 AS [varchar]) + 's' + '</duration>' + 
+						'<size>' + CONVERT([varchar](32), CAST(bs.[size_bytes]/(1024*1024*1.0) AS [money]), 1) + ' mb</size>' + 
+						'<size_bytes>' + CAST(bs.[size_bytes] AS [varchar](32)) + '</size_bytes>' + 
+						'<verified>N/A</verified>' + 
+						'<file_name>' + [dbo].[ufn_getObjectQuoteName](bs.[file_name], 'xml') + '</file_name>' + 
+						'<error_code>0</error_code>' + 
+					'</detail></backupset>'
+				, 0 AS [event_type]
+		FROM #msdbBackupHistory bs
+		LEFT JOIN tdpBackups tdp ON		tdp.[instance_name] = @sqlServerName
+									AND	tdp.[database_name] = bs.[database_name]
+									AND tdp.[backup_type] = bs.[backup_type]
+									AND tdp.[file_name] = bs.[file_name]
+		WHERE tdp.[instance_name] IS NULL
+
 		FETCH NEXT FROM crsActiveInstances INTO @instanceID, @sqlServerName, @sqlServerVersion, @isAzureSQLDatabase
 	end
 CLOSE crsActiveInstances
