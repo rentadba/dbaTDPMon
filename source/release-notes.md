@@ -1056,3 +1056,11 @@
 #### January 2022 new features & fixes
 31.01.2021
 * health-check: add more details for AlwaysOn Availability Group collected information
+
+------------
+#### February 2022 new features & fixes
+20.02.2021
+* health-check: add AlwaysOn Availability Group details into the health check report
+* health-check: collect database backup information taken with other tools then dbaTDPMon (enhance Backup Size details in the HTML report)
+* health-check: fixed minor bugs on data collection
+* release of dbaTDPMon - v2022.02
