@@ -8,6 +8,8 @@ CREATE FUNCTION [dbo].[ufn_reportHTMLGetClusterNodeNames]
 (		
 	  @projectID		[smallint]
 	, @instanceName		[sysname]
+	, @flgOptions		[bigint] = 0	/*	 268435456 - do not consider @projectCode when filtering instance and database information
+										*/
 )
 RETURNS [nvarchar](max)
 /* WITH ENCRYPTION */
@@ -27,10 +29,10 @@ begin
 			, @nodeName			[sysname]
 
 	SET @clusterNodes = N''
-	DECLARE crsClusterNodes CURSOR LOCAL FAST_FORWARD FOR	SELECT	cin.[machine_name]
+	DECLARE crsClusterNodes CURSOR LOCAL FAST_FORWARD FOR	SELECT	DISTINCT cin.[machine_name]
 															FROM	[dbo].[vw_catalogInstanceNames] cin
 															WHERE	cin.[instance_name] = @instanceName
-																	AND cin.[project_id] = @projectID
+																	AND (cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 																	AND cin.[is_clustered] = 1
 	OPEN crsClusterNodes
 	FETCH NEXT FROM crsClusterNodes INTO @nodeName

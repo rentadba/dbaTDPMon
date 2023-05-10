@@ -11,6 +11,9 @@
 -----------------------------------------------------------------------------------------------------
 RAISERROR('Create table: [dbo].[catalogSolutions]', 10, 1) WITH NOWAIT
 GO
+IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[catalogProjects]') AND type in (N'U'))
+DROP TABLE [dbo].[catalogProjects]
+GO
 IF  EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[catalogSolutions]') AND type in (N'U'))
 DROP TABLE [dbo].[catalogSolutions]
 GO

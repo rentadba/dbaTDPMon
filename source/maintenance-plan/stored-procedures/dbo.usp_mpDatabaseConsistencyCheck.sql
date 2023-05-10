@@ -403,7 +403,7 @@ IF @flgActions & 2 = 2 AND (GETDATE() <= @stopTimeLimit)
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'DBCC CHECKTABLE(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'quoted') + '''' + CASE WHEN @flgOptions & 2 = 2 THEN ', NOINDEX' ELSE '' END + ') WITH ALL_ERRORMSGS, NO_INFOMSGS'
+				SET @queryToRun = @queryToRun + N'DBCC CHECKTABLE(''' + [dbo].[ufn_getObjectQuoteName]([dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'sql'), 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName]([dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql'), 'quoted') + '''' + CASE WHEN @flgOptions & 2 = 2 THEN ', NOINDEX' ELSE '' END + ') WITH ALL_ERRORMSGS, NO_INFOMSGS'
 				
 				IF @dbi_dbccFlags <> 2
 					SET @queryToRun = @queryToRun + ', DATA_PURITY'
@@ -504,7 +504,7 @@ IF @flgActions & 16 = 16 AND (GETDATE() <= @stopTimeLimit)
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'DBCC CHECKCONSTRAINTS(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'quoted') + ''') WITH ALL_ERRORMSGS, NO_INFOMSGS'
+				SET @queryToRun = @queryToRun + N'DBCC CHECKCONSTRAINTS(''' + [dbo].[ufn_getObjectQuoteName]([dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'sql'), 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName]([dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql'), 'quoted') + ''') WITH ALL_ERRORMSGS, NO_INFOMSGS'
 				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
@@ -654,7 +654,7 @@ IF @flgActions & 32 = 32 AND (GETDATE() <= @stopTimeLimit)
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 						SET @queryToRun = N''
-						SET @queryToRun = @queryToRun + N'DBCC CHECKIDENT(''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'quoted') + ''', RESEED) WITH NO_INFOMSGS'
+						SET @queryToRun = @queryToRun + N'DBCC CHECKIDENT(''' + [dbo].[ufn_getObjectQuoteName]([dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'sql'), 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName]([dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql'), 'quoted') + ''', RESEED) WITH NO_INFOMSGS'
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
@@ -716,7 +716,7 @@ IF @flgActions & 64 = 64 AND (GETDATE() <= @stopTimeLimit)
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @objectName, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 						SET @queryToRun = N''
-						SET @queryToRun = @queryToRun + N'DBCC UPDATEUSAGE(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')  + ''', ''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql') + ''') WITH NO_INFOMSGS'
+						SET @queryToRun = @queryToRun + N'DBCC UPDATEUSAGE(''' + [dbo].[ufn_getObjectQuoteName]([dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'sql'), 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName]([dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql'), 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql') + ''') WITH NO_INFOMSGS'
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
 
 						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,

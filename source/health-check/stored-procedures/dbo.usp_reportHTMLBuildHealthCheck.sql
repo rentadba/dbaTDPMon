@@ -48,7 +48,7 @@ CREATE PROCEDURE [dbo].[usp_reportHTMLBuildHealthCheck]
 														  33554432 - SQL Server Agent Jobs - Long Running SQL Agent Jobs
 														  67108864 - OS Event messages - Permission errors
 														 134217728 - OS Event messages - Issues Detected
-														 268435456 - do not consider @projectCode when filtering database information
+														 268435456 - do not consider @projectCode when filtering instance and database information
 														 536870912 - Failed Login Attempts - Issues Detected
 														1073741824 - Database Growth Information - Issues Detected
 															*/
@@ -1297,7 +1297,7 @@ BEGIN TRY
 														AND rsr.[active] = 1
 														AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 			WHERE	cin.[instance_active]=1
-					AND cin.[project_id] = @projectID
+					AND (cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 					AND cin.[instance_name] LIKE @sqlServerNameFilter
 					AND (   (eld.[log_date_utc] IS NOT NULL AND eld.[log_date_utc] >= @dateTimeLowerLimitUTC)
 						 OR (eld.[log_date_utc] IS NULL     AND eld.[log_date] >= @dateTimeLowerLimit)
@@ -1329,7 +1329,7 @@ BEGIN TRY
 			SET @dateTimeLowerLimit		= DATEADD(hh, -@reportOptionErrorlogMessageLastHours, GETDATE())
 			SET @dateTimeLowerLimitUTC	= DATEADD(hh, -@reportOptionErrorlogMessageLastHours, GETUTCDATE())
 
-			SELECT eld.[instance_name], eld.[log_date], eld.[id], eld.[text], eld.[event_date_utc]
+			SELECT DISTINCT eld.[instance_name], eld.[log_date], eld.[id], eld.[text], eld.[event_date_utc]
 			INTO #filteredStatsFailedLoginsDetails
 			FROM [dbo].[vw_catalogInstanceNames]  cin
 			INNER JOIN [health-check].[vw_statsErrorlogDetails]	eld	ON eld.[project_id] = cin.[project_id] AND eld.[instance_id] = cin.[instance_id]
@@ -1338,7 +1338,7 @@ BEGIN TRY
 														AND rsr.[active] = 1
 														AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 			WHERE	cin.[instance_active]=1
-					AND cin.[project_id] = @projectID
+					AND (cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 					AND cin.[instance_name] LIKE @sqlServerNameFilter
 					AND (   (eld.[log_date_utc] IS NOT NULL AND eld.[log_date_utc] >= @dateTimeLowerLimitUTC)
 						 OR (eld.[log_date_utc] IS NULL     AND eld.[log_date] >= @dateTimeLowerLimit)
@@ -1392,7 +1392,7 @@ BEGIN TRY
 														AND rsr.[active] = 1
 														AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 			WHERE	cin.[instance_active]=1
-					AND cin.[project_id] = @projectID
+					AND (cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 					AND cin.[instance_name] LIKE @sqlServerNameFilter
 					AND (   (oel.[time_created_utc] IS NOT NULL AND oel.[time_created_utc] >= @dateTimeLowerLimitUTC)
 						 OR (oel.[time_created_utc] IS NULL     AND CONVERT([datetime], oel.[time_created]) >= @dateTimeLowerLimit)
@@ -1444,7 +1444,8 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsInstancesOffline CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
+			DECLARE crsInstancesOffline CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINCT 
+																				  cin.[machine_name], cin.[instance_name]
 																				, cin.[is_clustered], cin.[cluster_node_machine_name]
 																				, MAX(lsam.[event_date_utc]) [event_date_utc]
 																				, lsam.[message]
@@ -1455,7 +1456,7 @@ BEGIN TRY
 																													AND rsr.[active] = 1
 																													AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																		WHERE	cin.[instance_active]=0
-																				AND cin.[project_id] = @projectID
+																				AND (cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 																				AND cin.[instance_name] LIKE @sqlServerNameFilter
 																				AND lsam.[descriptor] IN (N'dbo.usp_refreshMachineCatalogs - Offline')
 																				AND rsr.[id] IS NULL
@@ -1468,7 +1469,7 @@ BEGIN TRY
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
 										N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @eventDate, 121), N'&nbsp;') + N'</TD>' + 
@@ -1533,11 +1534,14 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsInstancesOnline CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
+			DECLARE crsInstancesOnline CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT  
+																				  cin.[machine_name], cin.[instance_name]
 																				, cin.[is_clustered], cin.[cluster_node_machine_name]
-																				, cin.[version], cin.[edition], cin.[last_refresh_date_utc]	
-																				, SUM(shcdd.[database_count])   AS [database_count]
-																				, SUM(shcdd.[db_size_gb])		AS [db_size_gb]
+																				, MAX(cin.[version]) AS [version]
+																				, MAX(cin.[edition]) AS [edition]
+																				, MAX(cin.[last_refresh_date_utc]) AS [last_refresh_date_utc]
+																				, MAX(shcdd.[database_count])   AS [database_count]
+																				, MAX(shcdd.[db_size_gb])		AS [db_size_gb]
 																		FROM [dbo].[vw_catalogInstanceNames]  cin
 																		LEFT JOIN 
 																			(
@@ -1552,12 +1556,11 @@ BEGIN TRY
 																													AND rsr.[active] = 1
 																													AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																		WHERE cin.[instance_active]=1
-																				AND cin.[project_id] = @projectID
+																				AND (cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 																				AND cin.[instance_name] LIKE @sqlServerNameFilter
 																				AND rsr.[id] IS NULL
 																		GROUP BY  cin.[machine_name], cin.[instance_name]
-																				, cin.[is_clustered], cin.[cluster_node_machine_name]
-																				, cin.[version], cin.[edition], cin.[last_refresh_date_utc]	
+																				, cin.[is_clustered], cin.[cluster_node_machine_name]																				
 																		ORDER BY cin.[instance_name], cin.[machine_name]
 			OPEN crsInstancesOnline
 			FETCH NEXT FROM crsInstancesOnline INTO @machineName, @instanceName, @isClustered, @clusterNodeName, @version, @edition, @lastRefreshDate, @dbCount, @dbSize
@@ -1572,13 +1575,13 @@ BEGIN TRY
 					SET @hasSQLagentJob = 0
 					SELECT	@hasSQLagentJob = COUNT(*)
 					FROM	[health-check].[vw_statsSQLAgentJobsHistory]
-					WHERE	[project_id]=@projectID
+					WHERE	([project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 							AND [instance_name] = @instanceName
 
 					SET @hasDiskSpaceInfo = 0
 					SELECT	@hasDiskSpaceInfo = COUNT(*)
 					FROM	[health-check].[vw_statsDiskSpaceInfo]
-					WHERE	[project_id]=@projectID
+					WHERE	([project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 							AND [instance_name] = @instanceName
 					
 					SET @hasErrorlogMessages = 0
@@ -1617,7 +1620,7 @@ BEGIN TRY
 										END +  
 											N'<BR><BR>
 										</TD>' + 
-										N'<TD WIDTH="150px" class="details" ALIGN="LEFT">' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="150px" class="details" ALIGN="LEFT">' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</TD>' + 
 										N'<TD WIDTH="180px" class="details" ALIGN="LEFT">' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH=" 80px" class="details" ALIGN="CENTER">' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
 										N'<TD WIDTH= "80px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(@version, N'&nbsp;') + N'</TD>' + 
@@ -1647,7 +1650,8 @@ BEGIN TRY
 			SET @ErrMessage = 'Build Report: Instance Availability - Online - AG details'
 			EXEC [dbo].[usp_logPrintMessage] @customMessage = @ErrMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 			
-			IF EXISTS(	SELECT	  sdad.[cluster_name], sdad.[ag_name], sdad.[instance_name]
+			IF EXISTS(	SELECT	DISTINCT
+								  sdad.[cluster_name], sdad.[ag_name], sdad.[instance_name]
 								, sdad.[replica_connected_state_desc], sdad.[replica_join_state_desc], sdad.[role_desc]
 								, sdad.[failover_mode_desc], sdad.[availability_mode_desc], sdad.[readable_secondary_replica], sdad.[synchronization_health_desc]
 								, sdad.[database_name], sdad.[synchronization_state_desc], sdad.[suspend_reason_desc]
@@ -1656,8 +1660,11 @@ BEGIN TRY
 																AND rsr.[rule_id] = 2
 																AND rsr.[active] = 1
 																AND (rsr.[skip_value] = sdad.[machine_name] OR rsr.[skip_value]=sdad.[instance_name])
+																AND (	rsr.[skip_value2] IS NULL
+																		OR rsr.[skip_value2] = sdad.[ag_name]
+																	)
 						WHERE sdad.[instance_active]=1
-								AND sdad.[project_id] = @projectID
+								AND (sdad.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 								AND sdad.[instance_name] LIKE @sqlServerNameFilter
 								AND rsr.[id] IS NULL
 					 ) 
@@ -1689,12 +1696,14 @@ BEGIN TRY
 
 					SET @idx=1		
 
-					DECLARE crsAGDetails CURSOR LOCAL FAST_FORWARD FOR	SELECT [cluster_name], [ag_name], [instance_name], [role_desc], [properties], COUNT(*) cnt
+					DECLARE crsAGDetails CURSOR LOCAL FAST_FORWARD FOR	SELECT [cluster_name], [ag_name], [instance_name], [role_desc], [properties], COUNT(DISTINCT [database_name]) cnt
 																		FROM (
-																				SELECT	  sdad.[cluster_name]
+																				SELECT	DISTINCT
+																							  sdad.[cluster_name]
 																							, sdad.[ag_name]
 																							, sdad.[instance_name]
 																							, sdad.[role_desc]
+																							, [database_name]
 																							, N'connected state: ' + sdad.[replica_connected_state_desc] + N'<br>' + 
 																							  N'join state: ' + sdad.[replica_join_state_desc] + N'<br>' + 
 																							  N'failover mode: ' + sdad.[failover_mode_desc] + N'<br>' + 
@@ -1706,7 +1715,10 @@ BEGIN TRY
 																															AND rsr.[rule_id] = 2
 																															AND rsr.[active] = 1
 																															AND (rsr.[skip_value] = sdad.[machine_name] OR rsr.[skip_value]=sdad.[instance_name])
-																					WHERE	sdad.[project_id] = @projectID
+																															AND (	rsr.[skip_value2] IS NULL
+																																	OR rsr.[skip_value2] = sdad.[ag_name]
+																																)
+																					WHERE	(sdad.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 																							AND sdad.[instance_name] LIKE @sqlServerNameFilter
 																							AND rsr.[id] IS NULL
 																				)X
@@ -1796,7 +1808,8 @@ BEGIN TRY
 
 			SET @idx=1		
 																					
-			DECLARE crsDatabasesStatusPermissionErrors CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
+			DECLARE crsDatabasesStatusPermissionErrors CURSOR LOCAL FAST_FORWARD FOR	SELECT    DISTINCT
+																								  cin.[machine_name], cin.[instance_name]
 																								, cin.[is_clustered], cin.[cluster_node_machine_name]
 																								, COUNT(DISTINCT lsam.[message]) AS [message_count]
 																						FROM [dbo].[vw_catalogInstanceNames]  cin
@@ -1818,7 +1831,7 @@ BEGIN TRY
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + N'"><A NAME="DatabasesStatusPermissionErrors' + @instanceName + N'">' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</A></TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + N'"><A NAME="DatabasesStatusPermissionErrors' + @instanceName + N'">' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</A></TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + N'">' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + N'">' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' 
 
@@ -1920,7 +1933,8 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsDatabasesStatusIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
+			DECLARE crsDatabasesStatusIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT
+																							  cin.[machine_name], cin.[instance_name]
 																							, cin.[is_clustered], cin.[cluster_node_machine_name]
 																							, cdn.[database_name]
 																							, cdn.[state_desc]
@@ -1930,6 +1944,9 @@ BEGIN TRY
 																																AND rsr.[rule_id] = 4
 																																AND rsr.[active] = 1
 																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																																AND (	rsr.[skip_value2] IS NULL
+																																		OR rsr.[skip_value2] = cdn.[database_name]
+																																	)
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
 																							AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
@@ -1943,7 +1960,7 @@ BEGIN TRY
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
 										N'<TD WIDTH="490px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
@@ -1994,7 +2011,8 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsSQLServerAgentJobsStatusPermissionErrors CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
+			DECLARE crsSQLServerAgentJobsStatusPermissionErrors CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINCT
+																										  cin.[machine_name], cin.[instance_name]
 																										, cin.[is_clustered], cin.[cluster_node_machine_name]
 																										, MAX(lsam.[event_date_utc]) [event_date_utc]
 																										, lsam.[message]
@@ -2005,7 +2023,7 @@ BEGIN TRY
 																																			AND rsr.[active] = 1
 																																			AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																								WHERE	cin.[instance_active]=1
-																										AND cin.[project_id] = @projectID
+																										AND (cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 																										AND cin.[instance_name] LIKE @sqlServerNameFilter
 																										AND lsam.descriptor IN (N'dbo.usp_hcCollectSQLServerAgentJobsStatus')
 																										AND rsr.[id] IS NULL
@@ -2017,7 +2035,7 @@ BEGIN TRY
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes<BR>' + ISNULL(N'[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
 										N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @eventDate, 121), N'&nbsp;') + N'</TD>' + 
@@ -2081,14 +2099,19 @@ BEGIN TRY
 			SET @dateTimeLowerLimit		= DATEADD(hh, -@reportOptionJobFailuresInLastHours, GETDATE())
 			SET @dateTimeLowerLimitUTC	= DATEADD(hh, -@reportOptionJobFailuresInLastHours, GETUTCDATE())
 
-			DECLARE crsSQLServerAgentJobsStatusIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT	ssajh.[instance_name], ssajh.[job_name], ssajh.[last_execution_status], ssajh.[last_execution_date], ssajh.[last_execution_time], ssajh.[message]
+			DECLARE crsSQLServerAgentJobsStatusIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT	DISTINCT
+																										ssajh.[instance_name], ssajh.[job_name], ssajh.[last_execution_status], ssajh.[last_execution_date], ssajh.[last_execution_time], ssajh.[message]
 																								FROM	[health-check].[vw_statsSQLAgentJobsHistory] ssajh
 																								INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[project_id] = ssajh.[project_id] AND cin.[instance_id] = ssajh.[instance_id]
 																								LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																			AND rsr.[rule_id] = 16
 																																			AND rsr.[active] = 1
 																																			AND (rsr.[skip_value]=ssajh.[instance_name])
-																								WHERE	cin.[project_id]=@projectID
+																																			AND (	rsr.[skip_value2] IS NULL
+																																				 OR rsr.[skip_value2] = ssajh.[job_name]
+																																				)
+																								
+																								WHERE	(cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 																										AND cin.[instance_name] LIKE @sqlServerNameFilter
 																										AND cin.[instance_active]=1
 																										AND ssajh.[last_execution_status] IN (0, 2, 3) /* 0 = Failed; 2 = Retry; 3 = Canceled */
@@ -2175,7 +2198,8 @@ BEGIN TRY
 
 			DECLARE   @runningTime		[varchar](32)
 			
-			DECLARE crsLongRunningSQLAgentJobsIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT	  ssajh.[instance_name], ssajh.[job_name]
+			DECLARE crsLongRunningSQLAgentJobsIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT	DISTINCT
+																									  ssajh.[instance_name], ssajh.[job_name]
 																									, ssajh.[last_execution_date] AS [start_date], ssajh.[last_execution_time] AS [start_time]
 																									, [dbo].[ufn_reportHTMLFormatTimeValue](CAST(ssajh.[running_time_sec]*1000 AS [bigint])) AS [running_time]
 																									, ssajh.[message]
@@ -2187,7 +2211,7 @@ BEGIN TRY
 																																		AND (    rsr.[skip_value]=ssajh.[instance_name]
 																																			 AND ISNULL(rsr.[skip_value2], '') = ISNULL(ssajh.[job_name], '') 
 																																			)
-																							WHERE	cin.[project_id]=@projectID
+																							WHERE	(cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 																									AND cin.[instance_name] LIKE @sqlServerNameFilter
 																									AND cin.[instance_active]=1
 																									AND ssajh.[last_execution_status] = 4
@@ -2344,7 +2368,7 @@ BEGIN TRY
 														AND rsr.[active] = 1
 														AND (rsr.[skip_value]=iff.[instance_name])
 			WHERE cin.[instance_active] = 1
-				 AND cin.[project_id] = @projectID
+				 AND (cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 				 AND cin.[instance_name] LIKE @sqlServerNameFilter
 				 AND iff.[page_count] >= @minimumIndexSizeInPages
 				 AND iff.[fill_factor] >= @minimumIndexFillFactor
@@ -2548,7 +2572,8 @@ BEGIN TRY
 
 			DECLARE crsDatabaseBACKUPAgeIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	WITH databaseBackupAgeDetails AS
 																						(
-																							SELECT    cin.[machine_name], cin.[instance_name]
+																							SELECT    DISTINCT
+																									  cin.[machine_name], cin.[instance_name]
 																									, cin.[is_clustered], cin.[cluster_node_machine_name]
 																									, cdn.[database_name]
 																									, shcdd.[size_mb]
@@ -2577,6 +2602,9 @@ BEGIN TRY
 																																		AND rsr.[rule_id] = 8192
 																																		AND rsr.[active] = 1
 																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																																		AND (	rsr.[skip_value2] IS NULL
+																																			 OR rsr.[skip_value2] = cdn.[database_name]
+																																			)
 																							WHERE cin.[instance_active]=1
 																									AND cdn.[active]=1
 																									AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
@@ -2610,7 +2638,7 @@ BEGIN TRY
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
 										N'<TD WIDTH="360px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
@@ -2667,7 +2695,8 @@ BEGIN TRY
 											<TH WIDTH="80px" class="details-bold" nowrap>CHECKDB Age (Days)</TH>'
 			SET @idx=1		
 
-			DECLARE crsDatabaseDBCCCHECKDBAgeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
+			DECLARE crsDatabaseDBCCCHECKDBAgeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT  DISTINCT
+																									  cin.[machine_name], cin.[instance_name]
 																									, cin.[is_clustered], cin.[cluster_node_machine_name]
 																									, cdn.[database_name]
 																									, shcdd.[size_mb]
@@ -2683,6 +2712,9 @@ BEGIN TRY
 																																		AND rsr.[rule_id] = 16384
 																																		AND rsr.[active] = 1
 																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																																		AND (	rsr.[skip_value2] IS NULL
+																																			 OR rsr.[skip_value2] = cdn.[database_name]
+																																			)
 																							WHERE cin.[instance_active]=1
 																									AND cdn.[active]=1
 																									AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
@@ -2712,7 +2744,7 @@ BEGIN TRY
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
 										N'<TD WIDTH="360px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
@@ -2769,7 +2801,8 @@ BEGIN TRY
 			DECLARE   @isAutoClose		[bit]
 					, @isAutoShrink		[bit]
 
-			DECLARE crsDatabasesStatusIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
+			DECLARE crsDatabasesStatusIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT  DISTINCT
+																							  cin.[machine_name], cin.[instance_name]
 																							, cin.[is_clustered], cin.[cluster_node_machine_name]
 																							, cdn.[database_name]
 																							, shcdd.[is_auto_close]
@@ -2781,6 +2814,9 @@ BEGIN TRY
 																																AND rsr.[rule_id] = 512
 																																AND rsr.[active] = 1
 																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																																AND (	rsr.[skip_value2] IS NULL
+																																		OR rsr.[skip_value2] = cdn.[database_name]
+																																	)
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
 																							AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
@@ -2794,7 +2830,7 @@ BEGIN TRY
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
 										N'<TD WIDTH="490px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
@@ -2851,7 +2887,8 @@ BEGIN TRY
 			DECLARE @pageVerify			[sysname],
 					@compatibilityLevel	[tinyint]
 
-			DECLARE crsDatabasePageVerifyIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	SELECT    cin.[machine_name], cin.[instance_name]
+			DECLARE crsDatabasePageVerifyIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	SELECT  DISTINCT
+																								  cin.[machine_name], cin.[instance_name]
 																								, cin.[is_clustered], cin.[cluster_node_machine_name]
 																								, cdn.[database_name]
 																								, cin.[version]
@@ -2864,6 +2901,9 @@ BEGIN TRY
 																																	AND rsr.[rule_id] = 8388608
 																																	AND rsr.[active] = 1
 																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																																	AND (	rsr.[skip_value2] IS NULL
+																																			OR rsr.[skip_value2] = cdn.[database_name]
+																																		)
 																						WHERE cin.[instance_active]=1
 																								AND cdn.[active]=1
 																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
@@ -2886,7 +2926,7 @@ BEGIN TRY
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
 										N'<TD WIDTH="340px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
@@ -2943,7 +2983,8 @@ BEGIN TRY
 			SET @idx=1		
 			
 			DECLARE crsDatabaseFixedFileSizeIssuesDetected CURSOR LOCAL FAST_FORWARD FOR	
-																				SELECT    cin.[instance_name]
+																				SELECT DISTINCT
+																						  cin.[instance_name]
 																						, cdn.[database_name], cdn.[state_desc]
 																						, shcdd.[size_mb]
 																						, shcdd.[data_size_mb], shcdd.[data_space_used_percent]
@@ -2955,6 +2996,9 @@ BEGIN TRY
 																															AND rsr.[rule_id] = 4194304
 																															AND rsr.[active] = 1
 																															AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																															AND (	rsr.[skip_value2] IS NULL
+																																	OR rsr.[skip_value2] = cdn.[database_name]
+																																)
 																				WHERE	cin.[instance_active]=1
 																						AND cdn.[active]=1
 																						AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
@@ -3034,7 +3078,7 @@ BEGIN TRY
 																																		AND rsr.[active] = 1
 																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																							WHERE	cin.[instance_active]=1
-																									AND cin.[project_id] = @projectID
+																									AND (cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 																									AND cin.[instance_name] LIKE @sqlServerNameFilter
 																									AND lsam.descriptor IN (N'dbo.usp_hcCollectDiskSpaceUsage')
 																									AND rsr.[id] IS NULL
@@ -3046,7 +3090,7 @@ BEGIN TRY
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + N'"><A NAME="DiskSpaceInformationPermissionErrors' + @instanceName + N'">' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</A></TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + N'"><A NAME="DiskSpaceInformationPermissionErrors' + @instanceName + N'">' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</A></TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + N'">' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap ROWSPAN="' + CAST(@messageCount AS [nvarchar](64)) + N'">' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' 
 
@@ -3070,7 +3114,7 @@ BEGIN TRY
 															FROM [dbo].[vw_catalogInstanceNames]  cin
 															INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
 																WHERE	cin.[instance_active]=1
-																	AND cin.[project_id] = @projectID	
+																	AND (cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 																	AND cin.[instance_name] = @instanceName
 																	AND cin.[machine_name] = @machineName
 																	AND lsam.descriptor IN (N'dbo.usp_hcCollectDiskSpaceUsage')
@@ -3106,7 +3150,7 @@ BEGIN TRY
 			FROM [dbo].[vw_catalogInstanceNames]  cin
 			INNER JOIN [dbo].[vw_logAnalysisMessages] lsam ON lsam.[project_id] = cin.[project_id] AND lsam.[instance_id] = cin.[instance_id]
 			WHERE	cin.[instance_active]=1
-					AND cin.[project_id] = @projectID
+					AND (cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 					AND cin.[instance_name] LIKE @sqlServerNameFilter
 					AND lsam.descriptor IN (N'dbo.usp_hcCollectDiskSpaceUsage')
 
@@ -3164,8 +3208,11 @@ BEGIN TRY
 																																		AND rsr.[rule_id] = 262144
 																																		AND rsr.[active] = 1
 																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																																		AND (	rsr.[skip_value2] IS NULL
+																																			 OR rsr.[skip_value2] = dsi.[volume_mount_point]
+																																			)
 																							WHERE cin.[instance_active]=1
-																									AND cin.[project_id] = @projectID
+																									AND (cin.[project_id]=@projectID OR (@flgOptions & 268435456 = 268435456))
 																									AND cin.[instance_name] LIKE @sqlServerNameFilter
 																									AND (    (	  dsi.[percent_available] IS NOT NULL 
 																												AND dsi.[percent_available] < @reportOptionFreeDiskMinPercent 
@@ -3189,7 +3236,7 @@ BEGIN TRY
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
 										N'<TD WIDTH="100px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(@logicalDrive, N'&nbsp;') + N'</TD>' + 
@@ -3246,7 +3293,8 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsDatabasesStatusIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
+			DECLARE crsDatabasesStatusIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT  DISTINCT
+																							  cin.[machine_name], cin.[instance_name]
 																							, cin.[is_clustered], cin.[cluster_node_machine_name]
 																							, cdn.[database_name]
 																							, shcdd.[size_mb]
@@ -3257,6 +3305,9 @@ BEGIN TRY
 																																AND rsr.[rule_id] = 128
 																																AND rsr.[active] = 1
 																																AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																																AND (	rsr.[skip_value2] IS NULL
+																																		OR rsr.[skip_value2] = cdn.[database_name]
+																																	)
 																					WHERE cin.[instance_active]=1
 																							AND cdn.[active]=1
 																							AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
@@ -3272,7 +3323,7 @@ BEGIN TRY
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
 										N'<TD WIDTH="490px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
@@ -3330,7 +3381,8 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsDatabaseMaxLogSizeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
+			DECLARE crsDatabaseMaxLogSizeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT  DISTINCT
+																								  cin.[machine_name], cin.[instance_name]
 																								, cin.[is_clustered], cin.[cluster_node_machine_name]
 																								, cdn.[database_name]
 																								, shcdd.[size_mb]
@@ -3344,6 +3396,9 @@ BEGIN TRY
 																																	AND rsr.[rule_id] = 1024
 																																	AND rsr.[active] = 1
 																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																																	AND (	rsr.[skip_value2] IS NULL
+																																			OR rsr.[skip_value2] = cdn.[database_name]
+																																		)
 																						WHERE cin.[instance_active]=1
 																								AND cdn.[active]=1
 																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
@@ -3357,7 +3412,7 @@ BEGIN TRY
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
 										N'<TD WIDTH="370px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
@@ -3419,7 +3474,8 @@ BEGIN TRY
 
 			SET @idx=1		
 					
-			DECLARE crsDatabaseMinDataSpaceIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    cin.[machine_name], cin.[instance_name]
+			DECLARE crsDatabaseMinDataSpaceIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR SELECT  DISTINCT
+																								  cin.[machine_name], cin.[instance_name]
 																								, cin.[is_clustered], cin.[cluster_node_machine_name]
 																								, cdn.[database_name]
 																								, shcdd.[size_mb]
@@ -3433,6 +3489,9 @@ BEGIN TRY
 																																	AND rsr.[rule_id] = 2048
 																																	AND rsr.[active] = 1
 																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																																	AND (	rsr.[skip_value2] IS NULL
+																																			OR rsr.[skip_value2] = cdn.[database_name]
+																																		)
 																						WHERE cin.[instance_active]=1
 																								AND cdn.[active]=1
 																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
@@ -3450,7 +3509,7 @@ BEGIN TRY
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
 										N'<TD WIDTH="370px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
@@ -3525,6 +3584,9 @@ BEGIN TRY
 																																	AND rsr.[rule_id] = 32768
 																																	AND rsr.[active] = 1
 																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																																	AND (	rsr.[skip_value2] IS NULL
+																																			OR rsr.[skip_value2] = cdn.[database_name]
+																																		)
 																						WHERE cin.[instance_active]=1
 																								AND cdn.[active]=1
 																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
@@ -3543,7 +3605,7 @@ BEGIN TRY
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
 										N'<TD WIDTH="370px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
@@ -3607,7 +3669,8 @@ BEGIN TRY
 																									, [size_mb], [data_size_mb], [log_size_mb]
 																									, [log_vs_data]
 																							FROM (
-																									SELECT  cin.[machine_name], cin.[instance_name]
+																									SELECT  DISTINCT
+																											  cin.[machine_name], cin.[instance_name]
 																											, cin.[is_clustered], cin.[cluster_node_machine_name]
 																											, cdn.[database_name]
 																											, shcdd.[size_mb]
@@ -3621,6 +3684,9 @@ BEGIN TRY
 																																				AND rsr.[rule_id] = 4096
 																																				AND rsr.[active] = 1
 																																				AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																																				AND (	rsr.[skip_value2] IS NULL
+																																					 OR rsr.[skip_value2] = cdn.[database_name]
+																																					)
 																									WHERE cin.[instance_active]=1
 																											AND cdn.[active]=1
 																											AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
@@ -3639,7 +3705,7 @@ BEGIN TRY
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes' + ISNULL(N'<BR>[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
 										N'<TD WIDTH="370px" class="details" ALIGN="LEFT">' + ISNULL(@databaseName, N'&nbsp;') + N'</TD>' + 
@@ -3707,7 +3773,8 @@ BEGIN TRY
 
 			SET @idx=1		
 
-			DECLARE crsDatabaseLogVsDataSizeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT    hcdg.[instance_name], hcdg.[database_name], hcdg.[current_size_mb], hcdg.[old_size_mb]
+			DECLARE crsDatabaseLogVsDataSizeIssuesDetected CURSOR LOCAL FAST_FORWARD  FOR	SELECT  DISTINCT
+																									  hcdg.[instance_name], hcdg.[database_name], hcdg.[current_size_mb], hcdg.[old_size_mb]
 																									, hcdg.[current_data_size_mb], hcdg.[old_data_size_mb], hcdg.[current_log_size_mb], hcdg.[old_log_size_mb]
 																									, hcdg.[growth_size_mb], hcdg.[data_growth_percent]
 																							FROM #hcReportCapacityDatabaseGrowth		hcdg
@@ -3719,6 +3786,9 @@ BEGIN TRY
 																																		AND rsr.[rule_id] = 1073741824
 																																		AND rsr.[active] = 1
 																																		AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
+																																		AND (	rsr.[skip_value2] IS NULL
+																																			 OR rsr.[skip_value2] = cdn.[database_name]
+																																			)
 																							WHERE cin.[instance_active]=1
 																									AND cdn.[active]=1
 																									AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
@@ -3896,7 +3966,7 @@ BEGIN TRY
 																																	AND rsr.[active] = 1
 																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																						WHERE	cin.[instance_active]=1
-																								AND cin.[project_id] = @projectID
+																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																								AND cin.[instance_name] LIKE @sqlServerNameFilter
 																								AND lsam.descriptor IN (N'dbo.usp_hcCollectErrorlogMessages')
 																								AND rsr.[id] IS NULL
@@ -3908,7 +3978,7 @@ BEGIN TRY
 				begin
 					SET @HTMLReportArea = @HTMLReportArea + 
 								N'<TR VALIGN="TOP" class="' + CASE WHEN @idx & 1 = 1 THEN 'color-2' ELSE 'color-1' END + '">' + 
-										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName) END + N'</TD>' + 
+										N'<TD WIDTH="120px" class="details" ALIGN="LEFT" nowrap>' + CASE WHEN @isClustered=0 THEN @machineName ELSE dbo.ufn_reportHTMLGetClusterNodeNames(@projectID, @instanceName, @flgOptions) END + N'</TD>' + 
 										N'<TD WIDTH="200px" class="details" ALIGN="LEFT" nowrap>' + @instanceName + N'</TD>' + 
 										N'<TD WIDTH="120px" class="details" ALIGN="CENTER" nowrap>' + CASE WHEN @isClustered=0 THEN N'No' ELSE N'Yes<BR>' + ISNULL(N'[' + @clusterNodeName + ']', N'&nbsp;') END + N'</TD>' + 
 										N'<TD WIDTH="150px" class="details" ALIGN="CENTER" nowrap>' + ISNULL(CONVERT([nvarchar](24), @eventDate, 121), N'&nbsp;') + N'</TD>' + 
@@ -4062,7 +4132,7 @@ BEGIN TRY
 																																	AND rsr.[active] = 1
 																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																						WHERE	cin.[instance_active]=1
-																								AND cin.[project_id] = @projectID
+																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																								AND cin.[instance_name] LIKE @sqlServerNameFilter
 																								AND lsam.descriptor IN (N'dbo.usp_hcCollectOSEventLogs')
 																								AND rsr.[id] IS NULL
@@ -4270,7 +4340,8 @@ BEGIN TRY
 														 ELSE N''
 													END
 											FROM (
-													SELECT    cdn.[database_name], cdn.[state_desc]
+													SELECT    DISTINCT
+															  cdn.[database_name], cdn.[state_desc]
 															, shcdd.[size_mb]
 															, shcdd.[data_size_mb], shcdd.[data_space_used_percent]
 															, shcdd.[log_size_mb], shcdd.[log_space_used_percent] 
@@ -4340,14 +4411,14 @@ BEGIN TRY
 
 			SET @idx=1		
 			
-			DECLARE crsSQLServerAgentJobsInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT	ssajh.[instance_name], COUNT(*) AS [job_count]
+			DECLARE crsSQLServerAgentJobsInstanceName CURSOR LOCAL FAST_FORWARD FOR	SELECT	ssajh.[instance_name], COUNT(DISTINCT [job_name] + CONVERT(varchar(20), ISNULL([last_execution_utc], GETUTCDATE()), 120)) AS [job_count]
 																					FROM	[health-check].[vw_statsSQLAgentJobsHistory] ssajh
 																					INNER JOIN [dbo].[vw_catalogInstanceNames] cin ON cin.[project_id] = ssajh.[project_id] AND cin.[instance_id] = ssajh.[instance_id]
 																					LEFT JOIN [report].[htmlSkipRules] rsr ON	rsr.[module] = 'health-check'
 																																AND rsr.[rule_id] = 32
 																																AND rsr.[active] = 1
 																																AND (rsr.[skip_value]=ssajh.[instance_name])
-																					WHERE	cin.[project_id]=@projectID
+																					WHERE	(cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																							AND cin.[instance_name] LIKE @sqlServerNameFilter
 																							AND cin.[instance_active]=1
 																							AND rsr.[id] IS NULL
@@ -4382,12 +4453,16 @@ BEGIN TRY
 													END
 
 											FROM (
-													SELECT	[job_name], [last_execution_status], [last_execution_date], [last_execution_time], [message]
+													SELECT [job_name], [last_execution_status], [last_execution_date], [last_execution_time], [message]
 															, ROW_NUMBER() OVER(ORDER BY [job_name]) [row_no]
 															, SUM(1) OVER() AS [row_count]
-													FROM	[health-check].[vw_statsSQLAgentJobsHistory]
-													WHERE	[project_id]=@projectID
-															AND [instance_name] = @instanceName
+													FROM (
+															SELECT	DISTINCT
+																	[job_name], [last_execution_status], [last_execution_date], [last_execution_time], [message]
+															FROM	[health-check].[vw_statsSQLAgentJobsHistory]
+															WHERE	([project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
+																	AND [instance_name] = @instanceName
+														)Y
 												)X
 											ORDER BY [job_name]
 											FOR XML PATH(''), TYPE
@@ -4468,7 +4543,7 @@ BEGIN TRY
 																																	AND rsr.[active] = 1
 																																	AND (rsr.[skip_value] = cin.[machine_name] OR rsr.[skip_value]=cin.[instance_name])
 																						WHERE cin.[instance_active]=1
-																								AND cin.[project_id] = @projectID
+																								AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 																								AND cin.[instance_name] LIKE @sqlServerNameFilter
 																								AND rsr.[id] IS NULL	
 																						GROUP BY cin.[machine_name], cin.[is_clustered], cin.[cluster_node_machine_name]
@@ -4518,7 +4593,7 @@ BEGIN TRY
 																GROUP BY  dsi.[instance_id], dsi.[project_id], dsi.[logical_drive], dsi.[volume_mount_point]
 															) dsi	ON dsi.[project_id] = cin.[project_id] AND dsi.[instance_id] = cin.[instance_id]
 													WHERE	cin.[instance_active]=1
-															AND cin.[project_id] = @projectID	
+															AND (cin.[project_id] = @projectID OR (@flgOptions & 268435456 = 268435456))
 															/*AND cin.[instance_name] =  @instanceName*/
 															AND cin.[machine_name] = @machineName
 													GROUP BY dsi.[logical_drive], dsi.[volume_mount_point]

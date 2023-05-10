@@ -1064,3 +1064,8 @@
 * health-check: collect database backup information taken with other tools then dbaTDPMon (enhance Backup Size details in the HTML report)
 * health-check: fixed minor bugs on data collection
 * release of dbaTDPMon - v2022.02
+
+------------
+#### May 2023 new features & fixes
+10.05.2023
+* maintenance: add support for remote maintenance of system databases

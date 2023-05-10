@@ -330,6 +330,10 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpJobProjectDefaultPlanCreate.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\stored-procedures\dbo.usp_mpDoSystemMaintenance.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+
 :hc
 SET schema_installed=0
 sqlcmd.exe -S%server% %autentif% -Q "set nocount on; select name from sys.schemas where name='health-check' and exists(select * from sys.objects where name='usp_hcCollectDatabaseDetails')" -d %dbname% -o check-schema.out -b -r 1
@@ -489,7 +493,7 @@ if errorlevel 1 goto install_err
 
 
 :done
-sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2022.02.20' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2023.05.10' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err  
 
 echo *-----------------------------------------------------------------------------*
