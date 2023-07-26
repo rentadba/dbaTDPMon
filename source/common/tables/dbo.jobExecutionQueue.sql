@@ -77,7 +77,7 @@ CREATE INDEX [IX_jobExecutionQueue_ProjectID] ON [dbo].[jobExecutionQueue] ([pro
 GO
 CREATE INDEX [IX_jobExecutionQueue_JobName] ON [dbo].[jobExecutionQueue]([job_name], [job_step_name]) 
 GO
-CREATE INDEX [IX_jobExecutionQueue_Descriptor] ON [dbo].[jobExecutionQueue]([project_id], [status], [module], [descriptor], [task_id]) INCLUDE ([instance_id], [for_instance_id], [job_name], [execution_date]) 
+CREATE INDEX [IX_jobExecutionQueue_Descriptor] ON [dbo].[jobExecutionQueue]([descriptor], [module], [project_id], [task_id], [status]) INCLUDE ([instance_id], [for_instance_id], [job_name], [execution_date]) 
 GO
 CREATE INDEX [IX_jobExecutionQueue_JobQueue] ON [dbo].[jobExecutionQueue]([for_instance_id], [project_id], [task_id], [database_name], [instance_id], [job_name], [module], [descriptor], [job_step_name], [job_database_name]) INCLUDE([status], [event_date_utc], [priority])
 GO

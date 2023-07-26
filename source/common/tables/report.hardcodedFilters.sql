@@ -114,6 +114,9 @@ INSERT	INTO [report].[hardcodedFilters] ([module], [object_name], [filter_patter
 		SELECT 'health-check', 'statsErrorlogDetails', '%Restore is complete on database %. The database is now available.%', 1 UNION ALL
 		SELECT 'health-check', 'statsErrorlogDetails', '%AppDomain % created.%', 1 UNION ALL
 		SELECT 'health-check', 'statsErrorlogDetails', '%AppDomain % is marked for unload due to common language runtime (CLR) or security data definition language (DDL) operations.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Buffer Pool scan took % seconds: database ID %, command ''DBCC TABLE CHECK''%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Parallel redo is started for database % with worker pool size%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Parallel redo is shutdown for database % with worker pool size%', 1 UNION ALL
 
 		SELECT 'health-check', 'statsOSEventLogs', '%Logon failed for login%', 1 UNION ALL
 		SELECT 'health-check', 'statsOSEventLogs', '%Unable to retrieve steps for job%', 1 UNION ALL

@@ -472,6 +472,10 @@ IF @agName IS NOT NULL AND @clusterName IS NOT NULL AND ISNULL(@agSynchronizatio
 					begin
 						SET @queryToRun=N'Availability Group: Operation is not allowed on a non-readable secondary replica.'
 					end
+				IF @agReadableSecondary <> 'NO' AND @sqlServerName <> @@SERVERNAME
+					begin
+						SET @queryToRun=N'Availability Group: Operation is not supported on a secondary replica when running remote maintenance.'
+					end
 				IF 	(@flgActions & 8 = 8)
 					begin
 						SET @queryToRun=N'Availability Group: Operation is not supported on a secondary replica.'

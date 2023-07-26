@@ -101,7 +101,8 @@ DECLARE crsCollectorDescriptor CURSOR LOCAL FAST_FORWARD FOR	SELECT x.[descripto
 																		SELECT 'dbo.usp_hcCollectSQLServerAgentJobsStatus' AS [descriptor], 3 AS [execution_order] UNION ALL
 																		SELECT 'dbo.usp_hcCollectErrorlogMessages' AS [descriptor], 4 AS [execution_order] UNION ALL
 																		SELECT 'dbo.usp_hcCollectOSEventLogs' AS [descriptor], 5 AS [execution_order] UNION ALL
-																		SELECT 'dbo.usp_hcCollectEventMessages' AS [descriptor], 6 AS [execution_order]
+																		SELECT 'dbo.usp_hcCollectEventMessages' AS [descriptor], 6 AS [execution_order] UNION ALL
+																		SELECT 'dbo.usp_hcCollectDatabaseGrowth' AS [descriptor], 7 AS [execution_order]
 																	)x
 																INNER JOIN [dbo].[appInternalTasks] it ON it.[descriptor] = x.[descriptor]
 																WHERE x.[descriptor] LIKE @collectorDescriptor
@@ -224,8 +225,6 @@ WHILE @@FETCH_STATUS=0
 								WHERE @configParallelJobs = 1
 							)X
 			end
-
-
 
 		------------------------------------------------------------------------------------------------------------------------------------------
 		IF @codeDescriptor = 'dbo.usp_hcCollectErrorlogMessages'
@@ -352,6 +351,35 @@ WHILE @@FETCH_STATUS=0
 				WHERE y.[row_no] <> 1
 			end
 
+		------------------------------------------------------------------------------------------------------------------------------------------
+		IF @codeDescriptor = 'dbo.usp_hcCollectDatabaseGrowth'
+			begin
+				INSERT	INTO @jobExecutionQueue(  [instance_id], [project_id], [module], [descriptor], [task_id]
+												, [for_instance_id], [job_name], [job_step_name], [job_database_name]
+												, [job_command])
+						SELECT	@instanceID AS [instance_id], @projectID AS [project_id], @module AS [module], @codeDescriptor AS [descriptor], @taskID, 
+								X.[instance_id] AS [for_instance_id], 
+								SUBSTRING(DB_NAME() + ' - ' + @codeDescriptor + CASE WHEN X.[instance_name] <> @@SERVERNAME THEN ' - ' + CASE WHEN UPPER(X.[instance_name]) NOT LIKE '%.DATABASE.WINDOWS.NET' THEN REPLACE(UPPER(X.[instance_name]), '\', '$') ELSE SUBSTRING(UPPER(X.[instance_name]), 1, CHARINDEX('.', UPPER(X.[instance_name]))-1) END + ' - '  ELSE ' - ' END + @projectCode, 1, 128) AS [job_name],
+								'Run Collect'	AS [job_step_name],
+								DB_NAME()		AS [job_database_name],
+								'EXEC [dbo].[usp_hcCollectDatabaseGrowth] @projectCode = ''' + @projectCode + ''', @sqlServerNameFilter = ''' + X.[instance_name] + ''', @debugMode = ' + CAST(@debugMode AS [varchar])
+						FROM
+							(
+								SELECT	DISTINCT cin.[instance_id], cin.[instance_name]
+								FROM	[dbo].[vw_catalogInstanceNames] cin
+								WHERE 	cin.[project_id] = @projectID
+										AND cin.[instance_active]=1
+										AND cin.[instance_name] LIKE @sqlServerNameFilter
+										AND @configParallelJobs <> 1
+								
+								UNION ALL
+
+								SELECT @instanceID AS [instance_id], '%' AS [instance_name]
+								WHERE @configParallelJobs = 1
+							)X
+			end
+
+		------------------------------------------------------------------------------------------------------------------------------------------
 		IF @recreateMode = 0
 			begin
 				/* preserve any unfinished job and increase its priority */

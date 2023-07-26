@@ -60,26 +60,6 @@ echo *--------------------------------------------------------------------------
 echo Common: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
 
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20190906-patch-upgrade-from-v2019_6-to-v2019_9-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20191114-patch-upgrade-from-v2019_10-to-v2019_11-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20191203-patch-upgrade-from-v2019_11-to-v2019_12-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20191210-patch-upgrade-from-v2019_11-to-v2019_12-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20191212-patch-upgrade-from-v2019_12-to-v2020_01-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20191215-patch-upgrade-from-v2019_12-to-v2020_01-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20210215-patch-upgrade-from-v2020_01-to-v2021_02-common.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
 
 
 echo *-----------------------------------------------------------------------------*
@@ -245,7 +225,7 @@ echo *--------------------------------------------------------------------------
 sqlcmd.exe -S%server% %autentif% -i "..\maintenance-plan\job-scripts\msdb-create-custom-indexes.sql" -d msdb -v dbName=%dbname% -b -r 1
 if errorlevel 1 goto install_err
 
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20191129-patch-upgrade-from-v2019_10-to-v2019_11-mp.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20230515-patch-upgrade-from-v2022_02-to-v2023_05-mp.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 
@@ -345,7 +325,10 @@ echo *--------------------------------------------------------------------------
 echo Health Check: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
 
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20191103-patch-upgrade-from-v2019_10-to-v2019_11-hc.sql" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20230521-patch-upgrade-from-v2022_02-to-v2023_05-hc.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
+sqlcmd.exe -S%server% %autentif% -i "..\patches\20230726-patch-upgrade-from-v2023_05-to-v2023_07-hc.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
 
@@ -403,6 +386,9 @@ if errorlevel 1 goto install_err
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectOSEventLogs.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
+sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_hcCollectDatabaseGrowth.sql" -d %dbname%  -b -r 1
+if errorlevel 1 goto install_err
+
 sqlcmd.exe -S%server% %autentif% -i "..\health-check\stored-procedures\dbo.usp_reportHTMLBuildHealthCheck.sql" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err
 
@@ -438,9 +424,6 @@ if "%schema_installed%" == "0" goto integration
 echo *-----------------------------------------------------------------------------*
 echo Monitoring: Running table's patching scripts...
 echo *-----------------------------------------------------------------------------*
-
-sqlcmd.exe -S%server% %autentif% -i "..\patches\20191013-patch-upgrade-from-v2019_9-to-v2019_10-mon.sql" -d %dbname%  -b -r 1
-if errorlevel 1 goto install_err
 
 
 echo *-----------------------------------------------------------------------------*
@@ -493,7 +476,7 @@ if errorlevel 1 goto install_err
 
 
 :done
-sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2023.05.10' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
+sqlcmd.exe -S%server% %autentif% -Q "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2023.07.26' WHERE [module] = 'common' AND [name] = 'Application Version'" -d %dbname%  -b -r 1
 if errorlevel 1 goto install_err  
 
 echo *-----------------------------------------------------------------------------*

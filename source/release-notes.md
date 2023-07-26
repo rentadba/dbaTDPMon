@@ -1069,3 +1069,9 @@
 #### May 2023 new features & fixes
 10.05.2023
 * maintenance: add support for remote maintenance of system databases
+
+15.05.2023
+* maintenance: fixed issues related to alerts when running remote maintenance against a read-only secondary replica
+
+26.07.2023
+* health-check: collect database file(s) growth events from default trace files into [health-check].[statsDatabaseGrowth]
