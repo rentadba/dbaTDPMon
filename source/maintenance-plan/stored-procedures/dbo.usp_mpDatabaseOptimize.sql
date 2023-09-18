@@ -15,7 +15,7 @@ CREATE PROCEDURE [dbo].[usp_mpDatabaseOptimize]
 		@tableSchema				[sysname]	=   '%',
 		@tableName					[sysname]   =   '%',
 		@flgActions					[smallint]	=    27,
-		@flgOptions					[int]		= 45185,--32768 + 8192 + 4096 + 128 + 1
+		@flgOptions					[int]		= 45189,--32768 + 8192 + 4096 + 128 + 4 + 1
 		@defragIndexThreshold		[smallint]	=     5,
 		@rebuildIndexThreshold		[smallint]	=    30,
 		@pageThreshold				[int]		=  1000,
@@ -53,10 +53,10 @@ AS
 --						 8  - Update/create statistics for table (UPDATE STATISTICS)						(default)
 --							  should be performed daily
 --						16  - Rebuild heap tables (SQL versions +2K5 only)									(default)
---		@flgOptions		 1  - Compact large objects (LOB) (default)
+--		@flgOptions		 1  - Compact large objects (LOB) when reorganize  (default); for columnstore indexes will compress all row groups (COMPRESS_ALL_ROW_GROUPS)
 --						 2  - 
 --						 4  - Rebuild all dependent indexes when rebuild primary indexes (default)
---						 8  - Disable non-clustered index before rebuild (save space) (default)
+--						 8  - Disable non-clustered index before rebuild (save space)
 --						16  - Disable foreign key constraints that reffer current table before rebuilding with disable clustered/unique indexes
 --						32  - Stop execution if an error occurs. Default behaviour is to print error messages and continue execution
 --					    64  - When enabling foreign key constraints, do no check values. Default behaviour is to enabled foreign key constraint with check option
@@ -105,6 +105,9 @@ DECLARE		@queryToRun    					[nvarchar](4000),
 			@CurentPageDensityDeviation		[numeric] (6,2),
 			@CurrentPageCount				[bigint],
 			@CurrentForwardedRecordsPercent	[numeric] (6,2),
+			@CurrentSegmentCount			[bigint],
+			@CurrentDeletedSegmentCount		[bigint],
+			@CurentDeletedSegmentPercentage	[numeric] (6,2),
 			@errorCode						[int],
 			@ClusteredRebuildNonClustered	[bit],
 			@flgInheritOptions				[int],
@@ -352,8 +355,8 @@ end
 ---------------------------------------------------------------------------------------------
 --create temporary tables that will be used 
 ---------------------------------------------------------------------------------------------
-IF OBJECT_ID('tempdb..#CurrentIndexFragmentationStats') IS NOT NULL DROP TABLE #CurrentIndexFragmentationStats
-CREATE TABLE #CurrentIndexFragmentationStats 
+IF OBJECT_ID('tempdb..#currentRowStoreFragmentationStats') IS NOT NULL DROP TABLE #currentRowStoreFragmentationStats
+CREATE TABLE #currentRowStoreFragmentationStats 
 		(	
 			[ObjectName] 					[varchar] (255),
 			[ObjectId] 						[int],
@@ -379,8 +382,24 @@ CREATE TABLE #CurrentIndexFragmentationStats
 			[partition_number]				[int]
 		)	
 			
-CREATE INDEX IX_CurrentIndexFragmentationStats ON #CurrentIndexFragmentationStats([ObjectId], [IndexId])
+CREATE INDEX IX_currentRowStoreFragmentationStats ON #currentRowStoreFragmentationStats([ObjectId], [IndexId])
 
+---------------------------------------------------------------------------------------------
+IF object_id('tempdb..#currentColumnStoreFragmentationStats') IS NOT NULL 
+	DROP TABLE #currentColumnStoreFragmentationStats
+
+CREATE TABLE #currentColumnStoreFragmentationStats
+		(
+			[object_id]						[int],
+			[index_id]						[int],
+			[partition_number]				[int]		NULL,
+			[page_count]					[bigint]	NULL,
+			[avg_fragmentation_in_percent]	[decimal](38,2)	NULL,
+			[segments_count]				[bigint]	NULL,
+			[deleted_segments_count]		[bigint]	NULL,
+			[deleted_segments_percentage]	[decimal](38,2)	NULL
+		)
+CREATE INDEX IX_currentColumnStoreFragmentationStats ON #currentColumnStoreFragmentationStats([object_id], [index_id])
 
 ---------------------------------------------------------------------------------------------
 IF object_id('tempdb..#databaseObjectsWithIndexList') IS NOT NULL 
@@ -398,11 +417,14 @@ CREATE TABLE #databaseObjectsWithIndexList(
 											[is_rebuilt]					[bit]		NOT NULL DEFAULT (0),
 											[page_count]					[bigint]	NULL,
 											[avg_fragmentation_in_percent]	[decimal](38,2)	NULL,
-											[ghost_record_count]			[bigint]	NULL,
-											[forwarded_records_percentage]	[decimal](38,2)	NULL,
-											[page_density_deviation]		[decimal](38,2)	NULL,
+											[ghost_record_count]			[bigint]	NULL,		
+											[forwarded_records_percentage]	[decimal](38,2)	NULL,	
+											[page_density_deviation]		[decimal](38,2)	NULL,	
 											[partition_number]				[int] NULL,
-											[is_partitioned]				[bit] NULL
+											[is_partitioned]				[bit] NULL,
+											[segments_count]				[bigint]	NULL,		/* for columnstore indexes */
+											[deleted_segments_count]		[bigint]	NULL,		/* for columnstore indexes */
+											[deleted_segments_percentage]	[decimal](38,2)	NULL,	/* for columnstore indexes */
 											)
 CREATE INDEX IX_databaseObjectsWithIndexList_TableName ON #databaseObjectsWithIndexList([table_schema], [table_name], [index_id], [partition_number], [avg_fragmentation_in_percent], [page_count], [index_type], [is_rebuilt])
 CREATE INDEX IX_databaseObjectsWithIndexList_LogicalDefrag ON #databaseObjectsWithIndexList([avg_fragmentation_in_percent], [page_count], [index_type], [is_rebuilt])
@@ -458,6 +480,18 @@ CREATE TABLE #unusedIndexes (
 
 ---------------------------------------------------------------------------------------------
 EXEC [dbo].[usp_logPrintMessage] @customMessage = '<separator-line>', @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+
+--------------------------------------------------------------------------------------------------
+--perform internal cleanup
+--------------------------------------------------------------------------------------------------
+EXEC [dbo].[usp_mpMarkInternalAction]	@actionName			= N'index-rebuild',
+										@flgOperation		= 2,
+										@server_name		= @sqlServerName,
+										@database_name		= @dbName,
+										@schema_name		= @tableSchema,
+										@object_name		= @tableName,
+										@child_object_name	= '%'
 
 --------------------------------------------------------------------------------------------------
 --get objects for which maintenance cannot be perform as the filegroup is offline
@@ -634,7 +668,7 @@ IF (@flgActions & 16 = 16) AND (GETDATE() <= @stopTimeLimit)
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 						
-				INSERT	INTO #CurrentIndexFragmentationStats([ObjectName], [ObjectId], [IndexName], [IndexId], [LogicalFragmentation], [Pages], [Rows], [ForwardedRecords], [AverageRecordSize], [AveragePageDensity], [ghost_record_count], [partition_number])  
+				INSERT	INTO #currentRowStoreFragmentationStats([ObjectName], [ObjectId], [IndexName], [IndexId], [LogicalFragmentation], [Pages], [Rows], [ForwardedRecords], [AverageRecordSize], [AveragePageDensity], [ghost_record_count], [partition_number])  
 						EXEC sp_executesql  @queryToRun
 
 				FETCH NEXT FROM crsObjectsWithIndexes INTO @DatabaseID, @ObjectID, @CurrentTableSchema, @CurrentTableName, @IndexID, @IndexName, @IndexType, @IndexFillFactor
@@ -655,7 +689,7 @@ IF (@flgActions & 16 = 16) AND (GETDATE() <= @stopTimeLimit)
 															ELSE 0
 													   END)
 		FROM	#databaseObjectsWithIndexList doil
-		INNER JOIN #CurrentIndexFragmentationStats cifs ON	cifs.[ObjectId] = doil.[object_id] 
+		INNER JOIN #currentRowStoreFragmentationStats cifs ON	cifs.[ObjectId] = doil.[object_id] 
 															AND cifs.[IndexId] = doil.[index_id] 
 															AND cifs.[partition_number] = doil.[partition_number]
 	end
@@ -745,7 +779,7 @@ IF (@flgActions & 16 = 16) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly =
 --------------------------------------------------------------------------------------------------
 IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4)) AND (GETDATE() <= @stopTimeLimit)
 	begin
-		SET @analyzeIndexType=N'1,2,3,4'		
+		SET @analyzeIndexType=N'1,2,3,4,5,6'
 
 		SET @queryToRun=N'Create list of indexes to be analyzed...' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted')
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
@@ -1196,13 +1230,12 @@ IF @flgOptions & 32768 = 32768
 --------------------------------------------------------------------------------------------------
 IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AND (GETDATE() <= @stopTimeLimit)
 	begin
-
-		SET @queryToRun='Analyzing index fragmentation...'
+		SET @queryToRun='Analyzing row-store indexes fragmentation...'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 		DECLARE crsObjectsWithIndexes CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT [database_id], [object_id], [table_schema], [table_name], [index_id], [index_name], [index_type], [fill_factor]
 																	FROM #databaseObjectsWithIndexList																	
-																	WHERE [index_type] <> 0 /* exclude heaps */
+																	WHERE [index_type] IN (1, 2, 3, 4)
 																	ORDER BY [table_schema], [table_name], [index_id]
 		OPEN crsObjectsWithIndexes
 		FETCH NEXT FROM crsObjectsWithIndexes INTO @DatabaseID, @ObjectID, @CurrentTableSchema, @CurrentTableName, @IndexID, @IndexName, @IndexType, @IndexFillFactor
@@ -1233,7 +1266,7 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AN
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 						
-				INSERT	INTO #CurrentIndexFragmentationStats([ObjectName], [ObjectId], [IndexName], [IndexId], [LogicalFragmentation], [Pages], [Rows], [ForwardedRecords], [AverageRecordSize], [AveragePageDensity], [ghost_record_count], [partition_number])  
+				INSERT	INTO #currentRowStoreFragmentationStats([ObjectName], [ObjectId], [IndexName], [IndexId], [LogicalFragmentation], [Pages], [Rows], [ForwardedRecords], [AverageRecordSize], [AveragePageDensity], [ghost_record_count], [partition_number])  
 						EXEC sp_executesql  @queryToRun
 
 				FETCH NEXT FROM crsObjectsWithIndexes INTO @DatabaseID, @ObjectID, @CurrentTableSchema, @CurrentTableName, @IndexID, @IndexName, @IndexType, @IndexFillFactor
@@ -1254,9 +1287,77 @@ IF ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AN
 															ELSE 0
 													   END)
 		FROM	#databaseObjectsWithIndexList doil
-		INNER JOIN #CurrentIndexFragmentationStats cifs ON	cifs.[ObjectId] = doil.[object_id] 
+		INNER JOIN #currentRowStoreFragmentationStats cifs ON	cifs.[ObjectId] = doil.[object_id] 
 															AND cifs.[IndexId] = doil.[index_id] 
 															AND cifs.[partition_number] = doil.[partition_number]
+	end
+
+IF (@serverVersionNum >= 13) AND ((@flgActions & 1 = 1) OR (@flgActions & 2 = 2) OR (@flgActions & 4 = 4))  AND (GETDATE() <= @stopTimeLimit)
+	begin
+		SET @queryToRun='Analyzing columnstore indexes fragmentation...'
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+		DECLARE crsObjectsWithIndexes CURSOR LOCAL FAST_FORWARD FOR SELECT DISTINCT [database_id], [object_id], [table_schema], [table_name], [index_id], [index_name], [index_type], [fill_factor]
+																	FROM #databaseObjectsWithIndexList																	
+																	WHERE [index_type] IN (5, 6)
+																	ORDER BY [table_schema], [table_name], [index_id]
+		OPEN crsObjectsWithIndexes
+		FETCH NEXT FROM crsObjectsWithIndexes INTO @DatabaseID, @ObjectID, @CurrentTableSchema, @CurrentTableName, @IndexID, @IndexName, @IndexType, @IndexFillFactor
+		WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
+			begin
+				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted') + CASE WHEN @IndexName IS NOT NULL THEN N' - ' + [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') ELSE N' (heap)' END
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+				SET @queryToRun=CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
+					SELECT    cc.object_id, cc.index_id, cc.partition_number, ps.page_count
+							, cc.avg_fragmentation_in_percent, cc.deleted_segments_count, cc.segments_count
+					FROM (
+							SELECT    i.object_id
+									, i.index_id
+									, p.partition_number
+									, 100.0 * (ISNULL(SUM(rgs.deleted_rows), 0)) / NULLIF(SUM(rgs.total_rows), 0) AS avg_fragmentation_in_percent
+									, SUM(CASE rgs.deleted_rows WHEN rgs.total_rows THEN 1 ELSE 0 END ) AS deleted_segments_count
+									, COUNT(*) AS segments_count
+							FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.indexes AS i
+							INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.partitions AS p ON i.object_id = p.object_id
+							INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.dm_db_column_store_row_group_physical_stats AS rgs ON	i.object_id = rgs.object_id
+																								AND i.index_id = rgs.index_id					
+							WHERE rgs.state_desc = ''COMPRESSED''
+								AND i.object_id = ' + CAST(@ObjectID AS [nvarchar]) + N'
+								AND i.index_id = ' + CAST(@IndexID AS [nvarchar]) + N'
+								AND i.[is_disabled]=0
+							GROUP BY i.object_id, i.index_id, i.name, i.type_desc, p.partition_number
+					) cc
+					INNER JOIN
+						(
+							SELECT   object_id, index_id
+									, COUNT(*) AS partitions_count
+									, SUM(reserved_page_count) AS page_count
+									, SUM(row_count) AS row_count
+							FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'sys.dm_db_partition_stats
+							GROUP BY object_id, index_id
+						) ps ON cc.object_id = ps.object_id and cc.index_id = ps.index_id'
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode=1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+
+				INSERT	INTO #currentColumnStoreFragmentationStats([object_id], [index_id], [partition_number], [page_count], [avg_fragmentation_in_percent], [deleted_segments_count], [segments_count])
+						EXEC sp_executesql  @queryToRun
+
+				FETCH NEXT FROM crsObjectsWithIndexes INTO @DatabaseID, @ObjectID, @CurrentTableSchema, @CurrentTableName, @IndexID, @IndexName, @IndexType, @IndexFillFactor
+			end
+		CLOSE crsObjectsWithIndexes
+		DEALLOCATE crsObjectsWithIndexes
+
+		UPDATE doil
+			SET   doil.[avg_fragmentation_in_percent] = cifs.[avg_fragmentation_in_percent]
+				, doil.[page_count] = cifs.[page_count]
+				, doil.[segments_count] = cifs.[segments_count]
+				, doil.[deleted_segments_count] = cifs.[deleted_segments_count]
+				, doil.[deleted_segments_percentage] = CASE WHEN cifs.[segments_count] > 0 THEN 100.0 * cifs.[deleted_segments_count] / cifs.[segments_count] ELSE 0 END
+		FROM	#databaseObjectsWithIndexList doil
+		INNER JOIN #currentColumnStoreFragmentationStats cifs ON	cifs.[object_id] = doil.[object_id] 
+																	AND cifs.[index_id] = doil.[index_id] 
+																	AND cifs.[partition_number] = doil.[partition_number]
 	end
 
 
@@ -1268,7 +1369,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 	begin
 		SET @queryToRun=N'Defragmenting database tables indexes (fragmentation between ' + CAST(@defragIndexThreshold AS [nvarchar]) + ' and ' + CAST(CAST(@rebuildIndexThreshold AS NUMERIC(6,2)) AS [nvarchar]) + ') and more than ' + CAST(@pageThreshold AS [nvarchar](4000)) + ' pages...'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-		
+
 		DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT	DISTINCT doil.[table_schema], doil.[table_name]
 		   													FROM	#databaseObjectsWithIndexList doil
 															WHERE	doil.[page_count] >= @pageThreshold
@@ -1296,6 +1397,12 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 																						)
 																					)
 																			)
+																		OR (
+																			/* for columnstore indexes */
+																				doil.[index_type] IN (5, 6)
+																			AND	doil.[deleted_segments_percentage] >= @defragIndexThreshold
+																			AND doil.[deleted_segments_percentage] < @rebuildIndexThreshold
+																		   )
 																		)
 															ORDER BY doil.[table_schema], doil.[table_name]
 		OPEN crsTableList
@@ -1308,6 +1415,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 				DECLARE crsIndexesToDegfragment CURSOR LOCAL FAST_FORWARD FOR 	SELECT	DISTINCT doil.[index_name], doil.[index_type], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[object_id], doil.[index_id]
 																								, doil.[page_density_deviation], doil.[fill_factor]
 																								, doil.[is_partitioned], doil.[partition_number]
+																								, doil.[segments_count], doil.[deleted_segments_count], doil.[deleted_segments_percentage]																								
 							   													FROM	#databaseObjectsWithIndexList doil
    																				WHERE	doil.[table_name] = @CurrentTableName
 																						AND doil.[table_schema] = @CurrentTableSchema
@@ -1336,19 +1444,33 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 																											)
 																										)
 																								)
+																							OR (
+																								/* for columnstore indexes */
+																									doil.[index_type] IN (5, 6)
+																								AND	doil.[deleted_segments_percentage] >= @defragIndexThreshold
+																								AND doil.[deleted_segments_percentage] < @rebuildIndexThreshold
+																							   )
 																							)																		
 																				ORDER BY doil.[index_id]
 				OPEN crsIndexesToDegfragment
-				FETCH NEXT FROM crsIndexesToDegfragment INTO @IndexName, @IndexType, @CurrentFragmentation, @CurrentPageCount, @ObjectID, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor, @isPartitioned, @partitionNumber
+				FETCH NEXT FROM crsIndexesToDegfragment INTO @IndexName, @IndexType, @CurrentFragmentation, @CurrentPageCount, @ObjectID, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor, @isPartitioned, @partitionNumber, @CurrentSegmentCount, @CurrentDeletedSegmentCount, @CurentDeletedSegmentPercentage
 				WHILE @@FETCH_STATUS = 0 AND (GETDATE() <= @stopTimeLimit)
 					begin
 						SET @IndexTypeDesc=CASE @IndexType	WHEN 0 THEN 'Heap' 
-															WHEN 1 THEN 'Clustered' 
-															WHEN 2 THEN 'Nonclustered' 
+															WHEN 1 THEN 'Clustered rowstore' 
+															WHEN 2 THEN 'Nonclustered rowstore' 
 															WHEN 3 THEN 'XML'
 															WHEN 4 THEN 'Spatial' 
+															WHEN 5 THEN 'Clustered columnstore'
+															WHEN 6 THEN 'Nonclustered columnstore'
+															WHEN 7 THEN 'Nonclustered hash'
 											END
-   						SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') + ' => ' + CASE WHEN @isPartitioned = 1 THEN 'partition ' + CAST(@partitionNumber AS [varchar](32)) + N' / ' ELSE N'' END + 'current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
+		   				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') + ' => ' + CASE WHEN @isPartitioned = 1 THEN 'partition ' + CAST(@partitionNumber AS [varchar](32)) + N' / ' ELSE N'' END +
+																										'current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + 
+																										CASE WHEN @IndexType IN (1, 2, 3, 4) THEN ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) 
+																											 WHEN @IndexType IN (5, 6) THEN ' / segments count = ' + CAST(@CurrentSegmentCount AS [varchar](32)) 
+																										END + 																							+ 
+																										' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 
 						SET @objectName =  [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'quoted')
@@ -1356,18 +1478,32 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 
 						--------------------------------------------------------------------------------------------------
 						--log index fragmentation information
-						SET @eventData='<index-fragmentation><detail>' + 
-											'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
-											'<object_name>' + [dbo].[ufn_getObjectQuoteName](@objectName, 'xml') + '</object_name>'+ 
-											'<index_name>' + [dbo].[ufn_getObjectQuoteName](@childObjectName, 'xml') + '</index_name>' + 
-											'<partition_number>' + CAST(@partitionNumber AS [varchar](32)) + '</partition_number>' + 
-											'<is_partitioned>' + CASE WHEN @isPartitioned = 1 THEN 'Yes' ELSE 'No' END + '</is_partitioned>' + 
-											'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
-											'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
-											'<page_count>' + CAST(@CurrentPageCount AS [varchar](32)) + '</page_count>' + 
-											'<fill_factor>' + CAST(@IndexFillFactor AS [varchar](32)) + '</fill_factor>' + 
-											'<page_density_deviation>' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + '</page_density_deviation>' + 
-										'</detail></index-fragmentation>'
+						IF @IndexType IN (1, 2, 3, 4)
+							SET @eventData='<index-fragmentation><detail>' + 
+												'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
+												'<object_name>' + [dbo].[ufn_getObjectQuoteName](@objectName, 'xml') + '</object_name>'+ 
+												'<index_name>' + [dbo].[ufn_getObjectQuoteName](@childObjectName, 'xml') + '</index_name>' + 
+												'<partition_number>' + CAST(@partitionNumber AS [varchar](32)) + '</partition_number>' + 
+												'<is_partitioned>' + CASE WHEN @isPartitioned = 1 THEN 'Yes' ELSE 'No' END + '</is_partitioned>' + 
+												'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
+												'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
+												'<page_count>' + CAST(@CurrentPageCount AS [varchar](32)) + '</page_count>' + 
+												'<fill_factor>' + CAST(@IndexFillFactor AS [varchar](32)) + '</fill_factor>' + 
+												'<page_density_deviation>' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + '</page_density_deviation>' + 
+											'</detail></index-fragmentation>'
+						IF @IndexType IN (5, 6)
+							SET @eventData='<index-fragmentation><detail>' + 
+												'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
+												'<object_name>' + [dbo].[ufn_getObjectQuoteName](@objectName, 'xml') + '</object_name>'+ 
+												'<index_name>' + [dbo].[ufn_getObjectQuoteName](@childObjectName, 'xml') + '</index_name>' + 
+												'<partition_number>' + CAST(@partitionNumber AS [varchar](32)) + '</partition_number>' + 
+												'<is_partitioned>' + CASE WHEN @isPartitioned = 1 THEN 'Yes' ELSE 'No' END + '</is_partitioned>' + 
+												'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
+												'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
+												'<segment_count>' + CAST(@CurrentSegmentCount AS [varchar](32)) + '</segment_count>' + 
+												'<deleted_segment_count>' + CAST(@CurrentDeletedSegmentCount AS [varchar](32)) + '</deleted_segment_count>' + 
+												'<deleted_segment_percentage>' + CAST(@CurentDeletedSegmentPercentage AS [varchar](32)) + '</deleted_segment_percentage>' + 
+											'</detail></index-fragmentation>'
 
 						EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
 															@dbName			= @dbName,
@@ -1395,7 +1531,7 @@ IF ((@flgActions & 1 = 1) AND (@flgActions & 4 = 0)) AND (GETDATE() <= @stopTime
 																, @affectedDependentObjects = @affectedDependentObjects OUT
 																, @debugMode				= @debugMode
 
-	   					FETCH NEXT FROM crsIndexesToDegfragment INTO @IndexName, @IndexType, @CurrentFragmentation, @CurrentPageCount, @ObjectID, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor, @isPartitioned, @partitionNumber
+	   					FETCH NEXT FROM crsIndexesToDegfragment INTO @IndexName, @IndexType, @CurrentFragmentation, @CurrentPageCount, @ObjectID, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor, @isPartitioned, @partitionNumber, @CurrentSegmentCount, @CurrentDeletedSegmentCount, @CurentDeletedSegmentPercentage
 					end		
 				CLOSE crsIndexesToDegfragment
 				DEALLOCATE crsIndexesToDegfragment
@@ -1417,7 +1553,7 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 	begin
 		SET @queryToRun='Rebuilding database tables indexes (fragmentation between ' + CAST(@rebuildIndexThreshold AS [nvarchar]) + ' and 100) or small tables (no more than ' + CAST(@pageThreshold AS [nvarchar](4000)) + ' pages)...'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-																		
+																
 		DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR 	SELECT	DISTINCT doil.[table_schema], doil.[table_name]
 		   													FROM	#databaseObjectsWithIndexList doil
 															WHERE	    doil.[index_type] <> 0 /* heap tables will be excluded */
@@ -1431,6 +1567,11 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 																			(	  @flgOptions & 1024 = 1024 
 																			 AND doil.[page_density_deviation] >= @rebuildIndexThreshold
 																			)
+																		OR (
+																			/* for columnstore indexes */
+																				doil.[index_type] IN (5,6)
+																			AND doil.[deleted_segments_percentage] >= @rebuildIndexThreshold
+																		   )
 																		)
 															ORDER BY doil.[table_schema], doil.[table_name]
 		OPEN crsTableList
@@ -1441,10 +1582,10 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
 				SET @ClusteredRebuildNonClustered = 0
-
 				DECLARE crsIndexesToRebuild CURSOR LOCAL FAST_FORWARD FOR 	SELECT	DISTINCT doil.[index_name], doil.[index_type], doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[index_id]
 																							, doil.[page_density_deviation], doil.[fill_factor] 
 																							, doil.[is_partitioned], doil.[partition_number]
+																							, doil.[segments_count], doil.[deleted_segments_count], doil.[deleted_segments_percentage]
 				   							   								FROM	#databaseObjectsWithIndexList doil
 		   																	WHERE	doil.[table_name] = @CurrentTableName
 		   																			AND doil.[table_schema] = @CurrentTableSchema
@@ -1460,11 +1601,16 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 																							(	  @flgOptions & 1024 = 1024 
 																							 AND doil.[page_density_deviation] >= @rebuildIndexThreshold
 																							)
+																						OR (
+																							/* for columnstore indexes */
+																								doil.[index_type] IN (5,6)
+																							AND doil.[deleted_segments_percentage] >= @rebuildIndexThreshold
+																						   )
 																						)
 																			ORDER BY doil.[index_id]
 
 				OPEN crsIndexesToRebuild
-				FETCH NEXT FROM crsIndexesToRebuild INTO @IndexName, @IndexType, @CurrentFragmentation, @CurrentPageCount, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor, @isPartitioned, @partitionNumber
+				FETCH NEXT FROM crsIndexesToRebuild INTO @IndexName, @IndexType, @CurrentFragmentation, @CurrentPageCount, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor, @isPartitioned, @partitionNumber, @CurrentSegmentCount, @CurrentDeletedSegmentCount, @CurentDeletedSegmentPercentage
 				WHILE @@FETCH_STATUS = 0 AND @ClusteredRebuildNonClustered = 0 AND (GETDATE() <= @stopTimeLimit)
 					begin
 						SELECT	@indexIsRebuilt = doil.[is_rebuilt]
@@ -1477,12 +1623,20 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 						IF @indexIsRebuilt = 0
 							begin
 								SET @IndexTypeDesc=CASE @IndexType	WHEN 0 THEN 'Heap' 
-																	WHEN 1 THEN 'Clustered' 
-																	WHEN 2 THEN 'Nonclustered' 
+																	WHEN 1 THEN 'Clustered rowstore' 
+																	WHEN 2 THEN 'Nonclustered rowstore' 
 																	WHEN 3 THEN 'XML'
 																	WHEN 4 THEN 'Spatial' 
+																	WHEN 5 THEN 'Clustered columnstore'
+																	WHEN 6 THEN 'Nonclustered columnstore'
+																	WHEN 7 THEN 'Nonclustered hash'
 													END
-		   						SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') + ' => ' + CASE WHEN @isPartitioned = 1 THEN 'partition ' + CAST(@partitionNumber AS [varchar](32)) + N' / ' ELSE N'' END + 'current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) +  ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
+		   						SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') + ' => ' + CASE WHEN @isPartitioned = 1 THEN 'partition ' + CAST(@partitionNumber AS [varchar](32)) + N' / ' ELSE N'' END +
+																												'current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + 
+																												CASE WHEN @IndexType IN (1, 2, 3, 4) THEN ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) 
+																													 WHEN @IndexType IN (5, 6) THEN ' / segments count = ' + CAST(@CurrentSegmentCount AS [varchar](32)) 
+																												END + 																							+ 
+																												' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
 								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 
 								SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'quoted')
@@ -1490,18 +1644,32 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 
 								--------------------------------------------------------------------------------------------------
 								--log index fragmentation information
-								SET @eventData='<index-fragmentation><detail>' + 
-													'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
-													'<object_name>' + [dbo].[ufn_getObjectQuoteName](@objectName, 'xml') + '</object_name>'+ 
-													'<index_name>' + [dbo].[ufn_getObjectQuoteName](@childObjectName, 'xml') + '</index_name>' + 
-													'<partition_number>' + CAST(@partitionNumber AS [varchar](32)) + '</partition_number>' + 
-													'<is_partitioned>' + CASE WHEN @isPartitioned = 1 THEN 'Yes' ELSE 'No' END + '</is_partitioned>' + 
-													'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
-													'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
-													'<page_count>' + CAST(@CurrentPageCount AS [varchar](32)) + '</page_count>' + 
-													'<fill_factor>' + CAST(@IndexFillFactor AS [varchar](32)) + '</fill_factor>' + 
-													'<page_density_deviation>' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + '</page_density_deviation>' + 
-												'</detail></index-fragmentation>'
+								IF @IndexType IN (1, 2, 3, 4)
+									SET @eventData='<index-fragmentation><detail>' + 
+														'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
+														'<object_name>' + [dbo].[ufn_getObjectQuoteName](@objectName, 'xml') + '</object_name>'+ 
+														'<index_name>' + [dbo].[ufn_getObjectQuoteName](@childObjectName, 'xml') + '</index_name>' + 
+														'<partition_number>' + CAST(@partitionNumber AS [varchar](32)) + '</partition_number>' + 
+														'<is_partitioned>' + CASE WHEN @isPartitioned = 1 THEN 'Yes' ELSE 'No' END + '</is_partitioned>' + 
+														'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
+														'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
+														'<page_count>' + CAST(@CurrentPageCount AS [varchar](32)) + '</page_count>' + 
+														'<fill_factor>' + CAST(@IndexFillFactor AS [varchar](32)) + '</fill_factor>' + 
+														'<page_density_deviation>' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + '</page_density_deviation>' + 
+													'</detail></index-fragmentation>'
+								IF @IndexType IN (5, 6)
+									SET @eventData='<index-fragmentation><detail>' + 
+														'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
+														'<object_name>' + [dbo].[ufn_getObjectQuoteName](@objectName, 'xml') + '</object_name>'+ 
+														'<index_name>' + [dbo].[ufn_getObjectQuoteName](@childObjectName, 'xml') + '</index_name>' + 
+														'<partition_number>' + CAST(@partitionNumber AS [varchar](32)) + '</partition_number>' + 
+														'<is_partitioned>' + CASE WHEN @isPartitioned = 1 THEN 'Yes' ELSE 'No' END + '</is_partitioned>' + 
+														'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
+														'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
+														'<segment_count>' + CAST(@CurrentSegmentCount AS [varchar](32)) + '</segment_count>' + 
+														'<deleted_segment_count>' + CAST(@CurrentDeletedSegmentCount AS [varchar](32)) + '</deleted_segment_count>' + 
+														'<deleted_segment_percentage>' + CAST(@CurentDeletedSegmentPercentage AS [varchar](32)) + '</deleted_segment_percentage>' + 
+													'</detail></index-fragmentation>'
 
 								EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
 																	@dbName			= @dbName,
@@ -1573,7 +1741,7 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 									AND doil.[index_id] = @IndexID
 									AND doil.[partition_number] = @partitionNumber
 
-	   					FETCH NEXT FROM crsIndexesToRebuild INTO @IndexName, @IndexType, @CurrentFragmentation, @CurrentPageCount, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor, @isPartitioned, @partitionNumber
+	   					FETCH NEXT FROM crsIndexesToRebuild INTO @IndexName, @IndexType, @CurrentFragmentation, @CurrentPageCount, @IndexID, @CurentPageDensityDeviation, @IndexFillFactor, @isPartitioned, @partitionNumber, @CurrentSegmentCount, @CurrentDeletedSegmentCount, @CurentDeletedSegmentPercentage
 					end		
 				CLOSE crsIndexesToRebuild
 				DEALLOCATE crsIndexesToRebuild
@@ -1638,28 +1806,19 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 				DEALLOCATE crsClusteredIndexes						
 			end
 
-
 		--rebuilding indexes
 		DECLARE crsObjectsWithIndexes CURSOR LOCAL FAST_FORWARD FOR SELECT	DISTINCT doil.[table_schema], doil.[table_name], doil.[index_name], doil.[index_type], doil.[index_id]
 																					, doil.[avg_fragmentation_in_percent], doil.[page_count], doil.[page_density_deviation], doil.[fill_factor] 
 																					, doil.[is_partitioned], doil.[partition_number]
+																					, doil.[segments_count], doil.[deleted_segments_count], doil.[deleted_segments_percentage]
 							   										FROM	#databaseObjectsWithIndexList doil
    																	WHERE	doil.[index_type] <> 0 /* heap tables will be excluded */
 																			AND doil.[is_rebuilt]=0
 																			AND doil.[page_count] >= @pageThreshold
-																			AND	( 
-																					(
-																						doil.[avg_fragmentation_in_percent] >= @defragIndexThreshold
-																					)
-																				OR  /* when DETAILED analysis is selected, page density information will be used to reorganize / rebuild an index */
-																					(	  @flgOptions & 1024 = 1024 
-																						AND doil.[page_density_deviation] >= @defragIndexThreshold
-																					)
-																				)
 																	ORDER BY doil.[table_schema], doil.[table_name], doil.[index_id]
 
 		OPEN crsObjectsWithIndexes
-		FETCH NEXT FROM crsObjectsWithIndexes INTO @CurrentTableSchema, @CurrentTableName, @IndexName, @IndexType, @IndexID, @CurrentFragmentation, @CurrentPageCount, @CurentPageDensityDeviation, @IndexFillFactor, @isPartitioned, @partitionNumber
+		FETCH NEXT FROM crsObjectsWithIndexes INTO @CurrentTableSchema, @CurrentTableName, @IndexName, @IndexType, @IndexID, @CurrentFragmentation, @CurrentPageCount, @CurentPageDensityDeviation, @IndexFillFactor, @isPartitioned, @partitionNumber, @CurrentSegmentCount, @CurrentDeletedSegmentCount, @CurentDeletedSegmentPercentage
 		WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 			begin
 				SET @indexIsRebuilt = 0
@@ -1675,17 +1834,25 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 				IF @indexIsRebuilt = 0
 					begin
 						SET @IndexTypeDesc=CASE @IndexType	WHEN 0 THEN 'Heap' 
-															WHEN 1 THEN 'Clustered' 
-															WHEN 2 THEN 'Nonclustered' 
+															WHEN 1 THEN 'Clustered rowstore' 
+															WHEN 2 THEN 'Nonclustered rowstore' 
 															WHEN 3 THEN 'XML'
 															WHEN 4 THEN 'Spatial' 
+															WHEN 5 THEN 'Clustered columnstore'
+															WHEN 6 THEN 'Nonclustered columnstore'
+															WHEN 7 THEN 'Nonclustered hash'
 											END
 
 						--analyze curent object
 						SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@CurrentTableName, 'quoted')
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 
-		   				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') + ' => ' + CASE WHEN @isPartitioned = 1 THEN 'partition ' + CAST(@partitionNumber AS [varchar](32)) + N' / ' ELSE N'' END + 'current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + ' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
+		   				SET @queryToRun= [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted') + ' => ' + CASE WHEN @isPartitioned = 1 THEN 'partition ' + CAST(@partitionNumber AS [varchar](32)) + N' / ' ELSE N'' END +
+																										'current fragmentation level: ' + CAST(CAST(@CurrentFragmentation AS NUMERIC(6,2)) AS [nvarchar]) + 
+																										CASE WHEN @IndexType IN (1, 2, 3, 4) THEN ' / page density = ' + CAST(@CurentPageDensityDeviation AS [varchar](32)) 
+																											 WHEN @IndexType IN (5, 6) THEN ' / segments count = ' + CAST(@CurrentSegmentCount AS [varchar](32)) 
+																										END + 																							+ 
+																										' / pages = ' + CAST(@CurrentPageCount AS [nvarchar]) + ' / type = ' + @IndexTypeDesc
 						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
 
 						--------------------------------------------------------------------------------------------------
@@ -1693,18 +1860,32 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 						SET @objectName = [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'quoted')
 						SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@IndexName, 'quoted')
 
-						SET @eventData='<index-fragmentation><detail>' + 
-											'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
-											'<object_name>' + [dbo].[ufn_getObjectQuoteName](@objectName, 'xml') + '</object_name>'+ 
-											'<index_name>' + [dbo].[ufn_getObjectQuoteName](@childObjectName, 'xml') + '</index_name>' + 
-											'<partition_number>' +  CAST(@partitionNumber AS [varchar](32)) + '</partition_number>' + 
-											'<is_partitioned>' + CASE WHEN @isPartitioned = 1 THEN 'Yes' ELSE 'No' END + '</is_partitioned>' + 
-											'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
-											'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
-											'<page_count>' + CAST(@CurrentPageCount AS [varchar](32)) + '</page_count>' + 
-											'<fill_factor>' + CAST(@IndexFillFactor AS [varchar](32)) + '</fill_factor>' + 
-											'<page_density_deviation>' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + '</page_density_deviation>' + 
-										'</detail></index-fragmentation>'
+						IF @IndexType IN (1, 2, 3, 4)
+							SET @eventData='<index-fragmentation><detail>' + 
+												'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
+												'<object_name>' + [dbo].[ufn_getObjectQuoteName](@objectName, 'xml') + '</object_name>'+ 
+												'<index_name>' + [dbo].[ufn_getObjectQuoteName](@childObjectName, 'xml') + '</index_name>' + 
+												'<partition_number>' +  CAST(@partitionNumber AS [varchar](32)) + '</partition_number>' + 
+												'<is_partitioned>' + CASE WHEN @isPartitioned = 1 THEN 'Yes' ELSE 'No' END + '</is_partitioned>' + 
+												'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
+												'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
+												'<page_count>' + CAST(@CurrentPageCount AS [varchar](32)) + '</page_count>' + 
+												'<fill_factor>' + CAST(@IndexFillFactor AS [varchar](32)) + '</fill_factor>' + 
+												'<page_density_deviation>' + CAST(@CurentPageDensityDeviation AS [varchar](32)) + '</page_density_deviation>' + 
+											'</detail></index-fragmentation>'
+						IF @IndexType IN (5, 6)
+							SET @eventData='<index-fragmentation><detail>' + 
+												'<database_name>' + [dbo].[ufn_getObjectQuoteName](@dbName, 'xml') + '</database_name>' + 
+												'<object_name>' + [dbo].[ufn_getObjectQuoteName](@objectName, 'xml') + '</object_name>'+ 
+												'<index_name>' + [dbo].[ufn_getObjectQuoteName](@childObjectName, 'xml') + '</index_name>' + 
+												'<partition_number>' + CAST(@partitionNumber AS [varchar](32)) + '</partition_number>' + 
+												'<is_partitioned>' + CASE WHEN @isPartitioned = 1 THEN 'Yes' ELSE 'No' END + '</is_partitioned>' + 
+												'<index_type>' +  @IndexTypeDesc + '</index_type>' + 
+												'<fragmentation>' + CAST(@CurrentFragmentation AS [varchar](32)) + '</fragmentation>' + 
+												'<segment_count>' + CAST(@CurrentSegmentCount AS [varchar](32)) + '</segment_count>' + 
+												'<deleted_segment_count>' + CAST(@CurrentDeletedSegmentCount AS [varchar](32)) + '</deleted_segment_count>' + 
+												'<deleted_segment_percentage>' + CAST(@CurentDeletedSegmentPercentage AS [varchar](32)) + '</deleted_segment_percentage>' + 
+											'</detail></index-fragmentation>'
 
 						EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
 															@dbName			= @dbName,
@@ -1770,7 +1951,7 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 								AND doil.[partition_number] = @partitionNumber
 					end
 
-				FETCH NEXT FROM crsObjectsWithIndexes INTO @CurrentTableSchema, @CurrentTableName, @IndexName, @IndexType, @IndexID, @CurrentFragmentation, @CurrentPageCount, @CurentPageDensityDeviation, @IndexFillFactor, @isPartitioned, @partitionNumber
+				FETCH NEXT FROM crsObjectsWithIndexes INTO @CurrentTableSchema, @CurrentTableName, @IndexName, @IndexType, @IndexID, @CurrentFragmentation, @CurrentPageCount, @CurentPageDensityDeviation, @IndexFillFactor, @isPartitioned, @partitionNumber, @CurrentSegmentCount, @CurrentDeletedSegmentCount, @CurentDeletedSegmentPercentage
 			end
 		CLOSE crsObjectsWithIndexes
 		DEALLOCATE crsObjectsWithIndexes
@@ -1791,9 +1972,16 @@ IF (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 																@executionLevel	= @nestExecutionLevel, 
 																@debugMode		= @debugMode
 		end
+
+		--perform internal cleanup
+		EXEC [dbo].[usp_mpMarkInternalAction]	@actionName			= N'index-rebuild',
+												@flgOperation		= 2,
+												@server_name		= @sqlServerName,
+												@database_name		= @dbName,
+												@schema_name		= @tableSchema,
+												@object_name		= @tableName,
+												@child_object_name	= '%'
 	end
-
-
 
 --------------------------------------------------------------------------------------------------
 --cleanup of ghost records (sp_clean_db_free_space) (starting SQL Server 2005 SP3)
@@ -1970,10 +2158,9 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 									SET @queryToRun = @queryToRun + ','
 								SET @queryToRun = @queryToRun + ' MAXDOP = ' + CAST(@maxDOP AS [nvarchar])
 							end
-
-						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-						
-						SET @nestedExecutionLevel = @executionLevel + 1
+					
+						SET @nestedExecutionLevel = @executionLevel + 2
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
 
 						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 																		@dbName			= @dbName,
@@ -2089,9 +2276,8 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 				ELSE
 					SET @queryToRun = @queryToRun + N', @fullscan = ''fullscan'''
 
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-
 				SET @nestedExecutionLevel = @executionLevel + 1
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 																@dbName			= @dbName,
@@ -2107,7 +2293,7 @@ IF (@flgActions & 8 = 8) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 	end
 	
 ---------------------------------------------------------------------------------------------
-IF object_id('tempdb..#CurrentIndexFragmentationStats') IS NOT NULL DROP TABLE #CurrentIndexFragmentationStats
+IF object_id('tempdb..#currentRowStoreFragmentationStats') IS NOT NULL DROP TABLE #currentRowStoreFragmentationStats
 IF object_id('tempdb..#databaseObjectsWithIndexList') IS NOT NULL 	DROP TABLE #databaseObjectsWithIndexList
 
 --------------------------------------------------------------------------------------------------

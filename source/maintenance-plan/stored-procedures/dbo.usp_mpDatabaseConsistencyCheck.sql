@@ -296,7 +296,7 @@ INNER JOIN
 --------------------------------------------------------------------------------------------------
 --when running DBCC CHECKDB, check if DATA_PURITY option should be used or not (run only when dbi_dbccFlags=0)
 --------------------------------------------------------------------------------------------------
-IF @flgActions & 1 = 1 AND @flgOptions & 1 = 0 AND @isAzureSQLDatabase = 0
+IF (@flgActions & 1 = 1 OR @flgActions & 2 = 2) AND @flgOptions & 1 = 0 AND @isAzureSQLDatabase = 0
 	begin
 		IF object_id('tempdb..#dbi_dbccFlags') IS NOT NULL DROP TABLE #dbccLastKnownGood
 		CREATE TABLE #dbi_dbccFlags
@@ -369,7 +369,8 @@ IF @flgActions & 1 = 1 AND (GETDATE() <= @stopTimeLimit)
 		IF @serverVersionNum > = 12.05000 /* MAXDOP: applies to: SQL Server 2014 SP2 onwards */
 			SET @queryToRun = @queryToRun + ', MAXDOP=' + CAST(@maxDOP AS [nvarchar])
 
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+		SET @nestedExecutionLevel = @executionLevel + 1
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
 		
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 														@dbName			= @executionDBName,
@@ -414,7 +415,8 @@ IF @flgActions & 2 = 2 AND (GETDATE() <= @stopTimeLimit)
 				IF @serverVersionNum > = 12.05000 /* MAXDOP: applies to: SQL Server 2014 SP2 onwards */
 					SET @queryToRun = @queryToRun + ', MAXDOP=' + CAST(@maxDOP AS [nvarchar])
 
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+				SET @nestedExecutionLevel = @executionLevel + 1
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
 				
 				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 																@dbName			= @dbName,
@@ -445,8 +447,9 @@ IF @flgActions & 4 = 4 AND (GETDATE() <= @stopTimeLimit)
 
 		SET @queryToRun = N''
 		SET @queryToRun = @queryToRun + N'DBCC CHECKALLOC(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') WITH ALL_ERRORMSGS, NO_INFOMSGS'
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-
+		SET @nestedExecutionLevel = @executionLevel + 1
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
+		
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 														@dbName			= @executionDBName,
 														@module			= 'dbo.usp_mpDatabaseConsistencyCheck',
@@ -470,8 +473,9 @@ IF @flgActions & 8 = 8 AND (GETDATE() <= @stopTimeLimit)
 
 		SET @queryToRun = N''
 		SET @queryToRun = @queryToRun + N'DBCC CHECKCATALOG(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql') + ''') WITH NO_INFOMSGS'
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-
+		SET @nestedExecutionLevel = @executionLevel + 1
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
+		
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 														@dbName			= @executionDBName,
 														@module			= 'dbo.usp_mpDatabaseConsistencyCheck',
@@ -505,7 +509,8 @@ IF @flgActions & 16 = 16 AND (GETDATE() <= @stopTimeLimit)
 
 				SET @queryToRun = N''
 				SET @queryToRun = @queryToRun + N'DBCC CHECKCONSTRAINTS(''' + [dbo].[ufn_getObjectQuoteName]([dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'sql'), 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName]([dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql'), 'quoted') + ''') WITH ALL_ERRORMSGS, NO_INFOMSGS'
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+				SET @nestedExecutionLevel = @executionLevel + 1
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 																@dbName			= @dbName,
@@ -655,8 +660,9 @@ IF @flgActions & 32 = 32 AND (GETDATE() <= @stopTimeLimit)
 
 						SET @queryToRun = N''
 						SET @queryToRun = @queryToRun + N'DBCC CHECKIDENT(''' + [dbo].[ufn_getObjectQuoteName]([dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'sql'), 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName]([dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql'), 'quoted') + ''', RESEED) WITH NO_INFOMSGS'
-						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-
+						SET @nestedExecutionLevel = @executionLevel + 1
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
+						
 						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 																		@dbName			= @dbName,
 																		@objectName		= @objectName,
@@ -691,7 +697,8 @@ IF @flgActions & 64 = 64 AND (GETDATE() <= @stopTimeLimit)
 			begin
 				SET @queryToRun = N''
 				SET @queryToRun = @queryToRun + N'DBCC UPDATEUSAGE(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql')  + ''') WITH NO_INFOMSGS'
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+				SET @nestedExecutionLevel = @executionLevel + 1
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 																@dbName			= @executionDBName,
@@ -717,8 +724,9 @@ IF @flgActions & 64 = 64 AND (GETDATE() <= @stopTimeLimit)
 
 						SET @queryToRun = N''
 						SET @queryToRun = @queryToRun + N'DBCC UPDATEUSAGE(''' + [dbo].[ufn_getObjectQuoteName]([dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'sql'), 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName]([dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql'), 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'sql') + ''') WITH NO_INFOMSGS'
-						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
-
+						SET @nestedExecutionLevel = @executionLevel + 1
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
+						
 						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 																		@dbName			= @dbName,
 																		@objectName		= @objectName,
@@ -770,7 +778,8 @@ IF @flgActions & 128 = 128 AND (GETDATE() <= @stopTimeLimit)
 
 				SET @queryToRun = N''
 				SET @queryToRun = @queryToRun + N'DBCC CLEANTABLE(''' + [dbo].[ufn_getObjectQuoteName](@dbName, 'sql')  + ''', ''' + [dbo].[ufn_getObjectQuoteName](@CurrentTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](RTRIM(@CurrentTableName), 'quoted') + ''', ' + CAST(@DBCCCheckTableBatchSize AS [nvarchar]) + ') WITH NO_INFOMSGS'
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 0, @stopExecution=0
+				SET @nestedExecutionLevel = @executionLevel + 1
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 																@dbName			= @dbName,

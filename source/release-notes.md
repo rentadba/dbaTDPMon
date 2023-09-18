@@ -1075,3 +1075,10 @@
 
 26.07.2023
 * health-check: collect database file(s) growth events from default trace files into [health-check].[statsDatabaseGrowth]
+
+------------
+#### September 2023 new features & fixes
+* maintenance-plan: fix issue related to rebuilding a compressed index which led to removing the data compression option
+* maintenance-plan: fix issue related to rebuilding dependent indexes for a primary key - non-clustered indexes were rebuilt twice
+* maintenance-plan: fix issue related to running dbcc checktable with (data_purity) even that is was not needed (run only when dbi_dbccFlags=0)
+* maintenance-plan: add support for columnstore indexes maintenance (pending on deleted records and deleted segments "fragmentation")

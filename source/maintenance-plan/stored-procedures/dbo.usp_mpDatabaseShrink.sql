@@ -246,9 +246,9 @@ WHILE @@FETCH_STATUS=0
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				SET @queryToRun = N'DBCC SHRINKDATABASE(' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + N'' + CASE WHEN @flgOptions & 1 = 1 THEN N', TRUNCATEONLY' ELSE N'' END + N') WITH NO_INFOMSGS'
-				IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
 				SET @nestedExecutionLevel = @executionLevel + 1
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
+				
 				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 																@dbName			= @dbName,
 																@module			= 'dbo.usp_mpDatabaseShrink',
@@ -283,9 +283,9 @@ WHILE @@FETCH_STATUS=0
 				WHILE @@FETCH_STATUS=0
 					begin
 						SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; DBCC SHRINKFILE(' + [dbo].[ufn_getObjectQuoteName](@logName, 'quoted') + CASE WHEN @flgOptions & 1 = 1 THEN N', TRUNCATEONLY' ELSE N'' END + N') WITH NO_INFOMSGS'
-						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
 						SET @nestedExecutionLevel = @executionLevel + 1
+						EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
+
 						EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 																		@dbName			= @dbName,
 																		@module			= 'dbo.usp_mpDatabaseShrink',

@@ -825,7 +825,8 @@ IF @optionForceChangeBackupType=1
 				SET @queryToRun	= N'BACKUP DATABASE '+ [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + 
 									CASE WHEN @backupToURL = 0 THEN N' TO DISK = ''' ELSE N' TO URL = ''' END + 
 									[dbo].[ufn_getObjectQuoteName](@backupLocation, 'sql') + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N''' WITH STATS = 10, NAME = ''' + [dbo].[ufn_getObjectQuoteName](@backupFileName, 'sql') + N'''' + @backupOptions
-				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+				SET @nestedExecutionLevel = @executionLevel + 1
+				EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
 
 				EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 																@dbName			= @executionDBName,
@@ -904,7 +905,9 @@ IF LEN(@backupLocation + @backupFileName) > @maxPATHLength
 	end
 ELSE
 	begin
-		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0	
+		SET @nestedExecutionLevel = @executionLevel + 1
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
+		
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 														@dbName			= 'master',
 														@module			= 'dbo.usp_mpDatabaseBackup',
@@ -946,7 +949,9 @@ IF @flgOptions & 16 = 16 AND @errorCode = 0
 		IF @optionBackupWithChecksum=1
 			SET @queryToRun = @queryToRun + N' WITH CHECKSUM'
 
-		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+		SET @nestedExecutionLevel = @executionLevel + 1
+		EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
+		
 		EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 														@dbName			= @executionDBName,
 														@module			= 'dbo.usp_mpDatabaseBackup',

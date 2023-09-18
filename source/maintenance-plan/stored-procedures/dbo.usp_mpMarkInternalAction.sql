@@ -46,9 +46,9 @@ IF @flgOperation = 2
 			WHERE	[name] = @actionName
 					AND [server_name] = @server_name
 					AND ([database_name] = @database_name OR ([database_name] IS NULL AND @database_name IS NULL))
-					AND ([schema_name] = @schema_name OR ([schema_name] IS NULL AND @schema_name IS NULL))
-					AND ([object_name] = @object_name OR ([object_name] IS NULL AND @object_name IS NULL))
-					AND ([child_object_name] = @child_object_name OR ([child_object_name] IS NULL AND @child_object_name IS NULL))
+					AND ([schema_name] LIKE @schema_name OR ([schema_name] IS NULL AND @schema_name IS NULL))
+					AND ([object_name] LIKE @object_name OR ([object_name] IS NULL AND @object_name IS NULL))
+					AND ([child_object_name] LIKE @child_object_name OR ([child_object_name] IS NULL AND @child_object_name IS NULL))
 		ELSE
 			DELETE	FROM [maintenance-plan].[logInternalAction]
 			WHERE	[name] = @actionName
