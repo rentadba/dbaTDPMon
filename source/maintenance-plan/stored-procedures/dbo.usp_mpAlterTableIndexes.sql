@@ -293,7 +293,6 @@ BEGIN TRY
 						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-						DELETE FROM @tmpTableToAlterIndexes
 						INSERT	INTO @tmpTableToAlterIndexes([index_id], [index_name], [index_type], [allow_page_locks], [is_disabled], [is_primary_xml], [has_dependent_fk], [is_replicated], [partition_number], [is_partitioned], [data_compression_desc])
 								EXEC sp_executesql  @queryToRun
 
@@ -595,7 +594,7 @@ BEGIN TRY
 																						@flgOptions		= @flgOptions,
 																						@executionLevel	= @nestedExecutionLevel,
 																						@debugMode		= @debugMode
-
+										
 										IF @flgOptions & 4 = 4
 											begin
 												EXEC [dbo].[usp_mpMarkInternalAction]	@actionName			= N'index-rebuild',
@@ -778,6 +777,7 @@ BEGIN TRY
 																					@flgOptions		= @flgOptions,
 																					@executionLevel	= @nestedExecutionLevel,
 																					@debugMode		= @debugMode
+									
 								end
 							ELSE
 								begin
@@ -811,7 +811,7 @@ BEGIN TRY
 																				@flgOptions		= @flgOptions,
 																				@executionLevel	= @nestedExecutionLevel,
 																				@debugMode		= @debugMode
-
+								
 								/* 4 disable index -> insert action 1 */
 								IF @errorCode=0
 									EXEC [dbo].[usp_mpMarkInternalAction]	@actionName		= N'index-made-disable',

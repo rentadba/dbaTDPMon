@@ -90,7 +90,7 @@ IF (@partitionNumber <> 1)
 	end
 
 -----------------------------------------------------------------------------------------
-/* disabled indexes / XML, spatial indexes, columnstore, hash */
+/* disabled indexes / XML, spatial indexes, columnstore */
 -----------------------------------------------------------------------------------------
 SET @queryToRun = N''
 SET @queryToRun = @queryToRun + CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
@@ -105,7 +105,7 @@ SET @queryToRun = @queryToRun + CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE
 										ELSE ' AND idx.[index_id] = ' + CAST(@indexID AS [nvarchar])
 								END + N'
 								AND (   idx.[is_disabled] = 1
-										OR idx.[type] IN (3, 4, 5, 6, 7)
+										OR idx.[type] IN (3, 4, 6)
 									)'
 
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
