@@ -1,6 +1,6 @@
 **dbaTDPMon - Troubleshoot Database Performance and Monitoring**
 
-This utility is a bespoke database / system maintenance, health-check and monitoring solution for SQL Server. It runs for versions from SQL Server 2000 until 2019 plus Azure SQL Database and Managed Instances.
+This utility is a bespoke database / system maintenance, health-check and monitoring solution for SQL Server. It runs for versions from SQL Server 2000 until 2022 plus Azure SQL Database and Managed Instances.
 Some features are only available for SQL Server 2005 and beyond.
 Utility consists in plain T-SQL code. A database is needed in order to store objects used by this utility.
 Task automation is performed using SQL Agent jobs, pre-scheduled.
@@ -27,6 +27,8 @@ Maintenance-plan, health-check and monitoring modules can be used as “agentles
 	* use "drive table" to limit the number of analyzed indexes
 	* 2 algorithms available: online/offline index rebuild or disable/rebuild (managing dependencies)
 	* may force ghost records cleanup
+* **_Columnstore indexes Maintenance_**
+	* decision based on deleted records and deleted segments
 * **_Heap Tables Maintenance_**
 	* rebuild decision based on extent fragmentation, page density and forwarded records
 * **_Statistics Maintenance_**
