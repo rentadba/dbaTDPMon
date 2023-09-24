@@ -11,7 +11,7 @@ GO
 CREATE PROCEDURE [dbo].[usp_mpJobSQLAgentCreate]
 		@jobName				[sysname],
 		@projectCode			[varchar](32)=NULL,
-		@sqlServerNameFilter	[sysname]=@@SERVERNAME,
+		@sqlServerNameFilter	[sysname]='%',
 		@jobDescriptorList		[varchar](256)='%',		/*	dbo.usp_mpDatabaseConsistencyCheck
 															dbo.usp_mpDatabaseOptimize
 															dbo.usp_mpDatabaseShrink

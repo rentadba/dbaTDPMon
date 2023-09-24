@@ -91,7 +91,9 @@ DECLARE   @flgRaiseErrorAndStop [bit]
 		, @errorCode			[int]
 
 DECLARE @DependentIndexes TABLE	(
-									[index_name]		[sysname]	NULL
+								    [schema_name]		[sysname]	NULL
+								  , [table_name]		[sysname]	NULL								
+								  , [index_name]		[sysname]	NULL
 								  , [is_primary_xml]	[bit]		DEFAULT(0)
 								)
 
@@ -218,7 +220,7 @@ BEGIN TRY
 		---------------------------------------------------------------------------------------------
 		IF EXISTS(SELECT 1 FROM #tmpTableList)
 			begin
-				DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT [table_schema], [table_name]
+				DECLARE crsTableList CURSOR LOCAL FAST_FORWARD FOR	SELECT DISTINCT [table_schema], [table_name]
 																	FROM #tmpTableList
 																	ORDER BY [table_schema], [table_name]
 				OPEN crsTableList
@@ -293,540 +295,554 @@ BEGIN TRY
 						SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 						IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
+						DELETE FROM @tmpTableToAlterIndexes;
 						INSERT	INTO @tmpTableToAlterIndexes([index_id], [index_name], [index_type], [allow_page_locks], [is_disabled], [is_primary_xml], [has_dependent_fk], [is_replicated], [partition_number], [is_partitioned], [data_compression_desc])
 								EXEC sp_executesql  @queryToRun
 
-						FETCH NEXT FROM crsTableList INTO @crtTableSchema, @crtTableName
-					end
-				CLOSE crsTableList
-				DEALLOCATE crsTableList
 
-				DECLARE crsTableToAlterIndexes CURSOR LOCAL DYNAMIC FOR	SELECT DISTINCT tai.[index_id], tai.[index_name], tai.[index_type], tai.[allow_page_locks], tai.[is_disabled]
-																						, tai.[is_primary_xml], tai.[has_dependent_fk], tai.[is_replicated]
-																						, tai.[partition_number], tai.[is_partitioned], tai.[data_compression_desc]
-																				FROM @tmpTableToAlterIndexes tai
-																				LEFT JOIN [maintenance-plan].[logInternalAction] smpi ON	smpi.[name]=N'index-made-disable'
-																																					AND smpi.[server_name]=@sqlServerName
-																																					AND smpi.[database_name]=@dbName
-																																					AND smpi.[schema_name]=@crtTableSchema
-																																					AND smpi.[object_name]=@crtTableName
-																																					AND smpi.[child_object_name]=tai.[index_name]
+						DECLARE crsTableToAlterIndexes CURSOR LOCAL DYNAMIC FOR	SELECT DISTINCT tai.[index_id], tai.[index_name], tai.[index_type], tai.[allow_page_locks], tai.[is_disabled]
+																								, tai.[is_primary_xml], tai.[has_dependent_fk], tai.[is_replicated]
+																								, tai.[partition_number], tai.[is_partitioned], tai.[data_compression_desc]
+																						FROM @tmpTableToAlterIndexes tai
+																						LEFT JOIN [maintenance-plan].[logInternalAction] smpi ON	smpi.[name]=N'index-made-disable'
+																																							AND smpi.[server_name]=@sqlServerName
+																																							AND smpi.[database_name]=@dbName
+																																							AND smpi.[schema_name]=@crtTableSchema
+																																							AND smpi.[object_name]=@crtTableName
+																																							AND smpi.[child_object_name]=tai.[index_name]
 
-																				WHERE smpi.[child_object_name] IS NULL
-																				ORDER BY [index_id], [index_name], [partition_number]					
-				OPEN crsTableToAlterIndexes
-				FETCH NEXT FROM crsTableToAlterIndexes INTO @crtIndexID, @crtIndexName, @crtIndexType, @crtIndexAllowPageLocks, @crtIndexIsDisabled, @crtIndexIsPrimaryXML, @crtIndexHasDependentFK, @crtTableIsReplicated, @crtPartitionNumber, @crtIsPartitioned, @crtDataCompressionDesc
-				WHILE @@FETCH_STATUS=0
-					begin
-						SET @strMessage= [dbo].[ufn_getObjectQuoteName](@crtIndexName, 'quoted') + CASE WHEN @crtIsPartitioned = 1 THEN ' (partition ' + CAST(@crtPartitionNumber AS [varchar](32)) + N')' ELSE N'' END
-						EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
+																						WHERE smpi.[child_object_name] IS NULL
+																						ORDER BY [index_id], [index_name], [partition_number]					
+						OPEN crsTableToAlterIndexes
+						FETCH NEXT FROM crsTableToAlterIndexes INTO @crtIndexID, @crtIndexName, @crtIndexType, @crtIndexAllowPageLocks, @crtIndexIsDisabled, @crtIndexIsPrimaryXML, @crtIndexHasDependentFK, @crtTableIsReplicated, @crtPartitionNumber, @crtIsPartitioned, @crtDataCompressionDesc
+						WHILE @@FETCH_STATUS=0
+							begin
+								SET @strMessage= [dbo].[ufn_getObjectQuoteName](@crtIndexName, 'quoted') + CASE WHEN @crtIsPartitioned = 1 THEN ' (partition ' + CAST(@crtPartitionNumber AS [varchar](32)) + N')' ELSE N'' END
+								EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 2, @stopExecution=0
 						
-						IF @flgAction = 1 AND @flgOptions & 4 = 4 AND EXISTS (	SELECT * 
-																				FROM [maintenance-plan].[logInternalAction] smpi 
-																				WHERE	smpi.[name]=N'index-rebuild'
-																					AND smpi.[server_name]=@sqlServerName
-																					AND smpi.[database_name]=@dbName
-																					AND smpi.[schema_name]=@crtTableSchema
-																					AND smpi.[object_name]=@crtTableName
-																					AND smpi.[child_object_name]=@crtIndexName
-																			  )
-							begin
-								SET @queryToRun='Index was already rebuilt. Skipping it.'
-								SET @nestedExecutionLevel = @executionLevel + 2
-								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
-
-								SET @eventName = 'database maintenance - rebuilding index'
-						 
-								SET @eventData='<skipaction><detail>' + 
-													'<name>database maintenance</name>' + 
-													'<type>rebuilding index</type>' + 
-													'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@strMessage, 'xml') + '</affected_object>' + 
-													'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
-													'<reason>' + @queryToRun + '</reason>' + 
-												'</detail></skipaction>'
-								
-								SET @strMessage=[dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted')
-								EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
-																	@dbName			= @dbName,
-																	@objectName		= @strMessage,
-																	@childObjectName= @crtIndexName,
-																	@module			= 'dbo.usp_mpAlterTableIndexes',
-																	@eventName		= @eventName,
-																	@eventMessage	= @eventData,
-																	@eventType		= 0 /* info */
-							end
-						ELSE
-							begin
-								SET @sqlScriptOnline=N''
-								---------------------------------------------------------------------------------------------
-								-- 1  - Rebuild indexes
-								---------------------------------------------------------------------------------------------
-								IF @flgAction = 1
+								IF @flgAction = 1 AND @flgOptions & 4 = 4 AND EXISTS (	SELECT * 
+																						FROM [maintenance-plan].[logInternalAction] smpi 
+																						WHERE	smpi.[name]=N'index-rebuild'
+																							AND smpi.[server_name]=@sqlServerName
+																							AND smpi.[database_name]=@dbName
+																							AND smpi.[schema_name]=@crtTableSchema
+																							AND smpi.[object_name]=@crtTableName
+																							AND smpi.[child_object_name]=@crtIndexName
+																					  )
 									begin
-										-- check for online operation mode	
-										IF @flgOptions & 4096 = 4096
-											begin
-												SET @nestedExecutionLevel = @executionLevel + 3
-												EXEC [dbo].[usp_mpCheckIndexOnlineOperation]	@sqlServerName		= @sqlServerName,
-																								@dbName				= @dbName,
-																								@tableSchema		= @crtTableSchema,
-																								@tableName			= @crtTableName,
-																								@indexName			= @crtIndexName,
-																								@indexID			= @crtIndexID,
-																								@partitionNumber	= @crtPartitionNumber,
-																								@sqlScriptOnline	= @sqlScriptOnline OUT,
-																								@flgOptions			= @flgOptions,
-																								@executionLevel		= @nestedExecutionLevel,
-																								@debugMode			= @debugMode
-											end
+										SET @queryToRun='Index was already rebuilt. Skipping it.'
+										SET @nestedExecutionLevel = @executionLevel + 2
+										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
 
+										SET @eventName = 'database maintenance - rebuilding index'
+						 
+										SET @eventData='<skipaction><detail>' + 
+															'<name>database maintenance</name>' + 
+															'<type>rebuilding index</type>' + 
+															'<affected_object>' + [dbo].[ufn_getObjectQuoteName](@strMessage, 'xml') + '</affected_object>' + 
+															'<date>' + CONVERT([varchar](24), GETDATE(), 121) + '</date>' + 
+															'<reason>' + @queryToRun + '</reason>' + 
+														'</detail></skipaction>'
+								
+										SET @strMessage=[dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted')
+										EXEC [dbo].[usp_logEventMessage]	@sqlServerName	= @sqlServerName,
+																			@dbName			= @dbName,
+																			@objectName		= @strMessage,
+																			@childObjectName= @crtIndexName,
+																			@module			= 'dbo.usp_mpAlterTableIndexes',
+																			@eventName		= @eventName,
+																			@eventMessage	= @eventData,
+																			@eventType		= 0 /* info */
+									end
+								ELSE
+									begin
+										SET @sqlScriptOnline=N''
 										---------------------------------------------------------------------------------------------
-										--primary / unique index options
-										-- 16  - Disable foreign key constraints that reffer current table before rebuilding clustered/unique indexes
-										IF @flgOptions & 16 = 16 AND @crtIndexHasDependentFK=1 
-											AND @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) 
-											AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0 AND @crtIsPartitioned = 0
-											begin
-												SET @nestedExecutionLevel = @executionLevel + 2
-												EXEC [dbo].[usp_mpAlterTableForeignKeys]	  @sqlServerName	= @sqlServerName
-																							, @dbName			= @dbName
-																							, @tableSchema		= @crtTableSchema
-																							, @tableName		= @crtTableName
-																							, @constraintName	= '%'
-																							, @flgAction		= 0		-- Disable Constraints
-																							, @flgOptions		= 1		-- Use tables that have foreign key constraints that reffers current table (default)
-																							, @executionLevel	= @nestedExecutionLevel
-																							, @debugMode		= @debugMode
-											end
-
+										-- 1  - Rebuild indexes
 										---------------------------------------------------------------------------------------------
-										--clustered/primary key index options
-										IF @crtIndexType IN (1, 5) AND @crtIsPartitioned = 0
+										IF @flgAction = 1
 											begin
-												--4  - Rebuild all dependent indexes when rebuild primary indexes
-												IF @flgOptions & 4 = 4
+												-- check for online operation mode	
+												IF @flgOptions & 4096 = 4096
 													begin
-														--get all enabled non-clustered/xml/spatial indexes for current table
-														SET @queryToRun = N''
-														SET @queryToRun = @queryToRun + CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
-																					SELECT  si.[name]
-																						, CASE WHEN xi.[type]=3 AND xi.[using_xml_index_id] IS NULL THEN 1 ELSE 0 END AS [is_primary_xml]
-																					FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[indexes]			si
-																					INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects]		so ON  si.[object_id] = so.[object_id]
-																					INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
-																					LEFT  JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id] AND si.[type]=3
-																					WHERE	so.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'sql') + '''
-																							AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'sql') + ''' 
-																							AND si.[type] in (2,3,4)
-																							AND si.[is_disabled] = 0'
-														SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-														IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-														INSERT INTO @DependentIndexes ([index_name], [is_primary_xml])
-															EXEC sp_executesql  @queryToRun
+														SET @nestedExecutionLevel = @executionLevel + 3
+														EXEC [dbo].[usp_mpCheckIndexOnlineOperation]	@sqlServerName		= @sqlServerName,
+																										@dbName				= @dbName,
+																										@tableSchema		= @crtTableSchema,
+																										@tableName			= @crtTableName,
+																										@indexName			= @crtIndexName,
+																										@indexID			= @crtIndexID,
+																										@partitionNumber	= @crtPartitionNumber,
+																										@sqlScriptOnline	= @sqlScriptOnline OUT,
+																										@flgOptions			= @flgOptions,
+																										@executionLevel		= @nestedExecutionLevel,
+																										@debugMode			= @debugMode
 													end
 
-												--8  - Disable non-clustered index before rebuild (save space)
-												--won't disable the index when performing online rebuild
-												IF @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtTableIsReplicated=0 AND @crtIsPartitioned = 0
+												---------------------------------------------------------------------------------------------
+												--primary / unique index options
+												-- 16  - Disable foreign key constraints that reffer current table before rebuilding clustered/unique indexes
+												IF @flgOptions & 16 = 16 AND @crtIndexHasDependentFK=1 
+													AND @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) 
+													AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0 AND @crtIsPartitioned = 0
 													begin
-														DECLARE crsNonClusteredIndexes	CURSOR LOCAL FAST_FORWARD FOR
-																						SELECT DISTINCT [index_name], [is_primary_xml]
-																						FROM @DependentIndexes
-																						ORDER BY [is_primary_xml]
-														OPEN crsNonClusteredIndexes
-														FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName, @tmpIndexIsPrimaryXML
-														WHILE @@FETCH_STATUS=0
+														SET @nestedExecutionLevel = @executionLevel + 2
+														EXEC [dbo].[usp_mpAlterTableForeignKeys]	  @sqlServerName	= @sqlServerName
+																									, @dbName			= @dbName
+																									, @tableSchema		= @crtTableSchema
+																									, @tableName		= @crtTableName
+																									, @constraintName	= '%'
+																									, @flgAction		= 0		-- Disable Constraints
+																									, @flgOptions		= 1		-- Use tables that have foreign key constraints that reffers current table (default)
+																									, @executionLevel	= @nestedExecutionLevel
+																									, @debugMode		= @debugMode
+													end
+
+												---------------------------------------------------------------------------------------------
+												--clustered/primary key index options
+												IF @crtIndexType IN (1, 5) AND @crtIsPartitioned = 0
+													begin
+														--4  - Rebuild all dependent indexes when rebuild primary indexes
+														IF @flgOptions & 4 = 4
+															begin
+																--get all enabled non-clustered/xml/spatial indexes for current table
+																SET @queryToRun = N''
+																SET @queryToRun = @queryToRun + CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
+																							SELECT  sch.[name] AS [schema_name], so.[name] AS [table_name], si.[name] AS [index_name]
+																									, CASE WHEN xi.[type]=3 AND xi.[using_xml_index_id] IS NULL THEN 1 ELSE 0 END AS [is_primary_xml]
+																							FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[indexes]			si
+																							INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects]		so ON  si.[object_id] = so.[object_id]
+																							INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
+																							LEFT  JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id] AND si.[type]=3
+																							WHERE	so.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'sql') + '''
+																									AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'sql') + ''' 
+																									AND si.[type] in (2,3,4)
+																									AND si.[is_disabled] = 0'
+																SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+																IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+																INSERT INTO @DependentIndexes ([schema_name], [table_name], [index_name], [is_primary_xml])
+																	EXEC sp_executesql  @queryToRun
+															end
+
+														--8  - Disable non-clustered index before rebuild (save space)
+														--won't disable the index when performing online rebuild
+														IF @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtTableIsReplicated=0 AND @crtIsPartitioned = 0
+															begin
+																DECLARE crsNonClusteredIndexes	CURSOR LOCAL FAST_FORWARD FOR
+																								SELECT DISTINCT [index_name], [is_primary_xml]
+																								FROM @DependentIndexes
+																								WHERE	[schema_name] = @crtTableSchema
+																									AND [table_name] = @crtTableName
+																								ORDER BY [is_primary_xml]
+																OPEN crsNonClusteredIndexes
+																FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName, @tmpIndexIsPrimaryXML
+																WHILE @@FETCH_STATUS=0
+																	begin
+																		SET @nestedExecutionLevel = @executionLevel + 2
+																		EXEC [dbo].[usp_mpAlterTableIndexes]	  @sqlServerName	= @sqlServerName
+																												, @dbName			= @dbName
+																												, @tableSchema		= @crtTableSchema
+																												, @tableName		= @crtTableName
+																												, @indexName		= @tmpIndexName
+																												, @indexID			= NULL
+																												, @partitionNumber	= DEFAULT
+																												, @flgAction		= 4				--disable
+																												, @flgOptions		= @flgOptions
+																												, @executionLevel	= @nestedExecutionLevel
+																												, @affectedDependentObjects = @affectedDependentObjects OUT
+																												, @debugMode		= @debugMode										
+
+																		FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName, @tmpIndexIsPrimaryXML
+																	end
+																CLOSE crsNonClusteredIndexes
+																DEALLOCATE crsNonClusteredIndexes
+															end
+													end
+												ELSE
+													---------------------------------------------------------------------------------------------
+													--xml primary key index options
+													IF @crtIndexType = 3 AND @crtIndexIsPrimaryXML=1 AND @crtIsPartitioned = 0
+														begin
+															--4  - Rebuild all dependent indexes when rebuild primary indexes
+															IF @flgOptions & 4 = 4
+																begin
+																	--get all enabled secondary xml indexes for current table
+																	SET @queryToRun = N''
+																	SET @queryToRun = @queryToRun + CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
+																								SELECT  sch.[name] AS [schema_name], so.[name] AS [table_name], si.[name] AS [index_name]
+																								FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[indexes]			si
+																								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects]		so ON  si.[object_id] = so.[object_id]
+																								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
+																								INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id]
+																								WHERE	so.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'sql') + '''
+																										AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'sql') + ''' 
+																										AND si.[type] = 3
+																										AND xi.[using_xml_index_id] = ''' + CAST(@crtIndexID AS [sysname]) + '''
+																										AND si.[is_disabled] = 0'
+																	SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+																	IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+																	INSERT INTO @DependentIndexes ([schema_name], [table_name], [index_name])
+																		EXEC sp_executesql  @queryToRun
+																end
+
+															--8  - Disable non-clustered index before rebuild (save space)
+															--won't disable the index when performing online rebuild
+															IF @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtTableIsReplicated=0 AND @crtIsPartitioned = 0
+																begin
+																	DECLARE crsNonClusteredIndexes	CURSOR LOCAL FAST_FORWARD FOR
+																									SELECT DISTINCT [index_name]
+																									FROM @DependentIndexes
+																									WHERE	[schema_name] = @crtTableSchema
+																										AND [table_name] = @crtTableName
+																	OPEN crsNonClusteredIndexes
+																	FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName
+																	WHILE @@FETCH_STATUS=0
+																		begin
+																			SET @nestedExecutionLevel = @executionLevel + 2
+																			EXEC [dbo].[usp_mpAlterTableIndexes]	  @sqlServerName	= @sqlServerName
+																													, @dbName			= @dbName
+																													, @tableSchema		= @crtTableSchema
+																													, @tableName		= @crtTableName
+																													, @indexName		= @tmpIndexName
+																													, @indexID			= NULL
+																													, @partitionNumber	= DEFAULT
+																													, @flgAction		= 4				--disable
+																													, @flgOptions		= @flgOptions
+																													, @executionLevel	= @nestedExecutionLevel
+																													, @affectedDependentObjects = @affectedDependentObjects OUT
+																													, @debugMode		= @debugMode										
+
+																			FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName
+																		end
+																	CLOSE crsNonClusteredIndexes
+																	DEALLOCATE crsNonClusteredIndexes
+																end
+														end
+													ELSE
+														--8  - Disable non-clustered index before rebuild (save space)
+														--won't disable the index when performing online rebuild										
+														IF @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0 AND @crtIsPartitioned = 0
 															begin
 																SET @nestedExecutionLevel = @executionLevel + 2
 																EXEC [dbo].[usp_mpAlterTableIndexes]	  @sqlServerName	= @sqlServerName
 																										, @dbName			= @dbName
 																										, @tableSchema		= @crtTableSchema
 																										, @tableName		= @crtTableName
-																										, @indexName		= @tmpIndexName
+																										, @indexName		= @crtIndexName
 																										, @indexID			= NULL
-																										, @partitionNumber	= DEFAULT
+																										, @partitionNumber	= @crtPartitionNumber
 																										, @flgAction		= 4				--disable
 																										, @flgOptions		= @flgOptions
 																										, @executionLevel	= @nestedExecutionLevel
 																										, @affectedDependentObjects = @affectedDependentObjects OUT
 																										, @debugMode		= @debugMode										
+														end
 
-																FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName, @tmpIndexIsPrimaryXML
+												---------------------------------------------------------------------------------------------
+												/* FIX: Data corruption occurs in clustered index when you run online index rebuild in SQL Server 2012 or SQL Server 2014 https://support.microsoft.com/en-us/kb/2969896 */
+												IF (@sqlScriptOnline LIKE N'ONLINE = ON%')
+													begin
+														IF     (@serverVersionNum >= 11.02100 AND @serverVersionNum < 11.03449) /* SQL Server 2012 RTM till SQL Server 2012 SP1 CU 11*/
+															OR (@serverVersionNum >= 11.05058 AND @serverVersionNum < 11.05532) /* SQL Server 2012 SP2 till SQL Server 2012 SP2 CU 1*/
+															OR (@serverVersionNum >= 12.02000 AND @serverVersionNum < 12.02370) /* SQL Server 2014 RTM CU 2*/
+															begin
+																SET @maxDOP=1
 															end
-														CLOSE crsNonClusteredIndexes
-														DEALLOCATE crsNonClusteredIndexes
+													end
+
+												---------------------------------------------------------------------------------------------
+												--generate rebuild index script
+												SET @queryToRun = N''
+
+												SET @queryToRun = @queryToRun + N'SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
+												SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, 'quoted') + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ' REBUILD'
+					
+												IF @crtIsPartitioned = 1 AND @crtIndexIsDisabled = 0
+													SET @queryToRun = @queryToRun + N' PARTITION = ' + CAST(@crtPartitionNumber AS [nvarchar])
+
+												--rebuild options
+												SET @queryToRun = @queryToRun + N' WITH (' + CASE WHEN @crtIndexType NOT IN (5, 6) THEN N'SORT_IN_TEMPDB = ON, ' ELSE N'' END + 
+																							 CASE WHEN ISNULL(@maxDOP, 0) <> 0 THEN N'MAXDOP = ' + CAST(@maxDOP AS [nvarchar]) + N', ' ELSE N'' END + 
+																							 CASE WHEN ISNULL(@sqlScriptOnline, N'')<>N'' THEN @sqlScriptOnline + N', ' ELSE N'' END + 
+																							 CASE WHEN ISNULL(@fillFactor, 0) <> 0 AND @crtIsPartitioned = 0
+																									 THEN N'FILLFACTOR = ' + CAST(@fillFactor AS [nvarchar]) + N', '
+																									 ELSE N'' 
+																							 END +
+																							 CASE WHEN @serverVersionNum >= 13.0 AND @crtIndexType NOT IN (5, 6) THEN N'DATA_COMPRESSION=' + @crtDataCompressionDesc + N', ' ELSE N'' END
+												SET  @queryToRun = SUBSTRING(@queryToRun, 1, LEN(@queryToRun)-1) + N')'
+
+												IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
+
+												IF @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%'))
+													begin
+														SET @strMessage=N'performing index rebuild'
+														SET @nestedExecutionLevel = @executionLevel + 2
+														EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
+													end
+
+												SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted')
+												SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, 'quoted')
+												SET @nestedExecutionLevel = @executionLevel + 1
+												EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
+												/*
+												EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+																								@dbName			= @dbName,
+																								@objectName		= @objectName,
+																								@childObjectName= @childObjectName,
+																								@module			= 'dbo.usp_mpAlterTableIndexes',
+																								@eventName		= 'database maintenance - rebuilding index',
+																								@queryToRun  	= @queryToRun,
+																								@flgOptions		= @flgOptions,
+																								@executionLevel	= @nestedExecutionLevel,
+																								@debugMode		= @debugMode
+												*/
+												IF @flgOptions & 4 = 4
+													begin
+														EXEC [dbo].[usp_mpMarkInternalAction]	@actionName			= N'index-rebuild',
+																								@flgOperation		= 1,
+																								@server_name		= @sqlServerName,
+																								@database_name		= @dbName,
+																								@schema_name		= @crtTableSchema,
+																								@object_name		= @crtTableName,
+																								@child_object_name	= @crtIndexName
+													end
+
+												IF @errorCode=0
+													EXEC [dbo].[usp_mpMarkInternalAction]	@actionName			= N'index-made-disable',
+																							@flgOperation		= 2,
+																							@server_name		= @sqlServerName,
+																							@database_name		= @dbName,
+																							@schema_name		= @crtTableSchema,
+																							@object_name		= @crtTableName,
+																							@child_object_name	= @crtIndexName
+
+												---------------------------------------------------------------------------------------------
+												--rebuild dependent indexes
+												--clustered / xml primary key index options
+												IF ((@crtIndexType IN (1, 5)) OR (@crtIndexType = 3 AND @crtIndexIsPrimaryXML=1)) AND @crtIsPartitioned = 0
+													begin
+														--4  - Rebuild all dependent indexes when rebuild primary indexes
+														--will rebuild only indexes disabled by this tool
+														IF (@flgOptions & 4 = 4)
+															begin		
+																IF EXISTS (	SELECT DISTINCT di.[index_name], di.[is_primary_xml]
+																			FROM @DependentIndexes di
+																			LEFT JOIN [maintenance-plan].[logInternalAction] smpi ON	smpi.[name]=N'index-made-disable'
+																																				AND smpi.[server_name]=@sqlServerName
+																																				AND smpi.[database_name]=@dbName
+																																				AND smpi.[schema_name]=di.[schema_name]
+																																				AND smpi.[object_name]=di.[table_name]
+																																				AND smpi.[child_object_name]=di.[index_name]
+																			WHERE	di.[schema_name] = @crtTableSchema
+																				AND	di.[table_name] = @crtTableName
+																				AND (
+																						(
+																							/* index was disabled (option selected) and marked as disabled */
+																							(@flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0) 
+																							AND smpi.[name]=N'index-made-disable'
+																						)
+																						OR
+																						(
+																							/* index was not disabled (option selected) */
+																							NOT (@flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0) 
+																							AND smpi.[name] IS NULL
+																						)
+																					)
+																			)	
+																	begin
+																		SET @strMessage=N'* Rebuilding all the dependent indexes' 
+																		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 2, @stopExecution=0
+																	end
+
+																DECLARE crsNonClusteredIndexes	CURSOR LOCAL FAST_FORWARD FOR
+																								SELECT DISTINCT di.[index_name], di.[is_primary_xml]
+																								FROM @DependentIndexes di
+																								LEFT JOIN [maintenance-plan].[logInternalAction] smpi ON	smpi.[name]=N'index-made-disable'
+																																									AND smpi.[server_name]=@sqlServerName
+																																									AND smpi.[database_name]=@dbName
+																																									AND smpi.[schema_name]=@crtTableSchema
+																																									AND smpi.[object_name]=@crtTableName
+																																									AND smpi.[child_object_name]=di.[index_name]
+																								WHERE	di.[schema_name] = @crtTableSchema
+																									AND	di.[table_name] = @crtTableName
+																									AND (
+																											(
+																												/* index was disabled (option selected) and marked as disabled */
+																												(@flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0) 
+																												AND smpi.[name]=N'index-made-disable'
+																											)
+																											OR
+																											(
+																												/* index was not disabled (option selected) */
+																												NOT (@flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0) 
+																												AND smpi.[name] IS NULL
+																											)
+																										)
+																								ORDER BY di.[is_primary_xml] DESC
+																OPEN crsNonClusteredIndexes
+																FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName, @tmpIndexIsPrimaryXML
+																WHILE @@FETCH_STATUS=0
+																	begin
+																		SET @nestedExecutionLevel = @executionLevel + 2
+																		EXEC [dbo].[usp_mpAlterTableIndexes]	  @sqlServerName	= @sqlServerName
+																												, @dbName			= @dbName
+																												, @tableSchema		= @crtTableSchema
+																												, @tableName		= @crtTableName
+																												, @indexName		= @tmpIndexName
+																												, @indexID			= NULL
+																												, @partitionNumber	= DEFAULT
+																												, @flgAction		= 1		--rebuild
+																												, @flgOptions		= @flgOptions
+																												, @executionLevel	= @nestedExecutionLevel
+																												, @affectedDependentObjects = @affectedDependentObjects OUT
+																												, @debugMode		= @debugMode										
+
+																		EXEC [dbo].[usp_mpMarkInternalAction]	@actionName			= N'index-rebuild',
+																												@flgOperation		= 1,
+																												@server_name		= @sqlServerName,
+																												@database_name		= @dbName,
+																												@schema_name		= @crtTableSchema,
+																												@object_name		= @crtTableName,
+																												@child_object_name	= @tmpIndexName
+
+																		FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName, @tmpIndexIsPrimaryXML
+																	end
+																CLOSE crsNonClusteredIndexes
+																DEALLOCATE crsNonClusteredIndexes
+															end
+													end		
+
+												---------------------------------------------------------------------------------------------
+												-- must enable previous disabled constraints
+												-- 16  - Disable foreign key constraints that reffer current table before rebuilding clustered/unique indexes
+												IF @flgOptions & 16 = 16 AND @crtIndexHasDependentFK=1 
+													AND @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) 
+													AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtTableIsReplicated=0 AND @crtIsPartitioned = 0
+													begin
+														SET @flgInheritOptions = 1								-- Use tables that have foreign key constraints that reffers current table (default)
+
+														--64  - When enabling foreign key constraints, do no check values. Default behaviour is to enabled foreign key constraint with check option
+														IF @flgOptions & 64 = 64
+															SET @flgInheritOptions = @flgInheritOptions + 4		-- Enable constraints with NOCHECK. Default is to enable constraints using CHECK option
+
+														SET @nestedExecutionLevel = @executionLevel + 2
+														EXEC [dbo].[usp_mpAlterTableForeignKeys]	  @sqlServerName	= @sqlServerName
+																									, @dbName			= @dbName
+																									, @tableSchema		= @crtTableSchema
+																									, @tableName		= @crtTableName
+																									, @constraintName	= '%'
+																									, @flgAction		= 1		-- Enable Constraints
+																									, @flgOptions		= @flgInheritOptions
+																									, @executionLevel	= @nestedExecutionLevel
+																									, @debugMode		= @debugMode
 													end
 											end
-										ELSE
-											---------------------------------------------------------------------------------------------
-											--xml primary key index options
-											IF @crtIndexType = 3 AND @crtIndexIsPrimaryXML=1 AND @crtIsPartitioned = 0
+									end
+
+								---------------------------------------------------------------------------------------------
+								-- 2  - Reorganize indexes
+								---------------------------------------------------------------------------------------------
+								-- avoid messages like:	The index [...] on table [..] cannot be reorganized because page level locking is disabled.		
+								IF @flgAction = 2
+									IF (@crtIndexType NOT IN (5, 6) AND @crtIndexAllowPageLocks=1) OR (@crtIndexType IN (5, 6))
+										begin
+											SET @queryToRun = N''
+											SET @queryToRun = @queryToRun + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
+											SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, 'quoted') + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ' REORGANIZE'
+				
+											IF @crtIsPartitioned = 1
+												SET @queryToRun = @queryToRun + N' PARTITION = ' + CAST(@crtPartitionNumber AS [nvarchar])
+
+											--  1  - Compact large objects (LOB) (default)
+											IF @crtIndexType NOT IN (5, 6)
 												begin
-													--4  - Rebuild all dependent indexes when rebuild primary indexes
-													IF @flgOptions & 4 = 4
-														begin
-															--get all enabled secondary xml indexes for current table
-															SET @queryToRun = N''
-															SET @queryToRun = @queryToRun + CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '; ' ELSE N'' END + N'
-																						SELECT  si.[name]
-																						FROM ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[indexes]			si
-																						INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[objects]		so ON  si.[object_id] = so.[object_id]
-																						INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[schemas]		sch ON sch.[schema_id] = so.[schema_id]
-																						INNER JOIN ' + CASE WHEN @sqlServerName<>@@SERVERNAME THEN [dbo].[ufn_getObjectQuoteName](@dbName, 'quoted') + '.' ELSE N'' END + N'[sys].[xml_indexes]	xi  ON xi.[object_id] = si.[object_id] AND xi.[index_id] = si.[index_id]
-																						WHERE	so.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'sql') + '''
-																								AND sch.[name] = ''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'sql') + ''' 
-																								AND si.[type] = 3
-																								AND xi.[using_xml_index_id] = ''' + CAST(@crtIndexID AS [sysname]) + '''
-																								AND si.[is_disabled] = 0'
-															SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-															IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-															INSERT INTO @DependentIndexes ([index_name])
-																EXEC sp_executesql  @queryToRun
-														end
-
-													--8  - Disable non-clustered index before rebuild (save space)
-													--won't disable the index when performing online rebuild
-													IF @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtTableIsReplicated=0 AND @crtIsPartitioned = 0
-														begin
-															DECLARE crsNonClusteredIndexes	CURSOR LOCAL FAST_FORWARD FOR
-																							SELECT DISTINCT [index_name]
-																							FROM @DependentIndexes
-															OPEN crsNonClusteredIndexes
-															FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName
-															WHILE @@FETCH_STATUS=0
-																begin
-																	SET @nestedExecutionLevel = @executionLevel + 2
-																	EXEC [dbo].[usp_mpAlterTableIndexes]	  @sqlServerName	= @sqlServerName
-																											, @dbName			= @dbName
-																											, @tableSchema		= @crtTableSchema
-																											, @tableName		= @crtTableName
-																											, @indexName		= @tmpIndexName
-																											, @indexID			= NULL
-																											, @partitionNumber	= DEFAULT
-																											, @flgAction		= 4				--disable
-																											, @flgOptions		= @flgOptions
-																											, @executionLevel	= @nestedExecutionLevel
-																											, @affectedDependentObjects = @affectedDependentObjects OUT
-																											, @debugMode		= @debugMode										
-
-																	FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName
-																end
-															CLOSE crsNonClusteredIndexes
-															DEALLOCATE crsNonClusteredIndexes
-														end
+													IF @flgOptions & 1 = 1
+														SET @queryToRun = @queryToRun + N' WITH (LOB_COMPACTION = ON) '
+													ELSE
+														SET @queryToRun = @queryToRun + N' WITH (LOB_COMPACTION = OFF) '
 												end
 											ELSE
-												--8  - Disable non-clustered index before rebuild (save space)
-												--won't disable the index when performing online rebuild										
-												IF @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0 AND @crtIsPartitioned = 0
-													begin
-														SET @nestedExecutionLevel = @executionLevel + 2
-														EXEC [dbo].[usp_mpAlterTableIndexes]	  @sqlServerName	= @sqlServerName
-																								, @dbName			= @dbName
-																								, @tableSchema		= @crtTableSchema
-																								, @tableName		= @crtTableName
-																								, @indexName		= @crtIndexName
-																								, @indexID			= NULL
-																								, @partitionNumber	= @crtPartitionNumber
-																								, @flgAction		= 4				--disable
-																								, @flgOptions		= @flgOptions
-																								, @executionLevel	= @nestedExecutionLevel
-																								, @affectedDependentObjects = @affectedDependentObjects OUT
-																								, @debugMode		= @debugMode										
+												begin
+													IF @flgOptions & 1 = 1
+														SET @queryToRun = @queryToRun + N' WITH (COMPRESS_ALL_ROW_GROUPS = ON) '
+													ELSE
+														SET @queryToRun = @queryToRun + N' WITH (COMPRESS_ALL_ROW_GROUPS = OFF) '
 												end
+											IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 
-										---------------------------------------------------------------------------------------------
-										/* FIX: Data corruption occurs in clustered index when you run online index rebuild in SQL Server 2012 or SQL Server 2014 https://support.microsoft.com/en-us/kb/2969896 */
-										IF (@sqlScriptOnline LIKE N'ONLINE = ON%')
-											begin
-												IF     (@serverVersionNum >= 11.02100 AND @serverVersionNum < 11.03449) /* SQL Server 2012 RTM till SQL Server 2012 SP1 CU 11*/
-													OR (@serverVersionNum >= 11.05058 AND @serverVersionNum < 11.05532) /* SQL Server 2012 SP2 till SQL Server 2012 SP2 CU 1*/
-													OR (@serverVersionNum >= 12.02000 AND @serverVersionNum < 12.02370) /* SQL Server 2014 RTM CU 2*/
-													begin
-														SET @maxDOP=1
-													end
-											end
 
-										---------------------------------------------------------------------------------------------
-										--generate rebuild index script
+											SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted')
+											SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, 'quoted')
+											SET @nestedExecutionLevel = @executionLevel + 1
+											EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
+											/*
+											EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
+																							@dbName			= @dbName,
+																							@objectName		= @objectName,
+																							@childObjectName= @childObjectName,
+																							@module			= 'dbo.usp_mpAlterTableIndexes',
+																							@eventName		= 'database maintenance - reorganize index',
+																							@queryToRun  	= @queryToRun,
+																							@flgOptions		= @flgOptions,
+																							@executionLevel	= @nestedExecutionLevel,
+																							@debugMode		= @debugMode
+											*/
+										end
+									ELSE
+										begin
+											SET @strMessage=N'index cannot be REORGANIZE because ALLOW_PAGE_LOCKS is set to OFF. Skipping...'
+											EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
+										end
+
+								---------------------------------------------------------------------------------------------
+								-- 4  - Disable indexes 
+								---------------------------------------------------------------------------------------------
+								IF @flgAction = 4
+									begin
 										SET @queryToRun = N''
-
-										SET @queryToRun = @queryToRun + N'SET QUOTED_IDENTIFIER ON; SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-										SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, 'quoted') + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ' REBUILD'
-					
-										IF @crtIsPartitioned = 1 AND @crtIndexIsDisabled = 0
-											SET @queryToRun = @queryToRun + N' PARTITION = ' + CAST(@crtPartitionNumber AS [nvarchar])
-
-										--rebuild options
-										SET @queryToRun = @queryToRun + N' WITH (' + CASE WHEN @crtIndexType NOT IN (5, 6) THEN N'SORT_IN_TEMPDB = ON, ' ELSE N'' END + 
-																					 CASE WHEN ISNULL(@maxDOP, 0) <> 0 THEN N'MAXDOP = ' + CAST(@maxDOP AS [nvarchar]) + N', ' ELSE N'' END + 
-																					 CASE WHEN ISNULL(@sqlScriptOnline, N'')<>N'' THEN @sqlScriptOnline + N', ' ELSE N'' END + 
-																					 CASE WHEN ISNULL(@fillFactor, 0) <> 0 AND @crtIsPartitioned = 0
-																							 THEN N'FILLFACTOR = ' + CAST(@fillFactor AS [nvarchar]) + N', '
-																							 ELSE N'' 
-																					 END +
-																					 CASE WHEN @serverVersionNum >= 13.0 AND @crtIndexType NOT IN (5, 6) THEN N'DATA_COMPRESSION=' + @crtDataCompressionDesc + N', ' ELSE N'' END
-										SET  @queryToRun = SUBSTRING(@queryToRun, 1, LEN(@queryToRun)-1) + N')'
-
+										SET @queryToRun = @queryToRun + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
+										SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, 'quoted') + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ' DISABLE'
+				
 										IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-										IF @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%'))
-											begin
-												SET @strMessage=N'performing index rebuild'
-												SET @nestedExecutionLevel = @executionLevel + 2
-												EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
-											end
 
 										SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted')
 										SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, 'quoted')
 										SET @nestedExecutionLevel = @executionLevel + 1
 										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
-										
+										/*
 										EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 																						@dbName			= @dbName,
 																						@objectName		= @objectName,
 																						@childObjectName= @childObjectName,
 																						@module			= 'dbo.usp_mpAlterTableIndexes',
-																						@eventName		= 'database maintenance - rebuilding index',
+																						@eventName		= 'database maintenance - disable index',
 																						@queryToRun  	= @queryToRun,
 																						@flgOptions		= @flgOptions,
 																						@executionLevel	= @nestedExecutionLevel,
 																						@debugMode		= @debugMode
-										
-										IF @flgOptions & 4 = 4
-											begin
-												EXEC [dbo].[usp_mpMarkInternalAction]	@actionName			= N'index-rebuild',
-																						@flgOperation		= 1,
-																						@server_name		= @sqlServerName,
-																						@database_name		= @dbName,
-																						@schema_name		= @crtTableSchema,
-																						@object_name		= @crtTableName,
-																						@child_object_name	= @crtIndexName
-											end
-
+										*/
+										/* 4 disable index -> insert action 1 */
 										IF @errorCode=0
-											EXEC [dbo].[usp_mpMarkInternalAction]	@actionName			= N'index-made-disable',
-																					@flgOperation		= 2,
+											EXEC [dbo].[usp_mpMarkInternalAction]	@actionName		= N'index-made-disable',
+																					@flgOperation	= 1,
 																					@server_name		= @sqlServerName,
 																					@database_name		= @dbName,
 																					@schema_name		= @crtTableSchema,
 																					@object_name		= @crtTableName,
 																					@child_object_name	= @crtIndexName
-
-										---------------------------------------------------------------------------------------------
-										--rebuild dependent indexes
-										--clustered / xml primary key index options
-										IF ((@crtIndexType IN (1, 5)) OR (@crtIndexType = 3 AND @crtIndexIsPrimaryXML=1)) AND @crtIsPartitioned = 0
-											begin
-												--4  - Rebuild all dependent indexes when rebuild primary indexes
-												--will rebuild only indexes disabled by this tool
-												IF (@flgOptions & 4 = 4)
-													begin		
-														IF EXISTS (SELECT DISTINCT di.[index_name], di.[is_primary_xml]
-																						FROM @DependentIndexes di
-																						LEFT JOIN [maintenance-plan].[logInternalAction] smpi ON	smpi.[name]=N'index-made-disable'
-																																							AND smpi.[server_name]=@sqlServerName
-																																							AND smpi.[database_name]=@dbName
-																																							AND smpi.[schema_name]=@crtTableSchema
-																																							AND smpi.[object_name]=@crtTableName
-																																							AND smpi.[child_object_name]=di.[index_name]
-																						WHERE	(
-																									/* index was disabled (option selected) and marked as disabled */
-																									(@flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0) 
-																									AND smpi.[name]=N'index-made-disable'
-																								)
-																								OR
-																								(
-																									/* index was not disabled (option selected) */
-																									NOT (@flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0) 
-																									AND smpi.[name] IS NULL
-																								)
-																	)	
-															begin
-																SET @strMessage=N'* Rebuilding all the dependent indexes' 
-																EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 2, @stopExecution=0
-															end
-
-														DECLARE crsNonClusteredIndexes	CURSOR LOCAL FAST_FORWARD FOR
-																						SELECT DISTINCT di.[index_name], di.[is_primary_xml]
-																						FROM @DependentIndexes di
-																						LEFT JOIN [maintenance-plan].[logInternalAction] smpi ON	smpi.[name]=N'index-made-disable'
-																																							AND smpi.[server_name]=@sqlServerName
-																																							AND smpi.[database_name]=@dbName
-																																							AND smpi.[schema_name]=@crtTableSchema
-																																							AND smpi.[object_name]=@crtTableName
-																																							AND smpi.[child_object_name]=di.[index_name]
-																						WHERE	(
-																									/* index was disabled (option selected) and marked as disabled */
-																									(@flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0) 
-																									AND smpi.[name]=N'index-made-disable'
-																								)
-																								OR
-																								(
-																									/* index was not disabled (option selected) */
-																									NOT (@flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtIndexIsDisabled=0 AND @crtTableIsReplicated=0) 
-																									AND smpi.[name] IS NULL
-																								)
-																						ORDER BY di.[is_primary_xml] DESC
-														OPEN crsNonClusteredIndexes
-														FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName, @tmpIndexIsPrimaryXML
-														WHILE @@FETCH_STATUS=0
-															begin
-																SET @nestedExecutionLevel = @executionLevel + 2
-																EXEC [dbo].[usp_mpAlterTableIndexes]	  @sqlServerName	= @sqlServerName
-																										, @dbName			= @dbName
-																										, @tableSchema		= @crtTableSchema
-																										, @tableName		= @crtTableName
-																										, @indexName		= @tmpIndexName
-																										, @indexID			= NULL
-																										, @partitionNumber	= DEFAULT
-																										, @flgAction		= 1		--rebuild
-																										, @flgOptions		= @flgOptions
-																										, @executionLevel	= @nestedExecutionLevel
-																										, @affectedDependentObjects = @affectedDependentObjects OUT
-																										, @debugMode		= @debugMode										
-
-																EXEC [dbo].[usp_mpMarkInternalAction]	@actionName			= N'index-rebuild',
-																										@flgOperation		= 1,
-																										@server_name		= @sqlServerName,
-																										@database_name		= @dbName,
-																										@schema_name		= @crtTableSchema,
-																										@object_name		= @crtTableName,
-																										@child_object_name	= @tmpIndexName
-
-																FETCH NEXT FROM crsNonClusteredIndexes INTO @tmpIndexName, @tmpIndexIsPrimaryXML
-															end
-														CLOSE crsNonClusteredIndexes
-														DEALLOCATE crsNonClusteredIndexes
-													end
-											end		
-
-										---------------------------------------------------------------------------------------------
-										-- must enable previous disabled constraints
-										-- 16  - Disable foreign key constraints that reffer current table before rebuilding clustered/unique indexes
-										IF @flgOptions & 16 = 16 AND @crtIndexHasDependentFK=1 
-											AND @flgOptions & 8 = 8 AND NOT ((@flgOptions & 4096 = 4096) 
-											AND (@sqlScriptOnline LIKE N'ONLINE = ON%')) AND @crtTableIsReplicated=0 AND @crtIsPartitioned = 0
-											begin
-												SET @flgInheritOptions = 1								-- Use tables that have foreign key constraints that reffers current table (default)
-
-												--64  - When enabling foreign key constraints, do no check values. Default behaviour is to enabled foreign key constraint with check option
-												IF @flgOptions & 64 = 64
-													SET @flgInheritOptions = @flgInheritOptions + 4		-- Enable constraints with NOCHECK. Default is to enable constraints using CHECK option
-
-												SET @nestedExecutionLevel = @executionLevel + 2
-												EXEC [dbo].[usp_mpAlterTableForeignKeys]	  @sqlServerName	= @sqlServerName
-																							, @dbName			= @dbName
-																							, @tableSchema		= @crtTableSchema
-																							, @tableName		= @crtTableName
-																							, @constraintName	= '%'
-																							, @flgAction		= 1		-- Enable Constraints
-																							, @flgOptions		= @flgInheritOptions
-																							, @executionLevel	= @nestedExecutionLevel
-																							, @debugMode		= @debugMode
-											end
 									end
+
+								FETCH NEXT FROM crsTableToAlterIndexes INTO @crtIndexID, @crtIndexName, @crtIndexType, @crtIndexAllowPageLocks, @crtIndexIsDisabled, @crtIndexIsPrimaryXML, @crtIndexHasDependentFK, @crtTableIsReplicated, @crtPartitionNumber, @crtIsPartitioned, @crtDataCompressionDesc
 							end
+						CLOSE crsTableToAlterIndexes
+						DEALLOCATE crsTableToAlterIndexes
 
-						---------------------------------------------------------------------------------------------
-						-- 2  - Reorganize indexes
-						---------------------------------------------------------------------------------------------
-						-- avoid messages like:	The index [...] on table [..] cannot be reorganized because page level locking is disabled.		
-						IF @flgAction = 2
-							IF (@crtIndexType NOT IN (5, 6) AND @crtIndexAllowPageLocks=1) OR (@crtIndexType IN (5, 6))
-								begin
-									SET @queryToRun = N''
-									SET @queryToRun = @queryToRun + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-									SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, 'quoted') + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ' REORGANIZE'
-				
-									IF @crtIsPartitioned = 1
-										SET @queryToRun = @queryToRun + N' PARTITION = ' + CAST(@crtPartitionNumber AS [nvarchar])
-
-									--  1  - Compact large objects (LOB) (default)
-									IF @crtIndexType NOT IN (5, 6)
-										begin
-											IF @flgOptions & 1 = 1
-												SET @queryToRun = @queryToRun + N' WITH (LOB_COMPACTION = ON) '
-											ELSE
-												SET @queryToRun = @queryToRun + N' WITH (LOB_COMPACTION = OFF) '
-										end
-									ELSE
-										begin
-											IF @flgOptions & 1 = 1
-												SET @queryToRun = @queryToRun + N' WITH (COMPRESS_ALL_ROW_GROUPS = ON) '
-											ELSE
-												SET @queryToRun = @queryToRun + N' WITH (COMPRESS_ALL_ROW_GROUPS = OFF) '
-										end
-									IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-
-									SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted')
-									SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, 'quoted')
-									SET @nestedExecutionLevel = @executionLevel + 1
-									EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
-									
-									EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
-																					@dbName			= @dbName,
-																					@objectName		= @objectName,
-																					@childObjectName= @childObjectName,
-																					@module			= 'dbo.usp_mpAlterTableIndexes',
-																					@eventName		= 'database maintenance - reorganize index',
-																					@queryToRun  	= @queryToRun,
-																					@flgOptions		= @flgOptions,
-																					@executionLevel	= @nestedExecutionLevel,
-																					@debugMode		= @debugMode
-									
-								end
-							ELSE
-								begin
-									SET @strMessage=N'index cannot be REORGANIZE because ALLOW_PAGE_LOCKS is set to OFF. Skipping...'
-									EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = @executionLevel, @messageTreelevel = 3, @stopExecution=0
-								end
-
-						---------------------------------------------------------------------------------------------
-						-- 4  - Disable indexes 
-						---------------------------------------------------------------------------------------------
-						IF @flgAction = 4
-							begin
-								SET @queryToRun = N''
-								SET @queryToRun = @queryToRun + N'SET LOCK_TIMEOUT ' + CAST(@queryLockTimeOut AS [nvarchar]) + N'; '
-								SET @queryToRun = @queryToRun + N'IF OBJECT_ID(''' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ''') IS NOT NULL ALTER INDEX ' + dbo.ufn_getObjectQuoteName(@crtIndexName, 'quoted') + ' ON ' + [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted') + ' DISABLE'
-				
-								IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
-
-								SET @objectName = [dbo].[ufn_getObjectQuoteName](@crtTableSchema, 'quoted') + '.' + [dbo].[ufn_getObjectQuoteName](@crtTableName, 'quoted')
-								SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, 'quoted')
-								SET @nestedExecutionLevel = @executionLevel + 1
-								EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
-								
-								EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
-																				@dbName			= @dbName,
-																				@objectName		= @objectName,
-																				@childObjectName= @childObjectName,
-																				@module			= 'dbo.usp_mpAlterTableIndexes',
-																				@eventName		= 'database maintenance - disable index',
-																				@queryToRun  	= @queryToRun,
-																				@flgOptions		= @flgOptions,
-																				@executionLevel	= @nestedExecutionLevel,
-																				@debugMode		= @debugMode
-								
-								/* 4 disable index -> insert action 1 */
-								IF @errorCode=0
-									EXEC [dbo].[usp_mpMarkInternalAction]	@actionName		= N'index-made-disable',
-																			@flgOperation	= 1,
-																			@server_name		= @sqlServerName,
-																			@database_name		= @dbName,
-																			@schema_name		= @crtTableSchema,
-																			@object_name		= @crtTableName,
-																			@child_object_name	= @crtIndexName
-							end
-
-						FETCH NEXT FROM crsTableToAlterIndexes INTO @crtIndexID, @crtIndexName, @crtIndexType, @crtIndexAllowPageLocks, @crtIndexIsDisabled, @crtIndexIsPrimaryXML, @crtIndexHasDependentFK, @crtTableIsReplicated, @crtPartitionNumber, @crtIsPartitioned, @crtDataCompressionDesc
+						FETCH NEXT FROM crsTableList INTO @crtTableSchema, @crtTableName
 					end
-				CLOSE crsTableToAlterIndexes
-				DEALLOCATE crsTableToAlterIndexes
+				CLOSE crsTableList
+				DEALLOCATE crsTableList
 			end
 
 		SET @affectedDependentObjects=N''

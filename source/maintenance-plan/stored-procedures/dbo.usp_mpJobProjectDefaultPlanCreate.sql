@@ -10,7 +10,7 @@ GO
 
 CREATE PROCEDURE [dbo].[usp_mpJobProjectDefaultPlanCreate]
 		@projectCode			[varchar](32),
-		@sqlServerNameFilter	[sysname]=@@SERVERNAME,
+		@sqlServerNameFilter	[sysname]='%',
 		@enableJobs				[bit] = 1,
 		@debugMode				[bit] = 0
 /* WITH ENCRYPTION */
