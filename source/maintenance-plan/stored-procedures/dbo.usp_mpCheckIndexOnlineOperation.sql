@@ -105,7 +105,7 @@ SET @queryToRun = @queryToRun + CASE WHEN @sqlServerName=@@SERVERNAME THEN N'USE
 										ELSE ' AND idx.[index_id] = ' + CAST(@indexID AS [nvarchar])
 								END + N'
 								AND (   idx.[is_disabled] = 1
-										OR idx.[type] IN (3, 4, 6)
+										AND idx.[type] IN (3, 4, 6)
 									)'
 
 SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
