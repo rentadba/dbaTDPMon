@@ -1,9 +1,9 @@
 ------------
-##### Copyright (c) 2004-2018 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
+##### Copyright (c) 2004-2023 Dan Andrei STEFAN (danandrei.stefan@gmail.com)
 ------------
 - Author	 	: Andrei STEFAN
 - Module	 	: dbaTDPMon (Troubleshoot Database Performance / Monitoring)
-- Description	: SQL Server 2000-2017 maintenance, checks and monitoring
+- Description	: SQL Server 2000-2022 maintenance, checks and monitoring
 ------------
 
 #### Initial Release

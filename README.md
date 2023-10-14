@@ -53,4 +53,3 @@ Reach me on:
 * https://www.linkedin.com/in/danandreistefan/
 * http://www.rentadba.eu
 
-[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.me/rentadba)
