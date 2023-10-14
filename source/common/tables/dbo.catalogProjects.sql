@@ -49,14 +49,3 @@ GO
 
 CREATE INDEX [IX_catalogProjects_ProjectID_SolutionID] ON [dbo].[catalogProjects]([solution_id]) 
 GO
-
------------------------------------------------------------------------------------------------------
-RAISERROR('		...insert default data', 10, 1) WITH NOWAIT
-GO
-SET NOCOUNT ON
-GO
-INSERT	INTO [dbo].[catalogProjects]([id], [code], [name], [description], [active], [solution_id], [is_production], [db_filter])
-		SELECT 0, '$(projectCode)', '$(projectCode)', '', 1, cs.[id], 1, '%'
-		FROM [dbo].[catalogSolutions] cs
-		WHERE cs.[name]='Default'
-GO

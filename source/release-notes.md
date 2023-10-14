@@ -1088,3 +1088,8 @@
 
 24.09.2023
 * maintenance-plan: fix issue related to online index rebuild (in some scenarios offline mode was forced)
+
+------------
+#### October 2023 new features & fixes
+14.10.2023
+* change (un)install and update from batch files to using a single powershell script

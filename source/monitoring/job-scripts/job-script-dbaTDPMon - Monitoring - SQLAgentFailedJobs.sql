@@ -51,10 +51,11 @@ SET @logFileLocation = [$(dbName)].[dbo].[ufn_formatPlatformSpecificPath](@@SERV
 IF CAST(SERVERPROPERTY('EngineEdition') AS [int]) IN (5, 6, 8) SET @logFileLocation = NULL
 
 ---------------------------------------------------------------------------------------------------
-/* dropping job if exists */
+/* will not drop/recreate the job if it exists */
 ---------------------------------------------------------------------------------------------------
 IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = @job_name)
-		EXEC msdb.dbo.sp_delete_job @job_name=@job_name, @delete_unused_schedule=1		
+	GOTO EndSave;
+	--EXEC msdb.dbo.sp_delete_job @job_name=@job_name, @delete_unused_schedule=1		
 
 
 ---------------------------------------------------------------------------------------------------

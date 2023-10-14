@@ -58,27 +58,3 @@ CREATE INDEX [IX_MaintenancePlan_internalScheduler_TaskID] ON [maintenance-plan]
 	INCLUDE
 		([scheduled_weekday], [active])
 GO
-
-
-
------------------------------------------------------------------------------------------------------
-RAISERROR('		...insert default data', 10, 1) WITH NOWAIT
-GO
-SET NOCOUNT ON
-GO
-INSERT	INTO[maintenance-plan].[internalScheduler] ([project_id], [task_id], [scheduled_weekday], [active])
-		SELECT NULL,    1, 'Saturday', 1 UNION ALL
-		SELECT NULL,    2, 'Daily', 1 UNION ALL
-		SELECT NULL,    4, 'Sunday', 1 UNION ALL
-		SELECT NULL,    8, 'Sunday', 1 UNION ALL
-		SELECT NULL,   16, 'N/A', 0 UNION ALL
-		SELECT NULL,   32, 'Daily', 1 UNION ALL
-		SELECT NULL,   64, 'Daily', 1 UNION ALL
-		SELECT NULL,  128, 'Daily', 1 UNION ALL
-		SELECT NULL,  256, 'Sunday', 1 UNION ALL
-		SELECT NULL,  512, 'Saturday', 1 UNION ALL
-		SELECT NULL, 1024, 'Daily', 1 UNION ALL
-		SELECT NULL, 2048, 'Saturday', 1 UNION ALL
-		SELECT NULL, 4096, 'Saturday', 1 UNION ALL
-		SELECT NULL, 8192, 'Daily', 1
-GO
