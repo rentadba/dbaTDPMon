@@ -741,55 +741,113 @@ foreach($moduleDetail in $moduleList)
     }
 }
 
-Write-Host "#-----------------------------------------------------------------------------------#"
-Write-Host "# deploying SQL Agent jobs"
-foreach($moduleDetail in $moduleList)
+#default configurations are set only at install time
+if ("$actioneMode".ToLower() -eq "install")
 {
-    $moduleName = $moduleDetail.Item(1)
-    if (($moduleName -eq "health-check") -or ($moduleName -eq "monitoring"))
+    Write-Host "#-----------------------------------------------------------------------------------#"
+    Write-Host "# configuring utility defaults"
+    foreach ($f in Get-ChildItem -path ".\setup\" -filter *.sql | sort-object)
     {
-        foreach ($f in Get-ChildItem -path ".\$moduleName\job-scripts\" -filter *.sql | sort-object)
-        {
-            $scriptName = $f.FullName;
-            $message = "	* " + $f.Name
-            Write-Host $message
+        $scriptName = $f.FullName;
+        $message = "	* " + $f.Name
+        Write-Host $message
 
-            if ([string]::IsNullOrEmpty($sqlLoginName))
-            {
-                Invoke-Sqlcmd -ServerInstance $instanceName -Database $databaseName -inputFile $scriptName -Querytimeout $queryTimeout -OutputSqlErrors $true -Variable @("projectCode=$projectName","dbName=$databaseName")
-            }
-            else
-            {
-                Invoke-Sqlcmd -ServerInstance $instanceName -Database $databaseName -Username $sqlLoginName -Password $sqlLoginPassword -inputFile $scriptName -Querytimeout $queryTimeout -OutputSqlErrors $true -Variable @("projectCode=$projectName","dbName=$databaseName")
-            }
+        if ([string]::IsNullOrEmpty($sqlLoginName))
+        {
+            Invoke-Sqlcmd -ServerInstance $instanceName -Database $databaseName -inputFile $scriptName -Querytimeout $queryTimeout -OutputSqlErrors $true -Variable @("projectCode=$projectName")
         }
+        else
+        {
+            Invoke-Sqlcmd -ServerInstance $instanceName -Database $databaseName -Username $sqlLoginName -Password $sqlLoginPassword -inputFile $scriptName -Querytimeout $queryTimeout -OutputSqlErrors $true -Variable @("projectCode=$projectName")
+        }
+
     }
+}
 
-    if (($moduleName -eq "maintenance-plan"))
+if ($recreateSQLAgentJobs.ToLower() -eq "yes")
+{
+    Write-Host "#-----------------------------------------------------------------------------------#"
+    Write-Host "# deploying SQL Agent jobs"
+    foreach($moduleDetail in $moduleList)
     {
-        foreach ($f in Get-ChildItem -path ".\$moduleName\job-scripts\" -filter msdb-create-custom-indexes.sql  | sort-object)
+        $moduleName = $moduleDetail.Item(1)
+        if (($moduleName -eq "health-check") -or ($moduleName -eq "monitoring"))
         {
-            $scriptName = $f.FullName;
-            $message = "	* " + $f.Name
-            Write-Host $message
+            foreach ($f in Get-ChildItem -path ".\$moduleName\job-scripts\" -filter *.sql | sort-object)
+            {
+                $scriptName = $f.FullName;
+                $message = "	* " + $f.Name
+                Write-Host $message
 
-            if ([string]::IsNullOrEmpty($sqlLoginName))
-            {
-                Invoke-Sqlcmd -ServerInstance $instanceName -Database $databaseName -inputFile $scriptName -Querytimeout $queryTimeout -OutputSqlErrors $true -Variable @("projectCode=$projectName","dbName=$databaseName")
-            }
-            else
-            {
-                Invoke-Sqlcmd -ServerInstance $instanceName -Database $databaseName -Username $sqlLoginName -Password $sqlLoginPassword -inputFile $scriptName -Querytimeout $queryTimeout -OutputSqlErrors $true -Variable @("projectCode=$projectName","dbName=$databaseName")
+                if ([string]::IsNullOrEmpty($sqlLoginName))
+                {
+                    Invoke-Sqlcmd -ServerInstance $instanceName -Database $databaseName -inputFile $scriptName -Querytimeout $queryTimeout -OutputSqlErrors $true -Variable @("projectCode=$projectName","dbName=$databaseName")
+                }
+                else
+                {
+                    Invoke-Sqlcmd -ServerInstance $instanceName -Database $databaseName -Username $sqlLoginName -Password $sqlLoginPassword -inputFile $scriptName -Querytimeout $queryTimeout -OutputSqlErrors $true -Variable @("projectCode=$projectName","dbName=$databaseName")
+                }
             }
         }
 
-
-        if ($useParallelExecution.ToLower() -eq "no")
+        if (($moduleName -eq "maintenance-plan"))
         {
-            #jobs that will run in a "serial" fashion
-            foreach ($f in Get-ChildItem -path ".\$moduleName\job-scripts\" -filter *job-script*.sql  | sort-object)
+            foreach ($f in Get-ChildItem -path ".\$moduleName\job-scripts\" -filter msdb-create-custom-indexes.sql  | sort-object)
             {
-                if ($f.Name -ne "job-script-dbaTDPMon - Database Maintenance - System DBs - remote.sql")
+                $scriptName = $f.FullName;
+                $message = "	* " + $f.Name
+                Write-Host $message
+
+                if ([string]::IsNullOrEmpty($sqlLoginName))
+                {
+                    Invoke-Sqlcmd -ServerInstance $instanceName -Database $databaseName -inputFile $scriptName -Querytimeout $queryTimeout -OutputSqlErrors $true -Variable @("projectCode=$projectName","dbName=$databaseName")
+                }
+                else
+                {
+                    Invoke-Sqlcmd -ServerInstance $instanceName -Database $databaseName -Username $sqlLoginName -Password $sqlLoginPassword -inputFile $scriptName -Querytimeout $queryTimeout -OutputSqlErrors $true -Variable @("projectCode=$projectName","dbName=$databaseName")
+                }
+            }
+
+
+            if ($useParallelExecution.ToLower() -eq "no")
+            {
+                #jobs that will run in a "serial" fashion
+                foreach ($f in Get-ChildItem -path ".\$moduleName\job-scripts\" -filter *job-script*.sql  | sort-object)
+                {
+                    if ($f.Name -ne "job-script-dbaTDPMon - Database Maintenance - System DBs - remote.sql")
+                    {
+                        $scriptName = $f.FullName;
+                        $message = "	* " + $f.Name
+                        Write-Host $message
+
+                        if ([string]::IsNullOrEmpty($sqlLoginName))
+                        {
+                            Invoke-Sqlcmd -ServerInstance $instanceName -Database $databaseName -inputFile $scriptName -Querytimeout $queryTimeout -OutputSqlErrors $true -Variable @("projectCode=$projectName","dbName=$databaseName")
+                        }
+                        else
+                        {
+                            Invoke-Sqlcmd -ServerInstance $instanceName -Database $databaseName -Username $sqlLoginName -Password $sqlLoginPassword -inputFile $scriptName -Querytimeout $queryTimeout -OutputSqlErrors $true -Variable @("projectCode=$projectName","dbName=$databaseName")
+                        }
+                    }
+                }
+            }
+            else
+            {
+                #jobs that can run in parallel, for multiple instances / databases if needed
+                $message = "	* backup and maintenance jobs for all instances/databases under project: " + $projectName
+                Write-Host $message
+
+                $sqlScript = "EXEC [dbo].[usp_mpJobProjectDefaultPlanCreate] @projectCode = '$projectName', @sqlServerNameFilter = @@SERVERNAME;"
+                if ([string]::IsNullOrEmpty($sqlLoginName))
+                {
+                    Invoke-SqlCmd -ServerInstance $instanceName -Database $databaseName -Query "$sqlScript" -Querytimeout $queryTimeout
+                }
+                else
+                {
+                    Invoke-SqlCmd -ServerInstance $instanceName -Database $databaseName -Username $sqlLoginName -Password $sqlLoginPassword -Query "$sqlScript" -Querytimeout $queryTimeout
+                }
+            
+                foreach ($f in Get-ChildItem -path ".\$moduleName\job-scripts\" -filter *job-script*remote.sql | sort-object)
                 {
                     $scriptName = $f.FullName;
                     $message = "	* " + $f.Name
@@ -806,46 +864,13 @@ foreach($moduleDetail in $moduleList)
                 }
             }
         }
-        else
-        {
-            #jobs that can run in parallel, for multiple instances / databases if needed
-            $message = "	* backup and maintenance jobs for all instances/databases under project: " + $projectName
-            Write-Host $message
-
-            $sqlScript = "EXEC [dbo].[usp_mpJobProjectDefaultPlanCreate] @projectCode = '$projectName', @sqlServerNameFilter = @@SERVERNAME;"
-            if ([string]::IsNullOrEmpty($sqlLoginName))
-            {
-                Invoke-SqlCmd -ServerInstance $instanceName -Database $databaseName -Query "$sqlScript" -Querytimeout $queryTimeout
-            }
-            else
-            {
-                Invoke-SqlCmd -ServerInstance $instanceName -Database $databaseName -Username $sqlLoginName -Password $sqlLoginPassword -Query "$sqlScript" -Querytimeout $queryTimeout
-            }
-            
-            foreach ($f in Get-ChildItem -path ".\$moduleName\job-scripts\" -filter *job-script*remote.sql | sort-object)
-            {
-                $scriptName = $f.FullName;
-                $message = "	* " + $f.Name
-                Write-Host $message
-
-                if ([string]::IsNullOrEmpty($sqlLoginName))
-                {
-                    Invoke-Sqlcmd -ServerInstance $instanceName -Database $databaseName -inputFile $scriptName -Querytimeout $queryTimeout -OutputSqlErrors $true -Variable @("projectCode=$projectName","dbName=$databaseName")
-                }
-                else
-                {
-                    Invoke-Sqlcmd -ServerInstance $instanceName -Database $databaseName -Username $sqlLoginName -Password $sqlLoginPassword -inputFile $scriptName -Querytimeout $queryTimeout -OutputSqlErrors $true -Variable @("projectCode=$projectName","dbName=$databaseName")
-                }
-            }
-        }
     }
 }
 
 
-
 Write-Host "#-----------------------------------------------------------------------------------#"
 #save installed information
-$sqlScript = "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2023.10.12' WHERE [module] = 'common' AND [name] = 'Application Version'"
+$sqlScript = "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2023.10.18' WHERE [module] = 'common' AND [name] = 'Application Version'"
 if ([string]::IsNullOrEmpty($sqlLoginName))
 {
     Invoke-SqlCmd -ServerInstance $instanceName -Database $databaseName -Query "$sqlScript" -Querytimeout $queryTimeout

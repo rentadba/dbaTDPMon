@@ -4640,46 +4640,52 @@ BEGIN TRY
 					, @reportBuildStartTime, DATEDIFF(ms, @reportBuildStartTime, GETUTCDATE()), @HTMLReport
 					, 0, NEWID()
 
+	SET @reportID=SCOPE_IDENTITY()
 		
 	-----------------------------------------------------------------------------------------------------
 	--save HTML report to external file
 	-----------------------------------------------------------------------------------------------------
-	SET @reportID=SCOPE_IDENTITY()
-
-	IF @reportFileName IS NOT NULL AND LEFT(@reportFileName, 1) = '+'
-		SET @HTMLReportFileName = REPLACE(REPLACE(@HTMLReportFileName, '.html', ''), '.htm', '') + '_' + CAST(@reportID AS [nvarchar]) + SUBSTRING(@reportFileName, 2, LEN(@reportFileName)-1) + '.html'
-	ELSE
-		SET @HTMLReportFileName = REPLACE(REPLACE(@HTMLReportFileName, '.html', ''), '.htm', '') + '_' + CAST(@reportID AS [nvarchar]) + '.html'
+	IF (SELECT [host_platform] FROM [dbo].[vw_catalogInstanceNames]	WHERE [instance_name] = @@SERVERNAME) <> 'linux'
+		begin
+			IF @reportFileName IS NOT NULL AND LEFT(@reportFileName, 1) = '+'
+				SET @HTMLReportFileName = REPLACE(REPLACE(@HTMLReportFileName, '.html', ''), '.htm', '') + '_' + CAST(@reportID AS [nvarchar]) + SUBSTRING(@reportFileName, 2, LEN(@reportFileName)-1) + '.html'
+			ELSE
+				SET @HTMLReportFileName = REPLACE(REPLACE(@HTMLReportFileName, '.html', ''), '.htm', '') + '_' + CAST(@reportID AS [nvarchar]) + '.html'
 
 			
-	SET @reportFilePath='"' + @localStoragePath + @HTMLReportFileName + '"'
+			SET @reportFilePath='"' + @localStoragePath + @HTMLReportFileName + '"'
 	
 
-	-----------------------------------------------------------------------------------------------------
-	DECLARE @optionXPValue				[int]
+			-----------------------------------------------------------------------------------------------------
+			DECLARE @optionXPValue				[int]
 
-	/* enable xp_cmdshell configuration option */
-	EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @@SERVERNAME
-													, @flgAction	 = 1			-- 1=enable | 0=disable
-													, @optionXPValue = @optionXPValue OUTPUT
-													, @debugMode	 = 0
+			/* enable xp_cmdshell configuration option */
+			EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @@SERVERNAME
+															, @flgAction	 = 1			-- 1=enable | 0=disable
+															, @optionXPValue = @optionXPValue OUTPUT
+															, @debugMode	 = 0
 
-	/* save report using bcp */	
-	SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [html_content] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[report].[htmlContent] WHERE [id]=' + CAST(@reportID AS [varchar]) + '" queryout ' + @reportFilePath + ' -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'''
-	EXEC sp_executesql  @queryToRun
+			/* save report using bcp */	
+			SET @queryToRun=N'master.dbo.xp_cmdshell ''bcp "SELECT [html_content] FROM ' + [dbo].[ufn_getObjectQuoteName](DB_NAME(), 'quoted') + '.[report].[htmlContent] WHERE [id]=' + CAST(@reportID AS [varchar]) + '" queryout ' + @reportFilePath + ' -c ' + CASE WHEN SERVERPROPERTY('InstanceName') IS NOT NULL THEN N'-S ' + @@SERVERNAME ELSE N'' END + N' -T'''
+			EXEC sp_executesql  @queryToRun
 
-	/* disable xp_cmdshell configuration option */
-	EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @@SERVERNAME
-													, @flgAction	 = 0			-- 1=enable | 0=disable
-													, @optionXPValue = @optionXPValue OUTPUT
-													, @debugMode	 = 0
+			/* disable xp_cmdshell configuration option */
+			EXEC [dbo].[usp_changeServerOption_xp_cmdshell]   @serverToRun	 = @@SERVERNAME
+															, @flgAction	 = 0			-- 1=enable | 0=disable
+															, @optionXPValue = @optionXPValue OUTPUT
+															, @debugMode	 = 0
 
-	IF @@ERROR=0
+			IF @@ERROR=0
+				UPDATE [report].[htmlContent]
+					SET   [html_content] = NULL
+						, [file_name]	 = @HTMLReportFileName
+				WHERE [id] = @reportID
+		end
+	ELSE
 		UPDATE [report].[htmlContent]
-			SET   [html_content] = NULL
-				, [file_name]	 = @HTMLReportFileName
+			SET   [file_path] = ''
 		WHERE [id] = @reportID
-				
+
 	-----------------------------------------------------------------------------------------------------
 	--
 	-----------------------------------------------------------------------------------------------------

@@ -61,5 +61,5 @@ GO
 
 CREATE INDEX [IX_statsDatabaseGrowth_ProjectID] ON [health-check].[statsDatabaseGrowth] ([project_id], [instance_id])
 GO
-CREATE INDEX [IX_statsDatabaseGrowth_InstanceID] ON [health-check].[statsDatabaseGrowth]([instance_id], [project_id]) INCLUDE ([start_time])
+CREATE INDEX [IX_statsDatabaseGrowth_InstanceID] ON [health-check].[statsDatabaseGrowth] ([instance_id], [project_id], [database_name], [logical_name], [start_time]);
 GO

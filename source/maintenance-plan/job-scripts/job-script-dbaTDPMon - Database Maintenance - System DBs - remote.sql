@@ -8,8 +8,8 @@ DECLARE   @job_name			[sysname]
 		, @stepName			[sysname]
 		, @queryParameters	[nvarchar](512)
 		, @databaseName		[sysname]
-		, @sqlServerName	[sysname] = @@SERVERNAME
-
+		, @sqlServerName	[sysname]
+SET @sqlServerName = @@SERVERNAME
 ------------------------------------------------------------------------------------------------------------------------------------------
 --get default folder for SQL Agent jobs
 SELECT	@logFileLocation = [value]

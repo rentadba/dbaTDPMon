@@ -64,7 +64,10 @@ IF @projectID IS NULL
 		SET @strMessage=N'The value specifief for Project Code is not valid.'
 		EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=1
 	end
-	
+
+DECLARE @folderSeparator nvarchar(16)
+SET @folderSeparator = [dbo].[ufn_formatPlatformSpecificPath] (@@SERVERNAME, '\')
+
 -------------------------------------------------------------------------------------------------------------------------
 SET @queryToRunTemplate = N''
 SET @queryToRunTemplate = @queryToRunTemplate + N'
@@ -74,9 +77,9 @@ DECLARE   @curr_tracefilename [varchar](500)
 
 SELECT @curr_tracefilename = path FROM sys.traces WHERE is_default = 1;
 SET @curr_tracefilename = REVERSE(@curr_tracefilename);
-SELECT @indx = PATINDEX(''%\%'', @curr_tracefilename) ;
+SELECT @indx = PATINDEX(''%{folderSeparator}%'', @curr_tracefilename) ;
 SET @curr_tracefilename = REVERSE(@curr_tracefilename) ;
-SET @base_tracefilename = LEFT( @curr_tracefilename,LEN(@curr_tracefilename) - @indx) + ''\log.trc'';
+SET @base_tracefilename = LEFT( @curr_tracefilename,LEN(@curr_tracefilename) - @indx) + ''{folderSeparator}log.trc'';
 
 WITH AutoGrow_CTE (DatabaseID, FileName, Growth, Duration, StartTime, EndTime, SPID, LoginName, HostName, ApplicationName, ClientProcessID)
 AS
@@ -130,6 +133,7 @@ WHILE @@FETCH_STATUS=0
 
 		SET @queryToRun = @queryToRunTemplate
 		SET @queryToRun = REPLACE(@queryToRun, '@StartTime', '''' + CONVERT([nvarchar](24), ISNULL(@lastEventTime, '1900-01-01'), 121) + '''');
+		SET @queryToRun = REPLACE(@queryToRun, '{folderSeparator}', @folderSeparator)
 		
 		IF @sqlServerName <> @@SERVERNAME
 			SET @queryToRun = 'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''' +  REPLACE(@queryToRun, '''', '''''') + ''')x' 		

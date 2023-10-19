@@ -1093,3 +1093,6 @@
 #### October 2023 new features & fixes
 14.10.2023
 * change (un)install and update from batch files to using a single powershell script
+
+18.10.2023
+* health-check: fixed isues when running on linux 
