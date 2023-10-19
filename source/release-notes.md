@@ -1096,3 +1096,4 @@
 
 18.10.2023
 * health-check: fixed isues when running on linux 
+* release of dbaTDPMon - v2023.10

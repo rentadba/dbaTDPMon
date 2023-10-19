@@ -1,4 +1,9 @@
------------------------------------------------------------------------------------------------------
+/*
+*-----------------------------------------------------------------------------*
+* dbaTDPMon (Troubleshoot Database Performance / Monitoring)                  *
+* https://github.com/rentadba/dbaTDPMon, under GNU (GPLv3) licence model      *
+*-----------------------------------------------------------------------------*
+*/
 SET NOCOUNT ON
 GO
 IF NOT EXISTS(SELECT * FROM [dbo].[catalogProjects] WHERE [code] = '$(projectCode)')

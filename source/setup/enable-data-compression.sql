@@ -1,3 +1,9 @@
+/*
+*-----------------------------------------------------------------------------*
+* dbaTDPMon (Troubleshoot Database Performance / Monitoring)                  *
+* https://github.com/rentadba/dbaTDPMon, under GNU (GPLv3) licence model      *
+*-----------------------------------------------------------------------------*
+*/
 SET NOCOUNT ON
 DECLARE   @compressionType	[varchar](30)
 		, @indexID			[smallint]
