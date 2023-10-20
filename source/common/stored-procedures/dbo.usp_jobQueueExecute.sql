@@ -724,18 +724,24 @@ WHILE @@FETCH_STATUS=0 AND (GETDATE() <= @stopTimeLimit)
 CLOSE crsJobQueue
 DEALLOCATE crsJobQueue
 
-/* in parallel execution, wait for all jobs to complete the execution*/
+/* in parallel execution, wait for all jobs to complete the execution, but no more then 30 minutes */
 IF @serialExecutionMode = 0
 	begin
-		WAITFOR DELAY @waitForDelay
-		
-		EXEC dbo.usp_jobQueueGetStatus	@projectCode			= @projectCode,
-										@moduleFilter			= @moduleFilter,
-										@descriptorFilter		= @descriptorFilter,
-										@waitForDelay			= @waitForDelay,
-										@minJobToRunBeforeExit	= 0,
-										@executionLevel			= 1,
-										@debugMode				= @debugMode
+		SET @stopTimeLimit = DATEADD(minute, 30, GETDATE())
+		SET @runningJobs = 1
+
+		WHILE @runningJobs > 0 AND (GETDATE() <= @stopTimeLimit)
+			begin
+				WAITFOR DELAY @waitForDelay
+
+				EXEC @runningJobs = dbo.usp_jobQueueGetStatus	@projectCode			= @projectCode,
+																@moduleFilter			= @moduleFilter,
+																@descriptorFilter		= @descriptorFilter,
+																@waitForDelay			= @waitForDelay,
+																@minJobToRunBeforeExit	= 0,
+																@executionLevel			= 1,
+																@debugMode				= @debugMode
+			end
 
 		IF @configFailMasterJob=1 
 			AND EXISTS(	SELECT *
