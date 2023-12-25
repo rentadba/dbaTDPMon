@@ -10,6 +10,7 @@ GO
 
 CREATE PROCEDURE [dbo].[usp_getSQLServerVersion]
 		@sqlServerName			[sysname],
+		@serverHostedType               [varchar](50)           OUT,
 		@serverEdition			[sysname]		OUT,
 		@serverVersionStr		[sysname]		OUT,
 		@serverVersionNum		[numeric](9,6)	OUT,
@@ -51,7 +52,8 @@ END CATCH
 IF @serverEdition IS NULL
 	begin
 		SET @queryToRun = N''
-		SET @queryToRun = @queryToRun + 'SELECT CAST(SERVERPROPERTY(''Edition'') AS [sysname]) AS [edition],
+		SET @queryToRun = @queryToRun + 'SELECT IIF( DB_ID(''rdsadmin'') IS NOT NULL, ''AWS RDS'', ''Windows Hosted'') AS [HostedType],
+							CAST(SERVERPROPERTY(''Edition'') AS [sysname]) AS [edition],
 												CAST(SERVERPROPERTY(''ProductVersion'') AS [sysname]) AS [product_version],
 												CAST(SERVERPROPERTY(''EngineEdition'') AS [int]) AS [engine]'
 		SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
@@ -61,14 +63,16 @@ IF @serverEdition IS NULL
 		CREATE TABLE #serverProperty 
 			(
 				[edition]			[sysname]
+			  , [HostedType]        [varchar](50)
 			  , [product_version]	[sysname]
 			  , [engine]			[int]
 			)
 
-		INSERT	INTO #serverProperty([edition], [product_version], [engine])
+		INSERT	INTO #serverProperty([HostedType], [edition], [product_version], [engine])
 				EXEC sp_executesql  @queryToRun
 
-		SELECT    @serverEdition = [edition] 
+		SELECT    @serverHostedType = [HostedType]
+				, @serverEdition = [edition] 
 				, @serverVersionStr = [product_version]
 				, @serverEngine = [engine]
 		FROM #serverProperty
