@@ -21,7 +21,7 @@ CREATE TABLE [monitoring].[alertSkipRules]
 	[category]				[varchar](32)	NOT NULL,
 	[alert_name]			[sysname]		NULL,
 	[skip_value]			[sysname]		NULL,
-	[skip_value2]			[sysname]		NULL,
+	[skip_value2]			[nvarchar](512)	NULL,
 	[active]				[bit]			NOT NULL CONSTRAINT [DF_alertSkipRules_Active] DEFAULT (1),
 	CONSTRAINT [PK_alertSkipRules] PRIMARY KEY  CLUSTERED 
 	(

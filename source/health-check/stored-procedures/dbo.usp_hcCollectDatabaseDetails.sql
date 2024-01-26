@@ -238,22 +238,102 @@ WHILE @@FETCH_STATUS=0
 			SET @serverVersionNum = 9.0
 		END CATCH
 
+		/* check for AlwaysOn Availability Groups configuration */
+		IF @serverVersionNum >= 12 AND @isAzureSQLDatabase = 0 
+			begin
+				SET @queryToRun = N'SELECT    hc.[cluster_name]
+											, ag.[name] AS [ag_name]
+											, hinm.[node_name] as [host_name]
+											, arcn.[replica_server_name] AS [instance_name]
+											, adc.[database_name]
+											, ars.[role_desc]
+											, rcs.[join_state_desc] AS [replica_join_state_desc]
+											, ars.[connected_state_desc] AS [replica_connected_state_desc]
+											, ar.[failover_mode_desc]
+											, ar.[availability_mode_desc]
+											, hdrs.[suspend_reason_desc]
+											, ars.[synchronization_health_desc]
+											, hdrs.[synchronization_state_desc]
+											, ar.[secondary_role_allow_connections_desc]
+									FROM sys.availability_replicas ar
+									INNER JOIN sys.dm_hadr_availability_replica_states ars ON ars.[replica_id]=ar.[replica_id] AND ars.[group_id]=ar.[group_id]
+									INNER JOIN sys.availability_groups ag ON ag.[group_id]=ar.[group_id]
+									INNER JOIN sys.dm_hadr_availability_replica_cluster_nodes arcn ON arcn.[group_name]=ag.[name] AND arcn.[replica_server_name]=ar.[replica_server_name]
+									INNER JOIN sys.dm_hadr_database_replica_states hdrs ON ar.[replica_id]=hdrs.[replica_id]
+									INNER JOIN sys.availability_databases_cluster adc ON adc.[group_id]=hdrs.[group_id] AND adc.[group_database_id]=hdrs.[group_database_id]
+									INNER JOIN sys.dm_hadr_instance_node_map hinm ON hinm.[ag_resource_id] = ag.[resource_id] AND hinm.[instance_name] = arcn.[replica_server_name]
+									INNER JOIN sys.dm_hadr_cluster hc ON 1=1
+									INNER JOIN sys.dm_hadr_availability_replica_cluster_states rcs on rcs.replica_id=ar.replica_id and rcs.group_id=hdrs.group_id'
+
+				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+		
+				BEGIN TRY
+					INSERT	INTO #statsDatabaseAlwaysOnDetails(	[cluster_name], [ag_name], [host_name], [instance_name], [database_name], [role_desc], 
+																[replica_join_state_desc], [replica_connected_state_desc], [failover_mode_desc], [availability_mode_desc], [suspend_reason_desc],
+																[synchronization_health_desc], [synchronization_state_desc], [readable_secondary_replica])
+							EXEC sp_executesql @queryToRun
+				END TRY
+				BEGIN CATCH
+					SET @strMessage = ERROR_MESSAGE()
+					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+							SELECT  @instanceID
+									, @projectID
+									, GETUTCDATE()
+									, 'dbo.usp_hcCollectDatabaseDetails'
+									, @strMessage
+				END CATCH
+			end
+
+		/* get list of databases for which will collect more details */
+		IF OBJECT_ID('tempdb..#activeDatabases') IS NOT NULL DROP TABLE #activeDatabases;
+
+		SELECT [catalog_database_id], [database_id], [database_name], [linked_server_name]
+		INTO #activeDatabases
+		FROM (
+				SELECT	cdn.[catalog_database_id], cdn.[database_id], cdn.[database_name],
+						CASE WHEN @isAzureSQLDatabase = 0
+								THEN @sqlServerName
+								ELSE CASE WHEN ss.[name] IS NOT NULL THEN ss.[name] ELSE NULL END
+						END [linked_server_name]
+				FROM	[dbo].[vw_catalogDatabaseNames] cdn
+				LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] COLLATE SQL_Latin1_General_CP1_CI_AS
+				WHERE 	cdn.[project_id] = @projectID
+						AND cdn.[instance_id] = @instanceID
+						AND cdn.[active]=1
+						AND cdn.[database_name] LIKE @databaseNameFilter
+						AND CHARINDEX(cdn.[state_desc], 'ONLINE, READ ONLY')<>0
+			)x
+		WHERE [linked_server_name] IS NOT NULL
+
+		IF @serverVersionNum >= 12 AND @isAzureSQLDatabase = 0 
+			begin
+				SET @queryToRun = N''
+				SET @queryToRun = @queryToRun + N'DELETE FROM #activeDatabases
+				WHERE [database_name] IN (
+											SELECT [database_name]
+											FROM [health-check].[vw_statsDatabaseAlwaysOnDetails]
+											WHERE [instance_id]=' + CAST(@instanceID AS [nvarchar]) + N'
+											AND [role_desc] = ''SECONDARY''
+											AND [readable_secondary_replica] = ''NO''
+										)'
+				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+				EXEC sp_executesql @queryToRun
+
+				DELETE FROM #activeDatabases
+				WHERE [database_name] IN (
+											SELECT [database_name]
+											FROM #statsDatabaseAlwaysOnDetails
+											WHERE [instance_name] = @sqlServerName
+											AND [role_desc] = 'SECONDARY'
+											AND [readable_secondary_replica] = 'NO'
+										)
+			end
+
 		DECLARE crsActiveDatabases CURSOR LOCAL FAST_FORWARD FOR 	SELECT [catalog_database_id], [database_id], [database_name], [linked_server_name]
-																	FROM (
-																			SELECT	cdn.[catalog_database_id], cdn.[database_id], cdn.[database_name],
-																					CASE WHEN @isAzureSQLDatabase = 0
-																						 THEN @sqlServerName
-																						 ELSE CASE WHEN ss.[name] IS NOT NULL THEN ss.[name] ELSE NULL END
-																					END [linked_server_name]
-																			FROM	[dbo].[vw_catalogDatabaseNames] cdn
-																			LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] COLLATE SQL_Latin1_General_CP1_CI_AS
-																			WHERE 	cdn.[project_id] = @projectID
-																					AND cdn.[instance_id] = @instanceID
-																					AND cdn.[active]=1
-																					AND cdn.[database_name] LIKE @databaseNameFilter
-																					AND CHARINDEX(cdn.[state_desc], 'ONLINE, READ ONLY')<>0
-																		)x
-																	WHERE [linked_server_name] IS NOT NULL
+																	FROM #activeDatabases
 																	ORDER BY [database_name]
 		OPEN crsActiveDatabases	
 		FETCH NEXT FROM crsActiveDatabases INTO @catalogDatabaseID, @databaseID, @databaseName, @sqlServerName
@@ -535,6 +615,8 @@ WHILE @@FETCH_STATUS=0
 		CLOSE crsActiveDatabases
 		DEALLOCATE crsActiveDatabases
 
+		IF OBJECT_ID('tempdb..#activeDatabases') IS NOT NULL DROP TABLE #activeDatabases;
+
 		/* get last date for backup and other database flags / options */
 		IF @isAzureSQLDatabase = 0
 			begin
@@ -618,57 +700,6 @@ WHILE @@FETCH_STATUS=0
 									, @strMessage
 				END CATCH
 			end
-
-
-		/* check for AlwaysOn Availability Groups configuration */
-		IF @serverVersionNum >= 12 AND @isAzureSQLDatabase = 0 
-			begin
-				SET @queryToRun = N'SELECT    hc.[cluster_name]
-											, ag.[name] AS [ag_name]
-											, hinm.[node_name] as [host_name]
-											, arcn.[replica_server_name] AS [instance_name]
-											, adc.[database_name]
-											, ars.[role_desc]
-											, rcs.[join_state_desc] AS [replica_join_state_desc]
-											, ars.[connected_state_desc] AS [replica_connected_state_desc]
-											, ar.[failover_mode_desc]
-											, ar.[availability_mode_desc]
-											, hdrs.[suspend_reason_desc]
-											, ars.[synchronization_health_desc]
-											, hdrs.[synchronization_state_desc]
-											, ar.[secondary_role_allow_connections_desc]
-									FROM sys.availability_replicas ar
-									INNER JOIN sys.dm_hadr_availability_replica_states ars ON ars.[replica_id]=ar.[replica_id] AND ars.[group_id]=ar.[group_id]
-									INNER JOIN sys.availability_groups ag ON ag.[group_id]=ar.[group_id]
-									INNER JOIN sys.dm_hadr_availability_replica_cluster_nodes arcn ON arcn.[group_name]=ag.[name] AND arcn.[replica_server_name]=ar.[replica_server_name]
-									INNER JOIN sys.dm_hadr_database_replica_states hdrs ON ar.[replica_id]=hdrs.[replica_id]
-									INNER JOIN sys.availability_databases_cluster adc ON adc.[group_id]=hdrs.[group_id] AND adc.[group_database_id]=hdrs.[group_database_id]
-									INNER JOIN sys.dm_hadr_instance_node_map hinm ON hinm.[ag_resource_id] = ag.[resource_id] AND hinm.[instance_name] = arcn.[replica_server_name]
-									INNER JOIN sys.dm_hadr_cluster hc ON 1=1
-									INNER JOIN sys.dm_hadr_availability_replica_cluster_states rcs on rcs.replica_id=ar.replica_id and rcs.group_id=hdrs.group_id'
-
-				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
-				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-		
-				BEGIN TRY
-					INSERT	INTO #statsDatabaseAlwaysOnDetails(	[cluster_name], [ag_name], [host_name], [instance_name], [database_name], [role_desc], 
-																[replica_join_state_desc], [replica_connected_state_desc], [failover_mode_desc], [availability_mode_desc], [suspend_reason_desc],
-																[synchronization_health_desc], [synchronization_state_desc], [readable_secondary_replica])
-							EXEC sp_executesql @queryToRun
-				END TRY
-				BEGIN CATCH
-					SET @strMessage = ERROR_MESSAGE()
-					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-
-					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
-							SELECT  @instanceID
-									, @projectID
-									, GETUTCDATE()
-									, 'dbo.usp_hcCollectDatabaseDetails'
-									, @strMessage
-				END CATCH
-			end
-
 
 		/* save results to stats table */
 		INSERT	INTO [health-check].[statsDatabaseDetails]([catalog_database_id], [instance_id], 

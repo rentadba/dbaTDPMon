@@ -115,7 +115,10 @@ IF (SELECT [file_exists] FROM #fileExists)=1
 		IF @sqlServerName=@@SERVERNAME
 				SET @queryToRun = N'master.dbo.xp_fileexist ''' + [dbo].[ufn_getObjectQuoteName](@fileName, 'sql') + ''''
 		else
+			IF @serverVersionNum < 11
 				SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC master.dbo.xp_fileexist ''''' + [dbo].[ufn_getObjectQuoteName](@fileName, 'sql') + ''''';'')x'
+			ELSE
+				SET @queryToRun = N'SELECT * FROM OPENQUERY([' + @sqlServerName + N'], ''SET FMTONLY OFF; EXEC (''''master.dbo.xp_fileexist ''''''''' + [dbo].[ufn_getObjectQuoteName](@fileName, 'sql') + ''''''''' '''') WITH RESULT SETS(([File Exists] [int], [File is a Directory] [int], [Parent Directory Exists] [int])) '')x'
 
 		IF @debugMode=1	EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = @executionLevel, @messageTreelevel = 1, @stopExecution=0
 		DELETE FROM #fileExists
