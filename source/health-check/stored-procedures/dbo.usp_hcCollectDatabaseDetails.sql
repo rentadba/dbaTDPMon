@@ -39,7 +39,8 @@ DECLARE @projectID				[smallint],
 		@databaseID				[int],
 		@databaseName			[sysname],
 		@queryToRun				[nvarchar](4000),
-		@strMessage				[nvarchar](4000)
+		@strMessage				[nvarchar](4000),
+		@isReplicaReadable		[varchar](4)
 
 DECLARE @serverVersionNum		[numeric](9,6),
 		@sqlServerVersion		[sysname],
@@ -158,10 +159,10 @@ END CATCH
 SET @reportOptionGetBackupSizeLastDays = ISNULL(@reportOptionGetBackupSizeLastDays, 7)
 
 		
-DECLARE   @startEvent		[datetime]
+DECLARE   @startEventUTC		[datetime]
+		, @minStartEventUTC		[datetime]
 
-SET @startEvent = DATEADD(day, -@reportOptionGetBackupSizeLastDays, GETUTCDATE())
-SET @startEvent = CONVERT([datetime], CONVERT([varchar](10), @startEvent, 120), 120);
+SET @minStartEventUTC = DATEADD(day, -@reportOptionGetBackupSizeLastDays, GETUTCDATE())
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 --A. get databases informations
@@ -238,6 +239,13 @@ WHILE @@FETCH_STATUS=0
 			SET @serverVersionNum = 9.0
 		END CATCH
 
+		SELECT TOP 1 @startEventUTC = DATEADD(hour, DATEDIFF(hour, GETDATE(), GETUTCDATE()),  [execution_date])
+		FROM [dbo].[vw_jobExecutionHistory]
+		WHERE [descriptor] = 'dbo.usp_hcCollectDatabaseDetails'
+			AND [for_instance_name] = @sqlServerName
+
+		SET @startEventUTC = ISNULL(@startEventUTC, @minStartEventUTC)
+
 		/* check for AlwaysOn Availability Groups configuration */
 		IF @serverVersionNum >= 12 AND @isAzureSQLDatabase = 0 
 			begin
@@ -289,68 +297,113 @@ WHILE @@FETCH_STATUS=0
 
 		/* get list of databases for which will collect more details */
 		IF OBJECT_ID('tempdb..#activeDatabases') IS NOT NULL DROP TABLE #activeDatabases;
+		CREATE TABLE #activeDatabases
+			(
+				[catalog_database_id]	[int] NULL
+			  , [database_id]			[int] NULL
+			  , [database_name]			[sysname] NULL
+			  , [linked_server_name]	[sysname] NULL
+			  , [readable_secondary_replica] [varchar](4) NULL
+			)
 
-		SELECT [catalog_database_id], [database_id], [database_name], [linked_server_name]
-		INTO #activeDatabases
-		FROM (
-				SELECT	cdn.[catalog_database_id], cdn.[database_id], cdn.[database_name],
-						CASE WHEN @isAzureSQLDatabase = 0
-								THEN @sqlServerName
-								ELSE CASE WHEN ss.[name] IS NOT NULL THEN ss.[name] ELSE NULL END
-						END [linked_server_name]
-				FROM	[dbo].[vw_catalogDatabaseNames] cdn
-				LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] COLLATE SQL_Latin1_General_CP1_CI_AS
-				WHERE 	cdn.[project_id] = @projectID
-						AND cdn.[instance_id] = @instanceID
-						AND cdn.[active]=1
-						AND cdn.[database_name] LIKE @databaseNameFilter
-						AND CHARINDEX(cdn.[state_desc], 'ONLINE, READ ONLY')<>0
-			)x
-		WHERE [linked_server_name] IS NOT NULL
+		INSERT	INTO #activeDatabases([catalog_database_id], [database_id], [database_name], [linked_server_name])
+				SELECT [catalog_database_id], [database_id], [database_name], [linked_server_name]		
+				FROM (
+						SELECT	cdn.[catalog_database_id], cdn.[database_id], cdn.[database_name],
+								CASE WHEN @isAzureSQLDatabase = 0
+										THEN @sqlServerName
+										ELSE CASE WHEN ss.[name] IS NOT NULL THEN ss.[name] ELSE NULL END
+								END [linked_server_name]
+						FROM	[dbo].[vw_catalogDatabaseNames] cdn
+						LEFT JOIN [sys].[servers] ss ON ss.[catalog] = cdn.[database_name] COLLATE SQL_Latin1_General_CP1_CI_AS
+						WHERE 	cdn.[project_id] = @projectID
+								AND cdn.[instance_id] = @instanceID
+								AND cdn.[active]=1
+								AND cdn.[database_name] LIKE @databaseNameFilter
+								AND CHARINDEX(cdn.[state_desc], 'ONLINE, READ ONLY')<>0
+					)x
+				WHERE [linked_server_name] IS NOT NULL
 
 		IF @serverVersionNum >= 12 AND @isAzureSQLDatabase = 0 
 			begin
 				SET @queryToRun = N''
-				SET @queryToRun = @queryToRun + N'DELETE FROM #activeDatabases
-				WHERE [database_name] IN (
-											SELECT [database_name]
-											FROM [health-check].[vw_statsDatabaseAlwaysOnDetails]
-											WHERE [instance_id]=' + CAST(@instanceID AS [nvarchar]) + N'
-											AND [role_desc] = ''SECONDARY''
-											AND [readable_secondary_replica] = ''NO''
-										)'
+				SET @queryToRun = @queryToRun + N'
+				UPDATE a 
+					SET a.[readable_secondary_replica] = b.[readable_secondary_replica]
+				FROM #activeDatabases a
+				INNER JOIN [health-check].[vw_statsDatabaseAlwaysOnDetails] b ON a.[database_name] = b.[database_name]
+																				AND b.[instance_id]=' + CAST(@instanceID AS [nvarchar]) + N'
+																				AND b.[role_desc] = ''SECONDARY''
+																				AND b.[readable_secondary_replica] = ''NO'''
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 				EXEC sp_executesql @queryToRun
 
-				DELETE FROM #activeDatabases
-				WHERE [database_name] IN (
-											SELECT [database_name]
-											FROM #statsDatabaseAlwaysOnDetails
-											WHERE [instance_name] = @sqlServerName
-											AND [role_desc] = 'SECONDARY'
-											AND [readable_secondary_replica] = 'NO'
-										)
+				UPDATE a 
+					SET a.[readable_secondary_replica] = b.[readable_secondary_replica]
+				FROM #activeDatabases a
+				INNER JOIN #statsDatabaseAlwaysOnDetails b ON	a.[database_name] = b.[database_name]
+															AND b.[instance_name] = @sqlServerName
+															AND b.[role_desc] = 'SECONDARY'
+															AND b.[readable_secondary_replica] = 'NO'
 			end
 
-		DECLARE crsActiveDatabases CURSOR LOCAL FAST_FORWARD FOR 	SELECT [catalog_database_id], [database_id], [database_name], [linked_server_name]
+		SELECT * FROM #activeDatabases
+		DECLARE crsActiveDatabases CURSOR LOCAL FAST_FORWARD FOR 	SELECT    [catalog_database_id], [database_id], [database_name]
+																			, [linked_server_name]
+																			, LOWER(ISNULL([readable_secondary_replica], 'YES')) [readable_secondary_replica]
 																	FROM #activeDatabases
 																	ORDER BY [database_name]
 		OPEN crsActiveDatabases	
-		FETCH NEXT FROM crsActiveDatabases INTO @catalogDatabaseID, @databaseID, @databaseName, @sqlServerName
+		FETCH NEXT FROM crsActiveDatabases INTO @catalogDatabaseID, @databaseID, @databaseName, @sqlServerName, @isReplicaReadable
 		WHILE @@FETCH_STATUS=0
 			begin
 				SET @strMessage='database: ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted')
 				EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 1, @messagRootLevel = 1, @messageTreelevel = 2, @stopExecution=0
 
-				/* get space allocated / used details */
-				IF (SELECT COUNT(*) FROM [health-check].[statsDiskSpaceInfo] 
-					WHERE	[instance_id] = @instanceID 
-							AND DATEDIFF(day, [event_date_utc], GETUTCDATE()) <= 1
-					) = 0 OR @isAzureSQLDatabase = 1
-				begin
-					IF @sqlServerName <> @@SERVERNAME
-						SET @queryToRun = N'SELECT *
-											FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC (''''USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
+				IF @isReplicaReadable = 'yes'
+					begin
+						/* get space allocated / used details */
+						IF (SELECT COUNT(*) FROM [health-check].[statsDiskSpaceInfo] 
+							WHERE	[instance_id] = @instanceID 
+									AND DATEDIFF(day, [event_date_utc], GETUTCDATE()) <= 1
+							) = 0 OR @isAzureSQLDatabase = 1
+						begin
+							IF @sqlServerName <> @@SERVERNAME
+								SET @queryToRun = N'SELECT *
+													FROM OPENQUERY([' + @sqlServerName + N'], ''EXEC (''''USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
+															SELECT    [volume_mount_point]
+																	, CAST([is_logfile]		AS [bit]) AS [is_logfile]
+																	, SUM([size_mb])		AS [size_mb]
+																	, SUM([space_used_mb])	AS [space_used_mb]
+																	, MAX(CAST([is_growth_limited] AS [tinyint])) AS [is_growth_limited]
+															FROM (		
+																	SELECT    [name]
+																			, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
+																			, CAST(FILEPROPERTY([name], ''''''''SpaceUsed'''''''') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
+																			, CAST(FILEPROPERTY([name], ''''''''IsLogFile'''''''') AS [bit])		AS [is_logfile] ' + 
+																			CASE WHEN @isAzureSQLDatabase = 0 
+																				 THEN	CASE WHEN @serverVersionNum >= 10.5
+																							 THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
+																							 ELSE N', REPLACE(LEFT([physical_name], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
+																						END
+																				 ELSE N', ( SELECT ISNULL([elastic_pool_name], sd.[name]) 
+																							FROM sys.database_service_objectives dso
+																							INNER JOIN sys.databases sd ON dso.[database_id] = sd.[database_id]
+																							WHERE sd.[name]=''''''''' + @databaseName + '''''''''
+  																						  ) AS [volume_mount_point] '
+																			END + N'
+																			, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
+																	FROM sys.database_files' + 
+																	CASE WHEN @serverVersionNum >= 10.5 AND @isAzureSQLDatabase = 0 
+																		 THEN N' CROSS APPLY sys.dm_os_volume_stats(DB_ID(), [file_id])'
+																		 ELSE N''
+																	END + 
+																	N'
+																)sf
+															GROUP BY [volume_mount_point], [is_logfile]
+													'''')'')x'
+							ELSE
+								SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
 													SELECT    [volume_mount_point]
 															, CAST([is_logfile]		AS [bit]) AS [is_logfile]
 															, SUM([size_mb])		AS [size_mb]
@@ -359,117 +412,85 @@ WHILE @@FETCH_STATUS=0
 													FROM (		
 															SELECT    [name]
 																	, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
-																	, CAST(FILEPROPERTY([name], ''''''''SpaceUsed'''''''') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
-																	, CAST(FILEPROPERTY([name], ''''''''IsLogFile'''''''') AS [bit])		AS [is_logfile] ' + 
-																	CASE WHEN @isAzureSQLDatabase = 0 
-																		 THEN	CASE WHEN @serverVersionNum >= 10.5
-																					 THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
-																					 ELSE N', REPLACE(LEFT([physical_name], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
-																				END
-																		 ELSE N', ( SELECT ISNULL([elastic_pool_name], sd.[name]) 
-																					FROM sys.database_service_objectives dso
-																					INNER JOIN sys.databases sd ON dso.[database_id] = sd.[database_id]
-																					WHERE sd.[name]=''''''''' + @databaseName + '''''''''
-  																				  ) AS [volume_mount_point] '
-																	END + N'
+																	, CAST(FILEPROPERTY([name], ''SpaceUsed'') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
+																	, CAST(FILEPROPERTY([name], ''IsLogFile'') AS [bit])		AS [is_logfile] ' + 
+																	CASE WHEN @serverVersionNum >= 10.5
+																			THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
+																			ELSE N', REPLACE(LEFT([physical_name], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
+																		END + N'
 																	, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
 															FROM sys.database_files' + 
-															CASE WHEN @serverVersionNum >= 10.5 AND @isAzureSQLDatabase = 0 
-																 THEN N' CROSS APPLY sys.dm_os_volume_stats(DB_ID(), [file_id])'
-																 ELSE N''
-															END + 
-															N'
-														)sf
-													GROUP BY [volume_mount_point], [is_logfile]
-											'''')'')x'
-					ELSE
-						SET @queryToRun = N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
-											SELECT    [volume_mount_point]
-													, CAST([is_logfile]		AS [bit]) AS [is_logfile]
-													, SUM([size_mb])		AS [size_mb]
-													, SUM([space_used_mb])	AS [space_used_mb]
-													, MAX(CAST([is_growth_limited] AS [tinyint])) AS [is_growth_limited]
-											FROM (		
-													SELECT    [name]
-															, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
-															, CAST(FILEPROPERTY([name], ''SpaceUsed'') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
-															, CAST(FILEPROPERTY([name], ''IsLogFile'') AS [bit])		AS [is_logfile] ' + 
 															CASE WHEN @serverVersionNum >= 10.5
-																	THEN N', CASE WHEN LEN([volume_mount_point])=3 THEN UPPER([volume_mount_point]) ELSE [volume_mount_point] END [volume_mount_point] '
-																	ELSE N', REPLACE(LEFT([physical_name], 2), '''''''':'''''''', '''''''''''''''') AS [volume_mount_point] '
-																END + N'
-															, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
-													FROM sys.database_files' + 
-													CASE WHEN @serverVersionNum >= 10.5
-															THEN N' CROSS APPLY sys.dm_os_volume_stats(DB_ID(), [file_id])'
-															ELSE N''
-													END + N'
-												)sf
-											GROUP BY [volume_mount_point], [is_logfile]'			
-				end
-				ELSE
-					begin
-						IF @sqlServerName <> @@SERVERNAME
-								SET @queryToRun = N'OPENQUERY([' + @sqlServerName + N'], ''EXEC (''''USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
-																									SELECT    [name]
-																											, [physical_name]
-																											, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
-																											, CAST(FILEPROPERTY([name], ''''''''SpaceUsed'''''''') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
-																											, CAST(FILEPROPERTY([name], ''''''''IsLogFile'''''''') AS [bit])		AS [is_logfile]
-																											, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
-																									FROM sys.database_files
-																								'''')'')'
-						ELSE
-							SET @queryToRun = N'(SELECT   [name]
-														, [physical_name]
-														, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
-														, CAST(FILEPROPERTY([name], ''SpaceUsed'') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
-														, CAST(FILEPROPERTY([name], ''IsLogFile'') AS [bit])		AS [is_logfile]
-														, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
-												FROM sys.database_files
-												)'
-
-						SET @queryToRun = CASE WHEN  @sqlServerName = @@SERVERNAME 
-											   THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N';' 
-											   ELSE N'' 
-										  END + N'
-												SELECT    CASE WHEN [volume_mount_point] = '''' THEN NULL ELSE [volume_mount_point] END [volume_mount_point]
-														, CAST([is_logfile]		AS [bit]) AS [is_logfile]
-														, SUM([size_mb])		AS [size_mb]
-														, SUM([space_used_mb])	AS [space_used_mb]
-														, MAX(CAST([is_growth_limited] AS [tinyint])) AS [is_growth_limited]
-												FROM (		
-														SELECT    [name]
-																, [is_logfile]
-																, MAX(ISNULL([size_mb], 0))					AS [size_mb]
-																, MAX(ISNULL([space_used_mb], 0))			AS [space_used_mb]
-																, MAX(ISNULL(dsi.[volume_mount_point], ''''))	AS [volume_mount_point]
-																, MAX([is_growth_limited])		AS [is_growth_limited]
-														FROM ' + @queryToRun + N' df
-														LEFT JOIN [' + DB_NAME() + N'].[health-check].[vw_statsDiskSpaceInfo] dsi ON CHARINDEX(dsi.[volume_mount_point] COLLATE SQL_Latin1_General_CP1_CI_AS, df.[physical_name] COLLATE SQL_Latin1_General_CP1_CI_AS) > 0 
-																															AND dsi.[instance_name] = ''' + @sqlServerName + N'''
-														GROUP BY [name], [is_logfile]
-													)sf
-												GROUP BY [volume_mount_point], [is_logfile]'
+																	THEN N' CROSS APPLY sys.dm_os_volume_stats(DB_ID(), [file_id])'
+																	ELSE N''
+															END + N'
+														)sf
+													GROUP BY [volume_mount_point], [is_logfile]'			
 						end
+						ELSE
+							begin
+								IF @sqlServerName <> @@SERVERNAME
+										SET @queryToRun = N'OPENQUERY([' + @sqlServerName + N'], ''EXEC (''''USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N'; 
+																											SELECT    [name]
+																													, [physical_name]
+																													, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
+																													, CAST(FILEPROPERTY([name], ''''''''SpaceUsed'''''''') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
+																													, CAST(FILEPROPERTY([name], ''''''''IsLogFile'''''''') AS [bit])		AS [is_logfile]
+																													, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
+																											FROM sys.database_files
+																										'''')'')'
+								ELSE
+									SET @queryToRun = N'(SELECT   [name]
+																, [physical_name]
+																, CAST([size] AS [numeric](20,3)) * 8 / 1024. AS [size_mb]
+																, CAST(FILEPROPERTY([name], ''SpaceUsed'') AS [numeric](20,3)) * 8 / 1024. AS [space_used_mb]
+																, CAST(FILEPROPERTY([name], ''IsLogFile'') AS [bit])		AS [is_logfile]
+																, CASE WHEN ([max_size]=-1 AND [type]=0) OR ([max_size]=-1 AND [type]=1) OR ([max_size]=268435456 AND [type]=1) THEN 0 ELSE 1 END AS [is_growth_limited]
+														FROM sys.database_files
+														)'
 
-				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
-				DELETE FROM #databaseSpaceInfo
-				BEGIN TRY				
-						INSERT	INTO #databaseSpaceInfo([volume_mount_point], [is_log_file], [size_mb], [space_used_mb], [is_growth_limited])
-							EXEC sp_executesql @queryToRun
-				END TRY
-				BEGIN CATCH
-					SET @strMessage = ERROR_MESSAGE()
-					EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+								SET @queryToRun = CASE WHEN  @sqlServerName = @@SERVERNAME 
+													   THEN N'USE ' + [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + N';' 
+													   ELSE N'' 
+												  END + N'
+														SELECT    CASE WHEN [volume_mount_point] = '''' THEN NULL ELSE [volume_mount_point] END [volume_mount_point]
+																, CAST([is_logfile]		AS [bit]) AS [is_logfile]
+																, SUM([size_mb])		AS [size_mb]
+																, SUM([space_used_mb])	AS [space_used_mb]
+																, MAX(CAST([is_growth_limited] AS [tinyint])) AS [is_growth_limited]
+														FROM (		
+																SELECT    [name]
+																		, [is_logfile]
+																		, MAX(ISNULL([size_mb], 0))					AS [size_mb]
+																		, MAX(ISNULL([space_used_mb], 0))			AS [space_used_mb]
+																		, MAX(ISNULL(dsi.[volume_mount_point], ''''))	AS [volume_mount_point]
+																		, MAX([is_growth_limited])		AS [is_growth_limited]
+																FROM ' + @queryToRun + N' df
+																LEFT JOIN [' + DB_NAME() + N'].[health-check].[vw_statsDiskSpaceInfo] dsi ON CHARINDEX(dsi.[volume_mount_point] COLLATE SQL_Latin1_General_CP1_CI_AS, df.[physical_name] COLLATE SQL_Latin1_General_CP1_CI_AS) > 0 
+																																	AND dsi.[instance_name] = ''' + @sqlServerName + N'''
+																GROUP BY [name], [is_logfile]
+															)sf
+														GROUP BY [volume_mount_point], [is_logfile]'
+								end
 
-					INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
-							SELECT  @instanceID
-								  , @projectID
-								  , GETUTCDATE()
-								  , 'dbo.usp_hcCollectDatabaseDetails'
-								  , [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ':' + @strMessage
-				END CATCH
+						IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+						DELETE FROM #databaseSpaceInfo
+						BEGIN TRY				
+								INSERT	INTO #databaseSpaceInfo([volume_mount_point], [is_log_file], [size_mb], [space_used_mb], [is_growth_limited])
+									EXEC sp_executesql @queryToRun
+						END TRY
+						BEGIN CATCH
+							SET @strMessage = ERROR_MESSAGE()
+							EXEC [dbo].[usp_logPrintMessage] @customMessage = @strMessage, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
+
+							INSERT	INTO [dbo].[logAnalysisMessages]([instance_id], [project_id], [event_date_utc], [descriptor], [message])
+									SELECT  @instanceID
+										  , @projectID
+										  , GETUTCDATE()
+										  , 'dbo.usp_hcCollectDatabaseDetails'
+										  , [dbo].[ufn_getObjectQuoteName](@databaseName, 'quoted') + ':' + @strMessage
+						END CATCH
+					end
 
 				/* get last date for dbcc checkdb, only for 2k5+ */
 				IF @isAzureSQLDatabase = 0 
@@ -610,7 +631,7 @@ WHILE @@FETCH_STATUS=0
 						END CATCH
 					end
 
-				FETCH NEXT FROM crsActiveDatabases INTO @catalogDatabaseID, @databaseID, @databaseName, @sqlServerName
+				FETCH NEXT FROM crsActiveDatabases INTO @catalogDatabaseID, @databaseID, @databaseName, @sqlServerName, @isReplicaReadable
 			end
 		CLOSE crsActiveDatabases
 		DEALLOCATE crsActiveDatabases
@@ -669,6 +690,8 @@ WHILE @@FETCH_STATUS=0
 
 				/* get msdb backup files history */
 				TRUNCATE TABLE #msdbBackupHistory;
+
+
 				SET @queryToRun = N'SELECT	  bs.[database_name]
 											, CASE bs.[type] WHEN ''D'' THEN ''full'' WHEN ''I'' THEN ''diff'' WHEN ''L'' THEN ''log'' END AS [backup_type]
 											, bs.[backup_start_date]
@@ -680,7 +703,7 @@ WHILE @@FETCH_STATUS=0
 											, REPLACE(bmf.[physical_device_name], REVERSE(SUBSTRING(REVERSE(bmf.[physical_device_name]), CHARINDEX(''\'', REVERSE(bmf.[physical_device_name])), LEN(REVERSE(bmf.[physical_device_name])))), '''') AS [file_name]
 									FROM msdb.dbo.backupset bs
 									INNER JOIN msdb.dbo.backupmediafamily bmf on bs.[media_set_id] = bmf.[media_set_id]
-									WHERE	bs.[backup_start_date] >= DATEADD(hour, DATEDIFF(hour, GETUTCDATE(), GETDATE()), CONVERT([datetime], CONVERT([varchar](10), DATEADD(day, -' + CAST(@reportOptionGetBackupSizeLastDays AS [nvarchar]) + N', GETUTCDATE()), 120), 120))'
+									WHERE	bs.[backup_start_date] >= DATEADD(hour, DATEDIFF(hour, GETUTCDATE(), GETDATE()), CONVERT([datetime], CONVERT([varchar](10), '''+ CONVERT(varchar(20), @startEventUTC, 120) + N''', 120), 120))'
 				SET @queryToRun = [dbo].[ufn_formatSQLQueryForLinkedServer](@sqlServerName, @queryToRun)
 				IF @debugMode = 1 EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 0, @messagRootLevel = 0, @messageTreelevel = 1, @stopExecution=0
 
@@ -806,7 +829,7 @@ WHILE @@FETCH_STATUS=0
 						AND l.[event_name]='database backup'
 						AND l.[event_type]=0
 						AND l.[message] LIKE '<backupset>%'
-						AND l.[event_date_utc] >= @startEvent
+						AND l.[event_date_utc] >= @startEventUTC
 						AND p.[project_code] LIKE @projectCode
 						AND l.[instance_name] LIKE @sqlServerNameFilter
 				) lem

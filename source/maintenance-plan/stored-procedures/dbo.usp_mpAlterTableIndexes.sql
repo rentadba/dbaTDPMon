@@ -10,7 +10,7 @@ GO
 
 -----------------------------------------------------------------------------------------
 CREATE PROCEDURE [dbo].[usp_mpAlterTableIndexes]
-		@sqlServerName				[sysname],
+				@sqlServerName				[sysname],
 		@dbName						[sysname],
 		@tableSchema				[sysname] = '%',
 		@tableName					[sysname] = '%',
@@ -299,7 +299,6 @@ BEGIN TRY
 						INSERT	INTO @tmpTableToAlterIndexes([index_id], [index_name], [index_type], [allow_page_locks], [is_disabled], [is_primary_xml], [has_dependent_fk], [is_replicated], [partition_number], [is_partitioned], [data_compression_desc])
 								EXEC sp_executesql  @queryToRun
 
-
 						DECLARE crsTableToAlterIndexes CURSOR LOCAL DYNAMIC FOR	SELECT DISTINCT tai.[index_id], tai.[index_name], tai.[index_type], tai.[allow_page_locks], tai.[is_disabled]
 																								, tai.[is_primary_xml], tai.[has_dependent_fk], tai.[is_replicated]
 																								, tai.[partition_number], tai.[is_partitioned], tai.[data_compression_desc]
@@ -586,7 +585,7 @@ BEGIN TRY
 												SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, 'quoted')
 												SET @nestedExecutionLevel = @executionLevel + 1
 												EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
-												/*
+												
 												EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 																								@dbName			= @dbName,
 																								@objectName		= @objectName,
@@ -597,7 +596,7 @@ BEGIN TRY
 																								@flgOptions		= @flgOptions,
 																								@executionLevel	= @nestedExecutionLevel,
 																								@debugMode		= @debugMode
-												*/
+												
 												IF @flgOptions & 4 = 4
 													begin
 														EXEC [dbo].[usp_mpMarkInternalAction]	@actionName			= N'index-rebuild',
@@ -777,7 +776,7 @@ BEGIN TRY
 											SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, 'quoted')
 											SET @nestedExecutionLevel = @executionLevel + 1
 											EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
-											/*
+											
 											EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 																							@dbName			= @dbName,
 																							@objectName		= @objectName,
@@ -788,7 +787,7 @@ BEGIN TRY
 																							@flgOptions		= @flgOptions,
 																							@executionLevel	= @nestedExecutionLevel,
 																							@debugMode		= @debugMode
-											*/
+											
 										end
 									ELSE
 										begin
@@ -811,7 +810,7 @@ BEGIN TRY
 										SET @childObjectName = [dbo].[ufn_getObjectQuoteName](@crtIndexName, 'quoted')
 										SET @nestedExecutionLevel = @executionLevel + 1
 										EXEC [dbo].[usp_logPrintMessage] @customMessage = @queryToRun, @raiseErrorAsPrint = 1, @messagRootLevel = @nestedExecutionLevel, @messageTreelevel = 1, @stopExecution=0
-										/*
+										
 										EXEC @errorCode = [dbo].[usp_sqlExecuteAndLog]	@sqlServerName	= @sqlServerName,
 																						@dbName			= @dbName,
 																						@objectName		= @objectName,
@@ -822,7 +821,7 @@ BEGIN TRY
 																						@flgOptions		= @flgOptions,
 																						@executionLevel	= @nestedExecutionLevel,
 																						@debugMode		= @debugMode
-										*/
+										
 										/* 4 disable index -> insert action 1 */
 										IF @errorCode=0
 											EXEC [dbo].[usp_mpMarkInternalAction]	@actionName		= N'index-made-disable',
@@ -855,6 +854,9 @@ BEGIN TRY
 			WHERE [name] = N'index-rebuild'
 				AND [session_id] = @@SPID
 
+		DELETE FROM [maintenance-plan].[logInternalAction]
+		WHERE [name] = N'index-made-disable'
+			AND [session_id] = @@SPID
 END TRY
 
 BEGIN CATCH

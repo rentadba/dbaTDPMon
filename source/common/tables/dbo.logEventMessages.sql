@@ -73,7 +73,7 @@ EXEC sp_executesql  @queryToRun
 SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_EventType_EventDateUTC_Instance_ID] ON [dbo].[logEventMessages] ([event_type], [event_date_utc], [instance_id]) '
 EXEC sp_executesql  @queryToRun
 
-SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_Module_EventName] ON [dbo].[logEventMessages] ([project_id], [instance_id], [module], [event_name]) INCLUDE ([parameters], [database_name], [object_name], [child_object_name], [event_date_utc]) '
+SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_Module_EventName] ON [dbo].[logEventMessages] ([module], [event_name], [event_type], [instance_id], [project_id]) INCLUDE ([parameters], [database_name], [object_name], [child_object_name], [event_date_utc]) '
 EXEC sp_executesql  @queryToRun
 
 SET @queryToRun = 'CREATE INDEX [IX_logEventMessages_project_id] ON [dbo].[logEventMessages] ([project_id], [instance_id], [is_email_sent]) INCLUDE ([event_date_utc]) '

@@ -202,6 +202,18 @@ BEGIN TRY
 					)
 
 		-----------------------------------------------------------------------------------------------------
+		DELETE sdg
+		FROM [health-check].[statsDatabaseGrowth] sdg
+		INNER JOIN dbo.catalogDatabaseNames cdb ON cdb.[instance_id] = sdg.[instance_id] AND cdb.[name] = sdg.[database_name]
+		INNER JOIN dbo.catalogInstanceNames cin ON cin.[id] = cdb.[instance_id] AND cin.[project_id] = cdb.[project_id]
+		WHERE cin.[project_id] = @projectID
+				AND cin.[name] = @sqlServerName
+				AND (	@databaseNameFilter IS NULL
+					 OR @databaseNameFilter = '%'
+					 OR (@databaseNameFilter IS NOT NULL AND @databaseNameFilter <> '%' AND cdb.[name] LIKE @databaseNameFilter)
+					)
+
+		-----------------------------------------------------------------------------------------------------
 		DELETE aar
 		FROM [monitoring].[alertAdditionalRecipients] aar
 		INNER JOIN dbo.catalogInstanceNames cin ON cin.[project_id] = aar.[project_id] AND cin.[id] = aar.[instance_id]

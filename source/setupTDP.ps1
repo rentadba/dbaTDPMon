@@ -870,7 +870,7 @@ if ($recreateSQLAgentJobs.ToLower() -eq "yes")
 
 Write-Host "#-----------------------------------------------------------------------------------#"
 #save installed information
-$sqlScript = "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2023.10.18' WHERE [module] = 'common' AND [name] = 'Application Version'"
+$sqlScript = "SET NOCOUNT ON; UPDATE [dbo].[appConfigurations] SET [value] = N'2024.08.14' WHERE [module] = 'common' AND [name] = 'Application Version'"
 if ([string]::IsNullOrEmpty($sqlLoginName))
 {
     Invoke-SqlCmd -ServerInstance $instanceName -Database $databaseName -Query "$sqlScript" -Querytimeout $queryTimeout

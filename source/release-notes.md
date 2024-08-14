@@ -1097,3 +1097,11 @@
 18.10.2023
 * health-check: fixed isues when running on linux 
 * release of dbaTDPMon - v2023.10
+
+------------
+#### August 2024 new features & fixes
+14.08.2024
+* maintenance-plan: fixed bug with index maintenance not executing 
+* health-check: fixed performance issues with data collection 
+* common: fixed run-time issues on removing instance from catalog
+* monitoring: allow sql-text as an option for alert skip

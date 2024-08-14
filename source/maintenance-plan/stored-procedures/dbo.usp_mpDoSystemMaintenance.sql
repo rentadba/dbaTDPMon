@@ -95,7 +95,6 @@ BEGIN
 	-- distribution - Consistency Checks (weekly)
 	/* only once a week on Saturday */
 	IF (DATENAME(weekday, GETDATE()) = 'Saturday' OR @doAllSteps = 1)  AND @hasDistribution = 1
-	-- AND EXISTS (SELECT * FROM sys.databases WHERE [name]='distribution')
 	BEGIN
 		EXEC [dbo].[usp_mpDatabaseConsistencyCheck]	@sqlServerName			= @sqlServerName,
 													@dbName					= 'distribution',
