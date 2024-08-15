@@ -1703,20 +1703,21 @@ IF (@flgActions & 2 = 2) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 																		, @affectedDependentObjects = @affectedDependentObjects OUT
 																		, @debugMode				= @debugMode
 
+								/*
 								--enable foreign key
 								IF @IndexType=1
 									begin
-											EXEC [dbo].[usp_mpAlterTableForeignKeys]	@sqlServerName	= @sqlServerName
+										EXEC [dbo].[usp_mpAlterTableForeignKeys]	  @sqlServerName	= @sqlServerName
 																					, @dbName			= @dbName
-																					, @tableSchema	= @CurrentTableSchema
+																					, @tableSchema		= @CurrentTableSchema
 																					, @tableName		= @CurrentTableName
-																					, @constraintName = '%'
+																					, @constraintName	= '%'
 																					, @flgAction		= 1
 																					, @flgOptions		= DEFAULT
 																					, @executionLevel	= @nestExecutionLevel
 																					, @debugMode		= @debugMode
 									end
-								
+								*/
 								IF @IndexType IN (1,3) AND @flgOptions & 4 = 4
 									begin										
 										--mark all dependent non-clustered/xml/spatial indexes as being rebuild
@@ -1911,6 +1912,7 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 																, @executionLevel			= @nestExecutionLevel
 																, @affectedDependentObjects = @affectedDependentObjects OUT
 																, @debugMode				= @debugMode
+						/*
 						--enable foreign key
 						IF @IndexType=1
 							begin
@@ -1924,6 +1926,7 @@ IF (@flgActions & 4 = 4) AND (GETDATE() <= @stopTimeLimit) AND @dbIsReadOnly = 0
 																			, @executionLevel	= @nestExecutionLevel
 																			, @debugMode		= @debugMode
 							end
+						*/
 
 						--mark secondary indexes as being rebuilt, if primary xml was rebuilt
 						IF @IndexType = 3 AND @flgOptions & 4 = 4
