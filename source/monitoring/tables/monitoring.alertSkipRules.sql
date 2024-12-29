@@ -52,7 +52,10 @@ INSERT	INTO [monitoring].[alertSkipRules] ([category], [alert_name], [skip_value
 		SELECT 'performance', 'Uncommitted Transaction Elapsed Time (sec)', 'InstanceName', NULL, 0 UNION ALL
 		SELECT 'performance', 'Blocking Transaction Elapsed Time (sec)', 'InstanceName', NULL, 0 UNION ALL
 		SELECT 'performance', 'Active Request/Session Elapsed Time (sec)', 'InstanceName', NULL, 0 UNION ALL
+		SELECT 'performance', 'Active Request/Session Elapsed Time (sec)', '%', NULL, 0 UNION ALL
 		SELECT 'performance', 'tempdb: space used by a single session', 'InstanceName', NULL, 0
 GO
 
-
+INSERT	INTO [monitoring].[alertSkipRules] ([category], [alert_name], [skip_value], [skip_value2], [active])
+		SELECT 'performance', 'Active Request/Session Elapsed Time (sec)', '%', 'sp_server_diagnostics', 1
+GO

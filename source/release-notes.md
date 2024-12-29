@@ -1105,3 +1105,8 @@
 * health-check: fixed performance issues with data collection 
 * common: fixed run-time issues on removing instance from catalog
 * monitoring: allow sql-text as an option for alert skip
+
+------------
+#### December 2024 new features & fixes
+29.12.2024
+* monitoring: add "all instances" option for alert skip
