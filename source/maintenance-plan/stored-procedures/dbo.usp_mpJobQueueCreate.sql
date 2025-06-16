@@ -120,7 +120,7 @@ IF @projectID IS NULL
 ------------------------------------------------------------------------------------------------------------------------------------------
 SELECT TOP 1 @instanceID = [id]
 FROM [dbo].[catalogInstanceNames]
-WHERE [name] = @@SERVERNAME
+WHERE UPPER([name]) = UPPER(@@SERVERNAME)
 		--AND [project_id] = @projectID
 ORDER BY [id]
 

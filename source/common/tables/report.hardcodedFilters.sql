@@ -117,6 +117,12 @@ INSERT	INTO [report].[hardcodedFilters] ([module], [object_name], [filter_patter
 		SELECT 'health-check', 'statsErrorlogDetails', '%Buffer Pool scan took % seconds: database ID %, command ''DBCC TABLE CHECK''%', 1 UNION ALL
 		SELECT 'health-check', 'statsErrorlogDetails', '%Parallel redo is started for database % with worker pool size%', 1 UNION ALL
 		SELECT 'health-check', 'statsErrorlogDetails', '%Parallel redo is shutdown for database % with worker pool size%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%RemoveStaleDbEntries: Cleanup of stale DB entries called for database ID:%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%RemoveStaleDbEntries: Cleanup of stale DB entries skipped because master db is not memory optimized.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%ADR enabled for the database.%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%Always On: DebugTraceVarArgs AR%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%DbMgrPartnerCommitPolicy::SetSyncState:%', 1 UNION ALL
+		SELECT 'health-check', 'statsErrorlogDetails', '%State information for database%', 1 UNION ALL
 
 		SELECT 'health-check', 'statsOSEventLogs', '%Logon failed for login%', 1 UNION ALL
 		SELECT 'health-check', 'statsOSEventLogs', '%Unable to retrieve steps for job%', 1 UNION ALL
